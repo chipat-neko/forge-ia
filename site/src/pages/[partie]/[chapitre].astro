@@ -1,14 +1,16 @@
 ---
 // Une page par chapitre écrit : src/content/chapitres/1-3.mdx devient
 // /forge-ia/partie-1/1-3/. Les composants du gabarit sont fournis au MDX :
-// un chapitre peut écrire <Etape>, <Pari>, <Verrou> et <EncadreLabo> sans
-// les importer.
+// un chapitre peut écrire <Etape>, <Pari>, <Verrou>, <EncadreLabo>,
+// <CodeExplique> et <LiensProjet> sans les importer.
 import { getCollection, render } from 'astro:content';
 import LayoutChapitre from '../../layouts/LayoutChapitre.astro';
 import Etape from '../../components/gabarit/Etape.astro';
 import Pari from '../../components/gabarit/Pari.astro';
 import Verrou from '../../components/gabarit/Verrou.astro';
 import EncadreLabo from '../../components/gabarit/EncadreLabo.astro';
+import CodeExplique from '../../components/gabarit/CodeExplique.astro';
+import LiensProjet from '../../components/gabarit/LiensProjet.astro';
 
 export async function getStaticPaths() {
   const chapitres = await getCollection('chapitres');
@@ -28,5 +30,5 @@ const { Content } = await render(entree);
 ---
 
 <LayoutChapitre {...entree.data}>
-  <Content components={{ Etape, Pari, Verrou, EncadreLabo }} />
+  <Content components={{ Etape, Pari, Verrou, EncadreLabo, CodeExplique, LiensProjet }} />
 </LayoutChapitre>

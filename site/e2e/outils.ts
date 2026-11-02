@@ -27,6 +27,9 @@ export async function plusLongueLigne(page: Page): Promise<{ longueur: number; l
       const lignes = new Map<number, string>();
       const marcheur = document.createTreeWalker(bloc, NodeFilter.SHOW_TEXT);
       for (let noeud = marcheur.nextNode() as Text | null; noeud; noeud = marcheur.nextNode() as Text | null) {
+        // Un texte réservé aux lecteurs d'écran (une boîte d'un pixel) ne
+        // se lit pas à l'écran : il ne compte pas dans la longueur des lignes.
+        if ((noeud.parentElement?.getBoundingClientRect().width ?? 2) <= 1) continue;
         for (let i = 0; i < noeud.length; i++) {
           const portion = document.createRange();
           portion.setStart(noeud, i);

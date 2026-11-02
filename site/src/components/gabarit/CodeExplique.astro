@@ -1,0 +1,273 @@
+---
+// Un extrait de code expliqué ligne à ligne.
+//
+// Le code n'est jamais recopié : à la construction, le composant lit le
+// fichier du projet (chemin depuis la racine du dépôt), en extrait la région
+// `# region: <region>` ... `# fin: <region>` (voir lib/regions.ts) et la
+// colore avec Shiki. Chaque ligne porte son numéro dans `data-l`, compté à
+// partir de 1 dans l'extrait.
+//
+// Le contenu du composant est la liste des explications, une par <li> :
+//
+//   <CodeExplique fichier="projets/1.3-tokenizer/tokenizer_pedagogique/bpe.py" region="choisir">
+//     <li data-lignes="1">Texte de l'explication.</li>
+//     <li data-lignes="2-6">Une plage de lignes.</li>
+//   </CodeExplique>
+//
+// Survoler ou focaliser une explication allume ses lignes (voir le script en
+// bas de ce fichier). Une ligne visée qui n'existe pas dans l'extrait fait
+// échouer la construction, pour que le texte ne dérive pas du code.
+import { Code } from 'astro:components';
+import type { ComponentProps } from 'astro/types';
+import { root } from 'astro:config/server';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { lignesVisees } from '../../lib/lignes';
+import { extraireRegion } from '../../lib/regions';
+
+interface Props {
+  /** Chemin du fichier depuis la racine du dépôt. */
+  fichier: string;
+  /** Nom de la région : `# region: <nom>` dans le fichier. */
+  region: string;
+  /** Langage de coloration (Shiki). */
+  langue?: string;
+}
+
+const { fichier, region, langue = 'python' } = Astro.props;
+
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const racineDepot = new URL('../', root);
+const source = readFileSync(fileURLToPath(new URL(fichier, racineDepot)), 'utf8');
+const code = extraireRegion(source, region, fichier);
+const nbLignes = code.split('\n').length;
+
+// Les explications : on vérifie que chaque ligne visée existe.
+const explications = await Astro.slots.render('default');
+for (const [, spec] of explications.matchAll(/data-lignes="([^"]*)"/g)) {
+  for (const n of lignesVisees(spec)) {
+    if (n > nbLignes) {
+      throw new Error(
+        `Ligne ${n} hors de l'extrait « ${region} » de ${fichier} (${nbLignes} lignes) : data-lignes="${spec}"`,
+      );
+    }
+  }
+}
+
+// Thème de coloration de la direction « fusion énergie » : fond brume claire,
+// encre indigo, mots-clés en indigo doux et en gras, chaînes en menthe,
+// commentaires en italique. Les couleurs viennent des jetons de jetons.css
+// (variables CSS) : aucune n'est recopiée ici.
+const theme = {
+  name: 'forge-brume',
+  type: 'light' as const,
+  colors: {
+    'editor.background': 'var(--brume-claire)',
+    'editor.foreground': 'var(--indigo)',
+  },
+  tokenColors: [
+    {
+      scope: ['comment', 'punctuation.definition.comment'],
+      settings: { foreground: 'var(--indigo-doux)', fontStyle: 'italic' },
+    },
+    {
+      scope: [
+        'keyword.control',
+        'keyword.operator.logical',
+        'keyword.operator.word',
+        'storage.type',
+        'storage.modifier',
+        'constant.language',
+      ],
+      settings: { foreground: 'var(--indigo-doux)', fontStyle: 'bold' },
+    },
+    {
+      scope: ['entity.name.function', 'entity.name.class', 'entity.name.type.class'],
+      settings: { foreground: 'var(--indigo)', fontStyle: 'bold' },
+    },
+    {
+      scope: ['string', 'punctuation.definition.string'],
+      settings: { foreground: 'var(--menthe)' },
+    },
+  ],
+};
+
+// Un numéro sur chaque ligne : c'est ce qui permet de l'allumer.
+const transformers = [
+  {
+    line(noeud: { properties: Record<string, unknown> }, numero: number) {
+      noeud.properties['data-l'] = numero;
+    },
+  },
+];
+---
+
+<figure class="code-explique">
+  <figcaption>
+    Extrait de <a href={`https://github.com/chipat-neko/forge-ia/blob/main/${fichier}`}>{fichier}</a>
+  </figcaption>
+  <Code code={code} lang={langue as ComponentProps<typeof Code>['lang']} theme={theme} transformers={transformers} />
+  {explications.trim() !== '' && <ul class="explications" set:html={explications} />}
+</figure>
+
+<style is:global>
+  .code-explique {
+    margin: 1.2em 0;
+  }
+
+  .code-explique figcaption {
+    font-family: var(--titres);
+    font-size: 16px;
+    line-height: 1.4;
+    color: var(--indigo-doux);
+    margin-bottom: 8px;
+  }
+
+  .code-explique figcaption a {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--indigo);
+    overflow-wrap: anywhere; /* le chemin est long : il passe à la ligne sur téléphone */
+  }
+
+  /* Le bloc de code. Les lignes sont des éléments de la colonne : une
+     ligne allumée couvre toute la largeur, même quand le code défile. */
+  .code-explique pre {
+    --hauteur-ligne: 1.7em;
+    font-family: var(--mono);
+    font-size: 15px;
+    line-height: 1.7;
+    font-variant-ligatures: none; /* « -> » reste « -> », pas une flèche : on montre les caractères du fichier */
+    margin: 0 0 1em;
+    padding: 16px 0;
+    border-radius: 10px;
+    overflow-x: auto; /* les longues lignes défilent dans le bloc, pas dans la page */
+  }
+
+  .code-explique pre code {
+    display: flex;
+    flex-direction: column;
+    min-width: max-content;
+  }
+
+  .code-explique [data-l] {
+    min-height: var(--hauteur-ligne); /* une ligne vide garde sa hauteur */
+    padding: 0 22px 0 12px;
+    transition: background-color 0.12s ease;
+  }
+
+  /* Numéro de ligne : dans le style, pas dans le texte. On ne le copie pas,
+     et les lecteurs d'écran ne le lisent pas. */
+  .code-explique [data-l]::before {
+    content: attr(data-l);
+    content: attr(data-l) / '';
+    display: inline-block;
+    width: 2ch;
+    margin-right: 16px;
+    text-align: right;
+    color: var(--indigo-doux);
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+  }
+
+  .code-explique [data-l].allumee {
+    background: var(--soleil-pale);
+  }
+
+  /* Les explications : chacune allume ses lignes. */
+  .code-explique .explications {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1em;
+  }
+
+  .code-explique .explications li {
+    padding: 6px 10px;
+    margin: 0 -10px;
+    border-radius: 6px;
+    cursor: default;
+  }
+
+  /* « active » : survolée ou focalisée (posé par le script). */
+  .code-explique .explications li.active {
+    background: var(--soleil-pale);
+  }
+
+  .code-explique .explications li:focus-visible {
+    outline-offset: -2px; /* le contour reste dans la colonne : pas de défilement */
+  }
+
+  /* Lu par les lecteurs d'écran seulement : quelles lignes l'explication vise. */
+  .code-explique .lignes-visees {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  @media (max-width: 720px) {
+    .code-explique pre {
+      font-size: 14px;
+    }
+
+    .code-explique [data-l] {
+      padding: 0 16px 0 10px;
+    }
+  }
+</style>
+
+<script>
+  // Une explication survolée ou focalisée allume ses lignes.
+  // Sans JavaScript, le code et les explications restent lisibles : seule
+  // la lumière manque.
+  import { libelleDesLignes, lignesVisees } from '../../lib/lignes';
+
+  function brancher(figure: HTMLElement): void {
+    const lignes = new Map<number, HTMLElement>();
+    for (const l of figure.querySelectorAll<HTMLElement>('pre [data-l]')) {
+      lignes.set(Number(l.dataset.l), l);
+    }
+    const explications = [...figure.querySelectorAll<HTMLElement>('.explications > li[data-lignes]')];
+
+    // Les explications actives (survolées ou focalisées) : si deux le sont à
+    // la fois, leurs lignes restent toutes allumées.
+    const actives = new Set<HTMLElement>();
+
+    function majLumiere(): void {
+      const voulues = new Set<number>();
+      for (const li of actives) {
+        for (const n of lignesVisees(li.dataset.lignes!)) voulues.add(n);
+      }
+      for (const [n, ligne] of lignes) ligne.classList.toggle('allumee', voulues.has(n));
+    }
+
+    for (const li of explications) {
+      try {
+        lignesVisees(li.dataset.lignes!);
+      } catch {
+        continue; // un attribut abîmé n'allume rien
+      }
+      li.tabIndex = 0; // atteignable au clavier
+
+      const quelles = document.createElement('span');
+      quelles.className = 'lignes-visees';
+      quelles.textContent = `${libelleDesLignes(li.dataset.lignes!)}. `;
+      li.prepend(quelles);
+
+      const allumer = (on: boolean) => () => {
+        if (on) actives.add(li);
+        else actives.delete(li);
+        li.classList.toggle('active', on);
+        majLumiere();
+      };
+      li.addEventListener('mouseenter', allumer(true));
+      li.addEventListener('mouseleave', allumer(false));
+      li.addEventListener('focus', allumer(true));
+      li.addEventListener('blur', allumer(false));
+    }
+  }
+
+  for (const figure of document.querySelectorAll<HTMLElement>('.code-explique')) brancher(figure);
+</script>

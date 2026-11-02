@@ -9,6 +9,8 @@ import Etape from '../../components/gabarit/Etape.astro';
 import Pari from '../../components/gabarit/Pari.astro';
 import Verrou from '../../components/gabarit/Verrou.astro';
 import EncadreLabo from '../../components/gabarit/EncadreLabo.astro';
+import CodeExplique from '../../components/gabarit/CodeExplique.astro';
+import LiensProjet from '../../components/gabarit/LiensProjet.astro';
 import { schemaChapitre } from '../../content.config';
 
 export async function getStaticPaths() {
@@ -28,5 +30,5 @@ const Contenu = module.Content;
 ---
 
 <LayoutChapitre {...donnees}>
-  <Contenu components={{ Etape, Pari, Verrou, EncadreLabo }} />
+  <Contenu components={{ Etape, Pari, Verrou, EncadreLabo, CodeExplique, LiensProjet }} />
 </LayoutChapitre>

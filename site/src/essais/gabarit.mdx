@@ -61,6 +61,17 @@ La zone ci-dessous reste floue tant que le premier pari n'est pas joué. Sans Ja
   <button type="button" class="essai-dedans">Dedans</button>
 </Verrou>
 
+Un extrait de code n'est jamais recopié dans la page : il est lu, à la construction, dans le fichier testé du projet. Passe la souris sur une explication, ou va-y au clavier : ses lignes s'allument dans le code.
+
+<CodeExplique fichier="projets/1.3-tokenizer/tokenizer_pedagogique/bpe.py" region="choisir">
+  <li data-lignes="1">La fonction reçoit le compte des paires et renvoie une seule paire, la gagnante.</li>
+  <li data-lignes="4-5">En cas d'égalité, on prend la plus petite paire dans l'ordre des points de code : un même corpus donne toujours les mêmes fusions.</li>
+  <li data-lignes="7">`min` renvoie la paire dont la clé est la plus petite.</li>
+  <li data-lignes="7">La clé est un couple : `-compte[paire]` d'abord, le signe moins mettant la paire la plus fréquente en tête, puis la paire elle-même pour départager.</li>
+</CodeExplique>
+
+<LiensProjet projet="1.3-tokenizer" />
+
 <EncadreLabo sources={[{ titre: 'Spécification de La Forge IA', url: 'https://github.com/chipat-neko/forge-ia', verifieLe: '2026-11-02' }]}>
 
 Un grand labo ferait la même chose à une autre échelle : des milliers de paris, des millions de lecteurs. Le principe reste exactement celui de cette page.
