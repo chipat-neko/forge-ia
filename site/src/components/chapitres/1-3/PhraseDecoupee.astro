@@ -1,0 +1,100 @@
+---
+// La phrase d'ouverture du chapitre 1.3, découpée en jetons, avec le numéro
+// de chaque jeton dessous (maquette 10). Le découpage est fait au moment de la
+// construction, par tokenizer13 : la page arrive déjà découpée, sans script.
+//
+// La phrase découpée est cachée aux lecteurs d'écran (une suite de morceaux
+// et de nombres s'écoute mal) : la légende dit la même chose en une phrase.
+import { segmentsVisibles, tokenizer13 } from '../../../lib/bpe';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  phrase: string;
+  /** Nombre de fusions apprises utilisées pour découper. */
+  k: number;
+}
+
+const { phrase, k } = Astro.props;
+const jetons = tokenizer13.decouper(phrase, k);
+const n = jetons.length;
+const morceaux = n > 1 ? 'morceaux' : 'morceau';
+const nombres = n > 1 ? 'nombres' : 'nombre';
+const legende = typographier(`« ${phrase} », tel que le modèle le reçoit : ${n} ${morceaux}, donc ${n} ${nombres}.`);
+---
+
+<figure class="phrase-decoupee">
+  <div class="glose" aria-hidden="true">
+    {
+      jetons.map((jeton, i) => (
+        <span class:list={['jeton', { b: i % 2 === 1 }]} data-jeton={jeton.id ?? 'inconnu'}>
+          {/* Sur une seule ligne : le morceau garde ses blancs, il n'en faut pas d'autres. */}
+          <span class="morceau">{segmentsVisibles(jeton.texte).map((s) => (s.blanc ? <span class="blanc">{s.texte}</span> : s.texte))}</span>
+          <span class="num">{jeton.id ?? 'inconnu'}</span>
+        </span>
+      ))
+    }
+  </div>
+  <figcaption>{legende}</figcaption>
+</figure>
+
+<style>
+  .phrase-decoupee {
+    margin: 40px 0 0;
+  }
+
+  .glose {
+    font-size: 34px;
+    line-height: 1.2;
+    font-variation-settings: 'opsz' 48;
+    overflow-wrap: anywhere;
+  }
+
+  .jeton {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    vertical-align: top;
+    max-width: 100%;
+    margin: 0 5px 10px 0;
+  }
+
+  /* Un simple souligné, en teintes alternées : la phrase reste une phrase. */
+  .morceau {
+    max-width: 100%;
+    padding: 0 2px;
+    border-bottom: 3px solid var(--teinte-a-trait);
+    white-space: pre-wrap;
+    line-height: 1.32;
+  }
+
+  .jeton.b .morceau {
+    border-bottom-color: var(--teinte-b-trait);
+  }
+
+  .blanc {
+    color: var(--indigo-doux);
+  }
+
+  .num {
+    font-family: var(--titres);
+    font-weight: 500;
+    font-size: 13px;
+    line-height: 1;
+    margin-top: 7px;
+    color: var(--indigo-doux);
+    font-variant-numeric: tabular-nums;
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 15px;
+    color: var(--indigo-doux);
+    margin-top: 6px;
+  }
+
+  @media (max-width: 720px) {
+    .glose {
+      font-size: 26px;
+    }
+  }
+</style>

@@ -6,6 +6,7 @@ import {
   choixNombreDeJetons,
   comparerPointsDeCode,
   preDecouper,
+  segmentsVisibles,
   TokenizerPedagogique,
   tokenizer13,
   visible,
@@ -176,6 +177,25 @@ describe('visible', () => {
     expect(visible('a\nb')).toBe('a↵b');
     expect(visible('  \n ')).toBe('␣␣↵␣');
     expect(visible('abc')).toBe('abc');
+  });
+});
+
+describe('segmentsVisibles', () => {
+  it('sépare les blancs (écrits ␣ et ↵) des autres caractères, dans l’ordre', () => {
+    expect(segmentsVisibles(' forg')).toEqual([
+      { texte: '␣', blanc: true },
+      { texte: 'forg', blanc: false },
+    ]);
+    expect(segmentsVisibles('a  \nb')).toEqual([
+      { texte: 'a', blanc: false },
+      { texte: '␣␣↵', blanc: true },
+      { texte: 'b', blanc: false },
+    ]);
+  });
+
+  it('renvoie une liste vide pour un texte vide, et garde un emoji entier', () => {
+    expect(segmentsVisibles('')).toEqual([]);
+    expect(segmentsVisibles('🙂')).toEqual([{ texte: '🙂', blanc: false }]);
   });
 });
 

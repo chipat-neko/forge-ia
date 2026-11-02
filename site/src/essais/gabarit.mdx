@@ -16,6 +16,11 @@ acquis:
     ou: "à l'étape 2, dans la zone qui s'ouvre"
 ---
 
+import AtelierTokenizer from '../components/chapitres/1-3/AtelierTokenizer.svelte';
+import PhraseDecoupee from '../components/chapitres/1-3/PhraseDecoupee.astro';
+
+<PhraseDecoupee phrase="Le forgeron frappe le métal sur l'enclume." k={165} />
+
 <Etape numero={1} titre="Parier avant de voir">
 
 Pourquoi parier avant de voir ? Parce qu'une réponse qu'on a devinée, même de travers, se retient mieux qu'une réponse qu'on a seulement lue. Chaque pari se joue une seule fois : les boutons se figent, et l'explication apparaît juste en dessous.
@@ -59,6 +64,7 @@ La zone ci-dessous reste floue tant que le premier pari n'est pas joué. Sans Ja
 
 <Verrou nom="zone" message="Fais le premier pari de l'étape 1 : cette zone s'ouvre juste après.">
   <button type="button" class="essai-dedans">Dedans</button>
+  <AtelierTokenizer client:load phraseInitiale="Le forgeron frappe le métal sur l'enclume." verrou="zone" />
 </Verrou>
 
 Un extrait de code n'est jamais recopié dans la page : il est lu, à la construction, dans le fichier testé du projet. Passe la souris sur une explication, ou va-y au clavier : ses lignes s'allument dans le code.

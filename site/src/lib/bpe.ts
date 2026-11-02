@@ -232,6 +232,25 @@ export function visible(s: string): string {
   return s.replace(/ /g, '␣').replace(/\n/g, '↵');
 }
 
+/** Un bout de jeton à afficher : des blancs (écrits « ␣ » et « ↵ ») ou d'autres caractères. */
+export interface Segment {
+  texte: string;
+  blanc: boolean;
+}
+
+/**
+ * Le texte d'un jeton découpé en segments pour l'affichage, dans l'ordre : les
+ * blancs (espaces et retours à la ligne, écrits avec `visible`) d'un côté, le
+ * reste de l'autre. Les composants dessinent les blancs plus discrètement que
+ * les lettres : « ␣forg » montre bien qu'il y a une espace, sans la crier.
+ */
+export function segmentsVisibles(s: string): Segment[] {
+  return Array.from(s.matchAll(/[ \n]+|[^ \n]+/g), ([bout]) => {
+    const blanc = bout[0] === ' ' || bout[0] === '\n';
+    return { texte: blanc ? visible(bout) : bout, blanc };
+  });
+}
+
 /**
  * Les trois réponses du pari « combien de jetons ? », par ordre croissant :
  * le nombre de mots (pré-jetons qui contiennent une lettre), le nombre exact

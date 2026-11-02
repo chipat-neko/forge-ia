@@ -17,6 +17,7 @@
   --soleil: #FFC93C;
   --soleil-vif: #FFB800;
   --soleil-pale: #FFF4D6;
+  --soleil-survol: #FFEDBC;  /* champ de saisie survolé ou au focus (maquette 10) */
 
   /* Bonne et mauvaise réponse */
   --menthe: #1C6E58;
@@ -27,6 +28,9 @@
   /* Teintes des jetons (morceaux de texte découpés) */
   --teinte-a: #E4E2F4;
   --teinte-b: #F2E9D8;
+  /* Leur trait, plus soutenu : les soulignés de la phrase découpée d'ouverture (maquette 10) */
+  --teinte-a-trait: #C9C5EA;
+  --teinte-b-trait: #E2CFAA;
 
   /* Polices, auto-hébergées par Fontsource (voir layouts/Base.astro) */
   --titres: "Gabarito", system-ui, sans-serif;

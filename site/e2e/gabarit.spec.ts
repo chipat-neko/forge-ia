@@ -243,6 +243,9 @@ test('accessibilité après les paris (verdicts, choix marqués)', async ({ page
   await page.locator('[data-pari="p1"] [data-juste]').click();
   await page.locator('[data-pari="p2"] button:not([data-juste])').click();
   await expect(page.locator('[data-pari="p2"] .verdict')).toBeVisible();
+  // La zone ouverte par p1 sort de son flou en 0,35 s : axe mesurerait le
+  // contraste de l'atelier à mi-fondu (opacité 0,45), et non tel qu'on le lit.
+  await expect(page.locator('[data-verrou="zone"]')).toHaveCSS('opacity', '1');
   await verifierAxe(page);
   await verifierSansDebordement(page);
 });
