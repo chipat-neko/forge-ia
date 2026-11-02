@@ -1,0 +1,34 @@
+---
+// Polices auto-hébergées (Fontsource) : aucun appel à Google Fonts.
+import '@fontsource/gabarito/500.css';
+import '@fontsource/gabarito/600.css';
+import '@fontsource/gabarito/700.css';
+import '@fontsource/gabarito/800.css';
+import '@fontsource-variable/newsreader/opsz.css';
+import '@fontsource-variable/newsreader/opsz-italic.css';
+import '@fontsource-variable/jetbrains-mono/wght.css';
+import '../styles/jetons.css';
+import '../styles/base.css';
+
+interface Props {
+  titre: string;
+  description?: string;
+}
+
+const NOM_DU_SITE = 'La Forge IA';
+const { titre, description = 'Apprendre à construire une IA de zéro, chapitre après chapitre.' } = Astro.props;
+const titreComplet = titre === NOM_DU_SITE ? titre : `${titre}, ${NOM_DU_SITE}`;
+---
+
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{titreComplet}</title>
+    <meta name="description" content={description} />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

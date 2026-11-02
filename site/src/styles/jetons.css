@@ -1,0 +1,35 @@
+/*
+  Jetons de style de La Forge IA (direction « fusion énergie »).
+  Valeurs de référence : docs/maquettes/maquette-10-fusion-energie.html.
+  Toutes les feuilles de style et tous les composants s'appuient sur ces
+  variables : on ne recopie jamais une couleur en dur ailleurs.
+*/
+:root {
+  /* Papier et encres */
+  --papier: #FFFFFF;
+  --indigo: #232057;         /* encre principale */
+  --indigo-doux: #5B5888;    /* encre douce, texte secondaire */
+  --lavande: #8F8CB8;        /* contraste d'environ 3,2 avec le papier : décor et traits, jamais du texte courant */
+  --brume: #E6E5F0;          /* filets et fonds de repos */
+  --brume-claire: #F5F4FA;
+
+  /* Soleil : réservé à ce qui se manipule (curseurs, boutons, zones à régler) */
+  --soleil: #FFC93C;
+  --soleil-vif: #FFB800;
+  --soleil-pale: #FFF4D6;
+
+  /* Bonne et mauvaise réponse */
+  --menthe: #1C6E58;
+  --menthe-pale: #E2F5EF;
+  --corail: #B8342D;
+  --corail-pale: #FDECEA;
+
+  /* Teintes des jetons (morceaux de texte découpés) */
+  --teinte-a: #E4E2F4;
+  --teinte-b: #F2E9D8;
+
+  /* Polices, auto-hébergées par Fontsource (voir layouts/Base.astro) */
+  --titres: "Gabarito", system-ui, sans-serif;
+  --texte: "Newsreader Variable", "Newsreader", Georgia, serif;
+  --mono: "JetBrains Mono Variable", ui-monospace, "Cascadia Code", Consolas, monospace;
+}
