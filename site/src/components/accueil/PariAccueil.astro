@@ -1,0 +1,539 @@
+---
+// L'ouverture de l'accueil (maquette accueil C) : un pari, tout de suite.
+// La phrase « Construis ton IA de zéro. » est découpée à la construction par
+// le moteur du chapitre 1.3 (src/lib/exemples.ts) : ses jetons, leurs numéros
+// et les trois choix du pari viennent du même code que la démo.
+//
+// Le script fait jouer le pari (scripts/paris.ts, gardé sous la clé
+// « accueil » de la progression) : une fois répondu, la phrase se découpe sur
+// place, et un bouton jaune n'en garde que les nombres. Sans JavaScript, la
+// réponse et son explication restent lisibles sous les choix.
+import type { Jeton } from '../../lib/bpe';
+import {
+  COLLES_ACCUEIL,
+  INCONNUS_ACCUEIL,
+  PHRASE_ACCUEIL,
+  caracteresAccueil,
+  choixAccueil,
+  enumerer,
+  jetonsAccueil,
+} from '../../lib/exemples';
+import { hrefChapitre } from '../../lib/parcours';
+import { typographier } from '../../lib/typo';
+
+const FINE = ' ';
+
+// Les jetons rangés par mot, pour qu'un mot ne se coupe pas en fin de ligne.
+// La ponctuation reste collée au mot qui la précède : pas de « . » seul en
+// début de ligne.
+interface JetonPlace extends Jeton {
+  i: number;
+}
+const mots: { mot: number; jetons: JetonPlace[] }[] = [];
+jetonsAccueil.forEach((jeton, i) => {
+  const ponctuation = i > 0 && /^[.,;:!?]+$/.test(jeton.texte);
+  const dernier = mots.at(-1);
+  if (!dernier || (jeton.mot !== dernier.mot && !ponctuation)) mots.push({ mot: jeton.mot, jetons: [] });
+  mots.at(-1)!.jetons.push({ ...jeton, i });
+});
+
+const n = jetonsAccueil.length;
+const bonne = choixAccueil.find((c) => c.juste)!;
+const guillemets = (mot: string) => `« ${mot.trim()} »`;
+const explication = typographier(
+  `Le petit découpeur du chapitre 1.3 la coupe en ${n} morceaux, et chaque morceau devient un nombre : ` +
+    `c'est tout ce que lit une IA. Les assemblages fréquents de son texte d'apprentissage restent collés, ` +
+    `comme ${COLLES_ACCUEIL.map(guillemets).join(' ou ')} avec son espace. ` +
+    `${enumerer(INCONNUS_ACCUEIL.map(guillemets))}, qu'il n'a jamais vus, partent en lettres.`,
+);
+
+// « 17 jetons » : le grand chiffre au-dessus de son unité, comme les paris des chapitres.
+function chiffreEtUnite(texte: string): { chiffre: string; unite: string } {
+  const [chiffre, ...reste] = texte.split(' ');
+  return { chiffre, unite: reste.join(' ') };
+}
+---
+
+<section class="pari-ouverture" aria-labelledby="q-accueil" data-paris="accueil">
+  <div class="pari-in" data-pari="phrase">
+    <p class="phrase-pari" data-phrase>
+      <span class="vh">{PHRASE_ACCUEIL}</span><span aria-hidden="true"
+        >{
+          mots.map((mot, m) => (
+            <span class="mot">{m === 0 && <span class="guill">«{FINE}</span>}{mot.jetons.map((j) => (<span class:list={['jeton', { b: j.i % 2 === 1 }]} style={`--i:${j.i}`}><span class="morceau">{j.texte}</span><span class="num">{j.id ?? 'inconnu'}</span></span>))}{m === mots.length - 1 && <span class="guill">{FINE}»</span>}</span>
+          ))
+        }</span
+      >
+    </p>
+    <h1 id="q-accueil">{typographier('Une IA va lire cette phrase. En combien de morceaux la découpe-t-elle ?')}</h1>
+    <p class="precision">
+      {typographier(`La phrase fait ${caracteresAccueil} caractères, espaces et point compris. Parie avant de regarder.`)}
+    </p>
+    <div class="choix" role="group" aria-labelledby="q-accueil">
+      {
+        choixAccueil.map((c, i) => {
+          const { chiffre, unite } = chiffreEtUnite(c.texte);
+          return (
+            <button type="button" data-choix={i} data-juste={c.juste ? '' : undefined}>
+              <span class="gros">{chiffre}</span> <span class="petit">{unite}</span>
+            </button>
+          );
+        })
+      }
+    </div>
+    <div class="verdict" hidden tabindex="-1">
+      {/* Sans JavaScript, on ne peut pas parier : la réponse est donnée d'emblée. */}
+      <p class="titre-v">{typographier(`Réponse : ${bonne.texte}`)}</p>
+      <p>{explication}</p>
+      <p class="actions">
+        <button type="button" class="bascule" data-bascule hidden>Ne garder que les nombres</button>
+        <a href={hrefChapitre('1.3')}>Construire ce découpeur, chapitre 1.3</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { brancherParis } from '../../scripts/paris';
+
+  const zone = document.querySelector<HTMLElement>('[data-paris="accueil"]');
+  const phrase = document.querySelector<HTMLElement>('[data-phrase]');
+  const bascule = document.querySelector<HTMLButtonElement>('[data-bascule]');
+
+  // Un mot qui commence une ligne laisse pendre son espace de tête dans la marge.
+  function pendre(): void {
+    if (!phrase) return;
+    let haut: number | null = null;
+    for (const mot of phrase.querySelectorAll<HTMLElement>('.mot')) {
+      mot.classList.remove('debut');
+      if (haut !== null && mot.offsetTop > haut + 4 && (mot.textContent ?? '').startsWith(' ')) {
+        mot.classList.add('debut');
+      }
+      haut = mot.offsetTop;
+    }
+  }
+
+  // Le pari est répondu : la phrase se découpe sur place (sans mouvement si
+  // on restaure un pari déjà fait), et le bouton jaune apparaît.
+  function decouper(anime: boolean): void {
+    phrase?.classList.toggle('sans-anim', !anime);
+    phrase?.classList.add('decoupee');
+    if (bascule) bascule.hidden = false;
+    pendre();
+  }
+
+  // Ne garder que les nombres : ce que le modèle reçoit vraiment.
+  bascule?.addEventListener('click', () => {
+    if (!phrase) return;
+    const numeros = !phrase.classList.contains('numeros');
+    phrase.classList.remove('sans-anim', 'change');
+    phrase.classList.toggle('numeros', numeros);
+    // Relancer l'animation de bascule : la retirer, forcer un rendu, la remettre.
+    void phrase.offsetWidth;
+    phrase.classList.add('change');
+    bascule.textContent = numeros ? 'Remontrer les morceaux' : 'Ne garder que les nombres';
+    pendre();
+  });
+
+  if (zone) brancherParis(zone, { cle: 'accueil', quandRepondu: (_pari, _juste, anime) => decouper(anime) });
+  pendre();
+  window.addEventListener('resize', pendre);
+  document.fonts?.ready.then(pendre);
+</script>
+
+<style>
+  .pari-ouverture {
+    background: var(--soleil-pale);
+  }
+
+  .pari-in {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 64px 24px 56px;
+  }
+
+  /* La phrase, en grand, telle qu'on la lit ; découpée après le pari. */
+  .phrase-pari {
+    font-size: clamp(36px, 5.2vw, 68px);
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    font-variation-settings: 'opsz' 72;
+    margin: 0 0 30px;
+  }
+
+  .guill {
+    color: var(--indigo-doux);
+  }
+
+  .mot {
+    display: inline-block;
+    white-space: nowrap;
+  }
+
+  .mot.debut .jeton:first-child {
+    margin-left: -0.25em;
+  }
+
+  .jeton {
+    display: inline-flex;
+    flex-direction: column;
+    vertical-align: top;
+  }
+
+  .morceau {
+    white-space: pre;
+    border-bottom: 0.07em solid transparent;
+  }
+
+  .num {
+    align-self: center;
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: max(13px, 0.24em);
+    line-height: 1;
+    color: var(--indigo-doux);
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.28em;
+    visibility: hidden;
+  }
+
+  .decoupee .jeton {
+    margin-right: 0.09em;
+  }
+
+  .decoupee .morceau {
+    border-bottom-color: var(--teinte-a-trait);
+  }
+
+  .decoupee .jeton.b .morceau {
+    border-bottom-color: var(--teinte-b-trait);
+  }
+
+  .decoupee .num {
+    visibility: visible;
+  }
+
+  /* Seulement les nombres, comme le modèle les reçoit. */
+  .numeros .morceau,
+  .numeros .guill {
+    display: none;
+  }
+
+  .numeros .jeton {
+    margin: 0 0.16em 0.16em 0;
+  }
+
+  .numeros .mot.debut .jeton:first-child {
+    margin-left: 0;
+  }
+
+  .numeros .num {
+    font-size: 0.7em;
+    font-weight: 700;
+    color: var(--indigo);
+    margin: 0;
+    padding: 0.1em 0.22em;
+    border-radius: 0.12em;
+    background: var(--teinte-a);
+  }
+
+  .numeros .jeton.b .num {
+    background: var(--teinte-b);
+  }
+
+  /* Sans JavaScript, la réponse est donnée : la phrase est montrée découpée. */
+  @media (scripting: none) {
+    .jeton {
+      margin-right: 0.09em;
+    }
+
+    .morceau {
+      border-bottom-color: var(--teinte-a-trait);
+    }
+
+    .jeton.b .morceau {
+      border-bottom-color: var(--teinte-b-trait);
+    }
+
+    .num {
+      visibility: visible;
+    }
+  }
+
+  /* La question et ses choix. */
+  h1 {
+    font-weight: 700;
+    font-size: 32px;
+    line-height: 1.22;
+    letter-spacing: -0.01em;
+    max-width: 21em;
+    margin: 0 0 8px;
+    text-wrap: balance;
+  }
+
+  .precision {
+    font-size: 19px;
+    color: var(--indigo-doux);
+    margin: 0 0 24px;
+  }
+
+  .choix {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    max-width: 600px;
+  }
+
+  .choix button {
+    cursor: pointer;
+    font-family: var(--titres);
+    font-weight: 700;
+    line-height: 1.15;
+    background: var(--papier);
+    color: var(--indigo);
+    border: 2px solid var(--indigo);
+    border-radius: 12px;
+    padding: 14px 12px;
+    box-shadow: 0 4px 0 var(--indigo);
+    transition:
+      transform 0.08s ease,
+      box-shadow 0.08s ease,
+      background-color 0.15s ease;
+  }
+
+  .gros {
+    display: block;
+    font-size: 44px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  .petit {
+    display: block;
+    font-size: 16px;
+    font-weight: 500;
+    margin-top: 4px;
+  }
+
+  /* La mention « ton choix » est posée par le script. */
+  .choix button :global(.rep) {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 6px;
+  }
+
+  .choix button:hover:not(:disabled) {
+    background: var(--soleil);
+  }
+
+  .choix button:active:not(:disabled) {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 var(--indigo);
+  }
+
+  .choix button:disabled {
+    cursor: default;
+  }
+
+  .choix button.juste {
+    background: var(--menthe-pale);
+    border-color: var(--menthe);
+    box-shadow: 0 4px 0 var(--menthe);
+    color: var(--menthe);
+  }
+
+  .choix button.faux {
+    background: var(--corail-pale);
+    border-color: var(--corail);
+    box-shadow: 0 4px 0 var(--corail);
+    color: var(--corail);
+  }
+
+  .choix button.attenue {
+    color: var(--indigo-doux);
+    border-color: color-mix(in srgb, var(--lavande) 50%, var(--papier));
+    box-shadow: 0 4px 0 color-mix(in srgb, var(--lavande) 50%, var(--papier));
+  }
+
+  /* Le verdict. */
+  .verdict {
+    margin-top: 26px;
+    padding: 18px 20px;
+    border-radius: 12px;
+    background: var(--papier);
+    font-size: 19px;
+    max-width: 40em;
+  }
+
+  .verdict[hidden] {
+    display: none;
+  }
+
+  .titre-v {
+    font-family: var(--titres);
+    font-weight: 800;
+    font-size: 22px;
+    margin: 0 0 4px;
+  }
+
+  .verdict.ok .titre-v {
+    color: var(--menthe);
+  }
+
+  .verdict.ko .titre-v {
+    color: var(--corail);
+  }
+
+  .verdict p:last-child {
+    margin-bottom: 0;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 26px;
+  }
+
+  .actions a {
+    font-family: var(--titres);
+    font-weight: 700;
+  }
+
+  /* Le bouton jaune : il se manipule. */
+  .bascule {
+    font-family: var(--titres);
+    font-weight: 700;
+    color: var(--indigo);
+    background: none;
+    border: 0;
+    border-radius: 4px;
+    padding: 0 2px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: var(--soleil);
+    text-decoration-thickness: 5px;
+    text-underline-offset: 4px;
+    text-decoration-skip-ink: none;
+  }
+
+  .bascule:hover {
+    background: var(--soleil-pale);
+    text-decoration-color: var(--soleil-vif);
+  }
+
+  .bascule[hidden] {
+    display: none;
+  }
+
+  @media (scripting: none) {
+    .verdict[hidden] {
+      display: block;
+    }
+  }
+
+  /* Le mouvement répond au pari et au bouton jaune, jamais au chargement. */
+  @media (prefers-reduced-motion: no-preference) {
+    .jeton {
+      transition: margin 0.35s cubic-bezier(0.2, 0.8, 0.3, 1.1);
+    }
+
+    .morceau {
+      transition: border-color 0.35s ease 0.15s;
+    }
+
+    .decoupee:not(.numeros) .num {
+      animation: tombe 0.35s cubic-bezier(0.2, 0.8, 0.3, 1.3) both;
+      animation-delay: calc(var(--i) * 22ms + 0.2s);
+    }
+
+    .change .jeton {
+      animation: bascule 0.32s cubic-bezier(0.2, 0.8, 0.3, 1.15);
+    }
+
+    .verdict.revele {
+      animation: revele 0.35s cubic-bezier(0.2, 0.8, 0.3, 1.2);
+    }
+
+    @keyframes tombe {
+      from {
+        opacity: 0;
+        transform: translateY(-0.4em);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    @keyframes bascule {
+      from {
+        opacity: 0.25;
+        transform: translateY(0.08em);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    @keyframes revele {
+      from {
+        transform: scale(0.96);
+        opacity: 0;
+      }
+
+      to {
+        transform: none;
+        opacity: 1;
+      }
+    }
+  }
+
+  /* Un pari restauré au rechargement ne bouge pas. */
+  .sans-anim,
+  .sans-anim * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .choix button {
+      transition: none;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .pari-in {
+      padding: 40px 20px;
+    }
+
+    h1 {
+      font-size: 25px;
+    }
+
+    .precision {
+      font-size: 17px;
+    }
+
+    .choix {
+      gap: 8px;
+    }
+
+    .choix button {
+      padding: 12px 6px;
+    }
+
+    .gros {
+      font-size: 34px;
+    }
+
+    .verdict {
+      padding: 16px;
+    }
+  }
+</style>

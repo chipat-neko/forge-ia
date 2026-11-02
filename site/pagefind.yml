@@ -1,0 +1,12 @@
+# Réglages de Pagefind (index de la recherche), lus par `pagefind --site dist`
+# dans npm run build. Seul le contenu des chapitres est indexé
+# (data-pagefind-body, voir src/layouts/LayoutChapitre.astro). On en retire
+# ce qui ferait des extraits illisibles dans les résultats : le code des
+# listings, les choix des paris (des boutons collés les uns aux autres), la
+# réponse écrite pour les lecteurs sans JavaScript et les jetons en liste.
+exclude_selectors:
+  - ".code-explique figcaption"
+  - ".code-explique pre"
+  - ".pari .choix"
+  - ".pari .titre-v"
+  - ".mini-jetons"

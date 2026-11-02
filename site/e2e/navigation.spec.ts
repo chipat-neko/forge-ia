@@ -1,0 +1,179 @@
+// Parcours des pages hors chapitre : l'accueil (pari d'ouverture et plan du
+// parcours), les pages de partie, la recherche (Pagefind) et la page 404.
+import { test, expect } from '@playwright/test';
+import { terminerChapitre13, verifierAxe, verifierSansDebordement } from './outils';
+
+const CLE_PROGRESSION = 'forge-ia:progression:v1';
+const FINE = ' ';
+
+// Les cinq tests du brief de la tâche 12, chacun terminé par axe et le
+// contrôle du débordement.
+
+test('accueil : 34 chapitres, 1.3 disponible', async ({ page }) => {
+  await page.goto('/forge-ia/');
+  await expect(page.locator('[data-chapitre-carte]')).toHaveCount(34);
+  await expect(page.locator('[data-chapitre-carte="1.3"]')).toHaveAttribute('data-etat', 'disponible');
+  await expect(page.locator('[data-chapitre-carte="1.4"]')).toHaveAttribute('data-etat', 'a-venir');
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
+  await page.locator('[data-chapitre-carte="1.3"] a').click();
+  await expect(page).toHaveURL(/\/forge-ia\/partie-1\/1-3\/$/);
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
+});
+
+test('page de partie', async ({ page }) => {
+  await page.goto('/forge-ia/partie-1/');
+  await expect(page.locator('[data-chapitre-carte]')).toHaveCount(21);
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Créer son IA de zéro');
+  await expect(page.locator('[data-chapitre-carte="1.3"]')).toHaveAttribute('data-etat', 'disponible');
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
+});
+
+test('recherche', async ({ page }) => {
+  await page.goto('/forge-ia/recherche/');
+  await page.getByRole('searchbox').fill('fusions');
+  await expect(page.locator('[data-resultat]').first()).toContainText('tokenizer');
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
+});
+
+test('404', async ({ page }) => {
+  const r = await page.goto('/forge-ia/nimporte-quoi/');
+  expect(r?.status()).toBe(404);
+  await expect(page.getByRole('link', { name: /accueil/i })).toBeVisible();
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
+});
+
+test('progression visible sur l’accueil', async ({ page }) => {
+  await terminerChapitre13(page);
+  await page.goto('/forge-ia/');
+  await expect(page.locator('[data-chapitre-carte="1.3"]')).toHaveAttribute('data-etat', 'fait');
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
+});
+
+// Parcours ajoutés : les maquettes validées en demandent davantage.
+
+test('accueil : le pari d’ouverture se joue une fois et reste répondu au rechargement', async ({ page }) => {
+  await page.goto('/forge-ia/');
+  const pari = page.locator('[data-pari="phrase"]');
+  // Les choix sont calculés par le moteur du chapitre 1.3 (mots, jetons, caractères).
+  await expect(pari.locator('button[data-choix]')).toHaveText([/^5\s*jetons/, /^17\s*jetons/, /^25\s*jetons/]);
+  await expect(pari.locator('.verdict')).toBeHidden();
+  await pari.locator('[data-juste]').click();
+  await expect(pari.locator('.verdict')).toContainText('Juste.');
+  await expect(pari.locator('[data-juste]')).toContainText('ton choix, juste');
+  await expect(page.locator('[data-phrase]')).toHaveClass(/\bdecoupee\b/);
+  // Le bouton jaune ne garde que les nombres, puis remontre les morceaux.
+  const bascule = page.getByRole('button', { name: 'Ne garder que les nombres' });
+  await bascule.click();
+  await expect(page.locator('[data-phrase]')).toHaveClass(/\bnumeros\b/);
+  // Le nom du bouton dit ce qu'il fera : pas d'aria-pressed en plus (il se contredirait).
+  await expect(page.getByRole('button', { name: 'Remontrer les morceaux' })).toBeVisible();
+  await page.reload();
+  await expect(pari.locator('.verdict')).toBeVisible();
+  await expect(pari.locator('.verdict')).toContainText('Juste.');
+  await expect(pari.locator('[data-juste]')).toBeDisabled();
+  await expect(page.locator('[data-phrase]')).toHaveClass(/\bdecoupee\b/);
+  const garde = await page.evaluate((cle) => localStorage.getItem(cle), CLE_PROGRESSION);
+  expect(JSON.parse(garde ?? '{}')).toMatchObject({ accueil: { paris: { phrase: 1 } } });
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
+});
+
+test('accueil : le bouton de lecture suit la progression du chapitre 1.3', async ({ page }) => {
+  await page.goto('/forge-ia/');
+  const bouton = page.locator('[data-suite] a');
+  await expect(bouton).toHaveText(/Ouvrir le chapitre 1\.3/);
+  await page.goto('/forge-ia/partie-1/1-3/');
+  await page.locator('[data-pari="nombres"] [data-juste]').click();
+  await page.goto('/forge-ia/');
+  await expect(bouton).toHaveText(/Reprendre le chapitre 1\.3/);
+  await expect(page.locator('[data-suite]')).toContainText('1 sur 5');
+  // « Commencé » garde l'état disponible, avec les acquis dans les infos.
+  await expect(page.locator('[data-chapitre-carte="1.3"]')).toHaveAttribute('data-etat', 'disponible');
+  await expect(page.locator('[data-chapitre-carte="1.3"]')).toContainText('1 acquis sur 5');
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
+});
+
+test('progression visible sur la page de partie, puis effacée depuis le pied de page', async ({ page }) => {
+  await terminerChapitre13(page);
+  await page.goto('/forge-ia/partie-1/');
+  const carte = page.locator('[data-chapitre-carte="1.3"]');
+  await expect(carte).toHaveAttribute('data-etat', 'fait');
+  await expect(page.locator('header')).toContainText('1 fait sur 21');
+  await expect(page.locator('[data-savoir="1.3"]')).toHaveClass(/\bacquis\b/);
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
+  await page.getByRole('button', { name: 'Effacer ma progression' }).click();
+  await expect(carte).toHaveAttribute('data-etat', 'disponible');
+  expect(await page.evaluate((cle) => localStorage.getItem(cle), CLE_PROGRESSION)).toBeNull();
+  await page.goto('/forge-ia/');
+  await expect(page.locator('[data-chapitre-carte="1.3"]')).toHaveAttribute('data-etat', 'disponible');
+});
+
+test('les quatre pages de partie', async ({ page }) => {
+  const attendus: [string, number, string][] = [
+    ['/forge-ia/partie-0/', 5, 'Les bases'],
+    ['/forge-ia/partie-1/', 21, 'Créer son IA de zéro'],
+    ['/forge-ia/partie-2/', 4, 'Hybride'],
+    ['/forge-ia/partie-3/', 4, 'Assemblage'],
+  ];
+  for (const [adresse, nombre, titre] of attendus) {
+    await page.goto(adresse);
+    await expect(page.locator('[data-chapitre-carte]')).toHaveCount(nombre);
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(titre);
+    await verifierAxe(page);
+    await verifierSansDebordement(page);
+  }
+  // L'accueil mène aux pages de partie.
+  await page.goto('/forge-ia/');
+  await page.getByRole('link', { name: /Hybride/ }).click();
+  await expect(page).toHaveURL(/\/forge-ia\/partie-2\/$/);
+});
+
+test('recherche : les titres du parcours, un numéro, et rien de la page d’essai', async ({ page }) => {
+  await page.goto('/forge-ia/recherche/');
+  const champ = page.getByRole('searchbox');
+  await champ.fill('images');
+  // Aucun chapitre paru n'en parle encore : les titres à venir le disent.
+  await expect(page.locator('.sommaire-trouve [data-resultat]')).toHaveCount(6);
+  await champ.fill('1.3');
+  await expect(page.locator('[data-resultat]').first()).toContainText('Le tokenizer');
+  // La page d'essai du gabarit (construite pour les tests) n'est jamais cherchée :
+  // « gabarit » n'est que dans son texte à elle.
+  await champ.fill('gabarit');
+  await expect(page.getByRole('heading', { level: 2, name: /Rien sur «\s?gabarit\s?»/ })).toBeVisible();
+  await expect(page.locator('[data-resultat]')).toHaveCount(0);
+  await champ.fill('Parier avant de voir');
+  await expect(page.locator('[role="status"]')).toContainText('avant');
+  await expect(page.locator('main a[href*="/essais/"]')).toHaveCount(0);
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
+});
+
+test('recherche : la requête de l’adresse est cherchée d’emblée', async ({ page }) => {
+  await page.goto('/forge-ia/recherche/?q=jetons');
+  await expect(page.getByRole('searchbox')).toHaveValue('jetons');
+  await expect(page.locator('[data-resultat]').first()).toContainText('tokenizer');
+  await expect(page.locator('[data-resultat] a[href*="#etape-"]').first()).toBeVisible();
+});
+
+test('404 : un chapitre à venir est reconnu, et le pari se joue', async ({ page }) => {
+  const r = await page.goto('/forge-ia/partie-1/1-4/');
+  expect(r?.status()).toBe(404);
+  await expect(page.locator('main')).toContainText('1.4, Le transformer, pièce par pièce');
+  await expect(page.locator('main')).toContainText('pas encore paru');
+  const pari = page.locator('[data-pari="introuvable"]');
+  await expect(pari.locator('button[data-choix]')).toHaveText([/^1\s*jeton/, /^8\s*jetons/, /^11\s*jetons/]);
+  await pari.locator('button:not([data-juste])').first().click();
+  await expect(pari.locator('.verdict')).toContainText('Pas tout à fait.');
+  const g = (mot: string) => `«${FINE}${mot}${FINE}»`;
+  await expect(pari.locator('.verdict')).toContainText(`${g('ou')}, ${g('ab')} et ${g('le')}`);
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
+});

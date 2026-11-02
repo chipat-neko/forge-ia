@@ -12,6 +12,7 @@
   --lavande: #8F8CB8;        /* contraste d'environ 3,2 avec le papier : décor et traits, jamais du texte courant */
   --brume: #E6E5F0;          /* filets et fonds de repos */
   --brume-claire: #F5F4FA;
+  --indigo-survol: #34307A;  /* bouton indigo survolé (maquettes de l'accueil et de la 404) */
 
   /* Soleil : réservé à ce qui se manipule (curseurs, boutons, zones à régler) */
   --soleil: #FFC93C;

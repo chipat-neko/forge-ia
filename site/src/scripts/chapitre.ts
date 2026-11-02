@@ -14,6 +14,7 @@
 // aucune zone n'est verrouillée.
 import { effacer, nettoyer, noterAcquis, noterEtape, noterPari } from '../lib/progression';
 import { ouverture } from '../lib/canal';
+import { boutonsDuPari, revelerPari } from './pari';
 
 /** Détail de l'événement `forge:acquis`, émis sur `window`. */
 export interface DetailAcquis {
@@ -32,7 +33,7 @@ function demarrer(article: HTMLElement): void {
   let efface = false;
 
   const paris = [...article.querySelectorAll<HTMLElement>('.pari[data-pari]')];
-  const boutonsDe = (pari: HTMLElement) => [...pari.querySelectorAll<HTMLButtonElement>('button[data-choix]')];
+  const boutonsDe = boutonsDuPari;
 
   // 1. Progression nettoyée des paris disparus ou dont le choix n'existe plus.
   const parisValides = Object.fromEntries(paris.map((p) => [p.dataset.pari!, boutonsDe(p).length]));
@@ -82,48 +83,8 @@ function demarrer(article: HTMLElement): void {
 
   // ---------- Paris ----------
 
-  function ajouterMention(bouton: HTMLButtonElement, texte: string): void {
-    const mention = document.createElement('span');
-    mention.className = 'rep';
-    mention.textContent = texte;
-    // L'espace sépare la mention du choix dans le nom lu par les lecteurs d'écran.
-    bouton.append(' ', mention);
-  }
-
   function reveler(pari: HTMLElement, choix: number): void {
-    if (pari.hasAttribute('data-repondu')) return;
-    pari.setAttribute('data-repondu', '');
-    const boutons = boutonsDe(pari);
-    const choisi = boutons[choix];
-    const juste = choisi.hasAttribute('data-juste');
-    for (const bouton of boutons) {
-      bouton.disabled = true;
-      if (bouton.hasAttribute('data-juste')) {
-        bouton.classList.add('juste');
-        ajouterMention(bouton, bouton === choisi ? 'ton choix, juste' : 'bonne réponse');
-      } else if (bouton === choisi) {
-        bouton.classList.add('faux');
-        ajouterMention(bouton, 'ton choix');
-      } else {
-        bouton.classList.add('attenue');
-      }
-    }
-    const verdict = pari.querySelector<HTMLElement>('.verdict');
-    if (!verdict) return;
-    verdict.classList.add(juste ? 'ok' : 'ko');
-    const titre = verdict.querySelector('.titre-v');
-    if (titre) titre.textContent = juste ? 'Juste.' : 'Pas tout à fait.';
-    verdict.hidden = false;
-    if (!restauration) {
-      verdict.classList.add('revele');
-      // Le bouton choisi vient d'être désactivé : le focus passe au verdict,
-      // que les lecteurs d'écran lisent aussitôt. S'il dépasse du bas de
-      // l'écran, on le fait juste entrer (en douceur, sauf si le lecteur a
-      // demandé moins de mouvement).
-      verdict.focus({ preventScroll: true });
-      const doux = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      verdict.scrollIntoView({ block: 'nearest', behavior: doux ? 'smooth' : 'auto' });
-    }
+    revelerPari(pari, choix, !restauration);
   }
 
   function parier(pari: HTMLElement, choix: number): void {

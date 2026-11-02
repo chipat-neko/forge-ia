@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PARCOURS, hrefChapitre, trouverChapitre, voisins } from './parcours';
+import {
+  ANNEXES,
+  PARCOURS,
+  chapitresDuGroupe,
+  hrefChapitre,
+  hrefPartie,
+  titreCourt,
+  trouverChapitre,
+  voisins,
+} from './parcours';
 
 describe('PARCOURS', () => {
   it('compte 5, 21, 4 et 4 chapitres par partie', () => {
@@ -148,5 +157,78 @@ describe('hrefChapitre', () => {
     expect(hrefChapitre('1.3')).toBe('/partie-1/1-3/');
     vi.stubEnv('BASE_URL', '');
     expect(hrefChapitre('1.3')).toBe('/partie-1/1-3/');
+  });
+});
+
+describe('textes des maquettes validées (accueil C et page de partie)', () => {
+  it('donne un résumé à chacun des 21 chapitres de la Partie 1, et à eux seuls', () => {
+    for (const partie of PARCOURS) {
+      for (const chapitre of partie.chapitres) {
+        if (partie.numero === 1) expect(chapitre.resume, chapitre.numero).toMatch(/\S/);
+        else expect(chapitre.resume).toBeUndefined();
+      }
+    }
+    expect(trouverChapitre('1.3').chapitre.resume).toBe(
+      "Une IA ne lit pas des lettres : elle lit des nombres. Tu construis l'outil qui découpe le texte en morceaux numérotés.",
+    );
+  });
+
+  it('place les quatre jalons de « ton IA » en 1.5, 1.7, 1.15 et 1.19', () => {
+    const jalons = PARCOURS.flatMap((p) => p.chapitres)
+      .filter((c) => c.jalon)
+      .map((c) => [c.numero, c.jalon]);
+    expect(jalons).toEqual([
+      ['1.5', 'Ici, ton IA naît.'],
+      ['1.7', 'Elle apprend à te répondre.'],
+      ['1.15', 'Elle voit les images.'],
+      ['1.19', 'Elle mène seule une tâche simple.'],
+    ]);
+  });
+
+  it("décrit les cinq groupes de la Partie 1, dans l'ordre de ses chapitres", () => {
+    const partie = PARCOURS[1];
+    const noms = [...new Set(partie.chapitres.map((c) => c.groupe))];
+    expect(partie.groupes?.map((g) => g.nom)).toEqual(noms);
+    expect(partie.groupes?.map((g) => chapitresDuGroupe(partie, g).length)).toEqual([6, 4, 5, 4, 2]);
+    for (const g of partie.groupes ?? []) {
+      expect(g.resume).toMatch(/\S/);
+      expect(g.gain).toMatch(/\S/);
+      expect(g.note).toMatch(/\S/);
+    }
+  });
+
+  it('fait partir la Partie 2 après 1.7 et la Partie 3 après 1.16', () => {
+    expect(PARCOURS.map((p) => p.depart)).toEqual([undefined, undefined, '1.7', '1.16']);
+  });
+
+  it('donne à chaque partie un résumé, et des savoirs tirés de ses chapitres', () => {
+    for (const partie of PARCOURS) expect(partie.resume).toMatch(/\S/);
+    const savoirs = PARCOURS[1].savoirs ?? [];
+    expect(savoirs.map((s) => s.chapitre)).toEqual(['1.3', '1.5', '1.7', '1.8', '1.9', '1.10', '1.15', '1.16', '1.19']);
+    for (const s of savoirs) expect(trouverChapitre(s.chapitre).partie.numero).toBe(1);
+  });
+
+  it('annonce les quatre annexes de la spécification', () => {
+    expect(ANNEXES.map((a) => a.titre)).toEqual([
+      'Glossaire',
+      'Annuaire des données, modèles et outils',
+      'Calculateur de coût',
+      'Matériel',
+    ]);
+  });
+});
+
+describe('hrefPartie', () => {
+  it('construit le lien de la page de partie', () => {
+    expect(hrefPartie(0)).toBe('/forge-ia/partie-0/');
+    expect(hrefPartie(3)).toBe('/forge-ia/partie-3/');
+  });
+});
+
+describe('titreCourt', () => {
+  it('coupe au deux-points ou à la parenthèse', () => {
+    expect(titreCourt('Le tokenizer (BPE)')).toBe('Le tokenizer');
+    expect(titreCourt('Les données : où les trouver, les nettoyer, les licences')).toBe('Les données');
+    expect(titreCourt('Le faire coder')).toBe('Le faire coder');
   });
 });

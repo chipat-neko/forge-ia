@@ -1,0 +1,709 @@
+---
+// La recherche (maquette validée docs/maquettes/recherche.html), avec sa
+// propre interface : un grand champ jaune (on y tape), quelques essais, puis
+// les résultats groupés par chapitre, un passage par étape, le mot trouvé
+// surligné comme un jeton. Le texte des chapitres parus est cherché par
+// Pagefind (src/lib/recherche.ts) ; les titres de tout le parcours, parus ou
+// à venir, sont cherchés aussi, pour savoir où une notion arrivera.
+import LayoutSite from '../layouts/LayoutSite.astro';
+import { chapitresParus } from '../lib/chapitres-parus';
+import { typographier } from '../lib/typo';
+
+const parus = await chapitresParus();
+const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
+const ESSAIS = ['jetons', 'BPE', 'zip', 'labo'];
+---
+
+<LayoutSite titre="Rechercher" courant="recherche" liens={['parcours', 'recherche']}>
+  <div class="bloc tete">
+    <div class="texte">
+      <h1>Rechercher</h1>
+      <form class="champ" role="search" action={`${base}/recherche/`} data-formulaire>
+        <label for="q">Un mot, une notion ou un numéro de chapitre</label>
+        <div class="champ-ligne">
+          <input
+            type="search"
+            id="q"
+            name="q"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="jetons, transformer, 1.3…"
+          />
+          <svg class="loupe" width="24" height="24" viewBox="0 0 17 17" aria-hidden="true">
+            <circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="2.2"></circle>
+            <path d="M11 11l4.6 4.6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path>
+          </svg>
+        </div>
+        <p class="essais" data-essais hidden>
+          <span>{typographier('Essaie :')}</span>
+          {
+            ESSAIS.map((essai) => (
+              <button type="button" class="bascule" data-essai={essai}>
+                {essai}
+              </button>
+            ))
+          }
+        </p>
+        <noscript>
+          <p class="sans-script">La recherche a besoin de JavaScript pour fonctionner.</p>
+        </noscript>
+      </form>
+    </div>
+    <aside class="note">
+      <p>
+        {
+          typographier(
+            'La recherche porte sur les chapitres parus. Les titres des chapitres à venir sont cherchés aussi, pour savoir où une notion arrivera.',
+          )
+        }
+      </p>
+      <p>Un numéro, comme 1.4, mène droit au chapitre.</p>
+    </aside>
+  </div>
+
+  <div class="bloc resultats">
+    <div class="texte" data-resultats data-parus={[...parus.keys()].join(' ')}></div>
+  </div>
+  <p class="vh" role="status" data-annonce></p>
+</LayoutSite>
+
+<script>
+  import { PARCOURS, hrefChapitre, titreCourt, trouverChapitre } from '../lib/parcours';
+  import {
+    chercher,
+    chercherDansLesTitres,
+    morceauxExtrait,
+    numeroDeChapitre,
+    type Passage,
+    type Resultat,
+  } from '../lib/recherche';
+  import { typographier } from '../lib/typo';
+
+  const FINE = ' ';
+  const TOUS = PARCOURS.flatMap((p) => p.chapitres);
+  const formulaire = document.querySelector<HTMLFormElement>('[data-formulaire]')!;
+  const champ = document.querySelector<HTMLInputElement>('#q')!;
+  const zone = document.querySelector<HTMLElement>('[data-resultats]')!;
+  const annonce = document.querySelector<HTMLElement>('[data-annonce]')!;
+  const parus = new Set((zone.dataset.parus ?? '').split(' ').filter(Boolean));
+
+  /** Fabrique un élément : classe, attributs et enfants (textes ou éléments). */
+  function el(
+    balise: string,
+    attributs: Record<string, string> = {},
+    ...enfants: (Node | string | null | undefined)[]
+  ): HTMLElement {
+    const element = document.createElement(balise);
+    for (const [nom, valeur] of Object.entries(attributs)) element.setAttribute(nom, valeur);
+    for (const enfant of enfants) if (enfant != null) element.append(enfant);
+    return element;
+  }
+
+  const guillemets = (q: string) => `«${FINE}${q}${FINE}»`;
+  const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+
+  /**
+   * Un extrait de Pagefind : du texte, et les mots trouvés surlignés. Pagefind
+   * rend les espaces fines en espaces ordinaires : on les remet.
+   */
+  function extrait(texte: string, balise = 'span'): HTMLElement {
+    const conteneur = el(balise, { class: 'extrait' });
+    for (const { texte: bout, marque } of morceauxExtrait(texte)) {
+      conteneur.append(marque ? el('mark', {}, bout) : typographier(bout));
+    }
+    return conteneur;
+  }
+
+  // Où se trouve un chapitre : « Partie 1, Le cœur : un modèle de langage ».
+  function situation(numero: string): string {
+    const { partie, chapitre } = trouverChapitre(numero);
+    return typographier(`Partie ${partie.numero}, ${chapitre.groupe ?? partie.titre}`);
+  }
+
+  function passage(p: Passage): HTMLElement {
+    return el(
+      'li',
+      {},
+      el(
+        'a',
+        { href: p.url },
+        el('span', { class: 'n-etape', 'aria-hidden': 'true' }, p.etape ? String(p.etape) : ''),
+        el(
+          'span',
+          {},
+          el('span', { class: 't-etape' }, p.etape ? el('span', { class: 'vh' }, `Étape ${p.etape}, `) : null, p.titre),
+          extrait(p.extrait),
+        ),
+      ),
+    );
+  }
+
+  function page(r: Resultat): HTMLElement {
+    const connu = r.numero !== undefined && TOUS.some((c) => c.numero === r.numero);
+    const titre = connu ? typographier(trouverChapitre(r.numero!).chapitre.titre) : r.titre;
+    return el(
+      'article',
+      { class: 'chapitre-trouve', 'data-resultat': '' },
+      el(
+        'h2',
+        {},
+        el('a', { href: r.url }, connu ? el('span', { class: 'n' }, r.numero!) : null, el('span', { class: 't' }, titre)),
+      ),
+      connu ? el('p', { class: 'ou' }, situation(r.numero!)) : null,
+      r.passages.length > 0 ? el('ol', { class: 'passages' }, ...r.passages.map(passage)) : extrait(r.extrait, 'p'),
+    );
+  }
+
+  function sommaire(numero: string | null, titres: typeof TOUS): HTMLElement {
+    return el(
+      'section',
+      { class: 'sommaire-trouve', 'aria-labelledby': 't-sommaire' },
+      el('h2', { id: 't-sommaire' }, numero ? 'Dans le parcours' : 'Dans les titres du parcours'),
+      el('p', {}, numero ? 'Le chapitre qui porte ce numéro.' : 'Ces chapitres en parlent dans leur titre.'),
+      el(
+        'ol',
+        {},
+        ...titres.map((c) => {
+          const paru = parus.has(c.numero);
+          return el(
+            'li',
+            { 'data-resultat': '' },
+            el('span', { class: 'num' }, c.numero),
+            paru ? el('a', { href: hrefChapitre(c.numero) }, typographier(c.titre)) : el('span', {}, typographier(c.titre)),
+            el('span', { class: 'etat' }, paru ? 'disponible' : 'à venir'),
+          );
+        }),
+      ),
+    );
+  }
+
+  function rien(q: string): HTMLElement {
+    const seul = [...parus][0];
+    const explication =
+      parus.size === 1 && seul
+        ? `Seuls les chapitres parus sont cherchés en entier, et un seul l'est aujourd'hui : ${seul}, ` +
+          `${titreCourt(trouverChapitre(seul).chapitre.titre)}. Essaie un mot plus court, ou un mot de ce ` +
+          'chapitre, comme « jetons » ou « fusions ».'
+        : 'Seuls les chapitres parus sont cherchés en entier. Essaie un mot plus court, comme « jetons » ou « fusions ».';
+    return el(
+      'div',
+      { class: 'vide' },
+      el('h2', {}, `Rien sur ${guillemets(q)} pour l${'’'}instant.`),
+      el('p', {}, typographier(explication)),
+    );
+  }
+
+  // Le numéro de la dernière recherche lancée : une réponse plus ancienne,
+  // arrivée en retard, est ignorée.
+  let tour = 0;
+
+  async function lancer(requete: string): Promise<void> {
+    const q = requete.trim();
+    const ceTour = ++tour;
+    history.replaceState(history.state, '', q ? `?q=${encodeURIComponent(q)}` : location.pathname);
+    if (q === '') {
+      zone.replaceChildren();
+      annonce.textContent = '';
+      return;
+    }
+    const numero = numeroDeChapitre(q);
+    const titres = chercherDansLesTitres(q, TOUS);
+    let pages: Resultat[] = [];
+    let panne = false;
+    if (!numero) {
+      try {
+        pages = await chercher(q);
+      } catch {
+        panne = true;
+      }
+    }
+    if (ceTour !== tour) return;
+
+    const blocs: HTMLElement[] = [];
+    const nbPassages = pages.reduce((n, r) => n + Math.max(1, r.passages.length), 0);
+    if (pages.length > 0) {
+      const ou =
+        pages.length === 1 && pages[0].numero ? `dans le chapitre ${pages[0].numero}` : `dans ${pluriel(pages.length, 'page')}`;
+      blocs.push(el('p', { class: 'bilan' }, el('strong', {}, pluriel(nbPassages, 'passage')), ` pour ${guillemets(q)}, ${ou}`));
+      annonce.textContent = `${pluriel(nbPassages, 'passage')} pour ${guillemets(q)}, ${ou}.`;
+    } else if (titres.length > 0 && !numero) {
+      const n = titres.length;
+      blocs.push(
+        el(
+          'p',
+          { class: 'bilan' },
+          `Aucun passage pour ${guillemets(q)} dans les chapitres parus, mais `,
+          el('strong', {}, pluriel(n, 'chapitre')),
+          ` du parcours en parle${n > 1 ? 'nt' : ''}.`,
+        ),
+      );
+      annonce.textContent = `Aucun passage dans les chapitres parus, ${pluriel(n, 'titre')} du parcours.`;
+    } else if (titres.length > 0) {
+      annonce.textContent = `Le chapitre ${titres[0].numero}.`;
+    }
+    if (panne) {
+      blocs.push(
+        el(
+          'p',
+          { class: 'panne' },
+          typographier(
+            "La recherche dans le texte des chapitres n'a pas pu se charger. Les titres du parcours sont cherchés quand même.",
+          ),
+        ),
+      );
+    }
+    blocs.push(...pages.map(page));
+    if (titres.length > 0) blocs.push(sommaire(numero, titres));
+    if (pages.length === 0 && titres.length === 0 && !panne) {
+      blocs.push(rien(q));
+      annonce.textContent = `Rien sur ${guillemets(q)}.`;
+    }
+    zone.replaceChildren(...blocs);
+  }
+
+  let minuterie: number | undefined;
+  champ.addEventListener('input', () => {
+    window.clearTimeout(minuterie);
+    minuterie = window.setTimeout(() => void lancer(champ.value), 150);
+  });
+
+  // Entrée : un numéro de chapitre paru mène droit au chapitre.
+  formulaire.addEventListener('submit', (evenement) => {
+    evenement.preventDefault();
+    window.clearTimeout(minuterie);
+    const numero = numeroDeChapitre(champ.value);
+    if (numero && parus.has(numero)) {
+      location.href = hrefChapitre(numero);
+      return;
+    }
+    void lancer(champ.value);
+  });
+
+  const essais = document.querySelector<HTMLElement>('[data-essais]');
+  if (essais) essais.hidden = false;
+  for (const bouton of document.querySelectorAll<HTMLButtonElement>('[data-essai]')) {
+    bouton.addEventListener('click', () => {
+      champ.value = bouton.dataset.essai ?? '';
+      window.clearTimeout(minuterie);
+      void lancer(champ.value);
+      champ.focus();
+    });
+  }
+
+  const demandee = new URLSearchParams(location.search).get('q');
+  if (demandee) {
+    champ.value = demandee;
+    void lancer(demandee);
+  }
+</script>
+
+<style>
+  .bloc {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 660px) 236px;
+    column-gap: 44px;
+    max-width: 1040px;
+    margin-inline: auto;
+    padding-inline: 24px;
+    box-sizing: content-box;
+  }
+
+  .bloc > .texte {
+    grid-column: 2;
+    min-width: 0;
+  }
+
+  .bloc > .note {
+    grid-column: 3;
+    align-self: start;
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--indigo-doux);
+    padding-top: 8px;
+  }
+
+  .note p {
+    margin: 0 0 0.8em;
+  }
+
+  .tete {
+    padding-top: 64px;
+  }
+
+  h1 {
+    font-weight: 800;
+    font-size: clamp(44px, 6vw, 72px);
+    line-height: 0.96;
+    letter-spacing: -0.03em;
+    margin: 0 0 28px;
+  }
+
+  .tete .note {
+    padding-top: 104px;
+  }
+
+  /* Le champ : on y tape, il est donc jaune, comme le champ de l'atelier. */
+  .champ label {
+    display: block;
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 17px;
+    color: var(--indigo-doux);
+    margin-bottom: 6px;
+  }
+
+  .champ-ligne {
+    position: relative;
+  }
+
+  .champ input {
+    width: 100%;
+    appearance: none;
+    font-family: var(--texte);
+    font-style: italic;
+    font-size: 32px;
+    line-height: 1.3;
+    color: var(--indigo);
+    background: var(--soleil-pale);
+    border: 0;
+    border-bottom: 4px solid var(--soleil);
+    border-radius: 8px 8px 0 0;
+    padding: 12px 56px 10px 16px;
+  }
+
+  .champ input::-webkit-search-cancel-button {
+    display: none;
+  }
+
+  .champ input::placeholder {
+    color: var(--indigo-doux);
+    opacity: 1;
+  }
+
+  .champ input:hover {
+    background: var(--soleil-survol);
+  }
+
+  .champ input:focus-visible {
+    outline: none;
+    background: var(--soleil-survol);
+    border-bottom-color: var(--indigo);
+  }
+
+  .loupe {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--indigo);
+  }
+
+  .essais {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 14px;
+    margin: 14px 0 0;
+    font-family: var(--titres);
+    font-size: 16px;
+    color: var(--indigo-doux);
+  }
+
+  .essais[hidden] {
+    display: none;
+  }
+
+  /* Les essais se manipulent : soulignés en jaune. */
+  .bascule {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--indigo);
+    background: none;
+    border: 0;
+    border-radius: 4px;
+    padding: 0 2px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: var(--soleil);
+    text-decoration-thickness: 4px;
+    text-underline-offset: 4px;
+    text-decoration-skip-ink: none;
+  }
+
+  .bascule:hover {
+    background: var(--soleil-pale);
+    text-decoration-color: var(--soleil-vif);
+  }
+
+  .sans-script {
+    font-family: var(--titres);
+    font-size: 16px;
+    color: var(--indigo-doux);
+    margin: 14px 0 0;
+  }
+
+  /* ---------- Résultats, posés par le script ---------- */
+  .resultats {
+    padding-top: 44px;
+  }
+
+  .resultats :global(.bilan) {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 17px;
+    color: var(--indigo-doux);
+    margin: 0 0 18px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--indigo);
+  }
+
+  .resultats :global(.bilan strong) {
+    color: var(--indigo);
+    font-weight: 800;
+  }
+
+  .resultats :global(.panne) {
+    font-family: var(--titres);
+    font-size: 16px;
+    color: var(--indigo-doux);
+  }
+
+  .resultats :global(.chapitre-trouve) {
+    margin-bottom: 40px;
+  }
+
+  .resultats :global(.chapitre-trouve h2) {
+    font-weight: 700;
+    font-size: 28px;
+    line-height: 1.2;
+    margin: 0 0 2px;
+  }
+
+  .resultats :global(.chapitre-trouve h2 a) {
+    text-decoration: none;
+  }
+
+  .resultats :global(.chapitre-trouve h2 .t) {
+    text-decoration: underline;
+    text-decoration-thickness: 3px;
+    text-decoration-color: var(--lavande);
+    text-underline-offset: 0.2em;
+  }
+
+  .resultats :global(.chapitre-trouve h2 a:hover .t) {
+    text-decoration-color: var(--indigo);
+  }
+
+  .resultats :global(.chapitre-trouve h2 .n) {
+    color: var(--indigo-doux);
+    margin-right: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .resultats :global(.chapitre-trouve .ou) {
+    font-family: var(--titres);
+    font-size: 15px;
+    color: var(--indigo-doux);
+    margin: 0 0 12px;
+  }
+
+  .resultats :global(.chapitre-trouve > .extrait) {
+    max-width: 31em;
+    font-size: 18px;
+    line-height: 1.55;
+    color: var(--indigo-doux);
+  }
+
+  .resultats :global(.passages) {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .resultats :global(.passages li) {
+    border-top: 1px solid var(--brume);
+  }
+
+  .resultats :global(.passages li:last-child) {
+    border-bottom: 1px solid var(--brume);
+  }
+
+  .resultats :global(.passages a) {
+    display: grid;
+    grid-template-columns: 2.2em minmax(0, 1fr);
+    column-gap: 8px;
+    padding: 14px 0 15px;
+    text-decoration: none;
+  }
+
+  .resultats :global(.n-etape) {
+    font-family: var(--titres);
+    font-weight: 800;
+    font-size: 30px;
+    line-height: 1;
+    color: var(--lavande); /* grand texte, et caché aux lecteurs d'écran */
+    font-variant-numeric: tabular-nums;
+  }
+
+  .resultats :global(.t-etape) {
+    display: block;
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 19px;
+    line-height: 1.3;
+  }
+
+  .resultats :global(.passages a:hover .t-etape) {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+  }
+
+  /* 31 em : moins de 80 signes par ligne. */
+  .resultats :global(.passages .extrait) {
+    display: block;
+    max-width: 31em;
+    font-size: 18px;
+    line-height: 1.55;
+    color: var(--indigo-doux);
+    margin-top: 4px;
+  }
+
+  /* Le mot trouvé, surligné comme un jeton. */
+  .resultats :global(mark) {
+    color: var(--indigo);
+    background: var(--teinte-a);
+    border-radius: 4px;
+    padding: 0 3px;
+    box-shadow: inset 0 -2px 0 var(--teinte-a-trait);
+  }
+
+  .resultats :global(.sommaire-trouve h2) {
+    font-weight: 700;
+    font-size: 22px;
+    margin: 0 0 4px;
+  }
+
+  .resultats :global(.sommaire-trouve > p) {
+    font-size: 17px;
+    color: var(--indigo-doux);
+    margin: 0 0 10px;
+  }
+
+  .resultats :global(.sommaire-trouve ol) {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .resultats :global(.sommaire-trouve li) {
+    display: grid;
+    grid-template-columns: 3.2em minmax(0, 1fr) auto;
+    column-gap: 10px;
+    align-items: baseline;
+    padding: 8px 0;
+    border-top: 1px solid var(--brume);
+    font-size: 18px;
+    color: var(--indigo-doux);
+  }
+
+  .resultats :global(.sommaire-trouve li:last-child) {
+    border-bottom: 1px solid var(--brume);
+  }
+
+  .resultats :global(.sommaire-trouve .num) {
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .resultats :global(.sommaire-trouve .etat) {
+    font-family: var(--titres);
+    font-size: 15px;
+  }
+
+  .resultats :global(.sommaire-trouve a) {
+    color: var(--indigo);
+    font-weight: 600;
+  }
+
+  .resultats :global(.vide h2) {
+    font-weight: 800;
+    font-size: 30px;
+    line-height: 1.15;
+    margin: 0 0 10px;
+  }
+
+  .resultats :global(.vide p) {
+    font-size: 19px;
+    max-width: 34em;
+  }
+
+  @media (max-width: 1140px) {
+    .bloc {
+      grid-template-columns: 56px minmax(0, 660px);
+      max-width: 760px;
+    }
+
+    /* Sous le texte, la note garde des lignes de moins de 80 signes. */
+    .bloc > .note {
+      grid-column: 2;
+      max-width: 34em;
+      margin-top: 18px;
+      padding: 0 0 0 1.2em;
+      font-size: 15px;
+    }
+
+    .tete .note {
+      padding-top: 0;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .bloc {
+      grid-template-columns: minmax(0, 1fr);
+      padding-inline: 20px;
+    }
+
+    .bloc > .texte,
+    .bloc > .note {
+      grid-column: 1;
+    }
+
+    .tete {
+      padding-top: 36px;
+    }
+
+    .champ input {
+      font-size: 24px;
+    }
+
+    .resultats :global(.chapitre-trouve h2) {
+      font-size: 24px;
+    }
+
+    .resultats :global(.passages a) {
+      grid-template-columns: 1.7em minmax(0, 1fr);
+    }
+
+    .resultats :global(.n-etape) {
+      font-size: 24px;
+    }
+
+    .resultats :global(.passages .extrait) {
+      font-size: 17px;
+    }
+
+    .resultats :global(.sommaire-trouve li) {
+      grid-template-columns: 3em minmax(0, 1fr);
+      font-size: 17px;
+    }
+
+    .resultats :global(.sommaire-trouve .etat) {
+      grid-column: 2;
+    }
+  }
+</style>

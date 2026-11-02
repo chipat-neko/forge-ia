@@ -2,7 +2,7 @@
 // Pied du chapitre : chapitres précédent et suivant dans le parcours.
 // Un chapitre qui n'a pas encore de fichier MDX s'affiche « à venir », sans lien.
 import { getCollection } from 'astro:content';
-import { hrefChapitre, voisins, type Chapitre } from '../../lib/parcours';
+import { hrefChapitre, titreCourt as court, voisins, type Chapitre } from '../../lib/parcours';
 import { typographier } from '../../lib/typo';
 
 interface Props {
@@ -16,7 +16,7 @@ const ecrits = new Set((await getCollection('chapitres')).map((entree) => entree
 // Titre court, comme dans la maquette : « Les données » plutôt que
 // « Les données : où les trouver, les nettoyer, les licences ».
 function titreCourt(chapitre: Chapitre): string {
-  return typographier(`${chapitre.numero} ${chapitre.titre.split(/ : | \(/)[0]}`);
+  return typographier(`${chapitre.numero} ${court(chapitre.titre)}`);
 }
 
 const liens = [
@@ -25,7 +25,7 @@ const liens = [
 ];
 ---
 
-<footer class="bloc pied">
+<footer class="bloc pied" data-pagefind-ignore>
   <nav class="texte voisins" aria-label="Chapitres voisins">
     {
       liens.map(({ chapitre, sens, classe }) =>

@@ -1,0 +1,468 @@
+---
+// La page 404 (maquette validée docs/maquettes/404.html). GitHub Pages la sert
+// pour toute adresse inconnue du site : ses liens sont donc tous absolus.
+//
+// « 404 » y est découpé par le moteur du chapitre 1.3, qui n'a appris aucun
+// chiffre : trois jetons inconnus. Le script montre l'adresse demandée et, si
+// c'est celle d'un chapitre à venir, dit lequel. Un petit pari termine la
+// page ; il n'est pas gardé dans la progression.
+import LayoutSite from '../layouts/LayoutSite.astro';
+import Pari from '../components/gabarit/Pari.astro';
+import MiniJetons from '../components/chapitres/1-3/MiniJetons.astro';
+import { chapitresParus } from '../lib/chapitres-parus';
+import {
+  MOT_404,
+  NB_FUSIONS,
+  assemblagesIntrouvable,
+  choixIntrouvable,
+  enLettres,
+  enumerer,
+  jetons404,
+  jetonsIntrouvable,
+} from '../lib/exemples';
+import { PARCOURS, hrefChapitre, titreCourt } from '../lib/parcours';
+import { typographier } from '../lib/typo';
+
+const parus = await chapitresParus();
+const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
+const accueil = `${base}/`;
+
+const n404 = enLettres(jetons404.length);
+const legende = typographier(
+  `« 404 », tel que le lit le petit découpeur du chapitre 1.3 : ${n404} caractères qu'il n'a jamais vus, ` +
+    `donc ${n404} jetons inconnus. Il n'a appris aucun chiffre.`,
+);
+
+// Les chapitres à venir, que le script reconnaît dans l'adresse demandée.
+const aVenir = Object.fromEntries(
+  PARCOURS.flatMap((p) => p.chapitres)
+    .filter((c) => !parus.has(c.numero))
+    .map((c) => [c.numero, typographier(c.titre)]),
+);
+const seul = [...parus.keys()][0];
+const pasParu = typographier(
+  "Il n'est pas encore paru. " +
+    (parus.size === 1 && seul
+      ? `Le seul chapitre disponible pour l'instant est le ${seul}, ${titreCourt(PARCOURS.flatMap((p) => p.chapitres).find((c) => c.numero === seul)!.titre)}.`
+      : "Les chapitres déjà parus sont sur l'accueil."),
+);
+
+const g = (mot: string) => `« ${mot} »`;
+const nbAssemblages = assemblagesIntrouvable.length;
+const assemblages = `${enLettres(nbAssemblages)} assemblage${nbAssemblages > 1 ? 's' : ''} appris sur d'autres mots`;
+---
+
+<LayoutSite titre="Page introuvable" liens={['parcours', 'recherche']}>
+  <div class="bloc inconnus">
+    <figure class="large">
+      <div class="nombre" aria-hidden="true">
+        {
+          jetons404.map((jeton, i) => (
+            <span class:list={['jeton', { b: i % 2 === 1 }]}>
+              <span class="morceau">{jeton.texte}</span>
+              <span class="num">{jeton.id ?? 'inconnu'}</span>
+            </span>
+          ))
+        }
+      </div>
+      <figcaption>{legende}</figcaption>
+    </figure>
+  </div>
+
+  <div class="bloc message">
+    <div class="texte">
+      <h1>Cette adresse ne mène à aucune page.</h1>
+      <p data-ligne-adresse hidden><span class="adresse" data-adresse></span></p>
+      <p data-explication data-a-venir={JSON.stringify(aVenir)} data-pas-paru={pasParu}>
+        {typographier("Le lien est peut-être ancien, ou l'adresse a été mal recopiée. Tout le site part de l'accueil.")}
+      </p>
+      <div class="sorties">
+        <a class="bouton" href={accueil}>{typographier("Retour à l'accueil")}</a>
+        <a href={`${accueil}#parcours`}>Voir tout le parcours</a>
+      </div>
+      <form class="cherche" role="search" action={`${base}/recherche/`}>
+        <label for="q404">{typographier("Ou cherche ce qui t'amenait")}</label>
+        <div class="ligne">
+          <input type="search" id="q404" name="q" placeholder="jetons, fusions, 1.3…" autocomplete="off" />
+          <button type="submit">Chercher</button>
+        </div>
+      </form>
+    </div>
+    <aside class="note">
+      <p>{typographier('Les adresses du site suivent le parcours :')} <code>partie-1/1-3/</code> mène au chapitre 1.3.</p>
+    </aside>
+  </div>
+
+  <div class="bloc pari-bloc" data-paris="404">
+    <div class="texte">
+      <Pari
+        id="introuvable"
+        question={`Pendant que tu es là, un pari : en combien de morceaux le même découpeur coupe-t-il « ${MOT_404} » ?`}
+        precision={`Le mot fait ${Array.from(MOT_404).length} lettres. Il n'apparaît pas dans le court texte où le découpeur a appris.`}
+        choix={choixIntrouvable}
+      >
+        <p>{typographier(`${g(MOT_404)} part en ${jetonsIntrouvable.length} morceaux :`)}</p>
+        <MiniJetons texte={MOT_404} k={NB_FUSIONS} numeros />
+        <p>
+          {
+            typographier(
+              `Le découpeur n'a jamais vu ce mot entier. Il l'écrit avec ce qu'il connaît : des lettres seules, et ${assemblages}, ${enumerer(assemblagesIntrouvable.map(g))}. C'est tout l'objet du `,
+            )
+          }<a href={hrefChapitre('1.3')}>chapitre 1.3</a>.
+        </p>
+      </Pari>
+    </div>
+  </div>
+</LayoutSite>
+
+<script>
+  import { brancherParis } from '../scripts/paris';
+
+  const FINE = ' ';
+
+  // L'adresse demandée, et le chapitre à venir qu'elle désigne peut-être.
+  const ligne = document.querySelector<HTMLElement>('[data-ligne-adresse]');
+  const adresse = document.querySelector<HTMLElement>('[data-adresse]');
+  if (ligne && adresse) {
+    adresse.textContent = decodeURIComponent(location.pathname);
+    ligne.hidden = false;
+  }
+  const explication = document.querySelector<HTMLElement>('[data-explication]');
+  const chapitre = /\/partie-(\d)\/(\d)-(\d{1,2})\/?$/.exec(location.pathname);
+  if (explication && chapitre && chapitre[1] === chapitre[2]) {
+    const numero = `${chapitre[2]}.${chapitre[3]}`;
+    let aVenir: Record<string, string> = {};
+    try {
+      aVenir = JSON.parse(explication.dataset.aVenir ?? '{}');
+    } catch {
+      // Données abîmées : on garde le message général.
+    }
+    const titre = aVenir[numero];
+    if (titre) {
+      const fort = document.createElement('strong');
+      fort.textContent = `${numero}, ${titre}`;
+      explication.className = 'chapitre-attendu';
+      explication.replaceChildren('Tu cherchais le chapitre ', fort, `${FINE}? ${explication.dataset.pasParu ?? ''}`);
+    }
+  }
+
+  const zone = document.querySelector<HTMLElement>('[data-paris="404"]');
+  if (zone) brancherParis(zone);
+</script>
+
+<style>
+  .bloc {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 660px) 236px;
+    column-gap: 44px;
+    max-width: 1040px;
+    margin-inline: auto;
+    padding-inline: 24px;
+    box-sizing: content-box;
+  }
+
+  .bloc > .texte {
+    grid-column: 2;
+    min-width: 0;
+  }
+
+  .bloc > .note {
+    grid-column: 3;
+    align-self: start;
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--indigo-doux);
+  }
+
+  .bloc > .large {
+    grid-column: 2 / 4;
+    min-width: 0;
+  }
+
+  .note p {
+    margin: 0 0 0.8em;
+  }
+
+  .note code {
+    font-size: 14px;
+    color: var(--indigo);
+  }
+
+  /* « 404 », tel que le lit le découpeur du chapitre 1.3 : trois inconnus. */
+  .inconnus {
+    padding-top: 56px;
+  }
+
+  .inconnus figure {
+    margin: 0;
+  }
+
+  .nombre {
+    display: flex;
+    gap: 14px;
+    font-family: var(--titres);
+    font-weight: 800;
+    font-size: clamp(110px, 17vw, 230px);
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+  }
+
+  .jeton {
+    display: inline-flex;
+    flex-direction: column;
+  }
+
+  .jeton .morceau {
+    padding: 0 0.03em 0.04em;
+    border-bottom: 10px solid var(--teinte-a-trait);
+  }
+
+  .jeton.b .morceau {
+    border-bottom-color: var(--teinte-b-trait);
+  }
+
+  .jeton .num {
+    align-self: center;
+    font-weight: 600;
+    font-size: 19px;
+    letter-spacing: 0;
+    line-height: 1;
+    margin-top: 12px;
+    color: var(--indigo-doux);
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 17px;
+    line-height: 1.45;
+    color: var(--indigo-doux);
+    margin-top: 18px;
+    max-width: 32em; /* moins de 80 signes par ligne */
+  }
+
+  /* Le message et les sorties. */
+  .message {
+    padding-top: 48px;
+  }
+
+  h1 {
+    font-weight: 800;
+    font-size: clamp(36px, 5vw, 56px);
+    line-height: 1.02;
+    letter-spacing: -0.025em;
+    margin: 0 0 16px;
+    text-wrap: balance;
+  }
+
+  .adresse {
+    font-family: var(--mono);
+    font-size: 17px;
+    background: var(--brume-claire);
+    border-radius: 6px;
+    padding: 4px 10px;
+    display: inline-block;
+    margin: 0 0 18px;
+    overflow-wrap: anywhere;
+  }
+
+  .message .texte p {
+    font-size: 20px;
+    max-width: 29.5em; /* comme la colonne d'un chapitre : moins de 80 signes */
+  }
+
+  .message .texte p[hidden] {
+    display: none;
+  }
+
+  .message .chapitre-attendu {
+    font-size: 22px;
+    line-height: 1.45;
+  }
+
+  .chapitre-attendu :global(strong) {
+    font-family: var(--titres);
+    font-weight: 700;
+  }
+
+  .sorties {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px 26px;
+    margin: 26px 0 0;
+  }
+
+  .bouton {
+    display: inline-block;
+    text-decoration: none;
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 19px;
+    line-height: 1.2;
+    color: var(--papier);
+    background: var(--indigo);
+    border-radius: 10px;
+    padding: 15px 22px 14px;
+  }
+
+  .bouton:hover {
+    background: var(--indigo-survol);
+  }
+
+  .sorties a:not(.bouton) {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 18px;
+    text-decoration-thickness: 2px;
+    text-decoration-color: var(--lavande);
+  }
+
+  .sorties a:not(.bouton):hover {
+    text-decoration-color: var(--indigo);
+  }
+
+  /* Le petit champ de recherche : on y tape, il est jaune. */
+  .cherche {
+    margin-top: 34px;
+    max-width: 520px;
+  }
+
+  .cherche label {
+    display: block;
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--indigo-doux);
+    margin-bottom: 6px;
+  }
+
+  .cherche .ligne {
+    display: flex;
+    gap: 10px;
+  }
+
+  .cherche input {
+    flex: 1;
+    min-width: 0;
+    appearance: none;
+    font-family: var(--texte);
+    font-style: italic;
+    font-size: 20px;
+    color: var(--indigo);
+    background: var(--soleil-pale);
+    border: 0;
+    border-bottom: 3px solid var(--soleil);
+    border-radius: 6px 6px 0 0;
+    padding: 8px 12px 6px;
+  }
+
+  .cherche input::placeholder {
+    color: var(--indigo-doux);
+    opacity: 1;
+  }
+
+  .cherche input:hover {
+    background: var(--soleil-survol);
+  }
+
+  .cherche input:focus-visible {
+    outline: none;
+    background: var(--soleil-survol);
+    border-bottom-color: var(--indigo);
+  }
+
+  .cherche button {
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 17px;
+    color: var(--indigo);
+    background: var(--papier);
+    border: 2px solid var(--indigo);
+    border-radius: 10px;
+    padding: 8px 16px;
+    cursor: pointer;
+    box-shadow: 0 3px 0 var(--indigo);
+  }
+
+  .cherche button:hover {
+    background: var(--soleil);
+  }
+
+  .cherche button:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 var(--indigo);
+  }
+
+  /* Le petit pari (styles du pari des chapitres, Pari.astro). */
+  .pari-bloc {
+    padding-top: 38px;
+  }
+
+  /* La colonne est plus large que celle d'un chapitre : la précision du pari
+     garde des lignes de moins de 80 signes. */
+  .pari-bloc :global(.q small) {
+    max-width: 34em;
+  }
+
+  @media (max-width: 1140px) {
+    .bloc {
+      grid-template-columns: 56px minmax(0, 660px);
+      max-width: 760px;
+    }
+
+    /* Sous le texte, la note garde des lignes de moins de 80 signes. */
+    .bloc > .note {
+      grid-column: 2;
+      max-width: 34em;
+      margin-top: 22px;
+      padding: 0 0 0 1.2em;
+      font-size: 15px;
+    }
+
+    .bloc > .large {
+      grid-column: 2;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .bloc {
+      grid-template-columns: minmax(0, 1fr);
+      padding-inline: 20px;
+    }
+
+    .bloc > .texte,
+    .bloc > .note,
+    .bloc > .large {
+      grid-column: 1;
+    }
+
+    .inconnus {
+      padding-top: 32px;
+    }
+
+    .nombre {
+      gap: 8px;
+      font-size: 104px;
+    }
+
+    .jeton .morceau {
+      border-bottom-width: 7px;
+    }
+
+    .jeton .num {
+      font-size: 15px;
+    }
+
+    .message {
+      padding-top: 32px;
+    }
+
+    .message .texte p {
+      font-size: 18px;
+    }
+
+    .message .chapitre-attendu {
+      font-size: 19px;
+    }
+  }
+</style>

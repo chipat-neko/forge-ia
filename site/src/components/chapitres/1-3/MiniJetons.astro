@@ -2,26 +2,36 @@
 // Un mot ou une phrase découpé en jetons, en petit, dans le texte d'une
 // explication (maquette 10, verdict des paris). Le découpage est fait à la
 // construction par tokenizer13, le même code que l'atelier et les paris.
+// Avec `numeros`, le numéro de chaque jeton s'affiche dessous (maquette 404).
 import { segmentsVisibles, tokenizer13 } from '../../../lib/bpe';
 
 interface Props {
   texte: string;
   /** Nombre de fusions apprises utilisées pour découper. */
   k: number;
+  /** Montrer le numéro de chaque jeton sous son morceau. */
+  numeros?: boolean;
 }
 
-const { texte, k } = Astro.props;
+const { texte, k, numeros = false } = Astro.props;
 const jetons = tokenizer13.decouper(texte, k);
 const n = jetons.length;
 ---
 
-<ol class="mini-jetons" aria-label={`Les ${n} ${n > 1 ? 'jetons' : 'jeton'}`}>
+<ol class:list={['mini-jetons', { numeros }]} aria-label={`Les ${n} ${n > 1 ? 'jetons' : 'jeton'}`}>
   {
-    jetons.map((jeton, i) => (
-      <li class:list={['morceau', { b: i % 2 === 1 }]} data-jeton={jeton.id ?? 'inconnu'}>
-        {segmentsVisibles(jeton.texte).map((s) => (s.blanc ? <span class="blanc">{s.texte}</span> : s.texte))}
-      </li>
-    ))
+    jetons.map((jeton, i) =>
+      numeros ? (
+        <li class="j" data-jeton={jeton.id ?? 'inconnu'}>
+          <span class:list={['morceau', { b: i % 2 === 1 }]}>{segmentsVisibles(jeton.texte).map((s) => (s.blanc ? <span class="blanc">{s.texte}</span> : s.texte))}</span>
+          <span class="num">{jeton.id ?? 'inconnu'}</span>
+        </li>
+      ) : (
+        <li class:list={['morceau', { b: i % 2 === 1 }]} data-jeton={jeton.id ?? 'inconnu'}>
+          {segmentsVisibles(jeton.texte).map((s) => (s.blanc ? <span class="blanc">{s.texte}</span> : s.texte))}
+        </li>
+      ),
+    )
   }
 </ol>
 
@@ -50,5 +60,32 @@ const n = jetons.length;
 
   .blanc {
     color: var(--indigo-doux);
+  }
+
+  /* Avec les numéros : chaque jeton en colonne, son numéro dessous. */
+  .numeros {
+    gap: 6px 4px;
+    margin: 10px 0 12px;
+    font-size: 24px;
+  }
+
+  .j {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .numeros .morceau {
+    padding: 0 6px;
+  }
+
+  .num {
+    font-family: var(--titres);
+    font-weight: 500;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--indigo-doux);
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
   }
 </style>

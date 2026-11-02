@@ -1,0 +1,103 @@
+---
+// Pied des pages hors chapitre : le site, ses licences, et la progression.
+// Sur l'accueil et les pages de partie, « Effacer ma progression » efface
+// toute la progression gardée (tous les chapitres et le pari de l'accueil).
+// Le bouton n'apparaît qu'avec JavaScript, qui seul peut le faire marcher.
+import { DEPOT } from '../../lib/depot';
+
+interface Props {
+  /** Montrer le bouton qui efface toute la progression. */
+  effacer?: boolean;
+}
+
+const { effacer = false } = Astro.props;
+---
+
+<footer class="pied-site">
+  <div class="pied-in">
+    <p><strong>La Forge IA</strong>, un parcours en français pour construire une IA de zéro.</p>
+    <p>Code sous licence MIT, textes sous licence CC BY 4.0. Tout le code est sur <a href={DEPOT}>GitHub</a>.</p>
+    <p>
+      Ta progression reste dans ce navigateur, sans compte.{' '}
+      {
+        effacer && (
+          <button type="button" class="lien-texte" data-effacer-tout hidden>
+            Effacer ma progression
+          </button>
+        )
+      }
+    </p>
+  </div>
+</footer>
+
+<script>
+  import { effacer } from '../../lib/progression';
+
+  for (const bouton of document.querySelectorAll<HTMLButtonElement>('[data-effacer-tout]')) {
+    bouton.hidden = false;
+    bouton.addEventListener('click', () => {
+      effacer();
+      // Recharger en haut de la page : tous les états repartent de zéro, et
+      // le lecteur voit le changement sur le plan.
+      history.replaceState(history.state, '', location.pathname + location.search);
+      window.scrollTo(0, 0);
+      location.reload();
+    });
+  }
+</script>
+
+<style>
+  .pied-site {
+    margin-top: 110px;
+    border-top: 1px solid var(--brume);
+    background: var(--brume-claire);
+  }
+
+  .pied-in {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 30px 24px 48px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px 40px;
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--indigo-doux);
+  }
+
+  .pied-in p {
+    margin: 0;
+  }
+
+  .pied-in strong {
+    font-family: var(--titres);
+    color: var(--indigo);
+  }
+
+  .pied-in a {
+    color: var(--indigo);
+  }
+
+  .lien-texte {
+    font-family: var(--texte);
+    font-size: inherit;
+    color: var(--indigo);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .lien-texte[hidden] {
+    display: none;
+  }
+
+  @media (max-width: 720px) {
+    .pied-in {
+      grid-template-columns: minmax(0, 1fr);
+      padding: 26px 20px 40px;
+    }
+  }
+</style>

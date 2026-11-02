@@ -14,15 +14,27 @@ import PiedChapitre from '../components/gabarit/PiedChapitre.astro';
 import type { DonneesChapitre } from '../content.config';
 import { typographier } from '../lib/typo';
 
-type Props = DonneesChapitre;
+type Props = DonneesChapitre & {
+  /**
+   * Mettre la page dans l'index de la recherche (Pagefind). Faux pour les
+   * pages d'essai, qui ne doivent jamais apparaître dans les résultats.
+   */
+  indexer?: boolean;
+};
 
-const { numero, titre, chapeau, programme, acquis } = Astro.props;
+const { numero, titre, chapeau, programme, acquis, indexer = true } = Astro.props;
 ---
 
 <Base titre={typographier(`${numero} ${titre}`)} description={typographier(chapeau)}>
   <BarreHaut numero={numero} acquis={acquis} />
   <main>
-    <article class="chapitre" data-chapitre={numero}>
+    {/* Seul le contenu de l'article est indexé : ni la barre du haut ni le pied. */}
+    <article
+      class="chapitre"
+      data-chapitre={numero}
+      data-pagefind-body={indexer ? '' : undefined}
+      data-pagefind-meta={indexer ? `numero:${numero}` : undefined}
+    >
       <div class="bloc titre">
         <div class="texte">
           <h1>{typographier(titre)}</h1>

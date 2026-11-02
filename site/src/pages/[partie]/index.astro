@@ -1,0 +1,820 @@
+---
+// Une page par partie (maquette validée docs/maquettes/partie.html, faite
+// pour la Partie 1) : /forge-ia/partie-0/ à /forge-ia/partie-3/.
+//
+// Elle reprend la grille du chapitre : la pastille de la partie dans la marge,
+// le titre, le chapeau et le programme, puis ce que ton IA saura faire (Partie
+// 1), puis les chapitres, rangés par groupe quand la partie en a. Chaque
+// chapitre est une ligne [data-chapitre-carte] : « à venir » ou
+// « disponible » ; le script la passe à « fait » ou y montre les acquis déjà
+// gagnés, et tient à jour la barre des chapitres en haut de la page.
+import LayoutSite from '../../layouts/LayoutSite.astro';
+import { chapitresParus } from '../../lib/chapitres-parus';
+import { PARCOURS, chapitresDuGroupe, hrefChapitre, hrefPartie, type Chapitre, type Partie } from '../../lib/parcours';
+import { typographier } from '../../lib/typo';
+
+export function getStaticPaths() {
+  return PARCOURS.map((partie) => ({ params: { partie: `partie-${partie.numero}` }, props: { partie } }));
+}
+
+interface Props {
+  partie: Partie;
+}
+
+const { partie } = Astro.props;
+const parus = await chapitresParus();
+const rang = PARCOURS.indexOf(partie);
+const precedente = PARCOURS[rang - 1];
+const suivante = PARCOURS[rang + 1];
+const total = partie.chapitres.length;
+const nbParus = partie.chapitres.filter((c) => parus.has(c.numero)).length;
+
+// Les étapes de la page : les groupes de la partie, ou une seule liste.
+const etapes = partie.groupes
+  ? partie.groupes.map((groupe) => ({ groupe, chapitres: chapitresDuGroupe(partie, groupe) }))
+  : [{ groupe: undefined, chapitres: partie.chapitres }];
+
+const enEtapes = partie.groupes ? ` en ${partie.groupes.length} étapes` : '';
+const programme = typographier(
+  `${total} chapitres${enEtapes}. ` +
+    (nbParus === 0
+      ? "Aucun n'est paru pour l'instant, ils paraissent par vagues."
+      : nbParus === total
+        ? 'Tous sont parus.'
+        : `${nbParus} paru${nbParus > 1 ? 's' : ''} pour l'instant, les autres paraissent par vagues.`),
+);
+
+const note = partie.depart
+  ? `Elle part de la Partie 1 après ${partie.depart}, ${PARCOURS[1].chapitres.find((c) => c.numero === partie.depart)?.titre}.`
+  : partie.note;
+
+const ancre = (c: Chapitre) => `chapitre-${c.numero.replace('.', '-')}`;
+const plage = (chapitres: Chapitre[]) => {
+  const n = chapitres.filter((c) => parus.has(c.numero)).length;
+  const etat = n === 0 ? 'à venir' : `${n} paru sur ${chapitres.length}`;
+  return `Chapitres ${chapitres[0].numero} à ${chapitres[chapitres.length - 1].numero}, ${etat}`;
+};
+const savoirs = partie.savoirs ?? [];
+---
+
+<LayoutSite
+  titre={typographier(`Partie ${partie.numero}, ${partie.titre}`)}
+  description={typographier(partie.chapeau ?? partie.resume)}
+  liens={['recherche']}
+  effacer
+>
+  <Fragment slot="barre">
+    <span class="ou">Partie {partie.numero} sur {PARCOURS.length}</span>
+    <nav class="chap-barre" aria-label="Chapitres de la partie">
+      {
+        etapes.map(({ chapitres }) => (
+          <span style={`--n:${chapitres.length}`}>
+            {chapitres.map((c) => {
+              const libelle = typographier(`${c.numero} ${c.titre}`);
+              const paru = parus.has(c.numero);
+              return (
+                <a
+                  href={`#${ancre(c)}`}
+                  class:list={{ dispo: paru }}
+                  data-barre={c.numero}
+                  data-libelle={libelle}
+                  aria-label={`${libelle}, ${paru ? 'disponible' : 'à venir'}`}
+                />
+              );
+            })}
+          </span>
+        ))
+      }
+    </nav>
+    <span class="fait-mini" data-fait-mini><strong>0</strong> fait sur {total}</span>
+  </Fragment>
+
+  <div class="bloc titre-partie">
+    <span class="pastille" aria-hidden="true">{partie.numero}</span>
+    <div class="texte">
+      <h1><span class="vh">Partie {partie.numero}, </span>{typographier(partie.titre)}</h1>
+      <p class="chapeau">{typographier(partie.chapeau ?? partie.resume)}</p>
+      <p class="programme">{programme}</p>
+    </div>
+    {
+      note && (
+        <aside class="note">
+          <p>{typographier(note)}</p>
+        </aside>
+      )
+    }
+  </div>
+
+  {
+    savoirs.length > 0 && (
+      <section class="bloc savoirs" aria-labelledby="t-savoirs">
+        <div class="large">
+          <h2 id="t-savoirs" class="vh">
+            Ce que ton IA saura faire
+          </h2>
+          <p class="phrase-savoirs">
+            {'À la fin de cette partie, ton IA saura '}
+            {savoirs.map((savoir, i) => {
+              // La ponctuation reste collée au savoir qui la précède.
+              const ponctuation = i === savoirs.length - 1 ? '.' : i === savoirs.length - 2 ? '' : ',';
+              const separateur = i === savoirs.length - 2 ? ' et ' : i < savoirs.length - 1 ? ' ' : '';
+              return [
+                <span class:list={['savoir', { b: i % 2 === 1 }]} data-savoir={savoir.chapitre}><span class="col"><span class="morceau">{typographier(savoir.texte)}</span><span class="ch-num"><span class="vh"> (chapitre </span>{savoir.chapitre}<span class="vh" data-savoir-fin>)</span></span></span>{ponctuation}</span>,
+                separateur,
+              ];
+            })}
+          </p>
+          <p class="legende-savoirs">
+            {typographier("Sous chaque savoir, le chapitre où ton IA l'apprend. Il se coche quand tu as fini ce chapitre.")}
+          </p>
+        </div>
+      </section>
+    )
+  }
+
+  {
+    etapes.map(({ groupe, chapitres }, i) => {
+      const ouverte = chapitres.some((c) => parus.has(c.numero));
+      const idTitre = `titre-etape-${i + 1}`;
+      return (
+        <section class:list={['bloc', 'etape', { ouverte }]} id={`etape-${i + 1}`} aria-labelledby={idTitre}>
+          {groupe && (
+            <span class="num-etape" aria-hidden="true">
+              {i + 1}
+            </span>
+          )}
+          <div class="texte">
+            {groupe ? (
+              <h2 id={idTitre}>{typographier(groupe.nom)}</h2>
+            ) : (
+              <h2 id={idTitre} class="vh">
+                Les chapitres de la partie
+              </h2>
+            )}
+            <p class="plage">{plage(chapitres)}</p>
+            {groupe && <p class="gain">{typographier(groupe.gain)}</p>}
+            <ol class="chapitres">
+              {chapitres.map((c) => {
+                const paru = parus.get(c.numero);
+                return (
+                  <li
+                    class="chap"
+                    id={ancre(c)}
+                    data-chapitre-carte={c.numero}
+                    data-etat={paru ? 'disponible' : 'a-venir'}
+                    data-acquis={paru?.acquis.join(' ')}
+                  >
+                    <span class="num">{c.numero}</span>
+                    <div>
+                      {paru ? (
+                        <a class="titre" href={hrefChapitre(c.numero)}>
+                          {typographier(c.titre)}
+                        </a>
+                      ) : (
+                        <span class="titre">{typographier(c.titre)}</span>
+                      )}
+                      {c.resume && <p class="resume">{typographier(c.resume)}</p>}
+                      {paru && (
+                        <p class="infos" data-infos>
+                          {typographier(paru.programme)}
+                        </p>
+                      )}
+                    </div>
+                    {paru ? (
+                      <span class="etat" data-etat-texte>
+                        disponible
+                      </span>
+                    ) : (
+                      <span class="vh">, à venir</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+          {groupe && (
+            <aside class="note">
+              <p>{typographier(groupe.note)}</p>
+            </aside>
+          )}
+        </section>
+      );
+    })
+  }
+
+  <footer class="bloc pied">
+    <nav class="texte voisins" aria-label="Parties voisines">
+      {
+        precedente ? (
+          <a href={hrefPartie(precedente.numero)}>
+            <span>Partie précédente</span>
+            <strong>
+              {precedente.numero}, {typographier(precedente.titre)}
+            </strong>
+          </a>
+        ) : (
+          <span />
+        )
+      }
+      {
+        suivante && (
+          <a class="suivante" href={hrefPartie(suivante.numero)}>
+            <span>Partie suivante</span>
+            <strong>
+              {suivante.numero}, {typographier(suivante.titre)}
+            </strong>
+          </a>
+        )
+      }
+    </nav>
+  </footer>
+</LayoutSite>
+
+<script>
+  import { typographier } from '../../lib/typo';
+  import { avancementDe, pastilles } from '../../scripts/etats';
+
+  const FINE = ' ';
+  let faits = 0;
+  for (const ligne of document.querySelectorAll<HTMLElement>('.chap[data-chapitre-carte]')) {
+    const avancement = avancementDe(ligne);
+    if (!avancement) continue;
+    const { gagnes, total, etat } = avancement;
+    const numero = ligne.dataset.chapitreCarte ?? '';
+    const infos = ligne.querySelector<HTMLElement>('[data-infos]');
+    const texteEtat = ligne.querySelector<HTMLElement>('[data-etat-texte]');
+    if (etat === 'fait') {
+      faits++;
+      ligne.dataset.etat = 'fait';
+      if (texteEtat) texteEtat.textContent = 'fait';
+      infos?.replaceChildren(pastilles(total, total), `Ce que tu sais${FINE}: ${total} sur ${total}`);
+      // La barre du haut et le savoir appris dans ce chapitre.
+      const trait = document.querySelector<HTMLElement>(`[data-barre="${numero}"]`);
+      trait?.classList.replace('dispo', 'fait');
+      trait?.setAttribute('aria-label', `${trait.dataset.libelle ?? numero}, fait`);
+      const savoir = document.querySelector<HTMLElement>(`[data-savoir="${numero}"]`);
+      savoir?.classList.add('acquis');
+      const fin = savoir?.querySelector('[data-savoir-fin]');
+      if (fin) fin.textContent = ', fait)';
+    } else if (etat === 'commence') {
+      if (texteEtat) texteEtat.textContent = 'commencé';
+      infos?.replaceChildren(
+        pastilles(gagnes, total),
+        typographier(`Ce que tu sais : ${gagnes} sur ${total}, reprends où tu t'es arrêté`),
+      );
+    }
+  }
+  const faitMini = document.querySelector('[data-fait-mini]');
+  const totalPartie = document.querySelectorAll('.chap[data-chapitre-carte]').length;
+  if (faitMini) {
+    const fort = document.createElement('strong');
+    fort.textContent = String(faits);
+    faitMini.replaceChildren(fort, ` fait${faits > 1 ? 's' : ''} sur ${totalPartie}`);
+  }
+</script>
+
+<style>
+  /* ---------- Dans la barre du haut ---------- */
+  .ou {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--indigo-doux);
+  }
+
+  .chap-barre {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex: 1 1 200px;
+    max-width: 300px;
+  }
+
+  .chap-barre > span {
+    display: flex;
+    gap: 3px;
+    flex: var(--n);
+  }
+
+  .chap-barre a {
+    flex: 1;
+    height: 7px;
+    border-radius: 2px;
+    background: var(--brume);
+    position: relative;
+  }
+
+  /* Zone de clic plus haute que le trait. */
+  .chap-barre a::after {
+    content: '';
+    position: absolute;
+    inset: -10px 0;
+  }
+
+  .chap-barre a.dispo {
+    background: var(--indigo);
+  }
+
+  .chap-barre a.fait {
+    background: var(--menthe);
+  }
+
+  .fait-mini {
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  /* Le compte est réécrit par le script. */
+  .fait-mini :global(strong) {
+    font-weight: 800;
+  }
+
+  /* ---------- La grille du gabarit de chapitre ---------- */
+  .bloc {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 660px) 236px;
+    column-gap: 44px;
+    max-width: 1040px;
+    margin-inline: auto;
+    padding-inline: 24px;
+    box-sizing: content-box;
+  }
+
+  .bloc > .texte {
+    grid-column: 2;
+    min-width: 0;
+  }
+
+  .bloc > .note {
+    grid-column: 3;
+    align-self: start;
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--indigo-doux);
+    padding-top: 8px;
+  }
+
+  .bloc > .num-etape,
+  .bloc > .pastille {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .bloc > .large {
+    grid-column: 2 / 4;
+    min-width: 0;
+  }
+
+  .note p {
+    margin: 0 0 0.8em;
+  }
+
+  /* ---------- Ouverture ---------- */
+  .titre-partie {
+    padding-top: 64px;
+  }
+
+  /* La pastille de la partie, la même que sur le plan de l'accueil. */
+  .pastille {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    margin-top: 10px;
+    display: grid;
+    place-items: center;
+    font-family: var(--titres);
+    font-weight: 800;
+    font-size: 28px;
+    line-height: 1;
+    background: var(--indigo);
+    color: var(--papier);
+  }
+
+  h1 {
+    text-wrap: balance;
+    font-weight: 800;
+    font-size: clamp(46px, 7vw, 84px);
+    line-height: 0.96;
+    letter-spacing: -0.03em;
+    margin: 0 0 26px;
+  }
+
+  .chapeau {
+    font-size: 24px;
+    line-height: 1.48;
+    margin: 0 0 14px;
+  }
+
+  .programme {
+    font-family: var(--titres);
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--indigo-doux);
+    margin: 0;
+  }
+
+  .titre-partie .note {
+    padding-top: 112px;
+  }
+
+  /* ---------- Ce que ton IA saura faire ---------- */
+  .savoirs {
+    padding-top: 56px;
+  }
+
+  .phrase-savoirs {
+    font-size: 34px;
+    line-height: 1.3;
+    font-variation-settings: 'opsz' 48;
+    margin: 0;
+  }
+
+  .savoir {
+    display: inline-flex;
+    align-items: flex-start;
+    vertical-align: top;
+    margin: 0 2px 12px;
+    white-space: nowrap;
+  }
+
+  .savoir .col {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    white-space: normal;
+  }
+
+  .savoir .morceau {
+    padding: 0 8px 1px;
+    background: var(--teinte-a);
+    border-radius: 6px;
+  }
+
+  .savoir.b .morceau {
+    background: var(--teinte-b);
+  }
+
+  .savoir .ch-num {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 1;
+    margin-top: 6px;
+    color: var(--indigo-doux);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .savoir.acquis .morceau {
+    background: var(--menthe-pale);
+    box-shadow: inset 0 -3px 0 var(--menthe);
+  }
+
+  .savoir.acquis .ch-num {
+    color: var(--menthe);
+  }
+
+  .savoir.acquis .ch-num::before {
+    content: '\2713\00a0';
+    font-weight: 800;
+  }
+
+  .legende-savoirs {
+    font-family: var(--titres);
+    font-size: 16px;
+    line-height: 1.45;
+    color: var(--indigo-doux);
+    margin: 8px 0 0;
+    max-width: 34em; /* moins de 80 signes par ligne */
+  }
+
+  /* ---------- Les étapes de la partie ---------- */
+  .etape {
+    padding-top: 76px;
+  }
+
+  .num-etape {
+    font-family: var(--titres);
+    font-weight: 800;
+    font-size: 44px;
+    line-height: 1;
+    color: var(--lavande); /* grand texte : 3,2 suffit */
+    font-variant-numeric: tabular-nums;
+    padding-top: 1px;
+  }
+
+  .etape.ouverte .num-etape {
+    color: var(--indigo);
+  }
+
+  .etape h2 {
+    font-weight: 700;
+    font-size: 31px;
+    line-height: 1.15;
+    letter-spacing: -0.012em;
+    margin: 0 0 8px;
+  }
+
+  .etape .gain {
+    font-size: 20px;
+    max-width: 29.5em; /* comme la colonne d'un chapitre : moins de 80 signes */
+    margin: 0 0 18px;
+  }
+
+  .etape .plage {
+    font-family: var(--titres);
+    font-weight: 500;
+    font-size: 16px;
+    color: var(--indigo-doux);
+    margin: 0 0 6px;
+  }
+
+  .chapitres {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-bottom: 1px solid var(--brume);
+  }
+
+  .chap {
+    display: grid;
+    grid-template-columns: 3.2em minmax(0, 1fr) auto;
+    column-gap: 12px;
+    align-items: baseline;
+    padding: 14px 0 15px;
+    border-top: 1px solid var(--brume);
+  }
+
+  .chap .num {
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 18px;
+    font-variant-numeric: tabular-nums;
+    color: var(--indigo-doux);
+  }
+
+  .chap .titre {
+    display: block;
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 21px;
+    line-height: 1.25;
+    text-decoration: none;
+  }
+
+  .chap .resume {
+    font-size: 17px;
+    line-height: 1.5;
+    color: var(--indigo-doux);
+    margin: 4px 0 0;
+  }
+
+  .chap .etat {
+    font-family: var(--titres);
+    font-weight: 500;
+    font-size: 15px;
+    color: var(--indigo-doux);
+    white-space: nowrap;
+  }
+
+  .chap[data-etat='a-venir'] .titre {
+    color: var(--indigo-doux);
+    font-weight: 600;
+  }
+
+  .chap[data-etat='disponible'],
+  .chap[data-etat='fait'] {
+    padding: 20px 0 22px;
+  }
+
+  .chap[data-etat='disponible'] .num,
+  .chap[data-etat='fait'] .num {
+    color: var(--indigo);
+  }
+
+  .chap a.titre {
+    font-size: 26px;
+    text-decoration: underline;
+    text-decoration-thickness: 3px;
+    text-decoration-color: var(--lavande);
+    text-underline-offset: 0.2em;
+  }
+
+  .chap a.titre:hover {
+    text-decoration-color: var(--indigo);
+  }
+
+  .chap[data-etat='disponible'] .resume,
+  .chap[data-etat='fait'] .resume {
+    color: var(--indigo);
+    font-size: 18px;
+    margin-top: 8px;
+  }
+
+  .chap .infos {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    margin: 10px 0 0;
+    font-family: var(--titres);
+    font-size: 15px;
+    color: var(--indigo-doux);
+  }
+
+  /* Pastilles « Ce que tu sais », posées par le script. */
+  .infos :global(.pips) {
+    display: inline-flex;
+    gap: 4px;
+  }
+
+  .infos :global(.pips i) {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--lavande);
+  }
+
+  .infos :global(.pips i.plein) {
+    background: var(--menthe);
+    border-color: var(--menthe);
+  }
+
+  .chap[data-etat='disponible'] .etat {
+    font-weight: 700;
+    color: var(--indigo);
+  }
+
+  .chap[data-etat='fait'] .etat {
+    font-weight: 700;
+    color: var(--menthe);
+  }
+
+  .chap[data-etat='fait'] .num::after {
+    content: ' \2713';
+    color: var(--menthe);
+    font-weight: 800;
+  }
+
+  /* ---------- Pied : parties voisines ---------- */
+  .pied {
+    padding-top: 88px;
+  }
+
+  .voisins {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    border-top: 2px solid var(--indigo);
+    padding-top: 20px;
+  }
+
+  .voisins a {
+    text-decoration: none;
+    display: block;
+    max-width: 48%;
+  }
+
+  .voisins a.suivante {
+    text-align: right;
+  }
+
+  .voisins span {
+    display: block;
+    font-family: var(--titres);
+    font-size: 15px;
+    color: var(--indigo-doux);
+  }
+
+  .voisins strong {
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 1.2;
+  }
+
+  .voisins a:hover strong {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 5px;
+  }
+
+  @media (max-width: 1140px) {
+    .bloc {
+      grid-template-columns: 56px minmax(0, 660px);
+      max-width: 760px;
+    }
+
+    /* Sous le texte, la note garde des lignes de moins de 80 signes. */
+    .bloc > .note {
+      grid-column: 2;
+      grid-row: auto;
+      max-width: 34em;
+      margin-top: 16px;
+      padding: 0 0 0 1.2em;
+      font-size: 15px;
+    }
+
+    .titre-partie .note {
+      padding-top: 0;
+    }
+
+    .bloc > .large {
+      grid-column: 2;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .ou {
+      display: none;
+    }
+
+    .chap-barre {
+      order: 3;
+      flex-basis: 100%;
+      max-width: none;
+    }
+
+    .bloc {
+      grid-template-columns: minmax(0, 1fr);
+      padding-inline: 20px;
+    }
+
+    .bloc > .texte,
+    .bloc > .note,
+    .bloc > .large {
+      grid-column: 1;
+    }
+
+    .bloc > .num-etape,
+    .bloc > .pastille {
+      grid-column: 1;
+      grid-row: auto;
+      justify-self: start;
+    }
+
+    .num-etape {
+      font-size: 34px;
+      margin-bottom: 6px;
+    }
+
+    .titre-partie {
+      padding-top: 36px;
+    }
+
+    .titre-partie .pastille {
+      width: 44px;
+      height: 44px;
+      font-size: 22px;
+      margin: 0 0 14px;
+    }
+
+    .chapeau {
+      font-size: 20px;
+    }
+
+    .phrase-savoirs {
+      font-size: 22px;
+    }
+
+    .etape {
+      padding-top: 56px;
+    }
+
+    .etape h2 {
+      font-size: 26px;
+    }
+
+    .etape .gain {
+      font-size: 18px;
+    }
+
+    .chap {
+      grid-template-columns: 2.9em minmax(0, 1fr);
+    }
+
+    .chap .etat {
+      grid-column: 2;
+      margin-top: 6px;
+    }
+
+    .chap .titre {
+      font-size: 19px;
+    }
+
+    .chap a.titre {
+      font-size: 22px;
+    }
+
+    .voisins {
+      flex-direction: column;
+    }
+
+    .voisins a {
+      max-width: none;
+    }
+
+    .voisins a.suivante {
+      text-align: left;
+    }
+  }
+</style>

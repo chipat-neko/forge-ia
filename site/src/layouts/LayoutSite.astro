@@ -1,0 +1,51 @@
+---
+// Gabarit des pages hors chapitre : lien d'évitement, barre du haut, contenu
+// principal et pied de page. Le slot « barre » passe à la barre du haut ce
+// qu'une page veut y ajouter (la barre des chapitres d'une partie).
+import Base from './Base.astro';
+import BarreSite from '../components/site/BarreSite.astro';
+import PiedSite from '../components/site/PiedSite.astro';
+
+interface Props {
+  titre: string;
+  description?: string;
+  courant?: 'accueil' | 'recherche';
+  liens?: ('parcours' | 'annexes' | 'recherche')[];
+  /** Le pied propose d'effacer toute la progression. */
+  effacer?: boolean;
+}
+
+const { titre, description, courant, liens, effacer } = Astro.props;
+---
+
+<Base titre={titre} description={description}>
+  <a class="evitement" href="#contenu">Aller au contenu</a>
+  <BarreSite courant={courant} liens={liens}>
+    <slot name="barre" />
+  </BarreSite>
+  <main id="contenu">
+    <slot />
+  </main>
+  <PiedSite effacer={effacer} />
+</Base>
+
+<style is:global>
+  /* Le pied reste en bas de l'écran même quand la page est courte
+     (recherche encore vide). */
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  #contenu {
+    flex: 1 0 auto;
+  }
+
+  /* Sur téléphone, le texte courant passe de 20 à 18 px (maquettes). */
+  @media (max-width: 720px) {
+    body {
+      font-size: 18px;
+    }
+  }
+</style>

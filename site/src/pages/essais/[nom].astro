@@ -3,6 +3,7 @@
 // src/essais/<nom>.mdx. Elles ne sont construites qu'avec FORGE_ESSAIS=1
 // (npm run build:essais, lancé par Playwright) et jamais publiées.
 // Leur frontmatter est celui d'un chapitre, vérifié par le même schéma.
+// Elles restent hors de l'index de la recherche (indexer={false}).
 import type { MDXInstance } from 'astro';
 import LayoutChapitre from '../../layouts/LayoutChapitre.astro';
 import Etape from '../../components/gabarit/Etape.astro';
@@ -29,6 +30,6 @@ const donnees = schemaChapitre.parse(module.frontmatter);
 const Contenu = module.Content;
 ---
 
-<LayoutChapitre {...donnees}>
+<LayoutChapitre {...donnees} indexer={false}>
   <Contenu components={{ Etape, Pari, Verrou, EncadreLabo, CodeExplique, LiensProjet }} />
 </LayoutChapitre>

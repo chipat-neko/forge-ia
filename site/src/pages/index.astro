@@ -1,25 +1,224 @@
 ---
-// Page provisoire, remplacée par la vraie page d'accueil à la tâche 12.
-import Base from '../layouts/Base.astro';
+// L'accueil (maquette validée docs/maquettes/accueil-c.html) : le pari
+// d'ouverture, la présentation et le bouton de lecture qui suit la
+// progression, le plan du parcours, puis les annexes.
+import LayoutSite from '../layouts/LayoutSite.astro';
+import PariAccueil from '../components/accueil/PariAccueil.astro';
+import CarteParcours from '../components/accueil/CarteParcours.astro';
+import { chapitresParus } from '../lib/chapitres-parus';
+import { ANNEXES, PARCOURS, hrefChapitre, titreCourt } from '../lib/parcours';
+import { typographier } from '../lib/typo';
+
+const parus = await chapitresParus();
+const premier = PARCOURS.flatMap((p) => p.chapitres).find((c) => parus.has(c.numero));
+
+// Le bouton de lecture, tel qu'il est sans progression : ouvrir le premier
+// chapitre paru. Le script le change en « Reprendre » ou « Revoir ».
+const VAGUES = "La suite arrive par vagues : d'abord la Partie 0 et le cœur de la Partie 1.";
+const apres = typographier(parus.size === 1 ? `Le premier chapitre paru. ${VAGUES}` : VAGUES);
 ---
 
-<Base titre="La Forge IA">
-  <main>
-    <h1>La Forge IA</h1>
-    <p>Le site se construit. Premier chapitre&#8239;: le tokenizer.</p>
-  </main>
-</Base>
+<LayoutSite
+  titre="La Forge IA"
+  description="Un parcours en français pour construire une IA de zéro, sur ton PC, en comprenant chaque pièce."
+  courant="accueil"
+  liens={['parcours', 'annexes', 'recherche']}
+  effacer
+>
+  <PariAccueil />
+
+  <div class="ouverture-suite">
+    <p class="chapeau">
+      {
+        typographier(
+          "La Forge IA est un parcours pour construire une IA de zéro, sur ton PC, en comprenant chaque pièce : les données, ce découpeur, le modèle, son entraînement, puis la conversation, les images, les outils et les agents. Chaque chapitre te fait parier comme tu viens de le faire : un pari, même faux, fait mieux retenir qu'une lecture seule.",
+        )
+      }
+    </p>
+    {
+      premier && (
+        <div
+          class="suite-lecture"
+          data-suite
+          data-vagues={typographier(VAGUES)}
+          data-fini={typographier(`Tu as fini tout ce qui est paru. ${VAGUES}`)}
+        >
+          <a class="bouton" href={hrefChapitre(premier.numero)}>
+            {typographier(`Ouvrir le chapitre ${premier.numero}, ${titreCourt(premier.titre)}`)}
+          </a>
+          <p class="apres">{apres}</p>
+        </div>
+      )
+    }
+  </div>
+
+  <CarteParcours parus={parus} />
+
+  <section class="annexes" id="annexes" aria-labelledby="t-annexes">
+    <h2 id="t-annexes">Les annexes</h2>
+    <p class="intro">À garder sous la main pendant tout le parcours.</p>
+    <ul>
+      {
+        ANNEXES.map((annexe) => (
+          <li>
+            <h3>{typographier(annexe.titre)}</h3>
+            <p>{typographier(annexe.resume)}</p>
+            <p class="a-venir">à venir</p>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+</LayoutSite>
+
+<script>
+  import '../scripts/accueil';
+</script>
 
 <style>
-  main {
-    max-width: 40rem;
+  .ouverture-suite {
+    max-width: 1180px;
     margin: 0 auto;
-    padding: 3rem 1.5rem;
+    padding: 56px 24px 0;
   }
 
-  h1 {
+  .ouverture-suite > * {
+    max-width: 690px;
+  }
+
+  .chapeau {
+    font-size: 24px;
+    line-height: 1.48;
+    margin: 0 0 30px;
+  }
+
+  .suite-lecture {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px 22px;
+  }
+
+  .bouton {
+    display: inline-block;
+    text-decoration: none;
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 19px;
+    line-height: 1.2;
+    color: var(--papier);
+    background: var(--indigo);
+    border-radius: 10px;
+    padding: 15px 22px 14px;
+  }
+
+  .bouton:hover {
+    background: var(--indigo-survol);
+  }
+
+  .apres {
+    font-family: var(--titres);
+    font-size: 16px;
+    line-height: 1.4;
+    color: var(--indigo-doux);
+    margin: 0;
+    max-width: 26em;
+  }
+
+  /* Pastilles « Ce que tu sais », posées par le script. */
+  .apres :global(.pips) {
+    display: inline-flex;
+    gap: 4px;
+    margin-right: 8px;
+    vertical-align: -1px;
+  }
+
+  .apres :global(.pips i) {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--lavande);
+  }
+
+  .apres :global(.pips i.plein) {
+    background: var(--menthe);
+    border-color: var(--menthe);
+  }
+
+  /* ---------- Annexes ---------- */
+  .annexes {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 96px 24px 0;
+  }
+
+  .annexes h2 {
     font-weight: 800;
-    font-size: clamp(2.5rem, 8vw, 4rem);
-    letter-spacing: -0.01em;
+    font-size: 34px;
+    letter-spacing: -0.015em;
+    margin-bottom: 8px;
+  }
+
+  .annexes .intro {
+    font-size: 19px;
+    color: var(--indigo-doux);
+    margin-bottom: 26px;
+  }
+
+  .annexes ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0 36px;
+  }
+
+  .annexes li {
+    border-top: 2px solid var(--indigo);
+    padding: 14px 0 26px;
+  }
+
+  .annexes h3 {
+    font-weight: 700;
+    font-size: 22px;
+    margin-bottom: 6px;
+  }
+
+  .annexes li p {
+    font-size: 17px;
+    line-height: 1.5;
+    margin: 0 0 8px;
+  }
+
+  .annexes .a-venir {
+    font-family: var(--titres);
+    font-size: 15px;
+    color: var(--indigo-doux);
+    margin: 0;
+  }
+
+  @media (max-width: 1000px) {
+    .annexes ul {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 720px) {
+    .ouverture-suite {
+      padding: 40px 20px 0;
+    }
+
+    .chapeau {
+      font-size: 20px;
+    }
+
+    .annexes {
+      padding: 72px 20px 0;
+    }
+
+    .annexes ul {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 </style>
