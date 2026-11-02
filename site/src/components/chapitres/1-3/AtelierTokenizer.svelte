@@ -16,11 +16,23 @@
   // Le nombre reste désactivé tant que le verrou n'est pas ouvert. Quand il
   // atteint `acquisA` fusions, l'atelier émet `forge:acquis` (clé « fusions »),
   // que le script du chapitre transforme en acquis gagné.
-  import { untrack } from 'svelte';
+  //
+  // Le contenu éventuel du composant (du texte du chapitre) s'affiche sous la
+  // bande de jetons, avant le défi. Le défi (prop `defi`) est vérifié en
+  // direct, toujours avec toutes les fusions, quel que soit le nombre jaune.
+  import { untrack, type Snippet } from 'svelte';
   import { canal } from '../../../lib/canal';
-  import { preDecouper, segmentsVisibles, tokenizer13, visible, type Jeton } from '../../../lib/bpe';
+  import { preDecouper, segmentsVisibles, tokenizer13, type Jeton } from '../../../lib/bpe';
   import type { DetailAcquis } from '../../../scripts/chapitre';
   import NombreManipulable from '../../interactif/NombreManipulable.svelte';
+  import DernieresFusions from './DernieresFusions.svelte';
+  import { FUSIONS_AU_DEPART, NB_FUSIONS } from './fusions';
+
+  /** Le défi : une phrase d'au moins `minCaracteres` caractères, en `maxJetons` jetons ou moins. */
+  interface Defi {
+    minCaracteres: number;
+    maxJetons: number;
+  }
 
   interface Props {
     /** La phrase déjà tapée dans le champ, à l'arrivée. */
@@ -31,15 +43,28 @@
     verrou?: string;
     /** Nombre de fusions qui fait gagner l'acquis « fusions » ; 60 par défaut. */
     acquisA?: number;
+    /** Le défi à afficher sous l'atelier, s'il y en a un. */
+    defi?: Defi;
+    /**
+     * Faux si les dernières fusions sont montrées ailleurs (dans la marge,
+     * avec DernieresFusions) ; vrai par défaut.
+     */
+    avecDernieresFusions?: boolean;
+    /** Texte du chapitre posé sous la bande de jetons. */
+    children?: Snippet;
   }
 
-  const { phraseInitiale, canalFusions = 'fusions', verrou, acquisA = 60 }: Props = $props();
+  const {
+    phraseInitiale,
+    canalFusions = 'fusions',
+    verrou,
+    acquisA = 60,
+    defi,
+    avecDernieresFusions = true,
+    children,
+  }: Props = $props();
 
-  // Comme dans la maquette : au départ, quelques fusions sont déjà apprises,
-  // pour que la phrase arrive à moitié collée et donne envie de pousser.
-  const FUSIONS_AU_DEPART = 20;
   const FINE = '\u202F';
-  const NB_FUSIONS = tokenizer13.fusions.length;
   const idSaisie = $props.id();
 
   // Le canal est choisi une fois pour toutes, comme dans NombreManipulable.
@@ -67,18 +92,39 @@
     dejaVus = new Set(jetons.map((j) => j.texte));
   });
 
-  // Les trois dernières fusions, de la plus récente à la plus ancienne :
-  // « fusion 30 : é + c → éc ». Le texte des jetons n'est jamais typographié.
-  const dernieres = $derived(
-    Array.from({ length: Math.min(3, k) }, (_, i) => {
-      const n = k - i;
-      const { a, b } = tokenizer13.fusions[n - 1];
-      return `fusion ${n}${FINE}: ${visible(a)} + ${visible(b)} → ${visible(a + b)}`;
-    }),
-  );
-
   const nombre = new Intl.NumberFormat('fr-FR');
   const pluriel = (n: number, un: string, plusieurs: string) => (n > 1 ? plusieurs : un);
+
+  // Le défi se mesure toujours avec toutes les fusions : il ne dépend que de
+  // la phrase, pas du nombre jaune.
+  const jetonsDuDefi = $derived(
+    defi === undefined ? 0 : k === NB_FUSIONS ? jetons.length : tokenizer13.decouper(texte, NB_FUSIONS).length,
+  );
+  const defiReussi = $derived(
+    defi !== undefined && nbCaracteres >= defi.minCaracteres && jetonsDuDefi <= defi.maxJetons,
+  );
+  const etatDuDefi = $derived.by(() => {
+    if (defi === undefined) return '';
+    const caracteres = `${nombre.format(nbCaracteres)} ${pluriel(nbCaracteres, 'caractère', 'caractères')}`;
+    const enJetons = `${nombre.format(jetonsDuDefi)} ${pluriel(jetonsDuDefi, 'jeton', 'jetons')}`;
+    if (nbCaracteres < defi.minCaracteres) {
+      return `Ta phrase fait ${caracteres}${FINE}: il en faut au moins ${defi.minCaracteres}.`;
+    }
+    if (defiReussi) return `Défi réussi${FINE}: ${caracteres} en ${enJetons}.`;
+    const deTrop = jetonsDuDefi - defi.maxJetons;
+    return `Avec les ${NB_FUSIONS} fusions, ta phrase tient en ${enJetons}, soit ${nombre.format(deTrop)} de trop.`;
+  });
+
+  // Les lecteurs d'écran entendent la réussite du défi au moment où elle
+  // arrive, et pas à chaque lettre tapée.
+  let annonceDefi = $state('');
+  let defiReussiAvant = untrack(() => defiReussi);
+  $effect(() => {
+    const reussi = defiReussi;
+    if (reussi === defiReussiAvant) return;
+    defiReussiAvant = reussi;
+    annonceDefi = reussi ? untrack(() => etatDuDefi) : '';
+  });
 
   // Quand le nombre de fusions change (et seulement lui : pas pendant la
   // frappe), les lecteurs d'écran entendent le nouveau nombre de jetons ; et
@@ -168,18 +214,24 @@
     </p>
   {/if}
 
-  <div class="dernieres" data-dernieres-fusions>
-    <p><strong>Dernières fusions apprises</strong></p>
-    {#if dernieres.length > 0}
-      <ul>
-        {#each dernieres as ligne (ligne)}
-          <li>{ligne}</li>
-        {/each}
-      </ul>
-    {:else}
-      <p>aucune pour l’instant{FINE}: chaque lettre reste seule.</p>
-    {/if}
-  </div>
+  {#if avecDernieresFusions}
+    <DernieresFusions {canalFusions} />
+  {/if}
+
+  {@render children?.()}
+
+  {#if defi}
+    <div class="defi" class:reussi={defiReussi} data-defi>
+      <h3>Défi</h3>
+      <p>
+        Écris une phrase d’au moins {defi.minCaracteres} caractères qui tient en {defi.maxJetons} jetons ou moins
+        avec les {NB_FUSIONS} fusions. Astuce{FINE}: les mots qui reviennent souvent dans le texte d’apprentissage
+        sont déjà des jetons entiers.
+      </p>
+      <p class="etat" data-test="defi">{etatDuDefi}</p>
+      <p class="lecteur-ecran" aria-live="polite">{annonceDefi}</p>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -325,32 +377,36 @@
     text-decoration-color: var(--soleil-vif);
   }
 
-  /* Les dernières fusions, à la manière d'une note de marge. */
-  .dernieres {
-    font-size: 16px;
-    line-height: 1.5;
-    color: var(--indigo-doux);
+  /* Le défi, sous un filet, un peu plus petit que le texte, comme dans la
+     maquette (19 px sur ordinateur : en 18 px, ses lignes dépasseraient 80
+     signes dans la colonne de lecture). */
+  .defi {
+    margin-top: 1.2em;
+    padding-top: 14px;
+    border-top: 1px solid var(--brume);
+    font-size: 0.95em;
   }
 
-  .dernieres p {
-    margin: 0 0 0.3em;
+  .defi h3 {
+    font-weight: 700;
+    font-size: 20px;
+    margin: 0 0 4px;
   }
 
-  .dernieres strong {
+  .defi p {
+    margin: 0 0 0.4em;
+  }
+
+  .defi .etat {
     font-family: var(--titres);
     font-weight: 600;
-    color: var(--indigo);
-  }
-
-  .dernieres ul {
-    list-style: none;
+    font-size: 16px;
+    color: var(--indigo-doux);
     margin: 0;
-    padding: 0;
-    font-variant-numeric: tabular-nums;
   }
 
-  .dernieres li {
-    padding: 1px 0;
+  .defi.reussi .etat {
+    color: var(--menthe);
   }
 
   .lecteur-ecran {

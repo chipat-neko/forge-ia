@@ -65,9 +65,9 @@ def compter_mots(corpus: str) -> dict[Mot, int]:
 
 
 # region: compter
-def compter_paires(mots: dict[Mot, int]) -> Counter[Paire]:
+def compter_paires(mots: dict[tuple[str, ...], int]) -> Counter[tuple[str, str]]:
     """Compte les paires de symboles voisins, en tenant compte de la fréquence des mots."""
-    compte: Counter[Paire] = Counter()
+    compte: Counter[tuple[str, str]] = Counter()
     for symboles, frequence in mots.items():
         # On regarde chaque symbole avec son voisin de droite.
         for gauche, droite in zip(symboles, symboles[1:]):
@@ -77,12 +77,13 @@ def compter_paires(mots: dict[Mot, int]) -> Counter[Paire]:
 
 
 # region: choisir
-def paire_la_plus_frequente(compte: Counter[Paire]) -> Paire:
+def paire_la_plus_frequente(compte: Counter[tuple[str, str]]) -> tuple[str, str]:
     """Choisit la paire la plus fréquente.
 
     En cas d'égalité, on prend la plus petite paire (a, b) dans l'ordre des
     points de code : ainsi le résultat est toujours le même.
     """
+    # Le signe moins donne la plus petite clé à la paire la plus fréquente.
     return min(compte, key=lambda paire: (-compte[paire], paire))
 # fin: choisir
 

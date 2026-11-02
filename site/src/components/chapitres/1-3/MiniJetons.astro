@@ -1,0 +1,54 @@
+---
+// Un mot ou une phrase découpé en jetons, en petit, dans le texte d'une
+// explication (maquette 10, verdict des paris). Le découpage est fait à la
+// construction par tokenizer13, le même code que l'atelier et les paris.
+import { segmentsVisibles, tokenizer13 } from '../../../lib/bpe';
+
+interface Props {
+  texte: string;
+  /** Nombre de fusions apprises utilisées pour découper. */
+  k: number;
+}
+
+const { texte, k } = Astro.props;
+const jetons = tokenizer13.decouper(texte, k);
+const n = jetons.length;
+---
+
+<ol class="mini-jetons" aria-label={`Les ${n} ${n > 1 ? 'jetons' : 'jeton'}`}>
+  {
+    jetons.map((jeton, i) => (
+      <li class:list={['morceau', { b: i % 2 === 1 }]} data-jeton={jeton.id ?? 'inconnu'}>
+        {segmentsVisibles(jeton.texte).map((s) => (s.blanc ? <span class="blanc">{s.texte}</span> : s.texte))}
+      </li>
+    ))
+  }
+</ol>
+
+<style>
+  .mini-jetons {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0 12px;
+    padding: 0;
+    font-size: 22px;
+    line-height: 1.32;
+  }
+
+  .morceau {
+    padding: 0 5px;
+    background: var(--teinte-a);
+    border-radius: 5px;
+    white-space: pre;
+  }
+
+  .morceau.b {
+    background: var(--teinte-b);
+  }
+
+  .blanc {
+    color: var(--indigo-doux);
+  }
+</style>

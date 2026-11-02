@@ -41,7 +41,10 @@ export async function plusLongueLigne(page: Page): Promise<{ longueur: number; l
         }
       }
       for (const ligne of lignes.values()) {
-        if (ligne.trim().length > plusLongue.length) plusLongue = ligne.trim();
+        // Les blancs du code source (retour à la ligne et retrait d'un gabarit)
+        // s'affichent comme une seule espace : on les compte comme tels.
+        const affichee = ligne.replace(/\s+/g, ' ').trim();
+        if (affichee.length > plusLongue.length) plusLongue = affichee;
       }
     }
     return { longueur: plusLongue.length, ligne: plusLongue };
@@ -55,4 +58,28 @@ export async function verifierSansDebordement(page: Page): Promise<void> {
     fenetre: window.innerWidth,
   }));
   expect(largeur).toBeLessThanOrEqual(fenetre);
+}
+
+/**
+ * Termine le chapitre 1.3 comme un lecteur : ouvre la page, fait les 4 paris
+ * (bonnes réponses) et pousse l'atelier de 20 à 60 fusions au clavier. Tous
+ * les acquis du chapitre sont alors gagnés (« 5 sur 5 »). Sert aussi aux
+ * parcours de l'accueil (progression d'un chapitre fait).
+ */
+export async function terminerChapitre13(page: Page): Promise<void> {
+  await page.goto('/forge-ia/partie-1/1-3/');
+  // L'atelier est un îlot Svelte : il répond au clavier une fois hydraté
+  // (Astro retire alors l'attribut ssr).
+  await expect(page.locator('astro-island[ssr]')).toHaveCount(0);
+  await page.locator('[data-pari="nombres"] [data-juste]').click();
+  await page.locator('[data-pari="prediction"] [data-juste]').click();
+  const fusions = page.locator('[data-test="fusions"]');
+  await expect(fusions).not.toHaveAttribute('aria-disabled', 'true');
+  await fusions.focus();
+  await page.keyboard.press('Home');
+  for (let i = 0; i < 60; i++) await page.keyboard.press('ArrowRight');
+  await expect(fusions).toHaveAttribute('aria-valuenow', '60');
+  await page.locator('[data-pari="rare"] [data-juste]').click();
+  await page.locator('[data-pari="zip"] [data-juste]').click();
+  await expect(page.locator('#recap [data-total]')).toContainText('5 sur 5');
 }

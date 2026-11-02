@@ -1,0 +1,250 @@
+---
+partie: 1
+numero: "1.3"
+titre: "Le tokenizer"
+chapeau: "Une IA ne lit pas des lettres : elle lit des nombres. Avant tout le reste, il faut donc un outil qui découpe le texte en morceaux et donne un numéro à chaque morceau. Dans ce chapitre, tu construis cet outil toi-même."
+programme: "7 étapes, 4 paris, environ 15 minutes."
+acquis:
+  - cle: nombres
+    texte: "Une IA lit des nombres, pas des lettres."
+    ou: "à l'étape 1"
+  - cle: prediction
+    texte: "Le BPE fusionne d'abord les paires les plus fréquentes."
+    ou: "à l'étape 3"
+  - cle: fusions
+    texte: "Plus de fusions, moins de jetons."
+    ou: "à l'étape 4, en poussant le nombre jaune jusqu'à 60"
+  - cle: rare
+    texte: "Les mots rares restent en morceaux."
+    ou: "à l'étape 5"
+  - cle: zip
+    texte: "Compter les paires tient en quelques lignes de Python."
+    ou: "à l'étape 6"
+---
+
+import AtelierTokenizer from '../../components/chapitres/1-3/AtelierTokenizer.svelte';
+import DernieresFusions from '../../components/chapitres/1-3/DernieresFusions.svelte';
+import EchelleVocabulaire from '../../components/chapitres/1-3/EchelleVocabulaire.svelte';
+import MiniJetons from '../../components/chapitres/1-3/MiniJetons.astro';
+import PhraseDecoupee from '../../components/chapitres/1-3/PhraseDecoupee.astro';
+import { NB_FUSIONS } from '../../components/chapitres/1-3/fusions';
+import { choixNombreDeJetons, tokenizer13, visible } from '../../lib/bpe';
+import { typographier } from '../../lib/typo';
+
+export const MOT = 'les forgerons';
+
+export const K = 30;
+
+export const RARE = 'reforgeronnes';
+
+export const jetonsMot = tokenizer13.decouper(MOT, K);
+
+export const jetonsRare = tokenizer13.decouper(RARE, NB_FUSIONS);
+
+export const collesDansMot = (() => {
+  // Les morceaux de « les forgerons » déjà collés avec K fusions, dans l'ordre
+  // où ils ont été appris. Le symbole de la fusion n (à partir de 1) porte le
+  // numéro base.length + n - 1 : son rang se lit dans son numéro.
+  const base = tokenizer13.base.length;
+  const liste = jetonsMot
+    .filter((jeton) => jeton.id !== null && jeton.id >= base)
+    .sort((x, y) => x.id - y.id)
+    .map((jeton) => `« ${visible(jeton.texte)} » (fusion ${jeton.id - base + 1})`);
+  const fin = liste.pop();
+  return typographier(liste.length > 0 ? `${liste.join(', ')} et ${fin}` : fin);
+})();
+
+<PhraseDecoupee phrase="Le forgeron frappe le métal" k={NB_FUSIONS} />
+
+<Etape numero={1} titre="Pourquoi découper ?">
+
+Un réseau de neurones fait des calculs. Pour qu'il puisse travailler sur « Le forgeron frappe le métal », il faut transformer cette phrase en une suite de nombres, puis savoir refaire le chemin inverse pour afficher sa réponse. L'outil qui fait cette traduction s'appelle un tokenizer, et les morceaux qu'il produit s'appellent des jetons (<span lang="en">tokens</span> en anglais).
+
+<Pari
+  id="nombres"
+  question="Au bout du compte, que reçoit vraiment le réseau de neurones ?"
+  choix={[{ texte: 'Des lettres' }, { texte: 'Des mots' }, { texte: 'Des nombres', juste: true }]}
+  acquis="nombres"
+>
+
+Le réseau ne voit que des nombres. Le tokenizer transforme le texte en numéros de jetons à l'entrée, et refait le chemin inverse à la sortie.
+
+</Pari>
+
+<Fragment slot="note">
+
+Le mot anglais <span lang="en">token</span> veut dire jeton, comme ceux d'un jeu de société : un petit objet qui en représente un autre.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={2} titre="Lettres ou mots ?">
+
+Découper lettre par lettre est simple, mais les phrases deviennent très longues, et le modèle doit tout réapprendre à partir de briques minuscules. Découper mot par mot donne des suites courtes, mais le vocabulaire n'a pas de fin : forger, forgeron, forgeronne, reforgé…
+
+La méthode utilisée par presque tous les grands modèles, le BPE (<span lang="en">Byte Pair Encoding</span>, « encodage par paires »), choisit un entre-deux. On part des lettres. On cherche la paire de symboles voisins la plus fréquente dans un grand texte, on la fusionne en un nouveau symbole, et on recommence.
+
+<Fragment slot="note">
+
+Le BPE a été inventé en 1994 pour compresser des fichiers. Il a été repris en 2015 pour la traduction automatique, puis par les modèles de langage.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={3} titre="Fais ton pari">
+
+Notre petit tokenizer a appris ses fusions sur un texte d'une quinzaine de lignes. Avant de le manipuler, parie.
+
+<Pari
+  id="prediction"
+  question={`Avec ${K} fusions apprises, en combien de jetons est découpé « ${MOT} » ?`}
+  precision={`Le texte fait ${Array.from(MOT).length} caractères, espace compris.`}
+  choix={choixNombreDeJetons(MOT, K)}
+  acquis="prediction"
+  ouvre="atelier"
+>
+
+Avec {K} fusions, « {MOT} » donne {jetonsMot.length} jetons :
+
+<MiniJetons texte={MOT} k={K} />
+
+Seules les paires très fréquentes du texte d'apprentissage sont déjà collées : {collesDansMot}. Le reste attend des fusions plus tardives. À toi de jouer : l'étape 4 est ouverte.
+
+</Pari>
+
+<Fragment slot="note">
+
+Se tromper ici n'a aucune importance : un pari, même faux, fait mieux retenir la réponse qu'une lecture passive.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={4} titre="À toi de découper">
+
+<Verrou nom="atelier" message="Fais ton pari à l'étape 3 : la phrase et le nombre jaune se débloquent juste après.">
+
+Tape une phrase, puis augmente le nombre de fusions.
+
+<AtelierTokenizer
+  client:load
+  phraseInitiale="Le forgeron frappe le métal sur l'enclume."
+  verrou="atelier"
+  defi={{ minCaracteres: 30, maxJetons: 12 }}
+  avecDernieresFusions={false}
+>
+
+À zéro fusion, chaque lettre est un jeton. Plus tu ajoutes de fusions, plus les morceaux fréquents (« es », « ent », « le ») deviennent des jetons entiers, et plus la suite raccourcit. Les mots rares, eux, restent découpés : c'est ce qui permet d'écrire n'importe quel mot avec un vocabulaire limité.
+
+</AtelierTokenizer>
+
+</Verrou>
+
+<Fragment slot="note">
+
+Tout ce qui est jaune se manipule. Le nombre se fait glisser à la souris ou au doigt ; au clavier, atteins-le avec Tab, puis utilise les flèches.
+
+<DernieresFusions client:load />
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={5} titre="Vérifie ton intuition">
+
+<Pari
+  id="rare"
+  question={`Avec les ${NB_FUSIONS} fusions, le mot rare « ${RARE} » devient-il un seul jeton ?`}
+  choix={[
+    { texte: 'Oui, un seul jeton', juste: jetonsRare.length === 1 },
+    { texte: 'Non, plusieurs morceaux', juste: jetonsRare.length > 1 },
+  ]}
+  acquis="rare"
+>
+
+Même avec toutes les fusions, « {RARE} » reste en {jetonsRare.length} morceaux :
+
+<MiniJetons texte={RARE} k={NB_FUSIONS} />
+
+Le mot n'apparaît jamais dans le texte d'apprentissage : aucune fusion ne le colle en entier. Il s'écrit quand même, avec des morceaux connus.
+
+</Pari>
+
+</Etape>
+
+<Etape numero={6} titre="Le code">
+
+Le cœur de l'algorithme tient en quelques lignes de Python. Une première fonction compte toutes les paires de symboles voisins :
+
+<CodeExplique fichier="projets/1.3-tokenizer/tokenizer_pedagogique/bpe.py" region="compter">
+  <li data-lignes="1">La fonction reçoit les mots du texte : chaque mot, écrit comme une suite de symboles, est associé à son nombre d'apparitions, par exemple `{('f', 'o', 'r', 'g', 'e'): 12, …}`.</li>
+  <li data-lignes="3">`Counter` compte les paires pour nous : une paire encore jamais vue part de zéro.</li>
+  <li data-lignes="6">`zip(symboles, symboles[1:])` donne chaque paire de voisins : (f, o), (o, r), (r, g)…</li>
+  <li data-lignes="4, 7">On ajoute la fréquence du mot : un mot vu 12 fois compte 12 fois.</li>
+</CodeExplique>
+
+<Pari
+  id="zip"
+  question="Si `symboles` vaut `('l', 'e', 's')`, que donne `list(zip(symboles, symboles[1:]))` ?"
+  precision="`symboles[1:]` est la même suite sans son premier élément : `('e', 's')`."
+  choix={[
+    { texte: "`['le', 'es']`" },
+    { texte: "`[('l', 'e'), ('e', 's')]`", juste: true },
+    { texte: "`[('l', 'e', 's')]`" },
+  ]}
+  acquis="zip"
+>
+
+`zip` avance dans les deux suites en même temps et forme des couples. En décalant la suite d'un cran (`symboles[1:]`), chaque couple est une paire de voisins : (l, e), puis (e, s). Le « s » final n'a pas de voisin à droite : `zip` s'arrête dès que la plus courte des deux suites est épuisée.
+
+</Pari>
+
+Une seconde fonction choisit, dans ce compte, la paire la plus fréquente. C'est elle qui décide de la prochaine fusion :
+
+<CodeExplique fichier="projets/1.3-tokenizer/tokenizer_pedagogique/bpe.py" region="choisir">
+  <li data-lignes="1">La fonction reçoit le compte des paires et renvoie une seule paire, la gagnante.</li>
+  <li data-lignes="8">`min` renvoie la paire dont la clé est la plus petite. Ici, la clé est un couple : d'abord `-compte[paire]`, puis la paire elle-même.</li>
+  <li data-lignes="7-8">Le signe moins retourne l'ordre : une paire vue 12 fois a une clé qui commence par −12, plus petit que le −5 d'une paire vue 5 fois. `min` prend donc la plus fréquente.</li>
+  <li data-lignes="4-5, 8">En cas d'égalité, on prend la paire la plus petite dans l'ordre alphabétique : le résultat est ainsi toujours le même, sur ton PC comme dans cette page.</li>
+</CodeExplique>
+
+<Fragment slot="note">
+
+Survole une explication, ou atteins-la avec Tab : ses lignes de code s'allument.
+
+`Counter` fait partie de la bibliothèque standard de Python : rien à installer.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={7} titre="À grande échelle">
+
+Tu as fait tourner un vrai tokenizer, de l'apprentissage au découpage. Voici ce que devient la même recette chez ceux qui entraînent les grands modèles.
+
+<EncadreLabo
+  sources={[
+    { titre: 'Llama 3 (Meta), article de présentation, section 3.2', url: 'https://arxiv.org/abs/2407.21783', verifieLe: '2026-11-02' },
+    { titre: 'Qwen3, rapport technique, section 2', url: 'https://arxiv.org/abs/2505.09388', verifieLe: '2026-11-02' },
+    { titre: 'gpt-oss (OpenAI), fiche du modèle, section 3', url: 'https://cdn.openai.com/pdf/419b6906-9da6-406c-a19d-1bb078ac7637/oai_gpt-oss_model_card.pdf', verifieLe: '2026-11-02' },
+    { titre: 'Gemma 4 (Google), fiche du modèle', url: 'https://huggingface.co/google/gemma-4-31B-it', verifieLe: '2026-11-02' },
+  ]}
+>
+
+Les tokenizers des grands modèles comptent bien plus de morceaux que le tien : 128&#8239;000 pour Llama 3 de Meta, 151&#8239;669 pour Qwen3 d'Alibaba, 201&#8239;088 pour gpt-oss d'OpenAI et environ 262&#8239;000 pour Gemma 4 de Google. Ils sont appris sur beaucoup plus de texte, dans de nombreuses langues, et travaillent souvent sur les octets plutôt que sur les lettres : ils peuvent ainsi écrire n'importe quel caractère, emoji compris. Le principe reste exactement celui que tu viens de manipuler.
+
+<EchelleVocabulaire client:load verrou="atelier" grandModele={{ nom: 'Gemma 4', taille: 262144 }} />
+
+</EncadreLabo>
+
+Le projet complet (apprentissage, découpage, tests) est sur GitHub, avec un notebook à ouvrir dans Colab :
+
+<LiensProjet projet="1.3-tokenizer" />
+
+### À suivre
+
+Ce découpeur pédagogique travaille sur les lettres. Celui de ton IA, que tu construiras dans la suite de ce chapitre, travaillera sur les octets, comme ceux des grands labos : il pourra écrire n'importe quel texte. Il prévoira aussi, dès le départ, les jetons spéciaux de la conversation et des outils : des jetons réservés qui marquent qui parle, et où commence l'appel d'un outil. Ils serviront quand ton IA apprendra à converser, puis à agir.
+
+</Etape>

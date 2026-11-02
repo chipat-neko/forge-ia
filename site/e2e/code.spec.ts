@@ -128,8 +128,8 @@ test('deux explications actives (focus sur l’une, souris sur l’autre) : les 
   await page.goto(PAGE);
   const explications = page.locator('.code-explique li');
   await explications.nth(1).focus(); // lignes 4 à 5
-  await explications.nth(2).hover(); // ligne 7
-  await expect.poll(() => lignesAllumees(page)).toEqual([4, 5, 7]);
+  await explications.nth(2).hover(); // ligne 8
+  await expect.poll(() => lignesAllumees(page)).toEqual([4, 5, 8]);
   await page.mouse.move(0, 0);
   await expect.poll(() => lignesAllumees(page)).toEqual([4, 5]);
 });

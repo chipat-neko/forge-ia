@@ -92,11 +92,13 @@ const bonne = choix.find((c) => c.juste === true)!;
 </div>
 
 <style is:global>
+  /* Marge du bas : le texte qui suit le pari ne lui colle pas (maquette :
+     1,2 em). Entre deux paris, elle se fond dans les 26 px du suivant. */
   .pari {
     background: var(--soleil-pale);
     border-radius: 18px;
     padding: 24px 26px 26px;
-    margin: 26px 0 6px;
+    margin: 26px 0 1.2em;
   }
 
   .pari .q {
