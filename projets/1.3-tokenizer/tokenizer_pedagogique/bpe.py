@@ -25,7 +25,12 @@ import regex
 #   - de la ponctuation ou des symboles, précédés d'une espace éventuelle ;
 #   - des espaces et retours à la ligne qui restent.
 # Le module `regex` (et non `re`) est nécessaire pour comprendre \p{L}.
-MOTIF = r"\s?[\p{L}\p{M}]+|\s?\p{N}+|\s?[^\s\p{L}\p{N}]+|\s+"
+# On écrit \p{White_Space} plutôt que \s : la liste des espaces est alors celle
+# d'Unicode, la même en Python et en JavaScript (\s diffère d'un langage à l'autre).
+MOTIF = (
+    r"\p{White_Space}?[\p{L}\p{M}]+|\p{White_Space}?\p{N}+|"
+    r"\p{White_Space}?[^\p{White_Space}\p{L}\p{N}]+|\p{White_Space}+"
+)
 _MOTIF_COMPILE = regex.compile(MOTIF)
 
 # Un mot du corpus est un tuple de symboles, par exemple ("l", "e", "s").

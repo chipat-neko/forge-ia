@@ -1,6 +1,6 @@
 from collections import Counter
 import json, pathlib
-from tokenizer_pedagogique.bpe import (TokenizerPedagogique, apprendre, charger_corpus,
+from tokenizer_pedagogique.bpe import (MOTIF, TokenizerPedagogique, apprendre, charger_corpus,
     paire_la_plus_frequente, pre_decouper)
 from tokenizer_pedagogique.attendus import calculer_attendus
 
@@ -12,6 +12,19 @@ def test_corpus_sans_retour_chariot():
 def test_pre_decouper():
     assert pre_decouper("Le forgeron  frappe, 2026 !\nFin") == [
         "Le", " forgeron", "  ", "frappe", ",", " 2026", " !", "\nFin"]
+
+def test_espaces_unicode():
+    # U+0085 est une espace (propriété White_Space) ; U+FEFF n'en est pas une.
+    assert pre_decouper("a\u0085b") == ["a", "\u0085b"]
+    assert pre_decouper("a\ufeffb") == ["a", "\ufeff", "b"]
+
+def test_motif_sans_s():
+    # \s n'a pas le même sens en Python et en JavaScript : le motif nomme la propriété Unicode.
+    assert r"\s" not in MOTIF
+    assert r"\p{White_Space}" in MOTIF
+    assert MOTIF == (
+        r"\p{White_Space}?[\p{L}\p{M}]+|\p{White_Space}?\p{N}+|"
+        r"\p{White_Space}?[^\p{White_Space}\p{L}\p{N}]+|\p{White_Space}+")
 
 def test_departage_des_egalites():
     assert paire_la_plus_frequente(Counter({("b", "a"): 2, ("a", "b"): 2})) == ("a", "b")

@@ -24,6 +24,8 @@ TEXTES_DE_REFERENCE: list[str] = [
     "Le forgeron  frappe, 2026 !\nFin",
     "",
     "forgé, reforgé : forgeronne",
+    # U+0085 est une espace (White_Space), U+FEFF n'en est pas une : le piège de \s.
+    "a\u0085b c\ufeffd",
 ]
 
 # Nombres de fusions essayés pour chaque texte (165 = toutes les fusions du corpus).
@@ -53,7 +55,9 @@ def en_json(attendus: dict) -> str:
     """Écrit les attendus en JSON, une fusion ou un cas par ligne (lisible dans git)."""
 
     def ligne(valeur) -> str:
-        return json.dumps(valeur, ensure_ascii=False)
+        texte = json.dumps(valeur, ensure_ascii=False)
+        # Les caractères invisibles (U+0085, U+FEFF...) sont écrits \uXXXX : on les voit dans le fichier.
+        return "".join(c if c.isprintable() else json.dumps(c)[1:-1] for c in texte)
 
     fusions = ",\n".join("  " + ligne(f) for f in attendus["fusions"])
     cas = ",\n".join("  " + ligne(c) for c in attendus["cas"])
