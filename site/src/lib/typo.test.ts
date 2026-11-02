@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { typographier } from './typo';
 
-const FINE = ' ';
+const FINE = '\u202F';
+const APOSTROPHE = '\u2019';
 
 describe('typographier', () => {
   it('met une espace fine insécable avant ? ! ; :', () => {
@@ -12,8 +13,8 @@ describe('typographier', () => {
   });
 
   it("remplace aussi l'espace insécable ordinaire (U+00A0)", () => {
-    expect(typographier('Pourquoi ?')).toBe(`Pourquoi${FINE}?`);
-    expect(typographier('Voici : la suite')).toBe(`Voici${FINE}: la suite`);
+    expect(typographier('Pourquoi\u00A0?')).toBe(`Pourquoi${FINE}?`);
+    expect(typographier('Voici\u00A0: la suite')).toBe(`Voici${FINE}: la suite`);
   });
 
   it("met une espace fine insécable à l'intérieur des guillemets", () => {
@@ -21,7 +22,7 @@ describe('typographier', () => {
     expect(typographier('«forge»')).toBe(`«${FINE}forge${FINE}»`);
     expect(typographier('« forge»')).toBe(`«${FINE}forge${FINE}»`);
     expect(typographier('«forge »')).toBe(`«${FINE}forge${FINE}»`);
-    expect(typographier('« forge »')).toBe(`«${FINE}forge${FINE}»`);
+    expect(typographier('«\u00A0forge\u00A0»')).toBe(`«${FINE}forge${FINE}»`);
   });
 
   it('traite les guillemets collés à un chiffre ou à une ponctuation', () => {
@@ -69,6 +70,39 @@ describe('typographier', () => {
       const une = typographier(texte);
       expect(typographier(une)).toBe(une);
     }
+  });
+
+  it("courbe l'apostrophe droite placée entre deux lettres", () => {
+    expect(typographier("l'atelier")).toBe(`l${APOSTROPHE}atelier`);
+    expect(typographier("aujourd'hui")).toBe(`aujourd${APOSTROPHE}hui`);
+    expect(typographier("Qu'il est l'heure d'apprendre")).toBe(
+      `Qu${APOSTROPHE}il est l${APOSTROPHE}heure d${APOSTROPHE}apprendre`,
+    );
+    // Lettres accentuées et capitales.
+    expect(typographier("à l'été, L'IA")).toBe(`à l${APOSTROPHE}été, L${APOSTROPHE}IA`);
+    // Lettre accentuée écrite en deux caractères (e + accent combinant).
+    expect(typographier("cafe\u0301'e")).toBe(`cafe\u0301${APOSTROPHE}e`);
+  });
+
+  it("laisse l'apostrophe droite qui n'est pas entre deux lettres", () => {
+    expect(typographier("'a'")).toBe("'a'");
+    expect(typographier("x = 'abc' + 'd'")).toBe("x = 'abc' + 'd'");
+    expect(typographier("l' atelier")).toBe("l' atelier");
+    expect(typographier("4'33")).toBe("4'33");
+    expect(typographier("'")).toBe("'");
+  });
+
+  it('ne touche ni aux guillemets droits doubles ni aux apostrophes déjà courbes', () => {
+    expect(typographier('un mot "brut"')).toBe('un mot "brut"');
+    expect(typographier(`l${APOSTROPHE}atelier`)).toBe(`l${APOSTROPHE}atelier`);
+  });
+
+  it('reste idempotent avec les apostrophes', () => {
+    const une = typographier("Qu'est-ce qu'un jeton ? « l'atelier »");
+    expect(une).toBe(
+      `Qu${APOSTROPHE}est-ce qu${APOSTROPHE}un jeton${FINE}? «${FINE}l${APOSTROPHE}atelier${FINE}»`,
+    );
+    expect(typographier(une)).toBe(une);
   });
 
   it('laisse intacte une espace fine déjà en place', () => {

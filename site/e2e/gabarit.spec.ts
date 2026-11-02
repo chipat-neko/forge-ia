@@ -68,6 +68,22 @@ test('typographie : espace fine avant « ? » dans la prose MDX et dans les prop
   expect(question).not.toMatch(/ \?/);
 });
 
+test('typographie : apostrophes courbes partout, guillemets droits jamais anglais', async ({ page }) => {
+  await page.goto('/forge-ia/essais/gabarit/');
+  // Prose MDX : \u00AB qu'une \u00BB est \u00E9crit avec une apostrophe droite dans la source.
+  const etape1 = (await page.locator('#etape-1').textContent()) ?? '';
+  expect(etape1).toContain('qu\u2019une r\u00E9ponse');
+  expect(etape1).not.toContain("qu'une");
+  // Prop d'un composant : la question du pari p1 contient \u00AB l'\u00E9tape \u00BB.
+  const question = (await page.locator('[data-pari="p1"] .q').textContent()) ?? '';
+  expect(question).toContain('l\u2019\u00E9tape');
+  expect(question).not.toContain("'");
+  // Les guillemets droits doubles de la prose restent droits.
+  const etape2 = (await page.locator('#etape-2').textContent()) ?? '';
+  expect(etape2).toContain('"comme ceux-ci"');
+  expect(etape2).not.toMatch(/[\u201C\u201D]/);
+});
+
 test('barre du haut : position, étapes faites et rechargement', async ({ page }) => {
   await page.goto('/forge-ia/essais/gabarit/');
   const barre = page.locator('header');

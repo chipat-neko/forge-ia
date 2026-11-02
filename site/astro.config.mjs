@@ -19,8 +19,18 @@ export default defineConfig({
   // plugins remark : on passe donc par le processeur unified, qui les exécute
   // (et que l'intégration MDX reprend, car elle étend la config Markdown).
   // La clé markdown.remarkPlugins est dépréciée et inopérante avec Sätteri.
+  //
+  // smartypants garde les tirets et les points de suspension, mais ne touche
+  // plus aux guillemets ni aux apostrophes (quotes: false) : sinon "x"
+  // deviendrait “x”, à l'anglaise. Les accents graves non plus (backticks:
+  // false), qui produiraient aussi des “ ”. L'apostrophe courbe vient de
+  // typographier() (src/lib/typo.ts), le même chemin que pour les props des
+  // composants.
   markdown: {
-    processor: unified({ remarkPlugins: [remarkTypoFr] }),
+    processor: unified({
+      remarkPlugins: [remarkTypoFr],
+      smartypants: { quotes: false, backticks: false },
+    }),
   },
   vite: {
     server: {

@@ -4,7 +4,7 @@ import { unified } from 'unified';
 import { describe, expect, it } from 'vitest';
 import { remarkTypoFr } from './remark-typo-fr';
 
-const FINE = ' ';
+const FINE = '\u202F';
 
 function texte(value: string): Text {
   return { type: 'text', value };
@@ -76,6 +76,15 @@ describe('remarkTypoFr', () => {
     expect(json).toContain(`Lien${FINE}!`);
     // L'adresse du lien n'est pas du texte : elle reste telle quelle.
     expect(json).toContain('https://exemple.fr/?a :b');
+  });
+
+  it("courbe les apostrophes du texte, jamais celles du code", () => {
+    const source = "L'atelier s'ouvre : `print('a')` reste tel quel.";
+    const processeur = unified().use(remarkParse).use(remarkTypoFr);
+    const arbre = processeur.runSync(processeur.parse(source)) as Root;
+    const json = JSON.stringify(arbre);
+    expect(json).toContain(`L’atelier s’ouvre${FINE}:`);
+    expect(json).toContain("print('a')");
   });
 
   it('fonctionne sur un vrai arbre produit par remark-parse', () => {
