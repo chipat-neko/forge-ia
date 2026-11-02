@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1.3 Le tokenizer, La Forge IA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700;800&family=Atkinson+Hyperlegible+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fond: #F3F5F7;
+    --surface: #FFFFFF;
+    --encre: #1D232A;
+    --encre-2: #48515C;
+    --trait: #D9DEE5;
+    /* Une couleur par notion, partagée par le texte, la figure et le code. */
+    --lettres: #2A6FB0;
+    --paires: #9A5B00;
+    --fusions: #2A7348;
+    --jetons: #8A3FA0;
+    --lettres-pale: #E3EEF8;
+    --paires-pale: #F8EBD6;
+    --fusions-pale: #E1F0E7;
+    --jetons-pale: #F2E6F5;
+    --texte: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+    --mono: "Atkinson Hyperlegible Mono", ui-monospace, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--fond);
+    color: var(--encre);
+    font-family: var(--texte);
+    font-size: 19px;
+    line-height: 1.6;
+  }
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--encre); outline-offset: 2px; border-radius: 3px; }
+
+  .page {
+    display: grid;
+    grid-template-columns: minmax(0, 620px) minmax(0, 470px);
+    column-gap: 64px;
+    max-width: 1154px;
+    margin-inline: auto;
+    padding: 0 24px;
+  }
+  .page > * { grid-column: 1; }
+  .page > .figure { grid-column: 2; grid-row: 1 / span 14; align-self: start; position: sticky; top: 20px; }
+
+  .entete { padding: 26px 0 0; display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: baseline; }
+  .marque { font-weight: 800; font-size: 18px; text-decoration: none; letter-spacing: -0.01em; }
+  .fil { font-size: 16px; color: var(--encre-2); margin: 0; }
+
+  .ouverture { padding: 64px 0 8px; }
+  h1 { font-size: clamp(44px, 6vw, 68px); font-weight: 800; line-height: 1.02; letter-spacing: -0.025em; margin: 0 0 22px; }
+  .chapeau { font-size: 22px; line-height: 1.5; color: var(--encre-2); margin: 0; }
+
+  section { padding-top: 40px; }
+  h2 { font-size: 27px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; margin: 0 0 12px; }
+  p { margin: 0 0 1em; }
+
+  /* Les mots-notions : colorés, soulignés, et reliés à la figure. */
+  .notion {
+    font: inherit;
+    font-weight: 700;
+    color: var(--c);
+    background: none;
+    border: 0;
+    padding: 0 2px;
+    margin: 0 -2px;
+    border-radius: 3px;
+    text-decoration: underline;
+    text-decoration-color: var(--c);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+    cursor: help;
+  }
+  [data-n="lettres"] { --c: var(--lettres); --p: var(--lettres-pale); }
+  [data-n="paires"] { --c: var(--paires); --p: var(--paires-pale); }
+  [data-n="fusions"] { --c: var(--fusions); --p: var(--fusions-pale); }
+  [data-n="jetons"] { --c: var(--jetons); --p: var(--jetons-pale); }
+  body[data-allume="lettres"] .notion[data-n="lettres"],
+  body[data-allume="paires"] .notion[data-n="paires"],
+  body[data-allume="fusions"] .notion[data-n="fusions"],
+  body[data-allume="jetons"] .notion[data-n="jetons"] { background: var(--p); }
+
+  /* La figure : quand une notion est allumée, le reste s'efface. */
+  .figure {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 18px 22px 20px;
+    max-height: calc(100vh - 40px);
+    overflow: auto;
+  }
+  .figure [data-n] { transition: opacity .15s ease; }
+  body[data-allume="lettres"] .figure [data-n]:not([data-n~="lettres"]),
+  body[data-allume="paires"] .figure [data-n]:not([data-n~="paires"]),
+  body[data-allume="fusions"] .figure [data-n]:not([data-n~="fusions"]),
+  body[data-allume="jetons"] .figure [data-n]:not([data-n~="jetons"]) { opacity: .22; }
+  body[data-allume] .figure .legende [data-n] { opacity: 1; }
+
+  .legende { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 12px; padding: 0; list-style: none; font-size: 16px; }
+  .legende button {
+    font: inherit;
+    font-weight: 700;
+    color: var(--c);
+    background: none;
+    border: 0;
+    padding: 2px 4px;
+    margin: 0 -4px;
+    border-radius: 4px;
+    cursor: help;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .legende button::before { content: ""; width: 12px; height: 12px; border-radius: 3px; background: var(--c); }
+  body[data-allume] .legende button[aria-pressed="true"] { background: var(--p); }
+
+  .consigne { font-size: 17px; color: var(--encre-2); margin: 0 0 8px; }
+  .champ label { display: block; font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  #saisie {
+    width: 100%;
+    font: inherit;
+    font-size: 18px;
+    color: var(--encre);
+    border: 2px solid var(--trait);
+    border-radius: 6px;
+    padding: 8px 10px;
+    background: var(--surface);
+  }
+  #saisie:focus-visible { outline: none; border-color: var(--encre); }
+  .reglage { margin-top: 10px; }
+  .reglage label { display: flex; justify-content: space-between; font-size: 15px; font-weight: 700; color: var(--fusions); }
+  .reglage output { font-variant-numeric: tabular-nums; }
+  #fusions { width: 100%; accent-color: var(--fusions); margin: 6px 0 0; height: 24px; }
+
+  .resultat { margin-top: 10px; }
+  .compte { font-size: 15px; color: var(--encre-2); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .compte b { color: var(--jetons); }
+  .bascule { font-size: 15px; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+  .bascule input { accent-color: var(--jetons); width: 16px; height: 16px; margin: 0; }
+  .jetons { display: flex; flex-wrap: wrap; gap: 8px 4px; margin: 10px 0 4px; padding: 0; }
+  .jeton {
+    font: inherit;
+    font-size: 19px;
+    color: var(--encre);
+    background: var(--jetons-pale);
+    border: 2px solid transparent;
+    border-radius: 5px;
+    padding: 1px 6px 2px;
+    cursor: pointer;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.3;
+    white-space: pre;
+    position: relative;
+  }
+  .jeton:hover { border-color: #C9A6D3; }
+  .jeton[aria-pressed="true"] { border-color: var(--jetons); }
+  .jeton .num { font-family: var(--mono); font-size: 12px; color: var(--jetons); display: none; }
+  .avec-numeros .jeton .num { display: block; }
+  .esp { color: #8C7E93; }
+  /* Allumer les lettres : chaque jeton laisse voir les lettres dont il est fait. */
+  body[data-allume="lettres"] .figure .jetons .jeton[data-n] { opacity: 1; background: transparent; }
+  body[data-allume="lettres"] .jeton .lt {
+    background: var(--lettres-pale);
+    box-shadow: inset 0 -2px 0 var(--lettres);
+    border-radius: 2px;
+    margin: 0 1px;
+    padding: 0 1px;
+  }
+  /* La paire qui sera fusionnée au prochain pas. */
+  .jeton.paire::after {
+    content: "";
+    position: absolute;
+    left: -3px; right: -3px; bottom: -7px;
+    height: 3px;
+    background: var(--paires);
+    border-radius: 2px;
+  }
+  .jeton.paire-g::after { right: -5px; }
+  .jeton.paire-d::after { left: -5px; }
+
+  .prochaine, .recentes-titre { font-size: 15px; margin: 12px 0 0; line-height: 1.45; }
+  .prochaine { color: var(--paires); font-weight: 700; }
+  .recentes-titre { color: var(--fusions); font-weight: 700; }
+  .recentes { list-style: none; padding: 0; margin: 4px 0 0; font-size: 15px; color: var(--encre-2); }
+  .recentes li { font-variant-numeric: tabular-nums; }
+  .recentes .ab { color: var(--jetons); font-weight: 700; }
+
+  .arbre-bloc { margin-top: 12px; border-top: 2px solid var(--fond); border-bottom: 2px solid var(--fond); padding: 10px 0 8px; }
+  .arbre-bloc p { font-size: 15px; color: var(--encre-2); margin: 0 0 6px; }
+  .arbre { overflow-x: auto; }
+  .arbre svg { display: block; margin: 0 auto; font-family: var(--texte); }
+
+  /* Code : les variables portent la couleur de leur notion. */
+  pre {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 18px 20px;
+    font-family: var(--mono);
+    font-size: 15px;
+    line-height: 1.65;
+    overflow-x: auto;
+    margin: 1.1em 0;
+  }
+  .kw { color: #4A5563; font-weight: 600; }
+  .st { color: #6B7280; }
+  .v { font-weight: 600; color: var(--c); }
+  .explications { padding-left: 1.1em; margin: 0 0 1em; }
+  .explications li { margin-bottom: .35em; }
+  code { font-family: var(--mono); font-size: .86em; }
+  p code, li code { background: var(--surface); padding: 1px 5px; border-radius: 4px; }
+
+  .labo { background: var(--surface); border-radius: 10px; padding: 26px 28px; margin-top: 44px; }
+  .labo h2 { font-size: 22px; }
+  .labo p:last-child { margin-bottom: 0; }
+
+  .pied { display: flex; justify-content: space-between; gap: 20px; padding: 56px 0 80px; }
+  .pied a { text-decoration: none; display: block; }
+  .pied a:last-child { text-align: right; }
+  .pied span { display: block; font-size: 15px; color: var(--encre-2); }
+  .pied strong { font-size: 21px; font-weight: 700; }
+  .pied a:hover strong { text-decoration: underline; text-underline-offset: 4px; }
+
+  @media (max-width: 1020px) {
+    .page { grid-template-columns: minmax(0, 640px); max-width: 640px; }
+    .page > .figure { grid-column: 1; grid-row: auto; position: static; max-height: none; margin-top: 28px; }
+  }
+  @media (max-width: 560px) {
+    body { font-size: 18px; }
+    .page { padding: 0 18px; }
+    .ouverture { padding-top: 40px; }
+    .chapeau { font-size: 20px; }
+    .figure { padding: 18px 16px 20px; margin-inline: -6px; }
+    .labo { padding: 22px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .figure [data-n] { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="entete">
+    <a class="marque" href="#">La Forge IA</a>
+    <p class="fil">Partie 1, De zéro. Chapitre 1.3 sur 21.</p>
+  </header>
+
+  <div class="ouverture">
+    <h1>Le tokenizer</h1>
+    <p class="chapeau">Une IA ne lit pas des <button class="notion" data-n="lettres" type="button">lettres</button> : elle lit des nombres. Avant tout le reste, il faut donc un outil qui découpe le texte en <button class="notion" data-n="jetons" type="button">morceaux</button> et donne un numéro à chaque morceau. Dans ce chapitre, tu construis cet outil toi-même.</p>
+  </div>
+
+  <section aria-labelledby="t-pourquoi">
+    <h2 id="t-pourquoi">Pourquoi découper ?</h2>
+    <p>Un réseau de neurones fait des calculs. Pour qu'il puisse travailler sur « Le forgeron frappe le métal », il faut transformer cette phrase en une suite de nombres, puis savoir refaire le chemin inverse pour afficher sa réponse. L'outil qui fait cette traduction s'appelle un tokenizer, et les morceaux qu'il produit s'appellent des <button class="notion" data-n="jetons" type="button">jetons</button> (<span lang="en">tokens</span> en anglais).</p>
+  </section>
+
+  <section aria-labelledby="t-lettres">
+    <h2 id="t-lettres">Lettres ou mots ?</h2>
+    <p>Découper <button class="notion" data-n="lettres" type="button">lettre par lettre</button> est simple, mais les phrases deviennent très longues, et le modèle doit tout réapprendre à partir de briques minuscules. Découper mot par mot donne des suites courtes, mais le vocabulaire n'a pas de fin : forger, forgeron, forgeronne, reforgé…</p>
+    <p>La méthode utilisée par presque tous les grands modèles, le BPE (<span lang="en">Byte Pair Encoding</span>, « encodage par paires »), choisit un entre-deux. On part des <button class="notion" data-n="lettres" type="button">lettres</button>. On cherche la <button class="notion" data-n="paires" type="button">paire de symboles voisins</button> la plus fréquente dans un grand texte, on la <button class="notion" data-n="fusions" type="button">fusionne</button> en un nouveau symbole, et on recommence.</p>
+  </section>
+
+  <aside class="figure" aria-label="Figure : le découpage de ta phrase">
+    <ul class="legende">
+      <li><button type="button" data-n="lettres" aria-pressed="false">lettres</button></li>
+      <li><button type="button" data-n="paires" aria-pressed="false">paires</button></li>
+      <li><button type="button" data-n="fusions" aria-pressed="false">fusions</button></li>
+      <li><button type="button" data-n="jetons" aria-pressed="false">jetons</button></li>
+    </ul>
+    <p class="consigne">Tape une phrase, puis augmente le nombre de fusions.</p>
+    <div class="champ">
+      <label for="saisie">Ta phrase</label>
+      <input id="saisie" data-test="saisie" type="text" value="Le forgeron frappe le métal sur l'enclume." autocomplete="off" spellcheck="false">
+    </div>
+    <div class="reglage" data-n="fusions">
+      <label for="fusions"><span>Fusions apprises</span><output id="sortie-fusions" for="fusions">0</output></label>
+      <input id="fusions" data-test="fusions" type="range" min="0" max="165" step="1" value="0">
+    </div>
+    <div class="resultat">
+      <div class="compte">
+        <span><b data-n="jetons"><span id="nb-jetons">0</span> <span id="mot-jetons">jetons</span></b> pour <span data-n="lettres"><span id="nb-car">0</span> caractères</span></span>
+        <label class="bascule"><input type="checkbox" id="numeros"> voir les numéros</label>
+      </div>
+      <div class="jetons" id="jetons" data-test="jetons" aria-live="polite"></div>
+      <p class="prochaine" data-n="paires" id="prochaine"></p>
+      <div class="arbre-bloc">
+        <p id="arbre-titre">Clique un jeton pour voir de quelles lettres il est né.</p>
+        <div class="arbre" id="arbre"></div>
+      </div>
+      <p class="recentes-titre" data-n="fusions">Dernières fusions apprises</p>
+      <ul class="recentes" data-n="fusions" id="recentes"></ul>
+    </div>
+  </aside>
+
+  <section>
+    <p>À zéro <button class="notion" data-n="fusions" type="button">fusion</button>, chaque <button class="notion" data-n="lettres" type="button">lettre</button> est un <button class="notion" data-n="jetons" type="button">jeton</button>. Plus tu ajoutes de fusions, plus les morceaux fréquents (« es », « ent », « le ») deviennent des jetons entiers, et plus la suite raccourcit. Les mots rares, eux, restent découpés : c'est ce qui permet d'écrire n'importe quel mot avec un vocabulaire limité.</p>
+  </section>
+
+  <section aria-labelledby="t-code">
+    <h2 id="t-code">Le code</h2>
+    <p>Le cœur de l'algorithme tient en quelques lignes. Cette fonction compte toutes les <button class="notion" data-n="paires" type="button">paires voisines</button> et renvoie la plus fréquente :</p>
+<pre><code><span class="kw">from</span> collections <span class="kw">import</span> Counter
+
+<span class="kw">def</span> paire_la_plus_frequente(mots):
+    <span class="st">"""mots : dictionnaire {('f','o','r','g','e'): 12, ...}"""</span>
+    compte = Counter()
+    <span class="kw">for</span> <span class="v" data-n="lettres">symboles</span>, frequence <span class="kw">in</span> mots.items():
+        <span class="kw">for</span> <span class="v" data-n="paires">gauche</span>, <span class="v" data-n="paires">droite</span> <span class="kw">in</span> zip(<span class="v" data-n="lettres">symboles</span>, <span class="v" data-n="lettres">symboles</span>[1:]):
+            compte[(<span class="v" data-n="paires">gauche</span>, <span class="v" data-n="paires">droite</span>)] += frequence
+    <span class="kw">return</span> compte.most_common(1)[0][0]</code></pre>
+    <ul class="explications">
+      <li><code>Counter</code> compte les paires pour nous.</li>
+      <li><code>zip(symboles, symboles[1:])</code> donne chaque paire de voisins : (f, o), (o, r), (r, g)…</li>
+      <li>On ajoute la fréquence du mot : un mot vu 12 fois compte 12 fois.</li>
+      <li><code>most_common(1)</code> renvoie la paire gagnante.</li>
+    </ul>
+    <p>Dans le code aussi, les couleurs restent les mêmes : les <button class="notion" data-n="lettres" type="button">symboles</button> d'un mot, et la <button class="notion" data-n="paires" type="button">paire</button> (gauche, droite) qu'on compte.</p>
+    <p>Le projet complet (apprentissage, découpage, tests) est dans <code>projets/1.3-tokenizer</code>, avec un notebook à ouvrir dans Colab.</p>
+  </section>
+
+  <section class="labo" aria-labelledby="t-labo">
+    <h2 id="t-labo">Et chez un grand labo ?</h2>
+    <p>Les tokenizers des grands modèles apprennent de 100 000 à plus de 250 000 <button class="notion" data-n="jetons" type="button">morceaux</button>, sur des centaines de gigaoctets de texte dans des dizaines de langues. Ils travaillent souvent sur les octets plutôt que sur les <button class="notion" data-n="lettres" type="button">lettres</button>, pour pouvoir écrire n'importe quel caractère, emoji compris. Le principe reste exactement celui que tu viens de manipuler.</p>
+    <p>Le tien connaît en ce moment 45 lettres et <span id="labo-fusions">0</span> <span id="labo-mot">fusion</span>, soit <strong id="labo-total">45</strong> jetons possibles.</p>
+  </section>
+
+  <nav class="pied" aria-label="Chapitres voisins">
+    <a href="#"><span>Précédent</span><strong>1.2 Les données</strong></a>
+    <a href="#"><span>Suivant</span><strong>1.4 Le transformer</strong></a>
+  </nav>
+</div>
+
+<script src="bpe.js"></script>
+<script>
+(function () {
+  const B = window.ForgeBPE;
+  const F = B.fusions;
+  const $ = id => document.getElementById(id);
+  const saisie = $('saisie'), curseur = $('fusions'), boite = $('jetons');
+  const etat = { k: 0, choisi: null };
+  const pluriel = (n, mot) => n > 1 ? mot + 's' : mot;
+
+  // Allumer une notion : le texte, la figure et le code réagissent ensemble.
+  let fixe = null;
+  function allumer(n) {
+    if (n) document.body.dataset.allume = n; else delete document.body.dataset.allume;
+    document.querySelectorAll('.legende button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.n === n)));
+  }
+  const relacher = () => allumer(fixe);
+  document.querySelectorAll('.notion, .legende button').forEach(el => {
+    el.addEventListener('pointerenter', () => allumer(el.dataset.n));
+    el.addEventListener('pointerleave', relacher);
+    el.addEventListener('focus', () => allumer(el.dataset.n));
+    el.addEventListener('blur', relacher);
+    el.addEventListener('click', () => { fixe = fixe === el.dataset.n ? null : el.dataset.n; allumer(fixe); });
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { fixe = null; allumer(null); } });
+
+  function morceau(texte) {
+    const f = document.createDocumentFragment();
+    for (const c of texte) {
+      const s = document.createElement('span');
+      s.className = c === ' ' ? 'lt esp' : 'lt';
+      s.textContent = c === ' ' ? '␣' : c === '\n' ? '↵' : c;
+      f.append(s);
+    }
+    return f;
+  }
+
+  // L'arbre des fusions d'un jeton : de quelles lettres il est né, étage par étage.
+  function construire(t, limite) {
+    if ([...t].length > 1) {
+      for (let j = 0; j < limite; j++) {
+        if (F[j].ab === t) return { t, fusion: j + 1, enfants: [construire(F[j].a, j), construire(F[j].b, j)] };
+      }
+    }
+    return { t };
+  }
+  function dessinerArbre(t) {
+    const racine = construire(t, etat.k);
+    const feuilles = [];
+    (function placer(n) {
+      if (!n.enfants) { n.x = feuilles.length; feuilles.push(n); n.h = 0; return; }
+      n.enfants.forEach(placer);
+      n.x = (n.enfants[0].x + n.enfants[1].x) / 2;
+      n.h = 1 + Math.max(n.enfants[0].h, n.enfants[1].h);
+    })(racine);
+    const pasX = 38, pasY = 48, marge = 24;
+    const larg = Math.max(feuilles.length * pasX + marge * 2, 160);
+    const haut = racine.h * pasY + 46;
+    const X = n => marge + n.x * pasX + pasX / 2 + (larg - (feuilles.length * pasX + marge * 2)) / 2;
+    const Y = n => 17 + (racine.h - n.h) * pasY;
+    const svg = [`<svg width="${larg}" height="${haut}" viewBox="0 0 ${larg} ${haut}" role="img" aria-label="Arbre des fusions du jeton ${esc(B.visible(t))}">`];
+    (function traits(n) {
+      if (!n.enfants) return;
+      for (const e of n.enfants) {
+        svg.push(`<path data-n="fusions" d="M${X(e)} ${Y(e) - 14} C ${X(e)} ${Y(e) - 34}, ${X(n)} ${Y(n) + 30}, ${X(n)} ${Y(n) + 14}" fill="none" stroke="#2A7348" stroke-width="2"/>`);
+        traits(e);
+      }
+    })(racine);
+    (function noeuds(n) {
+      const texte = esc(B.visible(n.t));
+      const w = Math.max(26, [...B.visible(n.t)].length * 11 + 14);
+      if (!n.enfants) {
+        svg.push(`<g data-n="lettres"><rect x="${X(n) - w / 2}" y="${Y(n) - 14}" width="${w}" height="28" rx="5" fill="#E3EEF8" stroke="#2A6FB0" stroke-width="1.5"/><text x="${X(n)}" y="${Y(n) + 6}" text-anchor="middle" font-size="16" fill="#1D232A">${texte}</text></g>`);
+      } else {
+        const estRacine = n === racine;
+        svg.push(`<g data-n="${estRacine ? 'jetons' : 'fusions'}"><rect x="${X(n) - w / 2}" y="${Y(n) - 14}" width="${w}" height="28" rx="5" fill="${estRacine ? '#F2E6F5' : '#FFFFFF'}" stroke="${estRacine ? '#8A3FA0' : '#2A7348'}" stroke-width="${estRacine ? 2 : 1.5}"/><text x="${X(n)}" y="${Y(n) + 6}" text-anchor="middle" font-size="16" font-weight="${estRacine ? 700 : 400}" fill="#1D232A">${texte}</text></g><text data-n="fusions" x="${X(n) + w / 2 + 5}" y="${Y(n) - 8}" font-size="12" fill="#2A7348" stroke="#FFFFFF" stroke-width="4" paint-order="stroke">n° ${n.fusion}</text>`);
+        n.enfants.forEach(noeuds);
+      }
+    })(racine);
+    svg.push('</svg>');
+    $('arbre').innerHTML = svg.join('');
+    $('arbre-titre').textContent = racine.enfants
+      ? `Le jeton « ${B.visible(t)} » est né de ${feuilles.length} lettres, en ${compterFusions(racine)} ${pluriel(compterFusions(racine), 'fusion')}. Clique un autre jeton pour comparer.`
+      : `« ${B.visible(t)} » est une lettre seule : aucune fusion ne l'a encore absorbée. Clique un jeton plus long.`;
+  }
+  const compterFusions = n => n.enfants ? 1 + compterFusions(n.enfants[0]) + compterFusions(n.enfants[1]) : 0;
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function maj() {
+    etat.k = +curseur.value;
+    const texte = saisie.value;
+    const jetons = B.decouper(texte, etat.k);
+    $('sortie-fusions').textContent = etat.k;
+    $('nb-jetons').textContent = jetons.length;
+    $('mot-jetons').textContent = pluriel(jetons.length, 'jeton');
+    $('nb-car').textContent = [...texte].length;
+
+    // Repérer, dans ta phrase, la paire qui sera fusionnée au prochain pas.
+    const suivante = F[etat.k];
+    const gauches = new Set(), droites = new Set();
+    if (suivante) {
+      for (let i = 0; i < jetons.length - 1; i++) {
+        if (jetons[i].mot === jetons[i + 1].mot && jetons[i].texte === suivante.a && jetons[i + 1].texte === suivante.b) {
+          gauches.add(i); droites.add(i + 1); i++;
+        }
+      }
+    }
+
+    if (etat.choisi === null || !jetons.some(j => j.texte === etat.choisi)) {
+      etat.choisi = jetons.reduce((m, j) => [...j.texte].length > [...m].length ? j.texte : m, jetons[0] ? jetons[0].texte : '');
+    }
+
+    boite.replaceChildren(...jetons.map((j, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'jeton';
+      b.dataset.jeton = '';
+      const enPaire = gauches.has(i) || droites.has(i);
+      b.dataset.n = enPaire ? 'jetons paires' : 'jetons';
+      if (enPaire) b.classList.add('paire', gauches.has(i) ? 'paire-g' : 'paire-d');
+      b.setAttribute('aria-pressed', String(j.texte === etat.choisi));
+      b.setAttribute('aria-label', `jeton « ${B.visible(j.texte)} », numéro ${j.id}`);
+      const m = document.createElement('span');
+      m.append(morceau(j.texte));
+      const n = document.createElement('span');
+      n.className = 'num';
+      n.textContent = j.id;
+      b.append(m, n);
+      b.addEventListener('click', () => { etat.choisi = j.texte; maj(); });
+      return b;
+    }));
+
+    $('prochaine').textContent = suivante
+      ? `Prochaine paire à fusionner : ${B.visible(suivante.a)} + ${B.visible(suivante.b)}, vue ${suivante.n} fois dans le texte d'apprentissage.` + (gauches.size ? ' Elle est soulignée dans ta phrase.' : '')
+      : 'Toutes les fusions sont apprises.';
+    const lignes = [];
+    for (let i = etat.k - 1; i >= Math.max(0, etat.k - 3); i--) {
+      lignes.push(`<li>fusion ${i + 1} : ${esc(B.visible(F[i].a))} + ${esc(B.visible(F[i].b))} donne <span class="ab">${esc(B.visible(F[i].ab))}</span></li>`);
+    }
+    $('recentes').innerHTML = lignes.join('') || '<li>Aucune pour l\'instant : chaque lettre est seule.</li>';
+    $('labo-fusions').textContent = etat.k;
+    $('labo-mot').textContent = pluriel(etat.k, 'fusion');
+    $('labo-total').textContent = B.tailleBase + etat.k;
+    dessinerArbre(etat.choisi);
+  }
+
+  saisie.addEventListener('input', maj);
+  curseur.addEventListener('input', maj);
+  $('numeros').addEventListener('change', e => boite.classList.toggle('avec-numeros', e.target.checked));
+  curseur.value = 35;
+  maj();
+})();
+</script>
+</body>
+</html>

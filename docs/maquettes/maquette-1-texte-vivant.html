@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1.3 Le tokenizer, La Forge IA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --papier: #FFFFFF;
+    --encre: #1B1E28;
+    --encre-2: #3A3F4D;
+    --gris: #6B7080;
+    --filet: #E4E6EC;
+    --cobalt: #1F4FD8;
+    --cobalt-pale: #EEF2FD;
+    --teinte-a: #DCE6FF;
+    --teinte-b: #FFE6BF;
+    --serif: "Newsreader", Georgia, serif;
+    --sans: "Instrument Sans", system-ui, sans-serif;
+    --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--papier);
+    color: var(--encre);
+    font-family: var(--serif);
+    font-size: 20px;
+    line-height: 1.62;
+    font-optical-sizing: auto;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--cobalt); outline-offset: 3px; border-radius: 2px; }
+
+  /* La grille commune : colonne de lecture + marge de notes, groupe centré dans la page. */
+  .bloc {
+    display: grid;
+    grid-template-columns: minmax(0, 660px) 240px;
+    column-gap: 56px;
+    max-width: 956px;
+    margin-inline: auto;
+    padding-inline: 24px;
+    box-sizing: content-box;
+  }
+  .bloc > .texte { grid-column: 1; }
+  .bloc > .note { grid-column: 2; align-self: start; }
+
+  /* En-tête : la frise des 21 chapitres de la Partie 1. */
+  .entete { padding-top: 28px; padding-bottom: 8px; }
+  .entete .texte { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 28px; }
+  .marque {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: -0.005em;
+    text-decoration: none;
+  }
+  .frise { display: flex; align-items: flex-end; gap: 0; height: 26px; }
+  .frise a {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    width: 14px;
+    height: 26px;
+    text-decoration: none;
+  }
+  .frise a::before {
+    content: "";
+    width: 2px;
+    height: 12px;
+    background: #C9CCD6;
+    transition: height .15s ease;
+  }
+  .frise a.lu::before { background: var(--encre); }
+  .frise a[aria-current="page"]::before { background: var(--cobalt); height: 24px; width: 3px; }
+  .frise a:hover::before { height: 20px; }
+  .ou { font-family: var(--sans); font-size: 15px; color: var(--gris); margin: 0; }
+
+  /* Titre du chapitre. */
+  .titre { padding-top: 72px; padding-bottom: 8px; }
+  .numero {
+    font-family: var(--sans);
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--gris);
+    margin: 0 0 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(46px, 7vw, 76px);
+    font-weight: 500;
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    margin: 0 0 28px;
+    font-variation-settings: "opsz" 72;
+  }
+  .chapeau {
+    font-size: 24px;
+    line-height: 1.48;
+    color: var(--encre-2);
+    margin: 0;
+  }
+
+  section.bloc { padding-top: 48px; }
+  h2 {
+    font-family: var(--serif);
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    margin: 0 0 14px;
+    font-variation-settings: "opsz" 36;
+  }
+  p { margin: 0 0 1em; }
+  .texte p:last-child { margin-bottom: 0; }
+
+  /* Notes de marge. */
+  .note {
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--gris);
+    padding-top: 6px;
+  }
+  .note p { margin: 0 0 .8em; }
+  .note strong { color: var(--encre-2); font-weight: 600; }
+  .note .fusions-recentes { list-style: none; margin: .3em 0 0; padding: 0; font-variant-numeric: tabular-nums; }
+  .note .fusions-recentes li { padding: 1px 0; }
+  .note code { font-family: var(--mono); font-size: 14px; color: var(--encre-2); }
+
+  /* Les valeurs vivantes du texte. */
+  .reglable {
+    display: inline-block;
+    min-width: 2ch;
+    padding: 0 3px;
+    margin: 0;
+    color: var(--cobalt);
+    background: var(--cobalt-pale);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    border-bottom: 2px dotted var(--cobalt);
+    cursor: ew-resize;
+    user-select: none;
+    touch-action: none;
+    border-radius: 3px 3px 0 0;
+    position: relative;
+  }
+  .reglable:hover, .reglable:focus-visible, .reglable.glisse { background: #DDE5FB; }
+  .reglable:focus-visible { outline-offset: 1px; }
+  .reglable::before, .reglable::after {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-52%);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--cobalt);
+    opacity: 0;
+    transition: opacity .12s ease;
+    pointer-events: none;
+  }
+  .reglable::before { content: "\2039"; left: -9px; }
+  .reglable::after { content: "\203A"; right: -9px; }
+  .reglable:hover::before, .reglable:hover::after,
+  .reglable:focus-visible::before, .reglable:focus-visible::after,
+  .reglable.glisse::before, .reglable.glisse::after { opacity: 1; }
+
+  .calcule { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .bascule {
+    font: inherit;
+    color: var(--cobalt);
+    background: none;
+    border: 0;
+    padding: 0 2px;
+    border-bottom: 2px dotted var(--cobalt);
+    border-radius: 3px 3px 0 0;
+    cursor: pointer;
+  }
+  .bascule:hover { background: var(--cobalt-pale); }
+
+  /* La phrase qu'on tape, posée dans le fil du texte. */
+  .ligne-saisie { display: flex; align-items: baseline; gap: 10px; margin: 0 0 1em; }
+  .ligne-saisie label { white-space: nowrap; }
+  #saisie {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-style: italic;
+    color: var(--encre);
+    background: transparent;
+    border: 0;
+    border-bottom: 2px dotted var(--cobalt);
+    padding: 2px 2px 3px;
+    border-radius: 3px 3px 0 0;
+  }
+  #saisie:hover { background: var(--cobalt-pale); }
+  #saisie:focus-visible { outline: none; background: var(--cobalt-pale); border-bottom-style: solid; }
+
+  /* La phrase découpée, qui reste du texte. */
+  .bande {
+    font-size: 30px;
+    line-height: 1.7;
+    margin: .2em 0 .7em;
+    padding: 14px 0 16px;
+    border-top: 1px solid var(--filet);
+    border-bottom: 1px solid var(--filet);
+    word-break: break-word;
+    font-variation-settings: "opsz" 36;
+  }
+  /* Chaque jeton se lit comme une glose : le morceau, et sous lui son numéro. */
+  .jeton {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    vertical-align: top;
+    margin: 0 3px 8px 0;
+  }
+  .jeton .morceau {
+    padding: 0 4px;
+    background: var(--teinte-a);
+    border-radius: 3px;
+    white-space: pre;
+    line-height: 1.32;
+  }
+  .jeton.b .morceau { background: var(--teinte-b); }
+  .jeton .num {
+    font-family: var(--sans);
+    font-size: 12px;
+    line-height: 1;
+    margin-top: 5px;
+    color: var(--gris);
+    font-variant-numeric: tabular-nums;
+  }
+  .esp { color: #8F95A3; }
+  .bande { line-height: 1.2; }
+  .bande.numeros .morceau { display: none; }
+  .bande.numeros .num {
+    font-size: 22px;
+    color: var(--encre);
+    margin: 0;
+    padding: 6px 7px;
+    background: var(--teinte-a);
+    border-radius: 3px;
+  }
+  .bande.numeros .jeton.b .num { background: var(--teinte-b); }
+  @media (prefers-reduced-motion: no-preference) {
+    .jeton.nouveau .morceau { animation: pose .25s ease-out; }
+    @keyframes pose { from { opacity: .2; } to { opacity: 1; } }
+  }
+
+  /* Ouverture : une phrase telle que le modèle la reçoit. */
+  .ouverture { margin: 40px 0 0; }
+  .ouverture .glose { font-size: 34px; font-variation-settings: "opsz" 48; line-height: 1.2; }
+  .ouverture .jeton { margin-right: 5px; margin-bottom: 10px; }
+  .ouverture .jeton .morceau { background: none; border-bottom: 2px solid var(--teinte-a); border-radius: 0; padding: 0 2px; }
+  .ouverture .jeton.b .morceau { border-bottom-color: #F5C77E; }
+  .ouverture .jeton .num { font-size: 13px; margin-top: 7px; }
+  .ouverture figcaption { font-family: var(--sans); font-size: 15px; color: var(--gris); margin-top: 6px; }
+
+  /* Code et explications liées aux lignes. */
+  pre {
+    font-family: var(--mono);
+    font-size: 15px;
+    line-height: 1.65;
+    background: #F5F6F9;
+    border-radius: 6px;
+    padding: 18px 0;
+    margin: 1.2em 0;
+    overflow-x: auto;
+  }
+  pre code { display: block; min-width: max-content; }
+  pre .l { display: block; padding: 0 22px; transition: background .12s ease; }
+  pre .l.allumee { background: #E3EAFC; }
+  .kw { color: #1F4FD8; }
+  .st { color: #8A5300; }
+  .fn { color: #1B1E28; font-weight: 600; }
+  .cm { color: #6B7080; }
+  .explications { list-style: none; padding: 0; margin: 0 0 1em; }
+  .explications li {
+    padding: 6px 10px;
+    margin: 0 -10px;
+    border-radius: 5px;
+    cursor: default;
+  }
+  .explications li:hover, .explications li:focus-visible { background: var(--cobalt-pale); }
+  .explications code, .texte p code {
+    font-family: var(--mono);
+    font-size: .8em;
+    background: #F1F2F6;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  /* Et chez un grand labo ? */
+  .labo {
+    background: #F2F4F8;
+    border-radius: 8px;
+    padding: 28px 30px 30px;
+  }
+  .labo h2 { font-family: var(--sans); font-size: 21px; font-weight: 600; letter-spacing: 0; margin-bottom: 10px; }
+  .labo p { font-size: 19px; }
+  .echelle { font-family: var(--sans); font-size: 15px; color: var(--encre-2); margin-top: 18px; }
+  .echelle .rangee { display: grid; grid-template-columns: 9.5em 1fr; gap: 12px; align-items: center; margin-top: 8px; }
+  .echelle .barre { height: 10px; background: #D5DAE6; border-radius: 2px; position: relative; overflow: hidden; }
+  .echelle .barre i { position: absolute; inset: 0 auto 0 0; background: var(--cobalt); min-width: 2px; }
+  .echelle .barre.grande i { width: 100%; background: var(--encre); }
+
+  /* Pied : chapitres voisins. */
+  .pied { padding-top: 64px; padding-bottom: 80px; }
+  .voisins { display: flex; justify-content: space-between; gap: 24px; border-top: 1px solid var(--filet); padding-top: 22px; }
+  .voisins a { text-decoration: none; display: block; max-width: 48%; }
+  .voisins a:last-child { text-align: right; }
+  .voisins span { display: block; font-family: var(--sans); font-size: 14px; color: var(--gris); }
+  .voisins strong { font-weight: 500; font-size: 22px; }
+  .voisins a:hover strong { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+
+  @media (max-width: 1060px) {
+    .bloc { grid-template-columns: minmax(0, 660px); max-width: 660px; }
+    .bloc > .note { grid-column: 1; margin-top: 16px; padding: 0 0 0 1.4em; font-size: 15px; }
+  }
+  @media (max-width: 560px) {
+    body { font-size: 18px; }
+    .bloc { padding-inline: 20px; }
+    .titre { padding-top: 44px; }
+    .chapeau { font-size: 20px; }
+    h2 { font-size: 25px; }
+    .bande { font-size: 24px; }
+    .ouverture .glose { font-size: 26px; }
+    .ligne-saisie { display: block; }
+    .ligne-saisie label { display: block; margin-bottom: 2px; }
+    #saisie { width: 100%; }
+    .labo { padding: 22px 20px; }
+    .frise a { width: 11px; }
+    .echelle .rangee { grid-template-columns: 1fr; gap: 4px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="entete bloc">
+  <div class="texte">
+    <a class="marque" href="#">La Forge IA</a>
+    <nav class="frise" aria-label="Les 21 chapitres de la Partie 1" id="frise"></nav>
+    <p class="ou">Partie 1, De zéro. Chapitre 1.3 sur 21.</p>
+  </div>
+</header>
+
+<main>
+  <article>
+    <div class="bloc titre">
+      <div class="texte">
+        <h1>Le tokenizer</h1>
+        <p class="chapeau">Une IA ne lit pas des lettres : elle lit des nombres. Avant tout le reste, il faut donc un outil qui découpe le texte en morceaux et donne un numéro à chaque morceau. Dans ce chapitre, tu construis cet outil toi-même.</p>
+        <figure class="ouverture">
+          <div class="glose" id="glose-ouverture" aria-hidden="true"></div>
+          <figcaption id="legende-ouverture"></figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <section class="bloc" aria-labelledby="t-pourquoi">
+      <div class="texte">
+        <h2 id="t-pourquoi">Pourquoi découper ?</h2>
+        <p>Un réseau de neurones fait des calculs. Pour qu'il puisse travailler sur « Le forgeron frappe le métal », il faut transformer cette phrase en une suite de nombres, puis savoir refaire le chemin inverse pour afficher sa réponse. L'outil qui fait cette traduction s'appelle un tokenizer, et les morceaux qu'il produit s'appellent des jetons (<span lang="en">tokens</span> en anglais).</p>
+      </div>
+      <aside class="note">
+        <p>Le mot anglais <span lang="en">token</span> veut dire jeton, comme ceux d'un jeu de société : un petit objet qui en représente un autre.</p>
+      </aside>
+    </section>
+
+    <section class="bloc" aria-labelledby="t-lettres">
+      <div class="texte">
+        <h2 id="t-lettres">Lettres ou mots ?</h2>
+        <p>Découper lettre par lettre est simple, mais les phrases deviennent très longues, et le modèle doit tout réapprendre à partir de briques minuscules. Découper mot par mot donne des suites courtes, mais le vocabulaire n'a pas de fin : forger, forgeron, forgeronne, reforgé…</p>
+        <p>La méthode utilisée par presque tous les grands modèles, le BPE (<span lang="en">Byte Pair Encoding</span>, « encodage par paires »), choisit un entre-deux. On part des lettres. On cherche la paire de symboles voisins la plus fréquente dans un grand texte, on la fusionne en un nouveau symbole, et on recommence.</p>
+      </div>
+      <aside class="note">
+        <p>Le BPE a été inventé en 1994 pour compresser des fichiers. Il a été repris en 2015 pour la traduction automatique, puis par les modèles de langage.</p>
+      </aside>
+    </section>
+
+    <section class="bloc" aria-labelledby="t-essai">
+      <div class="texte">
+        <h2 id="t-essai">À toi de découper</h2>
+        <p>Tape une phrase, puis augmente le nombre de fusions.</p>
+        <div class="ligne-saisie">
+          <label for="saisie">Ta phrase :</label>
+          <input id="saisie" data-test="saisie" type="text" value="Le forgeron frappe le métal sur l'enclume." autocomplete="off" spellcheck="false">
+        </div>
+        <p>Avec <span class="reglable" data-test="fusions" role="slider" tabindex="0" aria-label="Nombre de fusions apprises" aria-valuemin="0" aria-valuemax="165" aria-valuenow="0">0</span> <span data-mot-fusion>fusion apprise</span>, ses <span class="calcule" id="nb-car">0</span> caractères tiennent en <span class="calcule" id="nb-jetons">0</span> <span data-mot-jeton>jetons</span> :</p>
+        <div class="bande" id="bande" data-test="jetons" aria-live="polite"></div>
+        <p>Lettre par lettre, il en faudrait <span class="calcule" id="nb-lettres">0</span> ; mot par mot, <span class="calcule" id="nb-mots">0</span>, mais avec un vocabulaire sans limite. <span id="phrase-fusion"></span> Sous chaque morceau, son numéro : <button type="button" class="bascule" id="bascule" aria-pressed="false">cacher les morceaux</button> pour voir la phrase comme le modèle la reçoit.</p>
+      </div>
+      <aside class="note">
+        <p>Le nombre en bleu se fait glisser à la souris ou au doigt. Au clavier, atteins-le avec Tab, puis utilise les flèches.</p>
+        <p><strong>Dernières fusions apprises</strong></p>
+        <ul class="fusions-recentes" id="recentes"></ul>
+      </aside>
+    </section>
+
+    <section class="bloc">
+      <div class="texte">
+        <p>À zéro fusion, chaque lettre est un jeton. Plus tu ajoutes de fusions, plus les morceaux fréquents (« es », « ent », « le ») deviennent des jetons entiers, et plus la suite raccourcit. Les mots rares, eux, restent découpés : c'est ce qui permet d'écrire n'importe quel mot avec un vocabulaire limité.</p>
+      </div>
+    </section>
+
+    <section class="bloc" aria-labelledby="t-code">
+      <div class="texte">
+        <h2 id="t-code">Le code</h2>
+        <p>Le cœur de l'algorithme tient en quelques lignes. Cette fonction compte toutes les paires voisines et renvoie la plus fréquente :</p>
+<pre><code><span class="l" data-l="1"><span class="kw">from</span> collections <span class="kw">import</span> Counter</span><span class="l" data-l="2"> </span><span class="l" data-l="3"><span class="kw">def</span> <span class="fn">paire_la_plus_frequente</span>(mots):</span><span class="l" data-l="4">    <span class="st">"""mots : dictionnaire {('f','o','r','g','e'): 12, ...}"""</span></span><span class="l" data-l="5">    compte = Counter()</span><span class="l" data-l="6">    <span class="kw">for</span> symboles, frequence <span class="kw">in</span> mots.items():</span><span class="l" data-l="7">        <span class="kw">for</span> gauche, droite <span class="kw">in</span> zip(symboles, symboles[1:]):</span><span class="l" data-l="8">            compte[(gauche, droite)] += frequence</span><span class="l" data-l="9">    <span class="kw">return</span> compte.most_common(1)[0][0]</span></code></pre>
+        <ul class="explications" id="explications">
+          <li tabindex="0" data-lignes="1 5"><code>Counter</code> compte les paires pour nous.</li>
+          <li tabindex="0" data-lignes="7"><code>zip(symboles, symboles[1:])</code> donne chaque paire de voisins : (f, o), (o, r), (r, g)…</li>
+          <li tabindex="0" data-lignes="6 8">On ajoute la fréquence du mot : un mot vu 12 fois compte 12 fois.</li>
+          <li tabindex="0" data-lignes="9"><code>most_common(1)</code> renvoie la paire gagnante.</li>
+        </ul>
+        <p>Le projet complet (apprentissage, découpage, tests) est dans <code>projets/1.3-tokenizer</code>, avec un notebook à ouvrir dans Colab.</p>
+      </div>
+      <aside class="note">
+        <p>Survole une explication : la ligne de code qui lui correspond s'allume.</p>
+        <p><code>Counter</code> fait partie de la bibliothèque standard de Python : rien à installer.</p>
+      </aside>
+    </section>
+
+    <section class="bloc" aria-labelledby="t-labo">
+      <div class="texte labo">
+        <h2 id="t-labo">Et chez un grand labo ?</h2>
+        <p>Les tokenizers des grands modèles apprennent de 100 000 à plus de 250 000 morceaux, sur des centaines de gigaoctets de texte dans des dizaines de langues. Ils travaillent souvent sur les octets plutôt que sur les lettres, pour pouvoir écrire n'importe quel caractère, emoji compris. Le principe reste exactement celui que tu viens de manipuler.</p>
+        <div class="echelle">
+          <p>Ton tokenizer connaît en ce moment 45 lettres et <span class="reglable" role="slider" tabindex="0" aria-label="Nombre de fusions apprises" aria-valuemin="0" aria-valuemax="165" aria-valuenow="0">0</span> <span data-mot-fusion>fusion</span>, soit <span class="calcule" id="vocab">45</span> morceaux.</p>
+          <div class="rangee"><span>Le tien</span><span class="barre" aria-hidden="true"><i id="barre-toi"></i></span></div>
+          <div class="rangee"><span>Un grand modèle</span><span class="barre grande" aria-hidden="true"><i></i></span></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="bloc pied">
+      <nav class="texte voisins" aria-label="Chapitres voisins">
+        <a href="#"><span>Précédent</span><strong>1.2 Les données</strong></a>
+        <a href="#"><span>Suivant</span><strong>1.4 Le transformer</strong></a>
+      </nav>
+    </footer>
+  </article>
+</main>
+
+<script src="bpe.js"></script>
+<script>
+(function () {
+  const B = window.ForgeBPE;
+  const etat = { k: 0, texte: '', numeros: false };
+  const $ = id => document.getElementById(id);
+  const saisie = $('saisie');
+  const bande = $('bande');
+  const reglables = [...document.querySelectorAll('.reglable')];
+
+  // La frise des 21 chapitres.
+  const chapitres = ["Ce qu'est vraiment un modèle de langage", 'Les données', 'Le tokenizer', 'Le transformer, pièce par pièce',
+    'Le pré-entraînement', 'Évaluer son modèle', 'Apprendre à converser', "L'aligner", 'Le faire raisonner', 'Le faire coder',
+    'Compresser les images', 'Générer des images par diffusion', "Guider l'image par le texte", 'Passer à la vidéo',
+    'Comprendre les images', 'Les outils', "La boucle d'agent et la mémoire", 'Plusieurs agents qui coopèrent',
+    'Gérer un projet en autonomie', 'Accélérer et servir le modèle', 'Sécurité et garde-fous'];
+  chapitres.forEach((titre, i) => {
+    const a = document.createElement('a');
+    a.href = '#';
+    a.setAttribute('aria-label', `Chapitre 1.${i + 1} : ${titre}`);
+    a.title = `1.${i + 1} ${titre}`;
+    if (i < 2) a.className = 'lu';
+    if (i === 2) a.setAttribute('aria-current', 'page');
+    $('frise').append(a);
+  });
+
+  const pluriel = (n, mot) => (n > 1 ? mot.replace(/(\S+)/g, '$1s') : mot);
+
+  let precedents = new Set();
+  function maj() {
+    const jetons = B.decouper(etat.texte, etat.k);
+    const nbCar = [...etat.texte].length;
+    const mots = B.preDecouper(etat.texte).filter(m => /\p{L}/u.test(m)).length;
+
+    reglables.forEach(r => {
+      r.textContent = etat.k;
+      r.setAttribute('aria-valuenow', etat.k);
+      r.setAttribute('aria-valuetext', `${etat.k} ${pluriel(etat.k, 'fusion')}`);
+    });
+    document.querySelectorAll('[data-mot-fusion]').forEach((s, i) => {
+      s.textContent = i === 0 ? pluriel(etat.k, 'fusion apprise') : pluriel(etat.k, 'fusion');
+    });
+    document.querySelectorAll('[data-mot-jeton]').forEach(s => { s.textContent = pluriel(jetons.length, 'jeton'); });
+    $('nb-car').textContent = nbCar;
+    $('nb-jetons').textContent = jetons.length;
+    $('nb-lettres').textContent = nbCar;
+    $('nb-mots').textContent = mots;
+    const vocab = B.tailleBase + etat.k;
+    $('vocab').textContent = vocab;
+    $('barre-toi').style.width = (vocab / 200000 * 100) + '%';
+
+    // La phrase découpée.
+    const vus = new Set();
+    const elements = jetons.map((j, i) => {
+      const s = jeton(j, i);
+      s.dataset.jeton = '';
+      vus.add(j.texte);
+      if (precedents.size && !precedents.has(j.texte)) s.classList.add('nouveau');
+      return s;
+    });
+    precedents = vus;
+    bande.classList.toggle('numeros', etat.numeros);
+    bande.replaceChildren(...elements);
+
+    // La dernière fusion, dans le texte et dans la marge.
+    const f = B.fusions[etat.k - 1];
+    $('phrase-fusion').textContent = f
+      ? `La dernière fusion apprise est la n° ${etat.k} : ${B.visible(f.a)} + ${B.visible(f.b)} → ${B.visible(f.ab)}.`
+      : 'Aucune fusion pour l\'instant : chaque lettre reste seule.';
+    const recentes = [];
+    for (let i = Math.max(0, etat.k - 4); i < etat.k; i++) {
+      const g = B.fusions[i];
+      recentes.push(`<li>fusion ${i + 1} : ${esc(B.visible(g.a))} + ${esc(B.visible(g.b))} → ${esc(B.visible(g.ab))}</li>`);
+    }
+    $('recentes').innerHTML = recentes.length ? recentes.reverse().join('') : '<li>aucune pour l\'instant</li>';
+  }
+  // Un jeton = le morceau (espaces rendues visibles) + son numéro dessous.
+  function jeton(j, i) {
+    const s = document.createElement('span');
+    s.className = 'jeton' + (i % 2 ? ' b' : '');
+    const m = document.createElement('span');
+    m.className = 'morceau';
+    for (const c of j.texte) {
+      if (c === ' ') { const e = document.createElement('span'); e.className = 'esp'; e.textContent = '␣'; m.append(e); }
+      else m.append(c === '\n' ? '↵' : c);
+    }
+    const n = document.createElement('span');
+    n.className = 'num';
+    n.textContent = j.id;
+    s.append(m, n);
+    return s;
+  }
+
+  // L'ouverture : une phrase entièrement découpée avec toutes les fusions.
+  (function () {
+    const phrase = 'Le forgeron frappe le métal';
+    const j = B.decouper(phrase, B.maxFusions);
+    document.getElementById('glose-ouverture').replaceChildren(...j.map(jeton));
+    document.getElementById('legende-ouverture').textContent =
+      `« ${phrase} », tel que le modèle le reçoit : ${j.length} morceaux, donc ${j.length} nombres.`;
+  })();
+
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function regler(k) {
+    k = Math.max(0, Math.min(B.maxFusions, Math.round(k)));
+    if (k === etat.k) return;
+    etat.k = k;
+    maj();
+  }
+
+  // Les nombres vivants : glisser à la souris ou au doigt, flèches au clavier.
+  reglables.forEach(r => {
+    let depart = null;
+    r.addEventListener('pointerdown', e => {
+      depart = { x: e.clientX, k: etat.k };
+      r.setPointerCapture(e.pointerId);
+      r.classList.add('glisse');
+      document.body.style.cursor = 'ew-resize';
+      e.preventDefault();
+    });
+    r.addEventListener('pointermove', e => {
+      if (!depart) return;
+      regler(depart.k + (e.clientX - depart.x) / 4);
+    });
+    const fin = () => { depart = null; r.classList.remove('glisse'); document.body.style.cursor = ''; };
+    r.addEventListener('pointerup', fin);
+    r.addEventListener('pointercancel', fin);
+    r.addEventListener('keydown', e => {
+      const pas = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1, PageUp: 10, PageDown: -10 }[e.key];
+      if (pas !== undefined) { regler(etat.k + pas); e.preventDefault(); }
+      else if (e.key === 'Home') { regler(0); e.preventDefault(); }
+      else if (e.key === 'End') { regler(B.maxFusions); e.preventDefault(); }
+    });
+  });
+
+  saisie.addEventListener('input', () => { etat.texte = saisie.value; maj(); });
+  $('bascule').addEventListener('click', e => {
+    etat.numeros = !etat.numeros;
+    e.currentTarget.textContent = etat.numeros ? 'remontrer les morceaux' : 'cacher les morceaux';
+    e.currentTarget.setAttribute('aria-pressed', String(etat.numeros));
+    maj();
+  });
+
+  // Code : une explication survolée allume ses lignes.
+  document.querySelectorAll('#explications li').forEach(li => {
+    const lignes = li.dataset.lignes.split(' ');
+    const allumer = on => lignes.forEach(n => document.querySelector(`pre .l[data-l="${n}"]`).classList.toggle('allumee', on));
+    li.addEventListener('mouseenter', () => allumer(true));
+    li.addEventListener('mouseleave', () => allumer(false));
+    li.addEventListener('focus', () => allumer(true));
+    li.addEventListener('blur', () => allumer(false));
+  });
+
+  etat.texte = saisie.value;
+  etat.k = 20;
+  maj();
+})();
+</script>
+</body>
+</html>

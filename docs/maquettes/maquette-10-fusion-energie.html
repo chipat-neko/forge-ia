@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1.3 Le tokenizer, La Forge IA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gabarito:wght@500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --papier: #FFFFFF;
+    --indigo: #232057;
+    --indigo-doux: #5B5888;
+    --lavande: #8F8CB8;
+    --brume: #E6E5F0;
+    --brume-claire: #F5F4FA;
+    --soleil: #FFC93C;
+    --soleil-vif: #FFB800;
+    --soleil-pale: #FFF4D6;
+    --menthe: #1C6E58;
+    --menthe-pale: #E2F5EF;
+    --corail: #B8342D;
+    --corail-pale: #FDECEA;
+    --teinte-a: #E4E2F4;
+    --teinte-b: #F2E9D8;
+    --titres: "Gabarito", system-ui, sans-serif;
+    --texte: "Newsreader", Georgia, serif;
+    --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-padding-top: 5rem; }
+  body {
+    margin: 0;
+    background: var(--papier);
+    color: var(--indigo);
+    font-family: var(--texte);
+    font-size: 20px;
+    line-height: 1.62;
+    font-optical-sizing: auto;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: inherit; text-underline-offset: .2em; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--indigo); outline-offset: 3px; border-radius: 3px; }
+  p { margin: 0 0 1em; }
+  code { font-family: var(--mono); }
+
+  /* Barre du haut : où j'en suis dans le chapitre, et ce que j'ai acquis. */
+  .barre { position: sticky; top: 0; z-index: 5; background: rgba(255, 255, 255, .96); border-bottom: 1px solid var(--brume); }
+  .barre-in {
+    max-width: 1108px; margin: 0 auto; padding: 12px 24px;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px 28px;
+    font-family: var(--titres);
+  }
+  .marque { font-weight: 800; font-size: 19px; letter-spacing: -.01em; text-decoration: none; }
+  .ou { font-size: 15px; font-weight: 500; color: var(--indigo-doux); }
+  .etapes-barre { display: flex; gap: 5px; flex: 1 1 200px; max-width: 320px; }
+  .etapes-barre a { flex: 1; height: 7px; border-radius: 2px; background: var(--brume); position: relative; transition: height .15s ease; }
+  .etapes-barre a::after { content: ""; position: absolute; inset: -10px 0; }
+  .etapes-barre a.faite { background: var(--indigo); }
+  .etapes-barre a.ici { background: var(--lavande); height: 11px; }
+  .acquis-mini { margin-left: auto; display: flex; align-items: center; gap: 10px; text-decoration: none; font-size: 15px; font-weight: 600; }
+  .pips { display: flex; gap: 4px; }
+  .pips i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--lavande); }
+  .pips i.plein { background: var(--menthe); border-color: var(--menthe); }
+
+  /* Grille : numéro d'étape suspendu, colonne de lecture, marge de notes. */
+  .bloc {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 660px) 236px;
+    column-gap: 44px;
+    max-width: 1040px;
+    margin-inline: auto;
+    padding-inline: 24px;
+    box-sizing: content-box;
+  }
+  .bloc > .texte { grid-column: 2; min-width: 0; }
+  .bloc > .note { grid-column: 3; align-self: start; }
+  .bloc > .num-etape { grid-column: 1; grid-row: 1; justify-self: end; }
+
+  /* Ouverture du chapitre. */
+  .titre { padding-top: 64px; }
+  h1 {
+    font-family: var(--titres);
+    font-weight: 800;
+    font-size: clamp(50px, 8vw, 84px);
+    line-height: .96;
+    letter-spacing: -.03em;
+    margin: 0 0 26px;
+  }
+  .chapeau { font-size: 24px; line-height: 1.48; margin: 0 0 14px; }
+  .programme { font-family: var(--titres); font-size: 17px; font-weight: 500; color: var(--indigo-doux); margin: 0; }
+  .ouverture { margin: 40px 0 0; }
+  .ouverture .glose { font-size: 34px; font-variation-settings: "opsz" 48; line-height: 1.2; }
+  .ouverture .jeton { margin-right: 5px; margin-bottom: 10px; }
+  .ouverture .jeton .morceau, .ouverture .jeton.b .morceau { background: none; border-bottom: 3px solid #C9C5EA; border-radius: 0; padding: 0 2px; }
+  .ouverture .jeton.b .morceau { border-bottom-color: #E2CFAA; }
+  .ouverture .jeton .num { font-size: 13px; margin-top: 7px; }
+  .ouverture figcaption { font-family: var(--titres); font-size: 15px; color: var(--indigo-doux); margin-top: 6px; }
+
+  /* Les étapes. */
+  .etape { padding-top: 60px; }
+  .num-etape {
+    font-family: var(--titres);
+    font-weight: 800;
+    font-size: 44px;
+    line-height: 1;
+    color: var(--lavande);
+    font-variant-numeric: tabular-nums;
+    padding-top: 1px;
+    position: relative;
+  }
+  .etape.ici .num-etape { color: var(--indigo); }
+  .etape.faite .num-etape { color: var(--indigo); }
+  .etape.faite .num-etape::after {
+    content: "\2713";
+    position: absolute; right: -19px; top: -2px;
+    font-size: 17px; font-weight: 800; color: var(--menthe);
+  }
+  h2 {
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 31px;
+    line-height: 1.15;
+    letter-spacing: -.012em;
+    margin: 0 0 14px;
+  }
+  .texte p:last-child { margin-bottom: 0; }
+
+  /* Notes de marge. */
+  .note { font-size: 16px; line-height: 1.5; color: var(--indigo-doux); padding-top: 8px; }
+  .note p { margin: 0 0 .8em; }
+  .note strong { font-family: var(--titres); font-weight: 600; color: var(--indigo); }
+  .note ul { list-style: none; margin: .3em 0 0; padding: 0; font-variant-numeric: tabular-nums; }
+  .note li { padding: 1px 0; }
+  .note code { font-size: 14px; color: var(--indigo); }
+
+  /* Le pari : le moment où l'on s'engage. */
+  .pari {
+    background: var(--soleil-pale);
+    border-radius: 18px;
+    padding: 24px 26px 26px;
+    margin: 26px 0 6px;
+  }
+  .pari .q {
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 1.28;
+    margin: 0 0 18px;
+  }
+  .pari .q small { display: block; font-family: var(--texte); font-weight: 400; font-size: 17px; color: var(--indigo-doux); margin-top: 6px; }
+  .choix { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .choix button {
+    cursor: pointer;
+    font-family: var(--titres); font-weight: 700; font-size: 21px; line-height: 1.15;
+    background: var(--papier); color: var(--indigo);
+    border: 2px solid var(--indigo); border-radius: 12px;
+    padding: 14px 12px;
+    box-shadow: 0 4px 0 var(--indigo);
+    transition: transform .08s ease, box-shadow .08s ease, background-color .15s ease;
+  }
+  .choix button .gros { display: block; font-size: 40px; font-weight: 800; line-height: 1; letter-spacing: -.02em; }
+  .choix button .petit { display: block; font-size: 16px; font-weight: 500; margin-top: 4px; }
+  .choix button:hover:not(:disabled) { background: var(--soleil); }
+  .choix button:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--indigo); }
+  .choix button:disabled { cursor: default; }
+  .choix button.juste { background: var(--menthe-pale); border-color: var(--menthe); box-shadow: 0 4px 0 var(--menthe); color: var(--menthe); }
+  .choix button.faux { background: var(--corail-pale); border-color: var(--corail); box-shadow: 0 4px 0 var(--corail); color: var(--corail); }
+  .choix button.attenue { color: #6E6B95; border-color: #C9C7DD; box-shadow: 0 4px 0 #C9C7DD; }
+  .choix button .rep { display: block; font-size: 14px; font-weight: 600; margin-top: 6px; }
+  .choix.code-choix { grid-template-columns: 1fr; }
+  .choix.code-choix button { text-align: left; font-size: 17px; padding: 12px 16px; }
+  .verdict { margin-top: 20px; padding: 16px 18px; border-radius: 10px; background: var(--papier); font-size: 19px; }
+  .verdict[hidden] { display: none; }
+  .verdict .titre-v { display: block; font-family: var(--titres); font-weight: 800; font-size: 22px; margin-bottom: 4px; }
+  .verdict.ok .titre-v { color: var(--menthe); }
+  .verdict.ko .titre-v { color: var(--corail); }
+  .verdict p:last-child { margin-bottom: 0; }
+  .mini { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 10px; font-size: 22px; }
+  .mini .morceau { padding: 0 5px; border-radius: 5px; background: var(--teinte-a); white-space: pre; }
+  .mini .morceau:nth-child(even) { background: var(--teinte-b); }
+
+  /* Les valeurs vivantes du texte : tout ce qui est jaune se manipule. */
+  .reglable {
+    display: inline-block;
+    min-width: 2.2ch;
+    padding: 0 6px;
+    font-family: var(--titres);
+    font-weight: 800;
+    font-size: .95em;
+    line-height: 1.25;
+    color: var(--indigo);
+    background: var(--soleil);
+    border-radius: 6px;
+    box-shadow: 0 2px 0 var(--indigo);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    cursor: ew-resize;
+    user-select: none;
+    touch-action: none;
+    position: relative;
+    margin: 0 4px;
+  }
+  .reglable:focus-visible { outline-offset: 2px; }
+  .reglable:hover, .reglable.glisse { background: var(--soleil-vif); }
+  .reglable::before, .reglable::after {
+    position: absolute; top: 50%; transform: translateY(-52%);
+    font-size: 14px; font-weight: 800; color: var(--indigo);
+    opacity: 0; transition: opacity .12s ease; pointer-events: none;
+  }
+  .reglable::before { content: "\2039"; left: -10px; }
+  .reglable::after { content: "\203A"; right: -10px; }
+  .reglable:hover::before, .reglable:hover::after,
+  .reglable:focus-visible::before, .reglable:focus-visible::after,
+  .reglable.glisse::before, .reglable.glisse::after { opacity: 1; }
+  .calcule { font-family: var(--titres); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .bascule {
+    font: inherit; color: var(--indigo);
+    background: none;
+    text-decoration: underline; text-decoration-color: var(--soleil);
+    text-decoration-thickness: 5px; text-underline-offset: 4px; text-decoration-skip-ink: none;
+    border: 0; border-radius: 4px; padding: 0 2px; cursor: pointer;
+  }
+  .bascule:hover { background: var(--soleil-pale); text-decoration-color: var(--soleil-vif); }
+
+  /* L'atelier : verrouillé tant que le pari n'est pas fait. */
+  .atelier { position: relative; margin-top: 4px; }
+  .atelier .dedans { transition: filter .35s ease, opacity .35s ease; }
+  .atelier.verrou .dedans { filter: blur(3px); opacity: .4; }
+  .verrou-msg {
+    position: absolute; inset: 0; display: grid; justify-items: center; align-items: start; text-align: center; padding: 72px 16px 16px;
+  }
+  .verrou-msg p {
+    margin: 0; max-width: 24rem;
+    font-family: var(--titres); font-weight: 600; font-size: 18px; line-height: 1.4;
+    background: var(--papier); border: 2px solid var(--indigo); border-radius: 12px; padding: 14px 18px;
+  }
+  .atelier:not(.verrou) .verrou-msg { display: none; }
+
+  .ligne-saisie { display: flex; align-items: baseline; gap: 10px; margin: 0 0 1em; }
+  .ligne-saisie label { white-space: nowrap; }
+  #saisie {
+    flex: 1; min-width: 0;
+    font: inherit; font-style: italic; color: var(--indigo);
+    background: var(--soleil-pale);
+    border: 0; border-bottom: 3px solid var(--soleil);
+    border-radius: 6px 6px 0 0;
+    padding: 3px 8px 4px;
+  }
+  #saisie:hover { background: #FFEDBC; }
+  #saisie:focus-visible { outline: none; background: #FFEDBC; border-bottom-color: var(--indigo); }
+
+  /* La phrase découpée, qui reste du texte. */
+  .bande {
+    font-size: 30px;
+    line-height: 1.2;
+    margin: .2em 0 .7em;
+    padding: 16px 0 10px;
+    border-top: 2px solid var(--indigo);
+    border-bottom: 1px solid var(--brume);
+    word-break: break-word;
+    font-variation-settings: "opsz" 36;
+  }
+  .jeton { display: inline-flex; flex-direction: column; align-items: center; vertical-align: top; margin: 0 3px 8px 0; }
+  .jeton .morceau { padding: 0 4px; background: var(--teinte-a); border-radius: 4px; white-space: pre; line-height: 1.32; }
+  .jeton.b .morceau { background: var(--teinte-b); }
+  .jeton .num { font-family: var(--titres); font-weight: 500; font-size: 12px; line-height: 1; margin-top: 5px; color: var(--indigo-doux); font-variant-numeric: tabular-nums; }
+  .esp { color: #8A87B0; }
+  .bande.numeros .morceau { display: none; }
+  .bande.numeros .num { font-size: 22px; font-weight: 600; color: var(--indigo); margin: 0; padding: 6px 7px; background: var(--teinte-a); border-radius: 4px; }
+  .bande.numeros .jeton.b .num { background: var(--teinte-b); }
+
+  .defi { margin-top: 1.2em; padding-top: 14px; border-top: 1px solid var(--brume); font-size: 18px; }
+  .defi h3 { font-family: var(--titres); font-weight: 700; font-size: 20px; margin: 0 0 4px; }
+  .defi p { margin: 0 0 .4em; }
+  .defi .etat { font-family: var(--titres); font-weight: 600; font-size: 16px; color: var(--indigo-doux); }
+  .defi.reussi .etat { color: var(--menthe); }
+
+  /* Le code. */
+  pre {
+    font-family: var(--mono); font-size: 15px; line-height: 1.7;
+    background: var(--brume-claire); border-radius: 10px;
+    padding: 16px 0; margin: 1.2em 0; overflow-x: auto;
+  }
+  pre code { display: block; min-width: max-content; }
+  pre .l { display: block; padding: 0 22px 0 18px; border-left: 4px solid transparent; transition: background .12s ease; }
+  pre .l.allumee { background: var(--soleil-pale); border-left-color: var(--soleil); }
+  .kw { color: #4B45B5; font-weight: 600; }
+  .st { color: #8A5300; }
+  .fn { color: var(--indigo); font-weight: 700; }
+  .explications { list-style: none; padding: 0; margin: 0 0 1em; }
+  .explications li { padding: 6px 10px; margin: 0 -10px; border-radius: 6px; cursor: default; }
+  .explications li:hover, .explications li:focus-visible { background: var(--soleil-pale); }
+  .explications code, .texte p code { font-size: .8em; background: var(--brume-claire); padding: 1px 5px; border-radius: 4px; }
+
+  /* Et chez un grand labo ? */
+  .labo { background: var(--indigo); color: #F1F0FA; border-radius: 14px; padding: 30px 32px 32px; }
+  .labo h2 { color: #FFFFFF; }
+  .labo p { font-size: 19px; }
+  .labo .reglable { box-shadow: 0 2px 0 #0F0D33; }
+  .echelle { font-family: var(--titres); font-size: 16px; margin-top: 18px; }
+  .echelle p { font-family: var(--texte); font-size: 19px; }
+  .echelle .rangee { display: grid; grid-template-columns: 9.5em 1fr; gap: 12px; align-items: center; margin-top: 10px; }
+  .echelle .barre-v { height: 12px; background: rgba(255, 255, 255, .14); border-radius: 3px; position: relative; overflow: hidden; }
+  .echelle .barre-v i { position: absolute; inset: 0 auto 0 0; background: var(--soleil); min-width: 3px; }
+  .echelle .barre-v.grande i { width: 100%; background: #FFFFFF; }
+  .echelle .legende-e { font-size: 15px; color: #C9C7E3; margin-top: 10px; }
+
+  /* Ce que tu sais maintenant. */
+  .recap { padding-top: 72px; }
+  .recap h2 { margin-bottom: 4px; }
+  .recap .total { font-family: var(--titres); font-weight: 500; font-size: 17px; color: var(--indigo-doux); margin-bottom: 18px; }
+  .recap ol { list-style: none; margin: 0; padding: 0; }
+  .recap li {
+    display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start;
+    padding: 12px 0; border-top: 1px solid var(--brume);
+    color: #6E6B95;
+  }
+  .recap li:last-child { border-bottom: 1px solid var(--brume); }
+  .recap .coche {
+    width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--lavande);
+    display: grid; place-items: center;
+    font-family: var(--titres); font-weight: 800; font-size: 15px; color: #FFFFFF;
+    margin-top: 2px;
+  }
+  .recap li.acquis { color: var(--indigo); }
+  .recap li.acquis .coche { background: var(--menthe); border-color: var(--menthe); }
+  .recap .ou-gagner { display: block; font-family: var(--titres); font-size: 14px; font-weight: 500; color: #6E6B95; }
+  .recap li.acquis .ou-gagner { display: none; }
+
+  /* Pied : chapitres voisins. */
+  .pied { padding-top: 64px; padding-bottom: 80px; }
+  .voisins { display: flex; justify-content: space-between; gap: 24px; border-top: 2px solid var(--indigo); padding-top: 20px; }
+  .voisins a { text-decoration: none; display: block; max-width: 48%; }
+  .voisins a:last-child { text-align: right; }
+  .voisins span { display: block; font-family: var(--titres); font-size: 15px; color: var(--indigo-doux); }
+  .voisins strong { font-family: var(--titres); font-weight: 700; font-size: 24px; }
+  .voisins a:hover strong { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .revele { animation: revele .35s cubic-bezier(.2, .8, .3, 1.2); }
+    @keyframes revele { from { transform: scale(.95); opacity: 0; } to { transform: none; opacity: 1; } }
+    .pips i.vient, .recap li.vient .coche { animation: coche .45s cubic-bezier(.2, .8, .3, 1.5); }
+    @keyframes coche { from { transform: scale(.2); } to { transform: none; } }
+    .jeton.nouveau .morceau { animation: pose .25s ease-out; }
+    @keyframes pose { from { opacity: .2; } to { opacity: 1; } }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .choix button, .atelier .dedans, pre .l, .etapes-barre a { transition: none; }
+  }
+
+  @media (max-width: 1140px) {
+    .bloc { grid-template-columns: 56px minmax(0, 660px); max-width: 760px; }
+    .bloc > .note { grid-column: 2; margin-top: 16px; padding: 0 0 0 1.2em; font-size: 15px; }
+  }
+  @media (max-width: 720px) {
+    body { font-size: 18px; }
+    .bloc { grid-template-columns: minmax(0, 1fr); padding-inline: 20px; }
+    .bloc > .texte, .bloc > .note { grid-column: 1; }
+    .bloc > .num-etape { grid-column: 1; grid-row: auto; justify-self: start; font-size: 34px; margin-bottom: 6px; }
+    .etape.faite .num-etape::after { top: 0; right: -20px; }
+    .titre { padding-top: 40px; }
+    .chapeau { font-size: 20px; }
+    h2 { font-size: 26px; }
+    .ouverture .glose { font-size: 26px; }
+    .bande { font-size: 24px; }
+    .pari { padding: 20px 16px 20px; margin-inline: -4px; }
+    .pari .q { font-size: 21px; }
+    .choix { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .choix button { padding: 12px 6px; }
+    .choix button .gros { font-size: 32px; }
+    .choix.oui-non { grid-template-columns: 1fr; }
+    .ligne-saisie { display: block; }
+    .ligne-saisie label { display: block; margin-bottom: 4px; }
+    #saisie { width: 100%; }
+    .labo { padding: 24px 20px; }
+    .echelle .rangee { grid-template-columns: 1fr; gap: 4px; }
+    .barre-in { padding: 10px 20px; gap: 8px 16px; }
+    .ou { display: none; }
+    .etapes-barre { order: 3; flex-basis: 100%; max-width: none; }
+    .acquis-mini > span:first-child { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="barre">
+  <div class="barre-in">
+    <a class="marque" href="#">La Forge IA</a>
+    <span class="ou">Partie 1, chapitre 1.3 sur 21</span>
+    <nav class="etapes-barre" id="barre-etapes" aria-label="Étapes du chapitre"></nav>
+    <a class="acquis-mini" href="#recap" id="acquis-mini"><span>Ce que tu sais</span><span class="pips" id="pips" aria-hidden="true"></span></a>
+  </div>
+</header>
+
+<main>
+  <article>
+    <div class="bloc titre">
+      <div class="texte">
+        <h1>Le tokenizer</h1>
+        <p class="chapeau">Une IA ne lit pas des lettres : elle lit des nombres. Avant tout le reste, il faut donc un outil qui découpe le texte en morceaux et donne un numéro à chaque morceau. Dans ce chapitre, tu construis cet outil toi-même.</p>
+        <p class="programme">7 étapes, 4 paris, environ 15 minutes.</p>
+        <figure class="ouverture">
+          <div class="glose" id="glose-ouverture" aria-hidden="true"></div>
+          <figcaption id="legende-ouverture"></figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <section class="bloc etape" id="etape-1" data-titre="Pourquoi découper ?" aria-labelledby="t1">
+      <span class="num-etape" aria-hidden="true">1</span>
+      <div class="texte">
+        <h2 id="t1">Pourquoi découper ?</h2>
+        <p>Un réseau de neurones fait des calculs. Pour qu'il puisse travailler sur « Le forgeron frappe le métal », il faut transformer cette phrase en une suite de nombres, puis savoir refaire le chemin inverse pour afficher sa réponse. L'outil qui fait cette traduction s'appelle un tokenizer, et les morceaux qu'il produit s'appellent des jetons (<span lang="en">tokens</span> en anglais).</p>
+        <div class="pari" data-question="nombres">
+          <p class="q" id="q1">Au bout du compte, que reçoit vraiment le réseau de neurones ?</p>
+          <div class="choix" role="group" aria-labelledby="q1">
+            <button type="button">Des lettres</button>
+            <button type="button">Des mots</button>
+            <button type="button" data-juste>Des nombres</button>
+          </div>
+          <div class="verdict" hidden aria-live="polite"></div>
+        </div>
+      </div>
+      <aside class="note">
+        <p>Le mot anglais <span lang="en">token</span> veut dire jeton, comme ceux d'un jeu de société : un petit objet qui en représente un autre.</p>
+      </aside>
+    </section>
+
+    <section class="bloc etape" id="etape-2" data-titre="Lettres ou mots ?" aria-labelledby="t2">
+      <span class="num-etape" aria-hidden="true">2</span>
+      <div class="texte">
+        <h2 id="t2">Lettres ou mots ?</h2>
+        <p>Découper lettre par lettre est simple, mais les phrases deviennent très longues, et le modèle doit tout réapprendre à partir de briques minuscules. Découper mot par mot donne des suites courtes, mais le vocabulaire n'a pas de fin : forger, forgeron, forgeronne, reforgé…</p>
+        <p>La méthode utilisée par presque tous les grands modèles, le BPE (<span lang="en">Byte Pair Encoding</span>, « encodage par paires »), choisit un entre-deux. On part des lettres. On cherche la paire de symboles voisins la plus fréquente dans un grand texte, on la fusionne en un nouveau symbole, et on recommence.</p>
+      </div>
+      <aside class="note">
+        <p>Le BPE a été inventé en 1994 pour compresser des fichiers. Il a été repris en 2015 pour la traduction automatique, puis par les modèles de langage.</p>
+      </aside>
+    </section>
+
+    <section class="bloc etape" id="etape-3" data-titre="Ton pari" aria-labelledby="t3">
+      <span class="num-etape" aria-hidden="true">3</span>
+      <div class="texte">
+        <h2 id="t3">Fais ton pari</h2>
+        <p>Notre petit tokenizer a appris ses fusions sur un texte d'une quinzaine de lignes. Avant de le manipuler, parie.</p>
+        <div class="pari" data-question="prediction">
+          <p class="q" id="q3">Avec 30 fusions apprises, en combien de jetons est découpé « les forgerons » ?<small>Le texte fait <span id="q3-car"></span> caractères, espace compris.</small></p>
+          <div class="choix" role="group" aria-labelledby="q3" id="choix-prediction"></div>
+          <div class="verdict" hidden aria-live="polite"></div>
+        </div>
+      </div>
+      <aside class="note">
+        <p>Se tromper ici n'a aucune importance : un pari, même faux, fait mieux retenir la réponse qu'une lecture passive.</p>
+      </aside>
+    </section>
+
+    <section class="bloc etape" id="etape-4" data-titre="À toi de découper" aria-labelledby="t4">
+      <span class="num-etape" aria-hidden="true">4</span>
+      <div class="texte">
+        <h2 id="t4">À toi de découper</h2>
+        <div class="atelier verrou" id="atelier">
+          <div class="dedans" id="dedans" inert>
+            <p>Tape une phrase, puis augmente le nombre de fusions.</p>
+            <div class="ligne-saisie">
+              <label for="saisie">Ta phrase :</label>
+              <input id="saisie" data-test="saisie" type="text" value="Le forgeron frappe le métal sur l'enclume." autocomplete="off" spellcheck="false">
+            </div>
+            <p>Avec <span class="reglable" data-test="fusions" role="slider" tabindex="0" aria-label="Nombre de fusions apprises" aria-valuemin="0" aria-valuemax="165" aria-valuenow="20">20</span> <span data-mot-fusion>fusions apprises</span>, ses <span class="calcule" id="nb-car">0</span> caractères tiennent en <span class="calcule" id="nb-jetons">0</span> <span data-mot-jeton>jetons</span> :</p>
+            <div class="bande" id="bande" data-test="jetons"></div>
+            <p>Lettre par lettre, il en faudrait <span class="calcule" id="nb-lettres">0</span> ; mot par mot, <span class="calcule" id="nb-mots">0</span>, mais avec un vocabulaire sans limite. <span id="phrase-fusion"></span> Sous chaque morceau, son numéro : <button type="button" class="bascule" id="bascule" aria-pressed="false">cacher les morceaux</button> pour voir la phrase comme le modèle la reçoit.</p>
+            <p>À zéro fusion, chaque lettre est un jeton. Plus tu ajoutes de fusions, plus les morceaux fréquents (« es », « ent », « le ») deviennent des jetons entiers, et plus la suite raccourcit. Les mots rares, eux, restent découpés : c'est ce qui permet d'écrire n'importe quel mot avec un vocabulaire limité.</p>
+            <div class="defi" id="defi">
+              <h3>Défi</h3>
+              <p>Écris une phrase d'au moins 30 caractères qui tient en 12 jetons ou moins avec les 165 fusions. Astuce : les mots du texte d'apprentissage sont déjà des jetons entiers.</p>
+              <p class="etat" id="defi-etat" aria-live="polite"></p>
+            </div>
+          </div>
+          <div class="verrou-msg"><p>Fais ton pari à l'étape 3 : la phrase et le nombre jaune se débloquent juste après.</p></div>
+        </div>
+      </div>
+      <aside class="note">
+        <p>Tout ce qui est jaune se manipule. Le nombre se fait glisser à la souris ou au doigt ; au clavier, atteins-le avec Tab, puis utilise les flèches.</p>
+        <p><strong>Dernières fusions apprises</strong></p>
+        <ul id="recentes"></ul>
+      </aside>
+    </section>
+
+    <section class="bloc etape" id="etape-5" data-titre="Vérifie ton intuition" aria-labelledby="t5">
+      <span class="num-etape" aria-hidden="true">5</span>
+      <div class="texte">
+        <h2 id="t5">Vérifie ton intuition</h2>
+        <div class="pari" data-question="rare">
+          <p class="q" id="q5">Avec les 165 fusions, le mot rare « reforgeronnes » devient-il un seul jeton ?</p>
+          <div class="choix oui-non" role="group" aria-labelledby="q5" id="choix-rare"></div>
+          <div class="verdict" hidden aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bloc etape" id="etape-6" data-titre="Le code" aria-labelledby="t6">
+      <span class="num-etape" aria-hidden="true">6</span>
+      <div class="texte">
+        <h2 id="t6">Le code</h2>
+        <p>Le cœur de l'algorithme tient en quelques lignes. Cette fonction compte toutes les paires voisines et renvoie la plus fréquente :</p>
+<pre tabindex="0" aria-label="Code Python de la fonction paire_la_plus_frequente"><code><span class="l" data-l="1"><span class="kw">from</span> collections <span class="kw">import</span> Counter</span><span class="l" data-l="2"> </span><span class="l" data-l="3"><span class="kw">def</span> <span class="fn">paire_la_plus_frequente</span>(mots):</span><span class="l" data-l="4">    <span class="st">"""mots : dictionnaire {('f','o','r','g','e'): 12, ...}"""</span></span><span class="l" data-l="5">    compte = Counter()</span><span class="l" data-l="6">    <span class="kw">for</span> symboles, frequence <span class="kw">in</span> mots.items():</span><span class="l" data-l="7">        <span class="kw">for</span> gauche, droite <span class="kw">in</span> zip(symboles, symboles[1:]):</span><span class="l" data-l="8">            compte[(gauche, droite)] += frequence</span><span class="l" data-l="9">    <span class="kw">return</span> compte.most_common(1)[0][0]</span></code></pre>
+        <ul class="explications" id="explications">
+          <li tabindex="0" data-lignes="1 5"><code>Counter</code> compte les paires pour nous.</li>
+          <li tabindex="0" data-lignes="7"><code>zip(symboles, symboles[1:])</code> donne chaque paire de voisins : (f, o), (o, r), (r, g)…</li>
+          <li tabindex="0" data-lignes="6 8">On ajoute la fréquence du mot : un mot vu 12 fois compte 12 fois.</li>
+          <li tabindex="0" data-lignes="9"><code>most_common(1)</code> renvoie la paire gagnante.</li>
+        </ul>
+        <div class="pari" data-question="zip">
+          <p class="q" id="q6">Que donne <code>list(zip("abc", "bc"))</code> ?</p>
+          <div class="choix code-choix" role="group" aria-labelledby="q6">
+            <button type="button" data-juste><code>[('a','b'), ('b','c')]</code></button>
+            <button type="button"><code>['ab', 'bc']</code></button>
+            <button type="button"><code>[('a','b','c')]</code></button>
+          </div>
+          <div class="verdict" hidden aria-live="polite"></div>
+        </div>
+        <p style="margin-top:1.2em">Le projet complet (apprentissage, découpage, tests) est dans <code>projets/1.3-tokenizer</code>, avec un notebook à ouvrir dans Colab.</p>
+      </div>
+      <aside class="note">
+        <p>Survole une explication : la ligne de code qui lui correspond s'allume.</p>
+        <p><code>Counter</code> fait partie de la bibliothèque standard de Python : rien à installer.</p>
+      </aside>
+    </section>
+
+    <section class="bloc etape" id="etape-7" data-titre="Et chez un grand labo ?" aria-labelledby="t7">
+      <span class="num-etape" aria-hidden="true">7</span>
+      <div class="texte labo">
+        <h2 id="t7">Et chez un grand labo ?</h2>
+        <p>Les tokenizers des grands modèles apprennent de 100 000 à plus de 250 000 morceaux, sur des centaines de gigaoctets de texte dans des dizaines de langues. Ils travaillent souvent sur les octets plutôt que sur les lettres, pour pouvoir écrire n'importe quel caractère, emoji compris. Le principe reste exactement celui que tu viens de manipuler.</p>
+        <div class="echelle">
+          <p>Ton tokenizer connaît en ce moment 45 lettres et <span class="reglable" role="slider" tabindex="0" aria-label="Nombre de fusions apprises" aria-valuemin="0" aria-valuemax="165" aria-valuenow="20">20</span> <span data-mot-fusion>fusions</span>, soit <span class="calcule" id="vocab">65</span> morceaux.</p>
+          <div class="rangee"><span>Le tien</span><span class="barre-v" aria-hidden="true"><i id="barre-toi"></i></span></div>
+          <div class="rangee"><span>Un grand modèle</span><span class="barre-v grande" aria-hidden="true"><i></i></span></div>
+          <p class="legende-e">Même échelle pour les deux barres, jusqu'à 250 000 : ton vocabulaire tient dans un trait.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="bloc recap" id="recap" aria-labelledby="t-recap">
+      <div class="texte">
+        <h2 id="t-recap">Ce que tu sais maintenant</h2>
+        <p class="total" id="recap-total" aria-live="polite"></p>
+        <ol id="recap-liste"></ol>
+      </div>
+    </section>
+
+    <footer class="bloc pied">
+      <nav class="texte voisins" aria-label="Chapitres voisins">
+        <a href="#"><span>Précédent</span><strong>1.2 Les données</strong></a>
+        <a href="#"><span>Suivant</span><strong>1.4 Le transformer</strong></a>
+      </nav>
+    </footer>
+  </article>
+</main>
+
+<script src="bpe.js"></script>
+<script>
+(function () {
+  const B = window.ForgeBPE;
+  const $ = id => document.getElementById(id);
+  const etat = { k: 20, texte: '', numeros: false, ouvert: false };
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const pluriel = (n, mot) => (n > 1 ? mot.replace(/(\S+)/g, '$1s') : mot);
+
+  /* ---------- Ce que tu sais : liste, pastilles du haut ---------- */
+  const SAVOIRS = [
+    { cle: 'nombres', texte: 'Une IA lit des nombres, pas des lettres.', ou: 'à gagner à l’étape 1' },
+    { cle: 'prediction', texte: 'Le BPE fusionne d’abord les paires les plus fréquentes.', ou: 'à gagner à l’étape 3' },
+    { cle: 'fusions', texte: 'Plus de fusions, moins de jetons.', ou: 'à gagner à l’étape 4, en poussant le nombre jaune au-delà de 60' },
+    { cle: 'rare', texte: 'Les mots rares restent en morceaux.', ou: 'à gagner à l’étape 5' },
+    { cle: 'zip', texte: 'Compter les paires tient en quelques lignes de Python.', ou: 'à gagner à l’étape 6' },
+  ];
+  const acquis = new Set();
+  const liste = $('recap-liste');
+  const pips = $('pips');
+  SAVOIRS.forEach(s => {
+    const li = document.createElement('li');
+    li.dataset.acquis = s.cle;
+    li.innerHTML = `<span class="coche" aria-hidden="true"></span><span>${s.texte}<span class="ou-gagner">${s.ou}</span></span>`;
+    liste.append(li);
+    pips.append(document.createElement('i'));
+  });
+  function majSavoirs() {
+    const n = acquis.size, t = SAVOIRS.length;
+    $('recap-total').textContent = n === 0 ? `0 sur ${t} : fais les paris pour remplir ta liste.` : n === t ? `${n} sur ${t} : tout est acquis.` : `${n} sur ${t}`;
+    $('acquis-mini').setAttribute('aria-label', `Ce que tu sais : ${n} sur ${t}`);
+  }
+  function gagner(cle) {
+    if (acquis.has(cle)) return;
+    acquis.add(cle);
+    const li = liste.querySelector(`[data-acquis="${cle}"]`);
+    li.classList.add('acquis', 'vient');
+    li.querySelector('.coche').textContent = '✓';
+    const pip = pips.children[acquis.size - 1];
+    pip.classList.add('plein', 'vient');
+    majSavoirs();
+  }
+
+  /* ---------- Étapes et barre du haut ---------- */
+  const etapes = [...document.querySelectorAll('.etape')];
+  const faites = new Set();
+  etapes.forEach((e, i) => {
+    const a = document.createElement('a');
+    a.href = '#' + e.id;
+    a.setAttribute('aria-label', `Étape ${i + 1} : ${e.dataset.titre}`);
+    $('barre-etapes').append(a);
+  });
+  function majEtapes() {
+    const ici = etapes.findIndex(e => !faites.has(e.id));
+    etapes.forEach((e, i) => {
+      const fait = faites.has(e.id);
+      e.classList.toggle('faite', fait);
+      e.classList.toggle('ici', i === ici);
+      const a = $('barre-etapes').children[i];
+      a.classList.toggle('faite', fait);
+      a.classList.toggle('ici', i === ici);
+      if (i === ici) a.setAttribute('aria-current', 'step'); else a.removeAttribute('aria-current');
+    });
+  }
+  function finir(id) { if (!faites.has(id)) { faites.add(id); majEtapes(); } }
+
+  /* ---------- Les paris : un seul essai, puis l'explication ---------- */
+  function brancher(bloc, explication, apres) {
+    const boutons = [...bloc.querySelectorAll('.choix button')];
+    const verdict = bloc.querySelector('.verdict');
+    boutons.forEach(b => b.addEventListener('click', () => {
+      const juste = b.hasAttribute('data-juste');
+      boutons.forEach(x => {
+        x.disabled = true;
+        const rep = document.createElement('span');
+        rep.className = 'rep';
+        if (x.hasAttribute('data-juste')) { x.classList.add('juste'); rep.textContent = x === b ? 'ton choix, juste' : 'bonne réponse'; x.append(rep); }
+        else if (x === b) { x.classList.add('faux'); rep.textContent = 'ton choix'; x.append(rep); }
+        else x.classList.add('attenue');
+      });
+      verdict.hidden = false;
+      verdict.className = 'verdict revele ' + (juste ? 'ok' : 'ko');
+      verdict.innerHTML = `<span class="titre-v">${juste ? 'Juste.' : 'Pas tout à fait.'}</span>` + explication(juste);
+      if (apres) apres(juste);
+    }));
+  }
+  const puces = jetons => '<div class="mini">' + jetons.map(j => `<span class="morceau">${esc(B.visible(j.texte))}</span>`).join('') + '</div>';
+  const rangFusion = s => B.fusions.findIndex(f => f.ab === s) + 1;
+
+  brancher(document.querySelector('[data-question="nombres"]'), () =>
+    '<p>Le réseau ne voit que des nombres. Le tokenizer transforme le texte en numéros de jetons à l’entrée, et refait le chemin inverse à la sortie.</p>',
+    () => { gagner('nombres'); finir('etape-1'); });
+
+  // Le pari principal, calculé avec le vrai tokenizer.
+  const MOT = 'les forgerons', K = 30;
+  const jetonsK = B.decouper(MOT, K);
+  const bonne = jetonsK.length;
+  const nbCarMot = [...MOT].length;
+  const options = [...new Set([B.preDecouper(MOT).length, bonne, nbCarMot])].sort((a, b) => a - b);
+  while (options.length < 3) options.push(options[options.length - 1] + 3);
+  $('q3-car').textContent = nbCarMot;
+  options.forEach(n => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('data-test', 'prediction');
+    if (n === bonne) b.setAttribute('data-juste', '');
+    b.innerHTML = `<span class="gros">${n}</span><span class="petit">jetons</span>`;
+    $('choix-prediction').append(b);
+  });
+  brancher(document.querySelector('[data-question="prediction"]'), () => {
+    const colles = jetonsK.filter(j => [...j.texte].length > 1)
+      .sort((x, y) => rangFusion(x.texte) - rangFusion(y.texte))
+      .map(j => `« ${esc(B.visible(j.texte))} » (fusion ${rangFusion(j.texte)})`);
+    return `<p>Avec ${K} fusions, « ${MOT} » donne ${bonne} jetons :</p>${puces(jetonsK)}<p>Seules les paires très fréquentes du texte d’apprentissage sont déjà collées : ${colles.join(', ')}. Le reste attend des fusions plus tardives. À toi de jouer, l’étape 4 est ouverte.</p>`;
+  }, () => { gagner('prediction'); finir('etape-2'); finir('etape-3'); ouvrir(); });
+
+  // Le mot rare.
+  const RARE = 'reforgeronnes';
+  const jetonsRare = B.decouper(RARE, B.maxFusions);
+  const unSeul = jetonsRare.length === 1;
+  [['Oui, un seul jeton', unSeul], ['Non, plusieurs morceaux', !unSeul]].forEach(([t, j]) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = t;
+    if (j) b.setAttribute('data-juste', '');
+    $('choix-rare').append(b);
+  });
+  brancher(document.querySelector('[data-question="rare"]'), () =>
+    `<p>Même avec toutes les fusions, « ${RARE} » reste en ${jetonsRare.length} morceaux :</p>${puces(jetonsRare)}<p>Le mot n’apparaît jamais dans le texte d’apprentissage, donc aucune fusion ne le colle en entier. Il s’écrit quand même, avec des morceaux connus.</p>`,
+    () => { gagner('rare'); finir('etape-5'); });
+
+  brancher(document.querySelector('[data-question="zip"]'), () =>
+    '<p><code>zip</code> avance dans les deux textes en même temps et forme des couples. En décalant le texte d’un cran (<code>symboles[1:]</code>), chaque couple est une paire de voisins. Le « c » de "abc" reste seul : il est ignoré.</p>',
+    () => { gagner('zip'); finir('etape-6'); });
+
+  /* ---------- La phrase d'ouverture, entièrement découpée ---------- */
+  function jeton(j, i) {
+    const s = document.createElement('span');
+    s.className = 'jeton' + (i % 2 ? ' b' : '');
+    const m = document.createElement('span');
+    m.className = 'morceau';
+    for (const c of j.texte) {
+      if (c === ' ') { const e = document.createElement('span'); e.className = 'esp'; e.textContent = '␣'; m.append(e); }
+      else m.append(c === '\n' ? '↵' : c);
+    }
+    const n = document.createElement('span');
+    n.className = 'num';
+    n.textContent = j.id;
+    s.append(m, n);
+    return s;
+  }
+  (function () {
+    const phrase = 'Le forgeron frappe le métal';
+    const j = B.decouper(phrase, B.maxFusions);
+    $('glose-ouverture').replaceChildren(...j.map(jeton));
+    $('legende-ouverture').textContent = `« ${phrase} », tel que le modèle le reçoit : ${j.length} morceaux, donc ${j.length} nombres.`;
+  })();
+
+  /* ---------- L'atelier ---------- */
+  const saisie = $('saisie');
+  const bande = $('bande');
+  const reglables = [...document.querySelectorAll('.reglable')];
+  let precedents = new Set();
+
+  function maj() {
+    const jetons = B.decouper(etat.texte, etat.k);
+    const nbCar = [...etat.texte].length;
+    const mots = B.preDecouper(etat.texte).filter(m => /\p{L}/u.test(m)).length;
+    reglables.forEach(r => {
+      r.textContent = etat.k;
+      r.setAttribute('aria-valuenow', etat.k);
+      r.setAttribute('aria-valuetext', `${etat.k} ${pluriel(etat.k, 'fusion')}`);
+    });
+    document.querySelectorAll('[data-mot-fusion]').forEach((s, i) => {
+      s.textContent = i === 0 ? pluriel(etat.k, 'fusion apprise') : pluriel(etat.k, 'fusion');
+    });
+    document.querySelectorAll('[data-mot-jeton]').forEach(s => { s.textContent = pluriel(jetons.length, 'jeton'); });
+    $('nb-car').textContent = nbCar;
+    $('nb-jetons').textContent = jetons.length;
+    $('nb-lettres').textContent = nbCar;
+    $('nb-mots').textContent = mots;
+    const vocab = B.tailleBase + etat.k;
+    $('vocab').textContent = vocab;
+    $('barre-toi').style.width = (vocab / 250000 * 100) + '%';
+
+    const vus = new Set();
+    const elements = jetons.map((j, i) => {
+      const s = jeton(j, i);
+      s.dataset.jeton = '';
+      vus.add(j.texte);
+      if (precedents.size && !precedents.has(j.texte)) s.classList.add('nouveau');
+      return s;
+    });
+    precedents = vus;
+    bande.classList.toggle('numeros', etat.numeros);
+    bande.replaceChildren(...elements);
+
+    const f = B.fusions[etat.k - 1];
+    $('phrase-fusion').textContent = f
+      ? `La dernière fusion apprise est la n° ${etat.k} : ${B.visible(f.a)} + ${B.visible(f.b)} → ${B.visible(f.ab)}.`
+      : 'Aucune fusion pour l’instant : chaque lettre reste seule.';
+    const recentes = [];
+    for (let i = Math.max(0, etat.k - 4); i < etat.k; i++) {
+      const g = B.fusions[i];
+      recentes.push(`<li>fusion ${i + 1} : ${esc(B.visible(g.a))} + ${esc(B.visible(g.b))} → ${esc(B.visible(g.ab))}</li>`);
+    }
+    $('recentes').innerHTML = recentes.length ? recentes.reverse().join('') : '<li>aucune pour l’instant</li>';
+
+    // Défi, toujours mesuré avec les 165 fusions.
+    const nMax = B.decouper(etat.texte, B.maxFusions).length;
+    const ok = nbCar >= 30 && nMax <= 12;
+    $('defi').classList.toggle('reussi', ok);
+    $('defi-etat').textContent = nbCar < 30 ? `Ta phrase fait ${nbCar} caractères : il en faut au moins 30.`
+      : ok ? `Défi réussi : ${nbCar} caractères en ${nMax} jetons.`
+      : `Avec les 165 fusions, ta phrase fait ${nMax} jetons : encore ${nMax - 12} de trop.`;
+
+    if (etat.ouvert && etat.k >= 60) { gagner('fusions'); finir('etape-4'); }
+  }
+
+  function ouvrir() {
+    etat.ouvert = true;
+    $('atelier').classList.remove('verrou');
+    $('dedans').inert = false;
+    reglables.forEach(r => { r.tabIndex = 0; r.removeAttribute('aria-disabled'); });
+  }
+  // Tant que le pari n'est pas fait, le nombre du grand labo est figé lui aussi.
+  reglables.forEach(r => { if (!r.closest('#dedans')) { r.tabIndex = -1; r.setAttribute('aria-disabled', 'true'); } });
+
+  function regler(k) {
+    if (!etat.ouvert) return;
+    k = Math.max(0, Math.min(B.maxFusions, Math.round(k)));
+    if (k === etat.k) return;
+    etat.k = k;
+    maj();
+  }
+
+  // Les nombres jaunes : glisser à la souris ou au doigt, flèches au clavier.
+  reglables.forEach(r => {
+    let depart = null;
+    r.addEventListener('pointerdown', e => {
+      if (!etat.ouvert) return;
+      depart = { x: e.clientX, k: etat.k };
+      r.setPointerCapture(e.pointerId);
+      r.classList.add('glisse');
+      document.body.style.cursor = 'ew-resize';
+      e.preventDefault();
+    });
+    r.addEventListener('pointermove', e => { if (depart) regler(depart.k + (e.clientX - depart.x) / 4); });
+    const fin = () => { depart = null; r.classList.remove('glisse'); document.body.style.cursor = ''; };
+    r.addEventListener('pointerup', fin);
+    r.addEventListener('pointercancel', fin);
+    r.addEventListener('keydown', e => {
+      const pas = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1, PageUp: 10, PageDown: -10 }[e.key];
+      if (pas !== undefined) { regler(etat.k + pas); e.preventDefault(); }
+      else if (e.key === 'Home') { regler(0); e.preventDefault(); }
+      else if (e.key === 'End') { regler(B.maxFusions); e.preventDefault(); }
+    });
+  });
+
+  saisie.addEventListener('input', () => { etat.texte = saisie.value; maj(); });
+  $('bascule').addEventListener('click', e => {
+    etat.numeros = !etat.numeros;
+    e.currentTarget.textContent = etat.numeros ? 'remontrer les morceaux' : 'cacher les morceaux';
+    e.currentTarget.setAttribute('aria-pressed', String(etat.numeros));
+    maj();
+  });
+
+  // Code : une explication survolée allume ses lignes.
+  document.querySelectorAll('#explications li').forEach(li => {
+    const lignes = li.dataset.lignes.split(' ');
+    const allumer = on => lignes.forEach(n => document.querySelector(`pre .l[data-l="${n}"]`).classList.toggle('allumee', on));
+    li.addEventListener('mouseenter', () => allumer(true));
+    li.addEventListener('mouseleave', () => allumer(false));
+    li.addEventListener('focus', () => allumer(true));
+    li.addEventListener('blur', () => allumer(false));
+  });
+
+  // La dernière étape est faite quand on la lit.
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver((entrees, obs) => {
+      entrees.forEach(e => { if (e.isIntersecting) { finir('etape-7'); obs.unobserve(e.target); } });
+    }, { threshold: .6 }).observe(document.querySelector('.labo'));
+  }
+
+  etat.texte = saisie.value;
+  majSavoirs();
+  majEtapes();
+  maj();
+})();
+</script>
+</body>
+</html>

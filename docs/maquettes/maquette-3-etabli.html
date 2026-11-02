@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le tokenizer, chapitre 1.3 | La Forge IA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@500;700;900&family=Red+Hat+Mono:wght@400;500;600&family=Red+Hat+Text:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --papier: #F1F3F2;
+    --papier-fonce: #E3E8E5;
+    --encre: #17201D;
+    --encre-douce: #4E5B56;
+    --trait: #C3CCC8;
+    --etabli: #1D2B28;
+    --etabli-bord: #2C3D39;
+    --code: #E3EBE6;
+    --code-eteint: #8FA199;
+    --surligne: #F2D27A;
+    --fusion: #F6E6B4;
+    --focus: #1F6F5C;
+    --entete: 64px;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--papier);
+    color: var(--encre);
+    font: 400 18px/1.65 "Red Hat Text", system-ui, sans-serif;
+  }
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 2px; }
+
+  /* En-tête */
+  .entete {
+    position: sticky; top: 0; z-index: 10;
+    height: var(--entete);
+    display: flex; align-items: center; gap: 28px;
+    padding: 0 32px;
+    background: var(--papier);
+    border-bottom: 1px solid var(--trait);
+  }
+  .marque {
+    font: 900 20px/1 "Red Hat Display", sans-serif;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+  }
+  .fil { display: flex; gap: 18px; font-size: 15px; color: var(--encre-douce); margin: 0; padding: 0; list-style: none; }
+  .fil li + li::before { content: "/"; margin-right: 18px; color: var(--trait); }
+  .avancement { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 15px; color: var(--encre-douce); }
+  .avancement-barre { display: flex; gap: 3px; }
+  .avancement-barre span { width: 6px; height: 14px; background: var(--trait); }
+  .avancement-barre span.fait { background: var(--encre-douce); }
+  .avancement-barre span.ici { background: var(--encre); height: 18px; }
+
+  /* Écran partagé */
+  .atelier {
+    display: grid;
+    grid-template-columns: minmax(0, 45fr) minmax(0, 55fr);
+    gap: 0 48px;
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 0 32px 0 48px;
+  }
+  .recit { padding: 56px 0 30vh; }
+  .panneau-col { position: relative; }
+  .panneau {
+    position: sticky;
+    top: calc(var(--entete) + 24px);
+    height: calc(100vh - var(--entete) - 48px);
+    margin-top: 24px;
+    display: flex; flex-direction: column;
+    background: var(--etabli);
+    border-radius: 10px;
+    overflow: hidden;
+    color: var(--code);
+  }
+
+  /* Ouverture */
+  .ouverture { margin-bottom: 72px; max-width: 34em; }
+  .numero-chapitre {
+    font: 700 16px/1 "Red Hat Display", sans-serif;
+    color: var(--encre-douce);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font: 900 clamp(48px, 6vw, 84px)/0.95 "Red Hat Display", sans-serif;
+    letter-spacing: -0.03em;
+    margin: 0 0 28px;
+  }
+  .chapeau { font-size: 21px; line-height: 1.55; margin: 0; }
+  .indice { margin: 24px 0 0; font-size: 16px; color: var(--encre-douce); }
+
+  /* Étapes */
+  .etape {
+    position: relative;
+    min-height: 62vh;
+    padding: 8px 0 64px 76px;
+    max-width: calc(34em + 76px);
+  }
+  .etape:last-of-type { min-height: auto; }
+  .etape-num {
+    position: absolute; left: 0; top: 0;
+    width: 52px;
+    font: 900 56px/1 "Red Hat Display", sans-serif;
+    color: var(--trait);
+    transition: color .25s;
+  }
+  .etape.active .etape-num { color: var(--encre); }
+  .etape h2 {
+    font: 700 28px/1.2 "Red Hat Display", sans-serif;
+    letter-spacing: -0.01em;
+    margin: 6px 0 16px;
+  }
+  .etape p { margin: 0 0 16px; }
+  .etape ul { margin: 0 0 18px; padding-left: 1.1em; }
+  .etape li { margin-bottom: 8px; }
+  code, .mono { font-family: "Red Hat Mono", ui-monospace, monospace; font-size: 0.88em; }
+  .etape p code, .etape li code, .apres code, .projet code {
+    background: var(--papier-fonce);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  .lien-ligne {
+    font: inherit; color: inherit; background: none; border: 0; padding: 0;
+    text-decoration: underline 2px dotted #8C7A3E; text-underline-offset: 4px; cursor: pointer;
+  }
+  .lien-ligne:hover, .lien-ligne.actif { text-decoration-style: solid; text-decoration-color: #C9A43F; }
+  .lien-ligne code { background: var(--papier-fonce); padding: 1px 5px; border-radius: 3px; }
+  .astuce { font-size: 15px; color: var(--encre-douce); }
+  .ligne.pointee, .focus-on .ligne.vive.pointee { background: rgba(242, 210, 122, 0.30); color: #FFFFFF; }
+  .projet {
+    margin: 28px 0 0;
+    padding: 16px 0 0;
+    border-top: 1px solid var(--trait);
+    font-size: 16px;
+    color: var(--encre-douce);
+  }
+
+  /* La figure (dernière étape) */
+  .figure {
+    margin: 8px 0 28px;
+    padding: 24px;
+    background: #FFFFFF;
+    border: 1px solid var(--trait);
+    border-radius: 8px;
+  }
+  .consigne { font-weight: 700; margin: 0 0 18px; }
+  .champ label, .reglage label { display: block; font-size: 15px; font-weight: 500; color: var(--encre-douce); margin-bottom: 6px; }
+  .champ input {
+    width: 100%;
+    font: 400 18px/1.4 "Red Hat Text", sans-serif;
+    color: var(--encre);
+    padding: 10px 12px;
+    border: 1px solid #9AA6A1;
+    border-radius: 4px;
+    background: var(--papier);
+  }
+  .reglage { margin: 20px 0 6px; }
+  .reglage-ligne { display: flex; align-items: center; gap: 16px; }
+  .reglage output {
+    min-width: 3ch; text-align: right;
+    font: 600 22px/1 "Red Hat Mono", monospace;
+  }
+  input[type="range"] { flex: 1; appearance: none; -webkit-appearance: none; background: transparent; height: 32px; margin: 0; }
+  input[type="range"]::-webkit-slider-runnable-track { height: 6px; background: var(--trait); border-radius: 3px; }
+  input[type="range"]::-moz-range-track { height: 6px; background: var(--trait); border-radius: 3px; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 28px; margin-top: -11px; background: var(--encre); border-radius: 4px; border: 3px solid #FFFFFF; box-shadow: 0 0 0 1px var(--encre); }
+  input[type="range"]::-moz-range-thumb { width: 14px; height: 22px; background: var(--encre); border-radius: 4px; border: 3px solid #FFFFFF; box-shadow: 0 0 0 1px var(--encre); }
+  .jetons {
+    display: flex; flex-wrap: wrap; gap: 6px 4px;
+    margin: 22px 0 14px;
+    min-height: 40px;
+  }
+  .jeton {
+    display: inline-flex; flex-direction: column; align-items: center;
+    font: 500 16px/1.2 "Red Hat Mono", monospace;
+    padding: 5px 7px;
+    background: #FFFFFF;
+    border: 1px solid var(--trait);
+    border-radius: 4px;
+    white-space: pre;
+  }
+  .jeton .espace { font-style: normal; color: #7A8681; }
+  .jeton.fusionne { background: var(--fusion); border-color: #D9C178; }
+  .jeton .id { display: none; font-size: 12px; color: var(--encre-douce); margin-top: 3px; }
+  .avec-numeros .jeton .id { display: block; }
+  .bilan { margin: 0 0 12px; font-size: 17px; }
+  .bilan strong { font-weight: 700; }
+  .options { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; font-size: 15px; color: var(--encre-douce); }
+  .options label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: var(--encre); }
+  .options input { width: 18px; height: 18px; accent-color: var(--encre); }
+  .legende-fusion { display: inline-flex; align-items: center; gap: 8px; }
+  .legende-fusion i { display: inline-block; width: 14px; height: 14px; background: var(--fusion); border: 1px solid #D9C178; border-radius: 3px; }
+  .dernieres { list-style: none; margin: 18px 0 0; padding: 14px 0 0; border-top: 1px dashed var(--trait); font-size: 15px; color: var(--encre-douce); }
+  .dernieres li { padding: 2px 0; }
+  .dernieres .mono { color: var(--encre); }
+  .apres p { margin: 0 0 16px; }
+
+  /* Panneau de code */
+  .onglets {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 18px;
+    height: 44px;
+    background: #172320;
+    border-bottom: 1px solid var(--etabli-bord);
+    font-size: 14px;
+    color: var(--code-eteint);
+  }
+  .onglet { color: var(--code); font: 500 14px/44px "Red Hat Mono", monospace; border-bottom: 2px solid var(--surligne); }
+  .zone-code { flex: 1; overflow: auto; padding: 14px 0 40px; scroll-behavior: smooth; }
+  .source { margin: 0; font: 400 14px/1.7 "Red Hat Mono", monospace; counter-reset: ligne; }
+  .ligne {
+    display: block;
+    padding: 0 20px 0 0;
+    white-space: pre;
+    color: var(--code);
+    transition: background-color .25s, color .25s;
+    border-left: 3px solid transparent;
+  }
+  .ligne::before {
+    content: attr(data-n);
+    display: inline-block;
+    width: 3.2em;
+    padding-right: 1.2em;
+    text-align: right;
+    color: #879A91;
+  }
+  .focus-on .ligne { color: var(--code-eteint); }
+  .focus-on .ligne span { color: inherit !important; }
+  .focus-on .ligne.vive { background: rgba(242, 210, 122, 0.10); border-left-color: var(--surligne); color: var(--code); }
+  .focus-on .ligne.vive span { color: revert !important; }
+  .ligne .k { color: #E9B872; }
+  .ligne .f { color: #A9D2F0; }
+  .ligne .s { color: #B5DDA4; }
+  .ligne .c { color: #A3B7AE; font-style: italic; }
+  .ligne .n { color: #F0B79A; }
+  .ligne .b { color: #9FD8CB; }
+  .focus-on .ligne.vive .k { color: #E9B872 !important; }
+  .focus-on .ligne.vive .f { color: #A9D2F0 !important; }
+  .focus-on .ligne.vive .s { color: #B5DDA4 !important; }
+  .focus-on .ligne.vive .c { color: #A3B7AE !important; }
+  .focus-on .ligne.vive .n { color: #F0B79A !important; }
+  .focus-on .ligne.vive .b { color: #9FD8CB !important; }
+  .sortie {
+    flex: 0 0 auto;
+    max-height: 38%;
+    overflow: auto;
+    border-top: 1px solid var(--etabli-bord);
+    background: #16211E;
+  }
+  .sortie-titre { display: flex; justify-content: space-between; padding: 10px 20px 0; font-size: 14px; color: var(--code-eteint); }
+  .sortie pre { margin: 0; padding: 8px 20px 16px; font: 400 14px/1.6 "Red Hat Mono", monospace; white-space: pre-wrap; word-break: break-word; color: var(--code); }
+  .sortie .invite { color: #E9B872; }
+  .sortie .remarque { color: #A3B7AE; }
+
+  /* Extraits sur mobile */
+  .extrait { display: none; }
+
+  /* Labo */
+  .labo {
+    background: var(--papier-fonce);
+    border-top: 1px solid var(--trait);
+  }
+  .labo-int { max-width: 1100px; margin: 0 auto; padding: 72px 48px; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 56px; align-items: start; }
+  .labo h2 { font: 900 40px/1.05 "Red Hat Display", sans-serif; letter-spacing: -0.02em; margin: 0 0 18px; }
+  .labo p { margin: 0; max-width: 32em; }
+  .echelle { width: 100%; border-collapse: collapse; font-size: 16px; }
+  .echelle th, .echelle td { text-align: left; padding: 14px 12px 14px 0; border-bottom: 1px solid var(--trait); vertical-align: top; }
+  .echelle thead th { font: 700 15px/1.3 "Red Hat Display", sans-serif; color: var(--encre-douce); }
+  .echelle tbody th { font-weight: 500; color: var(--encre-douce); width: 30%; }
+  .echelle td.grand { font-weight: 700; }
+
+  .visuellement-cache { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* Navigation */
+  .suite { max-width: 1100px; margin: 0 auto; padding: 48px 48px 80px; display: flex; justify-content: space-between; gap: 24px; }
+  .suite a { text-decoration: none; display: block; padding: 18px 0; }
+  .suite small { display: block; font-size: 15px; color: var(--encre-douce); margin-bottom: 4px; }
+  .suite strong { font: 700 26px/1.2 "Red Hat Display", sans-serif; }
+  .suite a:hover strong { text-decoration: underline; text-underline-offset: 4px; }
+  .suite .suivant { text-align: right; }
+
+  @media (max-width: 960px) {
+    body { font-size: 17px; }
+    .entete { padding: 0 18px; gap: 16px; }
+    .fil { display: none; }
+    .atelier { display: block; padding: 0 20px; }
+    .panneau-col { display: none; }
+    .recit { padding: 36px 0 24px; }
+    .ouverture { margin-bottom: 40px; }
+    .etape { min-height: 0; padding: 0 0 40px 0; }
+    .etape-num { position: static; display: block; font-size: 40px; color: var(--encre); margin-bottom: 4px; }
+    .extrait {
+      display: block;
+      margin: 18px 0 8px;
+      background: var(--etabli);
+      border-radius: 8px;
+      overflow: hidden;
+      color: var(--code);
+    }
+    .extrait .source { font-size: 13px; padding: 12px 0; overflow-x: auto; }
+    .extrait .ligne::before { width: 2.6em; padding-right: .9em; }
+    .extrait .sortie { max-height: none; }
+    .extrait .sortie pre { font-size: 13px; }
+    .figure { padding: 16px; }
+    .labo-int { grid-template-columns: 1fr; gap: 28px; padding: 48px 20px; }
+    .labo h2 { font-size: 32px; }
+    .suite { padding: 32px 20px 56px; flex-direction: column; gap: 0; }
+    .suite .suivant { text-align: left; border-top: 1px solid var(--trait); }
+    .avancement-texte { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="entete">
+  <a class="marque" href="#">La Forge IA</a>
+  <ol class="fil" aria-label="Où tu es">
+    <li>Partie 1, De zéro</li>
+    <li>Chapitre 1.3 sur 21</li>
+  </ol>
+  <div class="avancement" aria-label="Chapitre 3 sur 21 de la Partie 1">
+    <span class="avancement-texte">3 / 21</span>
+    <span class="avancement-barre" aria-hidden="true"></span>
+  </div>
+</header>
+
+<div class="atelier">
+  <main class="recit" id="recit">
+    <section class="ouverture" data-etape="0">
+      <p class="numero-chapitre">Chapitre 1.3</p>
+      <h1>Le tokenizer</h1>
+      <p class="chapeau">Une IA ne lit pas des lettres : elle lit des nombres. Avant tout le reste, il faut donc un outil qui découpe le texte en morceaux et donne un numéro à chaque morceau. Dans ce chapitre, tu construis cet outil toi-même.</p>
+      <p class="indice">À droite, ton établi : le fichier complet <span class="mono">tokenizer.py</span>. À chaque étape, les lignes dont on parle s'allument.</p>
+    </section>
+
+    <section class="etape" data-etape="1">
+      <span class="etape-num" aria-hidden="true">1</span>
+      <h2>Pourquoi découper ?</h2>
+      <p>Un réseau de neurones fait des calculs. Pour qu'il puisse travailler sur « Le forgeron frappe le métal », il faut transformer cette phrase en une suite de nombres, puis savoir refaire le chemin inverse pour afficher sa réponse. L'outil qui fait cette traduction s'appelle un tokenizer, et les morceaux qu'il produit s'appellent des jetons (tokens en anglais).</p>
+      <p>Première chose à écrire : séparer les mots, chacun avec l'espace qui le précède, puis les compter.</p>
+    </section>
+
+    <section class="etape" data-etape="2">
+      <span class="etape-num" aria-hidden="true">2</span>
+      <h2>Lettres ou mots ?</h2>
+      <p>Découper lettre par lettre est simple, mais les phrases deviennent très longues, et le modèle doit tout réapprendre à partir de briques minuscules. Découper mot par mot donne des suites courtes, mais le vocabulaire n'a pas de fin : forger, forgeron, forgeronne, reforgé…</p>
+      <p>La méthode utilisée par presque tous les grands modèles, le BPE (Byte Pair Encoding, « encodage par paires »), choisit un entre-deux. On part des lettres : c'est ce que fait <code>tuple(mot)</code>, qui transforme « forge » en ('f', 'o', 'r', 'g', 'e').</p>
+    </section>
+
+    <section class="etape" data-etape="3">
+      <span class="etape-num" aria-hidden="true">3</span>
+      <h2>Compter les paires</h2>
+      <p>On cherche la paire de symboles voisins la plus fréquente dans un grand texte. Le cœur de l'algorithme tient en quelques lignes. Cette fonction compte toutes les paires voisines et renvoie la plus fréquente :</p>
+      <p class="astuce">Survole ou touche un morceau souligné : sa ligne s'allume dans le code.</p>
+      <ul>
+        <li><button type="button" class="lien-ligne" data-cherche="compte = Counter()"><code>Counter</code></button> compte les paires pour nous.</li>
+        <li><button type="button" class="lien-ligne" data-cherche="in zip(symboles"><code>zip(symboles, symboles[1:])</code></button> donne chaque paire de voisins : (f, o), (o, r), (r, g)…</li>
+        <li>On <button type="button" class="lien-ligne" data-cherche="+= frequence">ajoute la fréquence du mot</button> : un mot vu 12 fois compte 12 fois.</li>
+        <li><button type="button" class="lien-ligne" data-cherche="most_common(1)"><code>most_common(1)</code></button> renvoie la paire gagnante.</li>
+      </ul>
+    </section>
+
+    <section class="etape" data-etape="4">
+      <span class="etape-num" aria-hidden="true">4</span>
+      <h2>Fusionner, et recommencer</h2>
+      <p>On fusionne cette paire en un nouveau symbole, partout où elle apparaît, et on recommence. <code>fusionner</code> fait le remplacement, <code>apprendre</code> répète l'opération autant de fois qu'on le demande et garde la liste des fusions, dans l'ordre.</p>
+      <p>Cette liste, c'est tout le savoir du tokenizer.</p>
+    </section>
+
+    <section class="etape" data-etape="5">
+      <span class="etape-num" aria-hidden="true">5</span>
+      <h2>Essaie</h2>
+      <div class="figure" id="figure">
+        <p class="consigne">Tape une phrase, puis augmente le nombre de fusions.</p>
+        <div class="champ">
+          <label for="saisie">Ta phrase</label>
+          <input id="saisie" data-test="saisie" type="text" value="Le forgeron frappe le métal sur l'enclume." autocomplete="off" spellcheck="false">
+        </div>
+        <div class="reglage">
+          <label for="fusions">Fusions apprises</label>
+          <div class="reglage-ligne">
+            <input id="fusions" data-test="fusions" type="range" min="0" max="165" value="0" step="1">
+            <output id="nb-fusions" for="fusions">0</output>
+          </div>
+        </div>
+        <div class="jetons" id="jetons" data-test="jetons"></div>
+        <p class="bilan" id="bilan" aria-live="polite"></p>
+        <div class="options">
+          <label><input type="checkbox" id="numeros"> Voir les numéros</label>
+          <span class="legende-fusion"><i aria-hidden="true"></i> né d'une fusion</span>
+        </div>
+        <ol class="dernieres" id="dernieres" aria-label="Dernières fusions apprises"></ol>
+      </div>
+      <div class="apres">
+        <p>À zéro fusion, chaque lettre est un jeton. Plus tu ajoutes de fusions, plus les morceaux fréquents (« es », « ent », « le ») deviennent des jetons entiers, et plus la suite raccourcit. Les mots rares, eux, restent découpés : c'est ce qui permet d'écrire n'importe quel mot avec un vocabulaire limité.</p>
+      </div>
+      <p class="projet">Le projet complet (apprentissage, découpage, tests) est dans <code>projets/1.3-tokenizer</code>, avec un notebook à ouvrir dans Colab.</p>
+    </section>
+  </main>
+
+  <aside class="panneau-col" aria-label="Le code du chapitre">
+    <div class="panneau" id="panneau">
+      <div class="onglets">
+        <span class="onglet">tokenizer.py</span>
+        <span id="lignes-info"></span>
+      </div>
+      <div class="zone-code" id="zone-code" tabindex="0" role="region" aria-label="Code de tokenizer.py">
+        <pre class="source" id="source-panneau"></pre>
+      </div>
+      <div class="sortie" aria-live="polite" tabindex="0" role="region" aria-label="Sortie du code">
+        <div class="sortie-titre"><span>Sortie</span><span id="sortie-etape"></span></div>
+        <pre id="sortie-panneau"></pre>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<section class="labo" aria-labelledby="titre-labo">
+  <div class="labo-int">
+    <div>
+      <h2 id="titre-labo">Et chez un grand labo ?</h2>
+      <p>Les tokenizers des grands modèles apprennent de 100 000 à plus de 250 000 morceaux, sur des centaines de gigaoctets de texte dans des dizaines de langues. Ils travaillent souvent sur les octets plutôt que sur les lettres, pour pouvoir écrire n'importe quel caractère, emoji compris. Le principe reste exactement celui que tu viens de manipuler.</p>
+    </div>
+    <table class="echelle">
+      <thead>
+        <tr><th scope="col"><span class="visuellement-cache">Mesure</span></th><th scope="col">Sur ton établi</th><th scope="col">Chez un grand labo</th></tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">Vocabulaire</th><td id="vocab-ici">45 lettres + 165 fusions</td><td class="grand">100 000 à plus de 250 000 morceaux</td></tr>
+        <tr><th scope="row">Texte d'apprentissage</th><td id="corpus-ici">1 263 caractères</td><td class="grand">des centaines de gigaoctets</td></tr>
+        <tr><th scope="row">Briques de départ</th><td>les lettres</td><td class="grand">souvent les octets</td></tr>
+        <tr><th scope="row">Méthode</th><td>BPE</td><td class="grand">BPE, la même</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<nav class="suite" aria-label="Chapitres voisins">
+  <a href="#"><small>Précédent</small><strong>1.2 Les données</strong></a>
+  <a href="#" class="suivant"><small>Suivant</small><strong>1.4 Le transformer</strong></a>
+</nav>
+
+<script type="text/plain" id="source-python">import re
+from collections import Counter
+
+# Un mot garde l'espace qui le précède : " forgeron".
+MORCEAUX = re.compile(r" ?\w+| ?[^\w\s]+|\s+")
+
+def preparer(texte):
+    """Compte chaque mot du texte, découpé en lettres."""
+    mots = Counter()
+    for mot in MORCEAUX.findall(texte):
+        mots[tuple(mot)] += 1
+    return mots
+
+def paire_la_plus_frequente(mots):
+    """mots : dictionnaire {('f','o','r','g','e'): 12, ...}"""
+    compte = Counter()
+    for symboles, frequence in mots.items():
+        for gauche, droite in zip(symboles, symboles[1:]):
+            compte[(gauche, droite)] += frequence
+    return compte.most_common(1)[0][0]
+
+def fusionner(mots, paire):
+    """Remplace chaque paire voisine par un seul symbole."""
+    nouveaux = {}
+    for symboles, frequence in mots.items():
+        sortie, i = [], 0
+        while i < len(symboles):
+            if tuple(symboles[i:i + 2]) == paire:
+                sortie.append(paire[0] + paire[1])
+                i += 2
+            else:
+                sortie.append(symboles[i])
+                i += 1
+        nouveaux[tuple(sortie)] = frequence
+    return nouveaux
+
+def apprendre(texte, nb_fusions):
+    """Apprend les fusions, de la plus fréquente à la moins fréquente."""
+    mots = preparer(texte)
+    fusions = []
+    for _ in range(nb_fusions):
+        paire = paire_la_plus_frequente(mots)
+        mots = fusionner(mots, paire)
+        fusions.append(paire)
+    return fusions
+
+def decouper(texte, fusions):
+    """Découpe un texte avec les fusions apprises."""
+    jetons = []
+    for mot in MORCEAUX.findall(texte):
+        symboles = {tuple(mot): 1}
+        for paire in fusions:
+            symboles = fusionner(symboles, paire)
+        jetons.extend(next(iter(symboles)))
+    return jetons</script>
+
+<script src="bpe.js"></script>
+<script>
+(function () {
+  const B = window.ForgeBPE;
+  const saisie = document.getElementById('saisie');
+  const curseur = document.getElementById('fusions');
+  const source = document.getElementById('source-python').textContent.split('\n');
+
+  // Coloration minimale du Python.
+  const MOTS_CLES = new Set(['import', 'from', 'def', 'for', 'in', 'return', 'while', 'if', 'else']);
+  const NATIFS = new Set(['tuple', 'len', 'zip', 'next', 'iter', 'range', 'Counter', 're']);
+  function echapper(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function colorer(ligne) {
+    const motif = /(#.*$)|(r?"""[^]*?"""|r?"[^"]*"|'[^']*')|(\b\d+\b)|([A-Za-z_][A-Za-z0-9_]*)/g;
+    let html = '', fin = 0, m, apresDef = false;
+    while ((m = motif.exec(ligne))) {
+      html += echapper(ligne.slice(fin, m.index));
+      const t = echapper(m[0]);
+      if (m[1]) html += `<span class="c">${t}</span>`;
+      else if (m[2]) html += `<span class="s">${t}</span>`;
+      else if (m[3]) html += `<span class="n">${t}</span>`;
+      else if (apresDef) { html += `<span class="f">${t}</span>`; apresDef = false; }
+      else if (MOTS_CLES.has(m[0])) { html += `<span class="k">${t}</span>`; apresDef = m[0] === 'def'; }
+      else if (NATIFS.has(m[0])) html += `<span class="b">${t}</span>`;
+      else html += t;
+      fin = motif.lastIndex;
+    }
+    return html + echapper(ligne.slice(fin));
+  }
+  function lignesHTML(debut, fin) {
+    let html = '';
+    for (let i = debut; i <= fin; i++) {
+      html += `<span class="ligne" data-n="${i + 1}">${colorer(source[i]) || ' '}</span>`;
+    }
+    return html;
+  }
+
+  // Plage d'une fonction : de « def nom » jusqu'à la ligne vide suivante.
+  function bloc(debutTexte) {
+    const debut = source.findIndex(l => l.startsWith(debutTexte));
+    let fin = debut;
+    while (fin + 1 < source.length && source[fin + 1].trim() !== '') fin++;
+    return [debut, fin];
+  }
+  const L = {
+    morceaux: bloc('# Un mot'),
+    preparer: bloc('def preparer'),
+    paire: bloc('def paire_la_plus_frequente'),
+    fusionner: bloc('def fusionner'),
+    apprendre: bloc('def apprendre'),
+    decouper: bloc('def decouper'),
+  };
+  const lettresLigne = source.findIndex(l => l.includes('mots[tuple(mot)]'));
+
+  // Ce qui s'allume à chaque étape, et ce qu'affiche la sortie.
+  const repr = s => "'" + s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n') + "'";
+  const PHRASE_COURTE = 'Le forgeron frappe le métal';
+  const DEFAUT = "Le forgeron frappe le métal sur l'enclume.";
+  const ETAPES = {
+    0: { plages: [], titre: 'le fichier complet', sortie: () => [
+      ['remarque', "# Fais défiler : chaque étape allume ses lignes,"],
+      ['remarque', "# et le résultat s'affiche ici."],
+    ] },
+    1: { plages: [L.morceaux, L.preparer], titre: 'étape 1', sortie: () => {
+      const mots = B.preDecouper(PHRASE_COURTE);
+      const lignes = [['invite', `>>> preparer(${repr(PHRASE_COURTE)})`]];
+      lignes.push(['', 'Counter({']);
+      mots.forEach((m, i) => {
+        lignes.push(['', '  (' + [...m].map(repr).join(', ') + '): 1' + (i === mots.length - 1 ? '' : ',')]);
+      });
+      lignes.push(['', '})']);
+      return lignes;
+    } },
+    2: { plages: [[lettresLigne - 1, lettresLigne]], titre: 'étape 2', sortie: () => [
+      ['invite', `>>> phrase = ${repr(DEFAUT)}`],
+      ['invite', '>>> len(phrase)'],
+      ['', String([...DEFAUT].length)],
+      ['remarque', '# lettre par lettre : une brique par caractère'],
+      ['invite', '>>> len(MORCEAUX.findall(phrase))'],
+      ['', String(B.preDecouper(DEFAUT).length)],
+      ['remarque', '# mot par mot : court, mais le vocabulaire est sans fin'],
+    ] },
+    3: { plages: [L.paire], titre: 'étape 3', sortie: () => {
+      const f = B.fusions[0];
+      return [
+        ['invite', '>>> mots = preparer(corpus)'],
+        ['invite', '>>> paire_la_plus_frequente(mots)'],
+        ['', `(${repr(f.a)}, ${repr(f.b)})`],
+        ['remarque', `# vue ${f.n} fois dans le corpus du chapitre`],
+      ];
+    } },
+    4: { plages: [L.fusionner, L.apprendre], titre: 'étape 4', sortie: () => [
+      ['invite', '>>> apprendre(corpus, 5)'],
+      ['', '[' + B.fusions.slice(0, 5).map(f => `(${repr(f.a)}, ${repr(f.b)})`).join(',\n ') + ']'],
+    ] },
+    5: { plages: [L.decouper], titre: 'étape 5', sortie: () => {
+      const k = +curseur.value;
+      const jetons = B.decouper(saisie.value, k);
+      return [
+        ['invite', `>>> fusions = apprendre(corpus, ${k})`],
+        ['invite', `>>> decouper(${repr(saisie.value)}, fusions)`],
+        ['', '[' + jetons.map(j => repr(j.texte)).join(', ') + ']'],
+        ['remarque', `# ${jetons.length} jetons, calculés en direct par la page`],
+      ];
+    } },
+  };
+
+  function sortieHTML(lignes) {
+    return lignes.map(([cls, t]) => cls ? `<span class="${cls}">${echapper(t)}</span>` : echapper(t)).join('\n');
+  }
+
+  // Panneau collant (grand écran).
+  const panneauSource = document.getElementById('source-panneau');
+  const zone = document.getElementById('zone-code');
+  const sortiePanneau = document.getElementById('sortie-panneau');
+  const sortieEtape = document.getElementById('sortie-etape');
+  panneauSource.innerHTML = lignesHTML(0, source.length - 1);
+  document.getElementById('lignes-info').textContent = source.length + ' lignes';
+  const lignesPanneau = [...panneauSource.querySelectorAll('.ligne')];
+
+  let etapeActive = -1;
+  function activer(n) {
+    if (n === etapeActive) return;
+    etapeActive = n;
+    document.querySelectorAll('[data-etape]').forEach(e => e.classList.toggle('active', +e.dataset.etape === n));
+    const { plages, titre, sortie } = ETAPES[n];
+    panneauSource.classList.toggle('focus-on', plages.length > 0);
+    lignesPanneau.forEach((l, i) => l.classList.toggle('vive', plages.some(([a, b]) => i >= a && i <= b)));
+    if (plages.length) {
+      const premiere = lignesPanneau[plages[0][0]];
+      const derniere = lignesPanneau[plages[plages.length - 1][1]];
+      const hauteur = derniere.offsetTop + derniere.offsetHeight - premiere.offsetTop;
+      zone.scrollTop = Math.max(0, premiere.offsetTop - Math.max(24, (zone.clientHeight - hauteur) / 2));
+    } else zone.scrollTop = 0;
+    sortieEtape.textContent = titre;
+    sortiePanneau.innerHTML = sortieHTML(sortie());
+  }
+
+  const etapes = [...document.querySelectorAll('[data-etape]')];
+  function suivreLecture() {
+    const repere = window.innerHeight * 0.45;
+    let n = 0;
+    for (const e of etapes) if (e.getBoundingClientRect().top < repere) n = +e.dataset.etape;
+    activer(n);
+  }
+  window.addEventListener('scroll', suivreLecture, { passive: true });
+  window.addEventListener('resize', suivreLecture);
+
+  // Extraits sous chaque étape (petit écran).
+  const extraits = {};
+  etapes.forEach(e => {
+    const n = +e.dataset.etape;
+    const { plages, sortie } = ETAPES[n];
+    if (!plages.length) return;
+    const div = document.createElement('div');
+    div.className = 'extrait';
+    div.setAttribute('aria-hidden', 'true');
+    div.innerHTML = plages.map(([a, b]) => `<pre class="source">${lignesHTML(a, b)}</pre>`).join('') +
+      `<div class="sortie"><pre></pre></div>`;
+    const ancre = n === 5 ? e.querySelector('.figure') : e.querySelector('h2');
+    if (n === 5) ancre.before(div); else e.appendChild(div);
+    extraits[n] = div.querySelector('.sortie pre');
+    extraits[n].innerHTML = sortieHTML(sortie());
+  });
+
+  // Barre d'avancement : 21 chapitres.
+  const barre = document.querySelector('.avancement-barre');
+  for (let i = 1; i <= 21; i++) {
+    const s = document.createElement('span');
+    if (i < 3) s.className = 'fait';
+    if (i === 3) s.className = 'ici';
+    barre.appendChild(s);
+  }
+
+  // La figure.
+  const sortieNb = document.getElementById('nb-fusions');
+  const boiteJetons = document.getElementById('jetons');
+  const bilan = document.getElementById('bilan');
+  const numeros = document.getElementById('numeros');
+  const dernieres = document.getElementById('dernieres');
+  const figure = document.getElementById('figure');
+  curseur.max = B.maxFusions;
+  document.getElementById('vocab-ici').textContent = `${B.tailleBase} lettres + ${B.maxFusions} fusions`;
+  document.getElementById('corpus-ici').textContent = `${B.corpus.length.toLocaleString('fr-FR')} caractères`;
+
+  function majFigure() {
+    const k = +curseur.value;
+    sortieNb.textContent = k;
+    curseur.setAttribute('aria-valuetext', `${k} fusions`);
+    const jetons = B.decouper(saisie.value, k);
+    boiteJetons.innerHTML = '';
+    for (const j of jetons) {
+      const el = document.createElement('span');
+      el.className = 'jeton' + ([...j.texte].length > 1 ? ' fusionne' : '');
+      el.setAttribute('data-jeton', '');
+      el.title = `jeton n° ${j.id}`;
+      const t = document.createElement('span');
+      t.innerHTML = echapper(B.visible(j.texte)).replace(/␣/g, '<i class="espace" title="espace">␣</i>');
+      const id = document.createElement('span');
+      id.className = 'id';
+      id.textContent = j.id;
+      el.append(t, id);
+      boiteJetons.appendChild(el);
+    }
+    const nbCar = [...saisie.value].length;
+    bilan.innerHTML = `<strong>${jetons.length} jeton${jetons.length > 1 ? 's' : ''}</strong> pour ${nbCar} caractère${nbCar > 1 ? 's' : ''}`;
+    dernieres.innerHTML = '';
+    if (k === 0) {
+      dernieres.innerHTML = '<li>Aucune fusion apprise pour l\'instant : chaque lettre est un jeton.</li>';
+    } else {
+      for (let i = k - 1; i >= Math.max(0, k - 3); i--) {
+        const f = B.fusions[i];
+        const li = document.createElement('li');
+        li.innerHTML = `fusion ${i + 1} : <span class="mono">${echapper(B.visible(f.a))} + ${echapper(B.visible(f.b))} → ${echapper(B.visible(f.ab))}</span>`;
+        dernieres.appendChild(li);
+      }
+    }
+    const html = sortieHTML(ETAPES[5].sortie());
+    if (etapeActive === 5) sortiePanneau.innerHTML = html;
+    if (extraits[5]) extraits[5].innerHTML = html;
+  }
+  saisie.addEventListener('input', majFigure);
+  curseur.addEventListener('input', majFigure);
+  numeros.addEventListener('change', () => figure.classList.toggle('avec-numeros', numeros.checked));
+
+  document.querySelectorAll('.lien-ligne').forEach(bouton => {
+    const i = source.findIndex(l => l.includes(bouton.dataset.cherche));
+    const allumer = on => {
+      bouton.classList.toggle('actif', on);
+      document.querySelectorAll(`.ligne[data-n="${i + 1}"]`).forEach(l => l.classList.toggle('pointee', on));
+    };
+    bouton.addEventListener('mouseenter', () => allumer(true));
+    bouton.addEventListener('mouseleave', () => allumer(false));
+    bouton.addEventListener('focus', () => allumer(true));
+    bouton.addEventListener('blur', () => allumer(false));
+    bouton.addEventListener('click', () => allumer(true));
+  });
+
+
+  // Typographie française : espace fine insécable avant : ; ? ! » et après «.
+  (function espacesFines(racine) {
+    const marcheur = document.createTreeWalker(racine, NodeFilter.SHOW_TEXT, {
+      acceptNode: n => n.parentElement.closest('pre, code, script, style, .mono, .source, .sortie, .jetons, .cases, .dernieres, .table-fusions td, .renvoi, .renvoi-fusion') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+    });
+    const noeuds = [];
+    while (marcheur.nextNode()) noeuds.push(marcheur.currentNode);
+    for (const n of noeuds) {
+      n.nodeValue = n.nodeValue.replace(/[  ]([:;?!»])/g, ' $1').replace(/«[  ]/g, '« ');
+    }
+  })(document.body);
+
+  majFigure();
+  suivreLecture();
+})();
+</script>
+</body>
+</html>

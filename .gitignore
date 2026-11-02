@@ -1,0 +1,10 @@
+.superpowers/
+node_modules/
+site/dist/
+site/.astro/
+__pycache__/
+.venv/
+.pytest_cache/
+site/test-results/
+site/playwright-report/
+*.ipynb_checkpoints

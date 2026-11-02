@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le tokenizer, chapitre 1.3 | La Forge IA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Overpass:ital,wght@0,400;0,600;0,800;0,900;1,400&family=Overpass+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --encre: #1C1C1C;
+    --encre-douce: #4A4A4A;
+    --papier: #FFFFFF;
+    --quai: #F2F3F5;
+    --filet: #D5D8DD;
+    --l0: #6E6E6E;
+    --l1: #0062AE;
+    --l2: #00875A;
+    --l3: #E2001A;
+    --ici: #FFCD00;
+    --mesure: 36rem;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--papier);
+    color: var(--encre);
+    font-family: "Overpass", system-ui, sans-serif;
+    font-size: 1.1875rem;
+    line-height: 1.6;
+    font-feature-settings: "kern" 1;
+  }
+  a { color: inherit; }
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ici), 0 0 0 6px var(--encre);
+    border-radius: 3px;
+  }
+  .evitement { position: absolute; left: -999px; top: 0; background: var(--ici); padding: .5rem 1rem; z-index: 10; }
+  .evitement:focus { left: 1rem; }
+
+  /* Bandeau : la signalétique du réseau */
+  .bandeau {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: .7rem clamp(1rem, 4vw, 2.5rem);
+    background: var(--encre); color: #fff;
+  }
+  .marque { display: inline-flex; align-items: center; gap: .6rem; text-decoration: none; font-weight: 900; font-size: 1.15rem; letter-spacing: .01em; }
+  .marque svg { flex: none; }
+  .bouton-plan {
+    font: inherit; font-weight: 800; font-size: .95rem;
+    display: inline-flex; align-items: center; gap: .55rem;
+    background: #fff; color: var(--encre); border: 0; border-radius: 4px;
+    padding: .45rem .85rem .35rem; cursor: pointer;
+  }
+  .bouton-plan:hover { background: var(--ici); }
+
+  /* La bande de ligne */
+  .ligne-bande { border-bottom: 1px solid var(--filet); background: var(--papier); }
+  .ligne-entete {
+    display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1rem;
+    padding: .9rem clamp(1rem, 4vw, 2.5rem) 0;
+    font-size: 1rem;
+  }
+  .badge {
+    display: inline-grid; place-items: center;
+    min-width: 2rem; height: 2rem; padding: .15rem .45rem 0;
+    border-radius: 6px; color: #fff; font-weight: 900; font-size: 1.1rem; line-height: 1;
+  }
+  .badge.l0 { background: var(--l0); } .badge.l1 { background: var(--l1); }
+  .badge.l2 { background: var(--l2); } .badge.l3 { background: var(--l3); }
+  .badge.petit { min-width: 1.45rem; height: 1.45rem; font-size: .8rem; border-radius: 4px; }
+  .nom-ligne { font-weight: 800; font-size: 1.15rem; }
+  .direction { color: var(--encre-douce); }
+  .direction b { color: var(--encre); font-weight: 600; }
+
+  .ligne-defile {
+    overflow-x: auto; overscroll-behavior-x: contain;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 5rem), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 5rem), transparent);
+    scrollbar-width: thin; scrollbar-color: var(--filet) transparent;
+    padding: 0 clamp(1rem, 4vw, 2.5rem);
+  }
+  .stations {
+    list-style: none; margin: 0; padding: 3.1rem 0 1.1rem;
+    display: flex; width: max-content; position: relative;
+  }
+  .stations::before {
+    content: ""; position: absolute; left: 3.75rem; right: 3.75rem; top: calc(3.1rem + 7px);
+    height: 10px; background: var(--l1); border-radius: 5px;
+  }
+  .stations li { width: 7.5rem; position: relative; }
+  .stations a {
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    text-decoration: none; padding: 0 .35rem; font-size: .875rem; line-height: 1.3;
+  }
+  .stations .rond {
+    width: 24px; height: 24px; border-radius: 50%; background: #fff;
+    border: 4px solid var(--encre); position: relative; z-index: 1; margin-bottom: .55rem;
+  }
+  .stations .corresp .rond { width: 30px; height: 30px; margin-top: -3px; margin-bottom: .4rem; border-width: 5px; }
+  .stations .num { font-weight: 900; }
+  .stations .titre { color: var(--encre-douce); }
+  .stations a:hover .titre { color: var(--encre); text-decoration: underline; text-underline-offset: 3px; }
+  .stations .lignes { display: flex; gap: .25rem; margin-top: .35rem; }
+  .stations [aria-current] .rond { background: var(--ici); box-shadow: 0 0 0 6px rgba(255, 205, 0, .45); }
+  .stations [aria-current] .titre { color: var(--encre); font-weight: 600; }
+  .vous-etes-ici {
+    position: absolute; top: -2.55rem; left: 50%; transform: translateX(-50%);
+    background: var(--ici); color: var(--encre); font-weight: 800; font-size: .8rem;
+    white-space: nowrap; padding: .25rem .55rem .15rem; border-radius: 4px;
+  }
+  .vous-etes-ici::after {
+    content: ""; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%);
+    border: 6px solid transparent; border-bottom: 0; border-top-color: var(--ici);
+  }
+
+  /* Le chapitre */
+  main { padding: 0 clamp(1rem, 4vw, 2.5rem); }
+  .chapitre { max-width: calc(var(--mesure) + 4.5rem); margin: 0 auto; padding: 3rem 0 2rem; }
+  .titre-station { padding-left: 4.5rem; margin-bottom: 2.5rem; }
+  .plaque { display: flex; align-items: center; gap: 1rem; margin: 0 0 1.1rem -4.5rem; }
+  .plaque .badge { min-width: 3.5rem; height: 3.5rem; font-size: 1.55rem; border-radius: 9px; padding-top: .3rem; }
+  h1 { font-size: clamp(2.6rem, 6vw, 4rem); line-height: 1.02; font-weight: 900; letter-spacing: -.015em; margin: 0; }
+  .chapeau { font-size: 1.4rem; line-height: 1.5; margin: 0 0 1rem; max-width: 32rem; }
+  .position { margin: 0; color: var(--encre-douce); font-size: 1rem; }
+
+  .trajet { position: relative; padding-left: 4.5rem; }
+  .trajet::before {
+    content: ""; position: absolute; left: 1.45rem; top: .6rem; bottom: 1.5rem;
+    width: 8px; background: var(--l1); border-radius: 4px;
+  }
+  .trajet section { position: relative; margin-bottom: 2.75rem; }
+  .trajet h2 { font-size: 1.85rem; line-height: 1.2; font-weight: 900; margin: 0 0 .75rem; position: relative; }
+  .trajet h2::before {
+    content: ""; position: absolute; left: -3.62rem; top: .28rem;
+    width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 4px solid var(--encre);
+    transition: background-color .2s;
+  }
+  .trajet section.ici h2::before { background: var(--ici); }
+  .trajet p { margin: 0 0 1rem; max-width: var(--mesure); }
+  .trajet em { font-style: italic; }
+  dfn { font-style: normal; font-weight: 800; }
+
+  /* La figure : la phrase devient une ligne */
+  .figure-ligne {
+    margin: 1.5rem 0 1.75rem -4.5rem;
+    background: var(--quai); border-radius: 10px;
+    padding: 1.4rem clamp(1rem, 3vw, 2rem) 1.5rem;
+    position: relative; z-index: 1;
+  }
+  .figure-ligne figcaption { font-weight: 800; font-size: 1.1rem; margin-bottom: 1rem; }
+  .champ { display: grid; gap: .3rem; margin-bottom: 1rem; }
+  .champ label, .reglage label { font-weight: 600; font-size: .95rem; }
+  .champ input {
+    font: inherit; font-size: 1.15rem; width: 100%;
+    padding: .55rem .75rem .4rem; border: 2px solid var(--encre); border-radius: 4px; background: #fff; color: var(--encre);
+  }
+  .reglage { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .2rem 1rem; margin-bottom: 1.5rem; }
+  .reglage output { font-weight: 900; font-size: 1.6rem; font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; grid-row: 1; grid-column: 2; justify-self: start; }
+  .reglage input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--l1); height: 2rem; margin: 0; cursor: pointer; }
+  .reglage input[type="range"]::-webkit-slider-runnable-track { height: 10px; background: var(--l1); border-radius: 5px; }
+  .reglage input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 26px; height: 26px; margin-top: -8px;
+    border-radius: 50%; background: var(--ici); border: 4px solid var(--encre);
+  }
+  .reglage input[type="range"]::-moz-range-track { height: 10px; background: var(--l1); border-radius: 5px; }
+  .reglage input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--ici); border: 4px solid var(--encre); }
+  .reglage input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; }
+  .reglage .bornes { grid-column: 1 / -1; display: flex; justify-content: space-between; font-size: .85rem; color: var(--encre-douce); }
+
+  .trace {
+    display: flex; flex-wrap: wrap; row-gap: 1.1rem;
+    background: #fff; border-radius: 6px; padding: 1.2rem 1rem 1rem; min-height: 6rem;
+  }
+  .jeton {
+    position: relative; display: inline-flex; flex-direction: column; align-items: center;
+    padding: 0 .3rem; min-width: 2.1rem;
+  }
+  .jeton::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 8px; background: var(--l1);
+  }
+  .jeton.premier::before { left: 50%; }
+  .jeton.dernier::before { right: 50%; }
+  .jeton.premier { margin-left: .7rem; }
+  .jeton .arret {
+    width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 4px solid var(--encre);
+    position: relative; z-index: 1;
+  }
+  .jeton .nom {
+    margin-top: .35rem; font-weight: 600; font-size: 1.05rem; line-height: 1.1;
+    padding: .2rem .3rem .05rem; border-radius: 3px; white-space: pre;
+  }
+  .jeton .espace { color: #8A8F98; font-weight: 400; }
+  .jeton .id { font-family: "Overpass Mono", monospace; font-size: .75rem; color: var(--encre-douce); margin-top: .15rem; display: none; }
+  .trace.avec-numeros .jeton .id { display: block; }
+  .jeton.neuf .nom { background: var(--ici); }
+  .jeton.neuf .arret { background: var(--ici); }
+  @media (prefers-reduced-motion: no-preference) {
+    .jeton.neuf .arret { animation: arrivee .35s ease-out; }
+    @keyframes arrivee { from { transform: scale(1.5); } to { transform: scale(1); } }
+  }
+
+  .tableau { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .5rem 1.5rem; margin: 1rem 0 0; }
+  .compte { margin: 0; font-size: 1.1rem; }
+  .compte strong { font-weight: 900; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+  .bascule { display: inline-flex; align-items: center; gap: .5rem; font-weight: 600; font-size: .95rem; cursor: pointer; }
+  .bascule input { width: 1.15rem; height: 1.15rem; accent-color: var(--l1); margin: 0; }
+
+  .fusions-recentes { margin-top: 1.25rem; border-top: 2px solid var(--filet); padding-top: 1rem; }
+  .fusions-recentes h3 { font-size: 1rem; font-weight: 800; margin: 0 0 .5rem; }
+  .fusions-recentes ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; font-size: 1rem; }
+  .fusions-recentes li:first-child { font-weight: 800; }
+  .fusions-recentes code { font-family: "Overpass Mono", monospace; font-size: .95rem; background: #fff; padding: .05rem .3rem; border-radius: 3px; }
+  .fusions-recentes .vide { color: var(--encre-douce); font-weight: 400; }
+
+  /* Le code */
+  .listing {
+    margin: 1rem 0 1.25rem -4.5rem; background: var(--quai); border-radius: 10px; overflow-x: auto;
+    font-family: "Overpass Mono", monospace; font-size: .92rem; line-height: 1.7;
+    padding: 1rem 0;
+  }
+  .listing ol { list-style: none; margin: 0; padding: 0; counter-reset: ligne; min-width: max-content; }
+  .listing li { counter-increment: ligne; padding: 0 1.5rem 0 0; white-space: pre; }
+  .listing li::before {
+    content: counter(ligne); display: inline-block; width: 4.5rem; padding-right: 1.4rem; text-align: right;
+    color: #6B7079; font-weight: 600;
+  }
+  .listing li.repere::before { color: var(--l1); }
+  .kw { color: var(--l1); font-weight: 600; }
+  .str { color: #8A4B00; }
+  .fn { color: var(--encre); font-weight: 600; }
+  .explications { list-style: none; margin: 0 0 1rem; padding: 0; max-width: var(--mesure); }
+  .explications li { display: grid; grid-template-columns: 4.6rem 1fr; gap: .75rem; margin-bottom: .6rem; align-items: baseline; }
+  .explications .repere-ligne {
+    font-weight: 800; font-size: .85rem; white-space: nowrap; justify-self: start;
+    background: #fff; border: 2px solid var(--l1); color: var(--l1); border-radius: 4px; padding: .05rem .4rem 0;
+  }
+  code { font-family: "Overpass Mono", monospace; font-size: .9em; }
+  .projet { font-size: 1.05rem; }
+
+  /* Correspondance : l'échelle d'un grand labo */
+  .correspondance {
+    margin: 0 0 1rem -4.5rem; position: relative; z-index: 1;
+    border: 3px solid var(--encre); border-radius: 10px; padding: 1.25rem clamp(1rem, 3vw, 1.75rem) 1.1rem;
+    background: #fff;
+  }
+  .correspondance h2 { display: flex; align-items: center; gap: .75rem; font-size: 1.35rem; font-weight: 900; margin: 0 0 .6rem; }
+  .correspondance h2::before { display: none; }
+  .correspondance p { margin: 0; max-width: var(--mesure); }
+
+  /* Stations voisines */
+  .suite {
+    max-width: calc(var(--mesure) + 4.5rem); margin: 0 auto 4rem;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  }
+  .suite a {
+    display: grid; gap: .2rem; text-decoration: none;
+    background: var(--encre); color: #fff; border-radius: 8px; padding: .9rem 1.1rem .8rem;
+  }
+  .suite a:hover { background: var(--l1); }
+  .suite .sens { font-size: .9rem; color: #D7DAE0; }
+  .suite .vers { font-weight: 800; font-size: 1.15rem; display: flex; align-items: center; gap: .55rem; }
+  .suite .suivant { text-align: right; }
+  .suite .suivant .vers { justify-content: flex-end; }
+
+  /* Le plan du réseau */
+  dialog {
+    width: min(76rem, calc(100vw - 1.5rem)); max-height: calc(100vh - 1.5rem);
+    border: 0; border-radius: 12px; padding: 0; color: var(--encre);
+  }
+  dialog::backdrop { background: rgba(28, 28, 28, .6); }
+  .plan-entete {
+    display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .75rem 1.5rem;
+    padding: 1rem 1.25rem; border-bottom: 1px solid var(--filet);
+  }
+  .plan-entete .fermer { grid-column: 3; grid-row: 1; }
+  @media (max-width: 760px) {
+    .plan-entete { grid-template-columns: 1fr auto; }
+    .plan-entete .legende { grid-column: 1 / -1; grid-row: 2; }
+    .plan-entete .fermer { grid-column: 2; }
+  }
+  .plan-entete h2 { margin: 0; font-size: 1.35rem; font-weight: 900; }
+  .legende { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; margin: 0; padding: 0; list-style: none; font-size: .95rem; font-weight: 600; }
+  .legende li { display: inline-flex; align-items: center; gap: .45rem; }
+  .fermer { font: inherit; font-weight: 800; background: var(--encre); color: #fff; border: 0; border-radius: 4px; padding: .4rem .9rem .3rem; cursor: pointer; }
+  .plan-carte { overflow: auto; padding: .5rem 1rem 1rem; }
+  .plan-carte svg { display: block; width: 100%; min-width: 60rem; height: auto; max-height: calc(100vh - 8.5rem); }
+  .plan-carte text { font-family: "Overpass", sans-serif; }
+
+  .trace { padding-left: .3rem; }
+  @media (min-width: 1180px) {
+    .figure-ligne, .listing { margin-right: -11rem; }
+    .figure-ligne .champ, .figure-ligne .reglage { max-width: 40rem; }
+    .figure-ligne .jeton .nom { font-size: 1.15rem; }
+  }
+  @media (max-width: 760px) {
+    body { font-size: 1.0625rem; }
+    .titre-station, .trajet { padding-left: 2.6rem; }
+    .plaque { margin-left: -2.6rem; }
+    .plaque .badge { min-width: 2.9rem; height: 2.9rem; font-size: 1.25rem; }
+    .trajet::before { left: .55rem; width: 6px; }
+    .trajet h2 { font-size: 1.5rem; }
+    .trajet h2::before { left: -2.55rem; width: 20px; height: 20px; top: .18rem; }
+    .figure-ligne, .listing, .correspondance { margin-left: -2.6rem; }
+    .chapeau { font-size: 1.2rem; }
+    .suite { grid-template-columns: 1fr; }
+    .suite .suivant { text-align: left; }
+    .suite .suivant .vers { justify-content: flex-start; }
+    .listing li::before { width: 2.6rem; padding-right: .9rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body>
+<a class="evitement" href="#contenu">Aller au chapitre</a>
+
+<header class="bandeau">
+  <a class="marque" href="#" aria-label="La Forge IA, accueil">
+    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="13" fill="#FFCD00"/><circle cx="15" cy="15" r="6.5" fill="#fff" stroke="#1C1C1C" stroke-width="3.5"/></svg>
+    La Forge IA
+  </a>
+  <button class="bouton-plan" type="button" id="ouvrir-plan" aria-haspopup="dialog">
+    <svg width="22" height="16" viewBox="0 0 22 16" aria-hidden="true"><path d="M2 13 L8 4 H20" fill="none" stroke="#0062AE" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="4" r="2.6" fill="#fff" stroke="#1C1C1C" stroke-width="1.8"/></svg>
+    Plan du réseau
+  </button>
+</header>
+
+<nav class="ligne-bande" aria-label="Ligne 1, De zéro : toutes les stations">
+  <div class="ligne-entete">
+    <span class="badge l1" aria-hidden="true">1</span>
+    <span class="nom-ligne">De zéro</span>
+    <span class="direction">Direction <b>1.21 Sécurité et garde-fous</b></span>
+  </div>
+  <div class="ligne-defile" tabindex="0" aria-label="Stations de la ligne 1, défilement horizontal">
+    <ol class="stations" id="stations"></ol>
+  </div>
+</nav>
+
+<main id="contenu">
+  <article class="chapitre">
+    <header class="titre-station">
+      <div class="plaque">
+        <span class="badge l1">1.3</span>
+        <h1>Le tokenizer</h1>
+      </div>
+      <p class="chapeau">Une IA ne lit pas des lettres : elle lit des nombres. Avant tout le reste, il faut donc un outil qui découpe le texte en morceaux et donne un numéro à chaque morceau. Dans ce chapitre, tu construis cet outil toi-même.</p>
+      <p class="position">Chapitre 3 sur 21 de la Partie 1, De zéro</p>
+    </header>
+
+    <div class="trajet">
+      <section id="pourquoi">
+        <h2>Pourquoi découper ?</h2>
+        <p>Un réseau de neurones fait des calculs. Pour qu'il puisse travailler sur « Le forgeron frappe le métal », il faut transformer cette phrase en une suite de nombres, puis savoir refaire le chemin inverse pour afficher sa réponse. L'outil qui fait cette traduction s'appelle un <dfn>tokenizer</dfn>, et les morceaux qu'il produit s'appellent des <dfn>jetons</dfn> (<em>tokens</em> en anglais).</p>
+      </section>
+
+      <section id="lettres-ou-mots">
+        <h2>Lettres ou mots ?</h2>
+        <p>Découper lettre par lettre est simple, mais les phrases deviennent très longues, et le modèle doit tout réapprendre à partir de briques minuscules. Découper mot par mot donne des suites courtes, mais le vocabulaire n'a pas de fin : forger, forgeron, forgeronne, reforgé…</p>
+        <p>La méthode utilisée par presque tous les grands modèles, le <dfn>BPE</dfn> (<em>Byte Pair Encoding</em>, « encodage par paires »), choisit un entre-deux. On part des lettres. On cherche la paire de symboles voisins la plus fréquente dans un grand texte, on la fusionne en un nouveau symbole, et on recommence.</p>
+      </section>
+
+      <section id="essai">
+        <h2>À toi de faire rouler la ligne</h2>
+        <figure class="figure-ligne" aria-labelledby="consigne">
+          <figcaption id="consigne">Tape une phrase, puis augmente le nombre de fusions. Chaque arrêt de la ligne est un jeton.</figcaption>
+          <div class="champ">
+            <label for="saisie">Ta phrase</label>
+            <input id="saisie" data-test="saisie" type="text" value="Le forgeron frappe le métal sur l'enclume." autocomplete="off" spellcheck="false">
+          </div>
+          <div class="reglage">
+            <label for="fusions">Fusions apprises</label>
+            <output id="sortie-fusions" for="fusions">0</output>
+            <input id="fusions" data-test="fusions" type="range" min="0" max="165" value="0" step="1">
+            <div class="bornes" aria-hidden="true"><span>0, une lettre par arrêt</span><span>165</span></div>
+          </div>
+          <div class="trace" id="trace" data-test="jetons"></div>
+          <div class="tableau">
+            <p class="compte" id="compte" aria-live="polite"></p>
+            <label class="bascule"><input type="checkbox" id="numeros"> Voir les numéros</label>
+          </div>
+          <div class="fusions-recentes">
+            <h3>Dernières fusions apprises</h3>
+            <ol id="recentes"></ol>
+          </div>
+        </figure>
+        <p>À zéro fusion, chaque lettre est un jeton. Plus tu ajoutes de fusions, plus les morceaux fréquents (« es », « ent », « le ») deviennent des jetons entiers, et plus la suite raccourcit. Les mots rares, eux, restent découpés : c'est ce qui permet d'écrire n'importe quel mot avec un vocabulaire limité.</p>
+      </section>
+
+      <section id="code">
+        <h2>Le code</h2>
+        <p>Le cœur de l'algorithme tient en quelques lignes. Cette fonction compte toutes les paires voisines et renvoie la plus fréquente :</p>
+        <div class="listing" role="region" aria-label="Code Python de la fonction paire_la_plus_frequente" tabindex="0">
+<ol>
+<li class="repere"><span class="kw">from</span> collections <span class="kw">import</span> Counter</li>
+<li> </li>
+<li><span class="kw">def</span> <span class="fn">paire_la_plus_frequente</span>(mots):</li>
+<li>    <span class="str">"""mots : dictionnaire {('f','o','r','g','e'): 12, ...}"""</span></li>
+<li>    compte = Counter()</li>
+<li>    <span class="kw">for</span> symboles, frequence <span class="kw">in</span> mots.items():</li>
+<li class="repere">        <span class="kw">for</span> gauche, droite <span class="kw">in</span> zip(symboles, symboles[1:]):</li>
+<li class="repere">            compte[(gauche, droite)] += frequence</li>
+<li class="repere">    <span class="kw">return</span> compte.most_common(1)[0][0]</li>
+</ol>
+        </div>
+        <ol class="explications">
+          <li><span class="repere-ligne">Ligne 1</span><span><code>Counter</code> compte les paires pour nous.</span></li>
+          <li><span class="repere-ligne">Ligne 7</span><span><code>zip(symboles, symboles[1:])</code> donne chaque paire de voisins : (f, o), (o, r), (r, g)…</span></li>
+          <li><span class="repere-ligne">Ligne 8</span><span>On ajoute la fréquence du mot : un mot vu 12 fois compte 12 fois.</span></li>
+          <li><span class="repere-ligne">Ligne 9</span><span><code>most_common(1)</code> renvoie la paire gagnante.</span></li>
+        </ol>
+        <p class="projet">Le projet complet (apprentissage, découpage, tests) est dans <code>projets/1.3-tokenizer</code>, avec un notebook à ouvrir dans Colab.</p>
+      </section>
+
+      <aside class="correspondance" aria-labelledby="labo">
+        <h2 id="labo">
+          <svg width="40" height="22" viewBox="0 0 40 22" aria-hidden="true"><rect x="9" y="7" width="22" height="8" fill="#1C1C1C"/><circle cx="10" cy="11" r="8" fill="#fff" stroke="#1C1C1C" stroke-width="4"/><circle cx="30" cy="11" r="8" fill="#fff" stroke="#1C1C1C" stroke-width="4"/></svg>
+          Et chez un grand labo ?
+        </h2>
+        <p>Les tokenizers des grands modèles apprennent de 100 000 à plus de 250 000 morceaux, sur des centaines de gigaoctets de texte dans des dizaines de langues. Ils travaillent souvent sur les octets plutôt que sur les lettres, pour pouvoir écrire n'importe quel caractère, emoji compris. Le principe reste exactement celui que tu viens de manipuler.</p>
+      </aside>
+    </div>
+  </article>
+
+  <nav class="suite" aria-label="Chapitres voisins">
+    <a href="#" class="precedent">
+      <span class="sens">Station précédente</span>
+      <span class="vers"><span class="badge l1 petit">1.2</span> Les données</span>
+    </a>
+    <a href="#" class="suivant">
+      <span class="sens">Prochaine station</span>
+      <span class="vers"><span class="badge l1 petit">1.4</span> Le transformer</span>
+    </a>
+  </nav>
+</main>
+
+<dialog id="plan" aria-labelledby="plan-titre">
+  <div class="plan-entete">
+    <h2 id="plan-titre">Plan du réseau</h2>
+    <ul class="legende">
+      <li><span class="badge l0 petit">0</span> Les bases</li>
+      <li><span class="badge l1 petit">1</span> De zéro</li>
+      <li><span class="badge l2 petit">2</span> Hybride</li>
+      <li><span class="badge l3 petit">3</span> Assemblage</li>
+    </ul>
+    <button class="fermer" type="button" id="fermer-plan">Fermer</button>
+  </div>
+  <div class="plan-carte" tabindex="0" aria-label="Carte du parcours complet">
+    <svg id="carte" viewBox="0 0 1240 850" role="img" aria-labelledby="carte-titre">
+      <title id="carte-titre">Le parcours de La Forge IA : la ligne 0 mène à la ligne 1, d'où partent les lignes 2 et 3. Vous êtes à la station 1.3, Le tokenizer.</title>
+    </svg>
+  </div>
+</dialog>
+
+<script src="bpe.js"></script>
+<script>
+(function () {
+  const B = window.ForgeBPE;
+
+  // Le réseau : les stations reprennent le plan validé du site.
+  const L0 = [
+    ['0.1', "Python pour l'IA"], ['0.2', 'Les maths utiles'], ['0.3', 'Installer son poste'],
+    ['0.4', 'Tenseurs et calcul sur GPU'], ['0.5', 'Premier réseau de neurones'],
+  ];
+  const L1 = [
+    ['1.1', "Ce qu'est vraiment un modèle de langage"], ['1.2', 'Les données'], ['1.3', 'Le tokenizer'],
+    ['1.4', 'Le transformer, pièce par pièce'], ['1.5', 'Le pré-entraînement'], ['1.6', 'Évaluer son modèle'],
+    ['1.7', 'Apprendre à converser'], ['1.8', "L'aligner"], ['1.9', 'Le faire raisonner'], ['1.10', 'Le faire coder'],
+    ['1.11', 'Compresser les images'], ['1.12', 'Générer des images par diffusion'], ['1.13', "Guider l'image par le texte"],
+    ['1.14', 'Passer à la vidéo'], ['1.15', 'Comprendre les images'], ['1.16', 'Les outils'],
+    ['1.17', "La boucle d'agent et la mémoire"], ['1.18', 'Plusieurs agents qui coopèrent'],
+    ['1.19', 'Gérer un projet de A à Z'], ['1.20', 'Accélérer, compresser, servir'], ['1.21', 'Sécurité et garde-fous'],
+  ];
+  const L2 = [['2.1', 'Choisir un modèle ouvert'], ['2.2', "L'affiner sur 16 Go"], ['2.3', 'Affiner un générateur d’images'], ['2.4', 'Vidéo avec des modèles ouverts']];
+  const L3 = [['3.1', 'Modèles en local'], ['3.2', 'Brancher texte, image, vidéo'], ['3.3', 'Agents et outils'], ['3.4', 'Mener des projets seul']];
+  const ICI = '1.3';
+  const CORRESP = { '1.1': ['0'], '1.7': ['2'], '1.16': ['3'] };
+
+  // La bande de ligne en haut du chapitre
+  const stations = document.getElementById('stations');
+  for (const [n, titre] of L1) {
+    const li = document.createElement('li');
+    if (CORRESP[n]) li.className = 'corresp';
+    const a = document.createElement('a');
+    a.href = '#';
+    if (n === ICI) {
+      a.setAttribute('aria-current', 'page');
+      const tag = document.createElement('span');
+      tag.className = 'vous-etes-ici';
+      tag.textContent = 'Vous êtes ici';
+      a.append(tag);
+    }
+    const rond = document.createElement('span'); rond.className = 'rond';
+    const num = document.createElement('span'); num.className = 'num'; num.textContent = n;
+    const t = document.createElement('span'); t.className = 'titre'; t.textContent = titre;
+    a.append(rond, num, t);
+    if (CORRESP[n]) {
+      const lignes = document.createElement('span'); lignes.className = 'lignes';
+      for (const l of CORRESP[n]) {
+        const b = document.createElement('span');
+        b.className = 'badge petit l' + l; b.textContent = l;
+        b.setAttribute('aria-label', 'correspondance ligne ' + l);
+        lignes.append(b);
+      }
+      a.append(lignes);
+    }
+    li.append(a);
+    stations.append(li);
+  }
+
+  // La figure
+  const saisie = document.getElementById('saisie');
+  const fusions = document.getElementById('fusions');
+  const sortie = document.getElementById('sortie-fusions');
+  const trace = document.getElementById('trace');
+  const compte = document.getElementById('compte');
+  const recentes = document.getElementById('recentes');
+  const numeros = document.getElementById('numeros');
+  fusions.max = B.maxFusions;
+
+  function echapper(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function rendu(s) {
+    return echapper(s).replace(/ /g, '<span class="espace">␣</span>').replace(/\n/g, '<span class="espace">↵</span>');
+  }
+
+  function majFigure() {
+    const k = +fusions.value;
+    sortie.textContent = k;
+    const jetons = B.decouper(saisie.value, k);
+    const derniere = k > 0 ? B.fusions[k - 1].ab : null;
+    const frag = document.createDocumentFragment();
+    jetons.forEach((j, i) => {
+      const el = document.createElement('span');
+      el.className = 'jeton';
+      el.dataset.jeton = '';
+      // Un mot = un tronçon de ligne qui relie ses propres arrêts
+      if (i === 0 || jetons[i - 1].mot !== j.mot) el.classList.add('premier');
+      if (i === jetons.length - 1 || jetons[i + 1].mot !== j.mot) el.classList.add('dernier');
+      if (derniere && j.texte === derniere) el.classList.add('neuf');
+      el.title = 'Jeton « ' + B.visible(j.texte) + ' », numéro ' + j.id;
+      el.innerHTML = '<span class="arret"></span><span class="nom">' + rendu(j.texte) + '</span><span class="id">' + j.id + '</span>';
+      frag.append(el);
+    });
+    trace.replaceChildren(frag);
+    const nbCar = [...saisie.value].length;
+    compte.innerHTML = '<strong>' + jetons.length + '</strong> ' + (jetons.length > 1 ? 'jetons' : 'jeton') +
+      ' pour <strong>' + nbCar + '</strong> ' + (nbCar > 1 ? 'caractères' : 'caractère');
+    if (k === 0) {
+      recentes.innerHTML = '<li class="vide">Aucune fusion pour l’instant : chaque lettre est un jeton.</li>';
+    } else {
+      const items = [];
+      for (let i = k; i > Math.max(0, k - 4); i--) {
+        const f = B.fusions[i - 1];
+        items.push('<li>fusion ' + i + ' : <code>' + echapper(B.visible(f.a)) + '</code> + <code>' + echapper(B.visible(f.b)) + '</code> → <code>' + echapper(B.visible(f.ab)) + '</code></li>');
+      }
+      recentes.innerHTML = items.join('');
+    }
+  }
+  saisie.addEventListener('input', majFigure);
+  fusions.addEventListener('input', majFigure);
+  numeros.addEventListener('change', () => trace.classList.toggle('avec-numeros', numeros.checked));
+  majFigure();
+
+  // Le trajet du chapitre : l'arrêt en cours s'allume pendant la lecture
+  const sections = [...document.querySelectorAll('.trajet section')];
+  const obs = new IntersectionObserver((entrees) => {
+    for (const e of entrees) if (e.isIntersecting) {
+      sections.forEach(s => s.classList.toggle('ici', s === e.target));
+    }
+  }, { rootMargin: '-35% 0px -55% 0px' });
+  sections.forEach(s => obs.observe(s));
+
+  // Le plan complet
+  const NS = 'http://www.w3.org/2000/svg';
+  const carte = document.getElementById('carte');
+  function el(tag, attrs, parent) {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    (parent || carte).append(n);
+    return n;
+  }
+  const couleurs = { '0': '#6E6E6E', '1': '#0062AE', '2': '#00875A', '3': '#E2001A' };
+  const pos = {};
+  L0.forEach(([n], i) => pos[n] = { x: 100 + 120 * i, y: 90, l: 'b' });
+  ['1.1', '1.2', '1.3'].forEach((n, i) => pos[n] = { x: 780 + 120 * i, y: 230, l: 'b' });
+  ['1.4', '1.5', '1.6', '1.7', '1.8', '1.9', '1.10', '1.11'].forEach((n, i) => pos[n] = { x: 1020 - 120 * i, y: 400, l: 'b' });
+  ['1.12', '1.13', '1.14', '1.15', '1.16', '1.17', '1.18', '1.19'].forEach((n, i) => pos[n] = { x: 180 + 120 * i, y: 600, l: 'a' });
+  ['1.20', '1.21'].forEach((n, i) => pos[n] = { x: 1020 - 120 * i, y: 780, l: 'b' });
+  L2.forEach(([n], i) => pos[n] = { x: 460 - 120 * i, y: 250, l: 'b' });
+  L3.forEach(([n], i) => pos[n] = { x: 460 - 120 * i, y: 750, l: 'b' });
+
+  const traces = [
+    ['0', 'M100 90 H640 L780 230', 9],
+    ['2', 'M660 400 L510 250 H100', 9],
+    ['3', 'M660 600 L510 750 H100', 9],
+    ['1', 'M780 230 H1100 L1140 270 V360 L1100 400 H120 L80 440 V560 L120 600 H1100 L1140 640 V740 L1100 780 H900', 13],
+  ];
+  for (const [l, d, w] of traces) el('path', { d, fill: 'none', stroke: couleurs[l], 'stroke-width': w, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
+
+  function couper(texte, max) {
+    const mots = texte.split(' '), lignes = [];
+    let cur = '';
+    for (const m of mots) {
+      if ((cur + ' ' + m).trim().length > max && cur) { lignes.push(cur); cur = m; }
+      else cur = (cur + ' ' + m).trim();
+    }
+    if (cur) lignes.push(cur);
+    return lignes;
+  }
+
+  const tout = [...L0, ...L1, ...L2, ...L3];
+  // « Vous êtes ici » sous les stations pour rester visible
+  const p = pos[ICI];
+  el('circle', { cx: p.x, cy: p.y, r: 21, fill: '#FFCD00', opacity: '.55' });
+  for (const [n, titre] of tout) {
+    const s = pos[n];
+    const corresp = !!CORRESP[n];
+    el('circle', { cx: s.x, cy: s.y, r: corresp ? 12 : 8.5, fill: n === ICI ? '#FFCD00' : '#fff', stroke: '#1C1C1C', 'stroke-width': corresp ? 5 : 4 });
+    const lignes = couper(titre, 16);
+    const h = 15;
+    const t = el('text', { x: s.x, 'text-anchor': 'middle', 'font-size': 13, fill: '#1C1C1C' });
+    const y0 = s.l === 'b' ? s.y + 32 : s.y - 24 - lignes.length * h;
+    const tn = el('tspan', { x: s.x, y: y0, 'font-weight': 900 }, t); tn.textContent = n;
+    lignes.forEach((ln, i) => { const ts = el('tspan', { x: s.x, y: y0 + h * (i + 1), 'font-weight': n === ICI ? 800 : 600 }, t); ts.textContent = ln; });
+  }
+  const g = el('g', {});
+  el('rect', { x: p.x - 54, y: p.y - 62, width: 108, height: 26, rx: 4, fill: '#FFCD00' }, g);
+  el('path', { d: `M${p.x - 7} ${p.y - 36} L${p.x} ${p.y - 29} L${p.x + 7} ${p.y - 36} Z`, fill: '#FFCD00' }, g);
+  const tici = el('text', { x: p.x, y: p.y - 44, 'text-anchor': 'middle', 'font-size': 14, 'font-weight': 800, fill: '#1C1C1C' }, g);
+  tici.textContent = 'Vous êtes ici';
+  // Pastilles des lignes au départ de chaque embranchement
+  for (const [l, x, y] of [['0', 52, 90], ['2', 52, 250], ['3', 52, 750]]) {
+    el('rect', { x: x - 15, y: y - 15, width: 30, height: 30, rx: 6, fill: couleurs[l] });
+    const tb = el('text', { x, y: y + 6, 'text-anchor': 'middle', 'font-size': 17, 'font-weight': 900, fill: '#fff' });
+    tb.textContent = l;
+  }
+
+  const dlg = document.getElementById('plan');
+  document.getElementById('ouvrir-plan').addEventListener('click', () => {
+    dlg.showModal();
+    // Sur petit écran, on amène « Vous êtes ici » au centre du cadre
+    const cadre = dlg.querySelector('.plan-carte');
+    const largeur = carte.getBoundingClientRect().width;
+    cadre.scrollLeft = (pos[ICI].x / 1240) * largeur - cadre.clientWidth / 2;
+  });
+  document.getElementById('fermer-plan').addEventListener('click', () => dlg.close());
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+})();
+</script>
+</body>
+</html>

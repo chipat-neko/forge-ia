@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le tokenizer, chapitre 1.3 | La Forge IA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:ital,wght@0,400;0,700;0,900;1,400&family=Chivo+Mono:wght@400;700&family=Pixelify+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --encre: #1A1A1A;
+    --encre-douce: #4B4F55;
+    --papier: #FFFFFF;
+    --rouge: #D7263D;
+    --bleu: #1B6CA8;
+    --jaune: #F4C430;
+    --vert: #2A9D4B;
+    --vert-fonce: #1E7A39;
+    --ecran: #14325C;
+    --ecran-texte: #E8F1FF;
+    --ecran-doux: #9FB6D9;
+    --boitier: #D9DEE3;
+    --mesure: 38rem;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--papier); color: var(--encre);
+    font-family: "Chivo", system-ui, sans-serif; font-size: 1.15rem; line-height: 1.65;
+  }
+  a { color: var(--bleu); text-underline-offset: 3px; }
+  :focus-visible { outline: 3px solid var(--rouge); outline-offset: 3px; }
+  .evitement { position: absolute; left: -999px; top: .5rem; background: var(--jaune); color: var(--encre); padding: .5rem 1rem; z-index: 5; }
+  .evitement:focus { left: .5rem; }
+  .pixel { image-rendering: pixelated; shape-rendering: crispEdges; display: block; }
+
+  /* Têtière, comme en haut d'une page de livre */
+  .tetiere {
+    max-width: 72rem; margin: 0 auto; padding: 1rem clamp(1rem, 4vw, 2rem);
+    display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .25rem 1.5rem;
+    font-size: .95rem; border-bottom: 3px solid var(--encre);
+  }
+  .marque { font-weight: 900; font-size: 1.25rem; color: var(--encre); text-decoration: none; display: inline-flex; align-items: center; gap: .55rem; }
+  .marque svg { width: 22px; height: 22px; }
+  .tetiere .partie { color: var(--encre-douce); }
+  .tetiere .folio { font-weight: 700; }
+
+  .page {
+    max-width: 72rem; margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2rem);
+    display: grid; grid-template-columns: 1fr minmax(0, var(--mesure)) 1fr; column-gap: 2.5rem;
+  }
+  .page > * { grid-column: 2; }
+
+  /* Ouverture du chapitre */
+  .ouverture { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr minmax(0, var(--mesure)) 1fr; column-gap: 2.5rem; padding: 3rem 0 1.5rem; align-items: start; }
+  .ouverture .titre-bloc { grid-column: 2; }
+  .numero {
+    font-weight: 900; font-size: clamp(5rem, 13vw, 8.5rem); line-height: .85; margin: 0 0 .75rem;
+    color: var(--rouge); text-shadow: 6px 6px 0 var(--jaune); letter-spacing: -.02em;
+  }
+  h1 { font-weight: 900; font-size: clamp(2.75rem, 6vw, 4.25rem); line-height: 1; letter-spacing: -.02em; margin: 0 0 1.25rem; }
+  .chapeau { font-size: 1.4rem; line-height: 1.5; margin: 0; }
+  .ouverture .octet-accueil { grid-column: 3; align-self: end; display: flex; flex-direction: column; align-items: flex-start; gap: .75rem; }
+
+  /* Octet et ses bulles */
+  .bulle {
+    position: relative; margin: 0;
+    font-family: "Pixelify Sans", system-ui, sans-serif; font-size: 1.15rem; line-height: 1.4;
+    background: #fff; color: var(--encre); border: 3px solid var(--encre);
+    padding: .7rem .9rem .65rem; max-width: 17rem;
+    box-shadow: 5px 5px 0 var(--encre);
+  }
+  .bulle::after {
+    content: ""; position: absolute; left: 1.4rem; bottom: -15px; width: 18px; height: 12px;
+    background: var(--encre);
+    clip-path: polygon(0 0, 100% 0, 0 100%);
+  }
+  .octet-dit { display: flex; gap: 1rem; align-items: flex-start; margin: 1.75rem 0; }
+  .octet-dit .bulle::after { left: -15px; top: 1rem; bottom: auto; width: 12px; height: 18px; clip-path: polygon(100% 0, 100% 100%, 0 0); }
+  .octet-dit svg { flex: none; }
+  @media (min-width: 1100px) {
+    .octet-dit.marge {
+      grid-column: 3; grid-row: span var(--rangs, 2); margin: 2.9rem 0 0; flex-direction: column; align-items: flex-start;
+    }
+    .octet-dit.marge .bulle::after { left: 1.4rem; top: auto; bottom: -15px; width: 18px; height: 12px; clip-path: polygon(0 0, 100% 0, 0 100%); }
+    .octet-dit.marge { flex-direction: column-reverse; }
+    .octet-dit.marge-gauche { grid-column: 1; justify-self: end; align-items: flex-end; }
+    .octet-dit.marge .bulle { font-size: 1.02rem; }
+    .listing { grid-column: 2 / 4; }
+    .octet-dit.marge-gauche .bulle::after { left: auto; right: 1.4rem; clip-path: polygon(0 0, 100% 0, 100% 100%); }
+  }
+
+  /* Texte courant */
+  h2 { font-weight: 900; font-size: 2rem; line-height: 1.15; margin: 2.75rem 0 .75rem; display: flex; align-items: center; gap: .7rem; letter-spacing: -.01em; }
+  h2 .carre { width: 18px; height: 18px; background: var(--rouge); flex: none; box-shadow: 4px 4px 0 var(--jaune); }
+  p { margin: 0 0 1rem; }
+  dfn { font-style: normal; font-weight: 900; }
+  em { font-style: italic; }
+
+  /* Illustrations explicatives */
+  .illu { margin: 1.5rem 0 2rem; }
+  .illu figcaption { font-size: .95rem; color: var(--encre-douce); margin-top: .75rem; }
+  .rangee { display: flex; flex-wrap: wrap; gap: 4px; }
+  .bloc { font-family: "Pixelify Sans", sans-serif; font-size: 1rem; line-height: 1; padding: .35rem .45rem .3rem; border: 2px solid var(--encre); white-space: pre; }
+  .c0 { background: var(--jaune); } .c1 { background: #8FD0EA; } .c2 { background: #F7A8BE; } .c3 { background: #9BDB9E; }
+  .bloc.nombre { background: var(--encre); color: #fff; }
+  .paires { gap: 10px 6px; }
+  .paire { display: inline-flex; flex-direction: column; align-items: center; gap: 5px; }
+  .compare { display: grid; gap: .9rem; }
+  .compare .ligne { display: grid; grid-template-columns: 9.5rem 1fr; gap: .75rem; align-items: start; }
+  .compare .etiquette { font-weight: 700; font-size: 1rem; line-height: 1.3; padding-top: .2rem; }
+  .compare .etiquette span { display: block; font-weight: 400; color: var(--encre-douce); font-size: .9rem; }
+  .compare .bloc { font-size: .9rem; padding: .25rem .3rem .2rem; }
+
+  /* Essaie ça */
+  .essaie { margin: 2.5rem 0 1.5rem; border: 3px solid var(--encre); box-shadow: 8px 8px 0 var(--vert); }
+  .essaie .onglet {
+    margin: 0; background: var(--vert-fonce); color: #fff; font-size: 1.6rem;
+    padding: .55rem 1.2rem .45rem; border-bottom: 3px solid var(--encre);
+  }
+  .essaie .interieur { padding: 1.2rem clamp(.9rem, 3vw, 1.5rem) 1.4rem; }
+  .essaie .consigne { font-weight: 700; margin-bottom: 1.1rem; }
+
+  .ordinateur { background: var(--boitier); border: 3px solid var(--encre); padding: 1rem 1rem 0; }
+  .ecran {
+    background: var(--ecran); color: var(--ecran-texte); border: 3px solid var(--encre);
+    font-family: "Pixelify Sans", system-ui, sans-serif; padding: 1rem 1.1rem 1.1rem; min-height: 15rem;
+    box-shadow: inset 0 0 0 4px #0E2546;
+  }
+  .ecran .invite { display: flex; align-items: baseline; gap: .5rem; font-size: 1.15rem; border-bottom: 2px dashed #3A5A88; padding-bottom: .6rem; margin-bottom: 1rem; }
+  .ecran .invite label { color: var(--jaune); white-space: nowrap; }
+  .ecran input[type="text"] {
+    flex: 1; min-width: 0; font: inherit; color: var(--ecran-texte); background: transparent;
+    border: 0; padding: .1rem .2rem; caret-color: var(--jaune);
+  }
+  .ecran input[type="text"]:focus-visible { outline: 2px solid var(--jaune); outline-offset: 2px; }
+  .ecran .jetons { display: flex; flex-wrap: wrap; gap: 6px; min-height: 3rem; }
+  .ecran .jeton { display: inline-flex; flex-direction: column; align-items: center; }
+  .ecran .jeton .txt { font-size: 1.2rem; line-height: 1; padding: .35rem .4rem .3rem; color: var(--encre); white-space: pre; }
+  .ecran .jeton .espace { opacity: .55; }
+  .ecran .jeton .id { display: none; font-size: .85rem; color: var(--ecran-doux); margin-top: .2rem; }
+  .ecran .jetons.avec-numeros .id { display: block; }
+  .ecran .jeton.neuf .txt { outline: 3px solid #fff; outline-offset: 1px; }
+  .ecran .compte { margin: 1rem 0 .4rem; font-size: 1.15rem; }
+  .ecran .compte b { color: var(--jaune); font-weight: 600; }
+  .ecran .journal { list-style: none; margin: 0; padding: 0; color: var(--ecran-doux); font-size: 1rem; line-height: 1.5; }
+  .ecran .journal li:first-child { color: var(--ecran-texte); }
+
+  .pupitre { display: flex; flex-wrap: wrap; align-items: center; gap: .8rem 1.4rem; padding: 1rem .2rem 1rem; }
+  .pupitre .marque-machine { font-weight: 900; font-style: italic; font-size: 1rem; color: var(--encre); letter-spacing: .02em; margin-right: auto; display: flex; align-items: center; gap: .5rem; }
+  .pupitre .voyant { width: 12px; height: 12px; background: var(--vert); border: 2px solid var(--encre); }
+  .reglage { display: grid; grid-template-columns: auto auto; align-items: center; gap: .15rem .75rem; flex: 1 1 18rem; }
+  .reglage label { font-weight: 700; font-size: 1rem; }
+  .reglage output { font-weight: 900; font-size: 1.5rem; font-variant-numeric: tabular-nums; justify-self: end; }
+  .reglage input[type="range"] { grid-column: 1 / -1; width: 100%; -webkit-appearance: none; appearance: none; background: transparent; height: 1.8rem; margin: 0; cursor: pointer; }
+  .reglage input[type="range"]::-webkit-slider-runnable-track { height: 12px; background: var(--encre); }
+  .reglage input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 28px; margin-top: -8px; background: var(--rouge); border: 3px solid var(--encre); }
+  .reglage input[type="range"]::-moz-range-track { height: 12px; background: var(--encre); }
+  .reglage input[type="range"]::-moz-range-thumb { width: 16px; height: 22px; border-radius: 0; background: var(--rouge); border: 3px solid var(--encre); }
+  .bascule { display: inline-flex; align-items: center; gap: .5rem; font-weight: 700; font-size: 1rem; cursor: pointer; }
+  .bascule input { width: 1.2rem; height: 1.2rem; accent-color: var(--rouge); margin: 0; }
+
+  /* Le listing, comme dans les livres de programmes */
+  .listing { margin: 1.25rem 0 1rem; border: 3px solid var(--encre); background: #EAF2FA; }
+  .listing .titre-listing { margin: 0; background: var(--jaune); border-bottom: 3px solid var(--encre); font-weight: 900; font-size: 1rem; padding: .4rem .9rem .3rem; }
+  .listing .defile { overflow-x: auto; }
+  .listing ol { list-style: none; margin: 0; padding: .8rem 0; counter-reset: l; font-family: "Chivo Mono", monospace; font-size: .92rem; line-height: 1.75; min-width: max-content; }
+  .listing li { counter-increment: l; white-space: pre; padding-right: 1.25rem; display: flex; align-items: center; }
+  .listing li::before { content: counter(l); width: 3rem; text-align: right; padding-right: 1rem; color: var(--bleu); font-weight: 700; flex: none; }
+  .listing .note { display: inline-grid; place-items: center; width: 1.45rem; height: 1.45rem; background: var(--rouge); color: #fff; font-family: "Chivo", sans-serif; font-weight: 900; font-size: .8rem; margin-left: .8rem; border: 2px solid var(--encre); }
+  .kw { color: #8E1B2B; font-weight: 700; }
+  .fn { font-weight: 700; }
+  .str { color: #1E6B35; }
+  .notes { list-style: none; margin: 0 0 1rem; padding: 0; }
+  .notes li { display: grid; grid-template-columns: 2.2rem 1fr; gap: .6rem; margin-bottom: .55rem; }
+  .notes .note { display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; background: var(--rouge); color: #fff; font-weight: 900; font-size: .85rem; border: 2px solid var(--encre); margin-top: .1rem; }
+  code { font-family: "Chivo Mono", monospace; font-size: .88em; background: #EEF1F4; padding: .05rem .25rem; }
+
+  /* Et chez un grand labo ? */
+  .labo { margin: 2.5rem 0 2rem; background: var(--bleu); color: #fff; border: 3px solid var(--encre); box-shadow: 8px 8px 0 var(--jaune); padding: 1.3rem clamp(1rem, 3vw, 1.6rem) 1.4rem; }
+  .labo h2 { margin: 0 0 .9rem; color: var(--jaune); font-size: 1.7rem; }
+  .labo .baies { display: flex; gap: 6px; margin-bottom: 1rem; flex-wrap: wrap; }
+  .labo p { margin: 0; }
+
+  /* Pages voisines */
+  .pages { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0 4rem; }
+  .pages a { display: flex; align-items: center; gap: .9rem; color: #fff; text-decoration: none; border: 3px solid var(--encre); padding: .8rem 1rem; box-shadow: 5px 5px 0 var(--encre); }
+  .pages a:hover { transform: translate(2px, 2px); box-shadow: 3px 3px 0 var(--encre); }
+  .pages .prec { background: var(--rouge); }
+  .pages .suiv { background: var(--bleu); justify-content: flex-end; text-align: right; }
+  .pages small { display: block; font-size: .9rem; }
+  .pages strong { font-size: 1.15rem; font-weight: 900; }
+
+  @media (max-width: 1099px) {
+    .page, .ouverture { grid-template-columns: minmax(0, 1fr); column-gap: 0; }
+    .page > *, .ouverture .titre-bloc, .ouverture .octet-accueil { grid-column: 1; }
+    .ouverture .octet-accueil { flex-direction: row-reverse; justify-content: flex-end; align-items: center; margin-top: 1.5rem; }
+    .ouverture .octet-accueil .bulle::after { left: -15px; top: 1rem; bottom: auto; width: 12px; height: 18px; clip-path: polygon(100% 0, 100% 100%, 0 0); }
+    .ouverture .octet-accueil svg { width: 72px; height: auto; }
+    .octet-dit svg { width: 60px; height: auto; }
+  }
+  @media (max-width: 600px) {
+    body { font-size: 1.05rem; }
+    .compare .ligne { grid-template-columns: 1fr; gap: .3rem; }
+    .pages { grid-template-columns: 1fr; }
+    .pages .suiv { justify-content: flex-start; text-align: left; flex-direction: row-reverse; }
+    h2 { font-size: 1.65rem; }
+    .chapeau { font-size: 1.2rem; }
+    .bulle { font-size: 1.05rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    .pages a:hover { transform: none; }
+  }
+</style>
+</head>
+<body>
+<a class="evitement" href="#contenu">Aller au chapitre</a>
+
+<header class="tetiere">
+  <a class="marque" href="#">
+    <svg viewBox="0 0 11 11" class="pixel" aria-hidden="true"><path fill="#1A1A1A" d="M0 2h11v3H0zM3 5h5v2H3zM2 7h7v1H2zM1 8h9v3H1z"/><path fill="#F4C430" d="M1 3h3v1H1z"/></svg>
+    La Forge IA
+  </a>
+  <span class="partie">Partie 1 : De zéro</span>
+  <span class="folio">Chapitre 1.3 sur 21</span>
+</header>
+
+<main id="contenu" class="page">
+  <section class="ouverture" aria-labelledby="titre">
+    <div class="titre-bloc">
+      <p class="numero" aria-hidden="true">1.3</p>
+      <h1 id="titre">Le tokenizer</h1>
+      <p class="chapeau">Une IA ne lit pas des lettres : elle lit des nombres. Avant tout le reste, il faut donc un outil qui découpe le texte en morceaux et donne un numéro à chaque morceau. Dans ce chapitre, tu construis cet outil toi-même.</p>
+    </div>
+    <div class="octet-accueil">
+      <p class="bulle">Salut, moi c'est Octet ! Aujourd'hui, on apprend à découper du texte en morceaux.</p>
+      <div data-octet="normal" data-taille="8" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <h2><span class="carre" aria-hidden="true"></span>Pourquoi découper ?</h2>
+  <p>Un réseau de neurones fait des calculs. Pour qu'il puisse travailler sur « Le forgeron frappe le métal », il faut transformer cette phrase en une suite de nombres, puis savoir refaire le chemin inverse pour afficher sa réponse. L'outil qui fait cette traduction s'appelle un <dfn>tokenizer</dfn>, et les morceaux qu'il produit s'appellent des <dfn>jetons</dfn> (<em>tokens</em> en anglais).</p>
+  <figure class="illu" aria-label="La phrase Le forgeron frappe le métal devient une suite de jetons, puis de nombres">
+    <div class="rangee paires" id="illu"></div>
+    <figcaption>Le tokenizer transforme la phrase en nombres, et sait refaire le chemin inverse.</figcaption>
+  </figure>
+
+  <div class="octet-dit marge marge-gauche" style="--rangs: 3">
+    <div data-octet="question" data-taille="5" aria-hidden="true"></div>
+    <p class="bulle">Et pourquoi on ne découpe pas simplement en mots ?</p>
+  </div>
+
+  <h2><span class="carre" aria-hidden="true"></span>Lettres ou mots ?</h2>
+  <p>Découper lettre par lettre est simple, mais les phrases deviennent très longues, et le modèle doit tout réapprendre à partir de briques minuscules. Découper mot par mot donne des suites courtes, mais le vocabulaire n'a pas de fin : forger, forgeron, forgeronne, reforgé…</p>
+  <figure class="illu compare" aria-label="La même phrase découpée en lettres, en mots, puis avec le BPE">
+    <div class="ligne"><p class="etiquette">En lettres<span id="nb-lettres"></span></p><div class="rangee" id="cmp-lettres"></div></div>
+    <div class="ligne"><p class="etiquette">En mots<span id="nb-mots"></span></p><div class="rangee" id="cmp-mots"></div></div>
+    <div class="ligne"><p class="etiquette">Avec le BPE<span id="nb-bpe"></span></p><div class="rangee" id="cmp-bpe"></div></div>
+  </figure>
+  <p>La méthode utilisée par presque tous les grands modèles, le <dfn>BPE</dfn> (<em>Byte Pair Encoding</em>, « encodage par paires »), choisit un entre-deux. On part des lettres. On cherche la paire de symboles voisins la plus fréquente dans un grand texte, on la fusionne en un nouveau symbole, et on recommence.</p>
+
+  <section class="essaie" aria-labelledby="essaie-titre">
+    <h2 class="onglet" id="essaie-titre">Essaie ça</h2>
+    <div class="interieur">
+      <p class="consigne">Tape une phrase, puis augmente le nombre de fusions.</p>
+      <div class="ordinateur">
+        <div class="ecran">
+          <div class="invite">
+            <label for="saisie">&gt; ta phrase :</label>
+            <input id="saisie" data-test="saisie" type="text" value="Le forgeron frappe le métal sur l'enclume." autocomplete="off" spellcheck="false">
+          </div>
+          <div class="jetons" id="jetons" data-test="jetons"></div>
+          <p class="compte" id="compte" aria-live="polite"></p>
+          <ol class="journal" id="journal" aria-label="Dernières fusions apprises"></ol>
+        </div>
+        <div class="pupitre">
+          <span class="marque-machine"><span class="voyant" aria-hidden="true"></span>Forge 85</span>
+          <div class="reglage">
+            <label for="fusions">Fusions apprises</label>
+            <output id="sortie" for="fusions">0</output>
+            <input id="fusions" data-test="fusions" type="range" min="0" max="165" value="0">
+          </div>
+          <label class="bascule"><input type="checkbox" id="numeros"> Voir les numéros</label>
+        </div>
+      </div>
+      <div class="octet-dit" style="margin-bottom:0">
+        <div data-octet="clin" data-taille="5" aria-hidden="true"></div>
+        <p class="bulle" id="astuce" aria-live="polite"></p>
+      </div>
+    </div>
+  </section>
+
+  <p>À zéro fusion, chaque lettre est un jeton. Plus tu ajoutes de fusions, plus les morceaux fréquents (« es », « ent », « le ») deviennent des jetons entiers, et plus la suite raccourcit. Les mots rares, eux, restent découpés : c'est ce qui permet d'écrire n'importe quel mot avec un vocabulaire limité.</p>
+
+  <div class="octet-dit marge marge-gauche" style="--rangs: 3">
+    <div data-octet="clin" data-taille="5" aria-hidden="true"></div>
+    <p class="bulle">Pas de panique : on lit le programme ligne par ligne. Les cases rouges renvoient aux explications.</p>
+  </div>
+  <h2><span class="carre" aria-hidden="true"></span>Le code</h2>
+  <p>Le cœur de l'algorithme tient en quelques lignes. Cette fonction compte toutes les paires voisines et renvoie la plus fréquente :</p>
+  <div class="listing">
+    <p class="titre-listing">Programme : paire_la_plus_frequente</p>
+    <div class="defile" tabindex="0" role="region" aria-label="Code Python">
+<ol>
+<li><span><span class="kw">from</span> collections <span class="kw">import</span> Counter</span><span class="note" aria-label="note 1">1</span></li>
+<li> </li>
+<li><span><span class="kw">def</span> <span class="fn">paire_la_plus_frequente</span>(mots):</span></li>
+<li><span>    <span class="str">"""mots : dictionnaire {('f','o','r','g','e'): 12, ...}"""</span></span></li>
+<li><span>    compte = Counter()</span></li>
+<li><span>    <span class="kw">for</span> symboles, frequence <span class="kw">in</span> mots.items():</span></li>
+<li><span>        <span class="kw">for</span> gauche, droite <span class="kw">in</span> zip(symboles, symboles[1:]):</span><span class="note" aria-label="note 2">2</span></li>
+<li><span>            compte[(gauche, droite)] += frequence</span><span class="note" aria-label="note 3">3</span></li>
+<li><span>    <span class="kw">return</span> compte.most_common(1)[0][0]</span><span class="note" aria-label="note 4">4</span></li>
+</ol>
+    </div>
+  </div>
+  <ol class="notes">
+    <li><span class="note">1</span><span><code>Counter</code> compte les paires pour nous.</span></li>
+    <li><span class="note">2</span><span><code>zip(symboles, symboles[1:])</code> donne chaque paire de voisins : (f, o), (o, r), (r, g)…</span></li>
+    <li><span class="note">3</span><span>On ajoute la fréquence du mot : un mot vu 12 fois compte 12 fois.</span></li>
+    <li><span class="note">4</span><span><code>most_common(1)</code> renvoie la paire gagnante.</span></li>
+  </ol>
+  <p>Le projet complet (apprentissage, découpage, tests) est dans <code>projets/1.3-tokenizer</code>, avec un notebook à ouvrir dans Colab.</p>
+
+  <aside class="labo" aria-labelledby="labo-titre">
+    <div class="baies" id="baies" aria-hidden="true"></div>
+    <h2 id="labo-titre">Et chez un grand labo ?</h2>
+    <p>Les tokenizers des grands modèles apprennent de 100 000 à plus de 250 000 morceaux, sur des centaines de gigaoctets de texte dans des dizaines de langues. Ils travaillent souvent sur les octets plutôt que sur les lettres, pour pouvoir écrire n'importe quel caractère, emoji compris. Le principe reste exactement celui que tu viens de manipuler.</p>
+  </aside>
+
+  <nav class="pages" aria-label="Chapitres voisins">
+    <a href="#" class="prec">
+      <svg class="pixel" width="24" height="24" viewBox="0 0 6 6" aria-hidden="true"><path fill="#fff" d="M3 0h1v6H3v-1H2V4H1V2h1V1h1z"/></svg>
+      <span><small>Page précédente</small><strong>1.2 Les données</strong></span>
+    </a>
+    <a href="#" class="suiv">
+      <span><small>Page suivante</small><strong>1.4 Le transformer</strong></span>
+      <svg class="pixel" width="24" height="24" viewBox="0 0 6 6" aria-hidden="true"><path fill="#fff" d="M2 0h1v1h1v1h1v2H4v1H3v1H2z"/></svg>
+    </a>
+  </nav>
+</main>
+
+<script src="bpe.js"></script>
+<script>
+(function () {
+  const B = window.ForgeBPE;
+
+  // Octet, dessiné pixel par pixel (16 x 27)
+  const PALETTE = { k: '#1A1A1A', r: '#D7263D', w: '#FFFFFF', g: '#C9D2DB', s: '#14325C', y: '#F4C430', b: '#1B6CA8', l: '#5EA4DE', d: '#6B7785', G: '#2A9D4B' };
+  const OCTET = [
+    '......kkkk......',
+    '.....krwrrk.....',
+    '......kkkk......',
+    '.......kk.......',
+    '.kkkkkkkkkkkkkk.',
+    '.kwgggggggggggk.',
+    '.kgkkkkkkkkkkgk.',
+    '.kgksssssssskgk.',
+    'rkgksyyssyyskgkr',
+    'rkgksyyssyyskgkr',
+    '.kgksssssssskgk.',
+    '.kgksyssssyskgk.',
+    '.kgkssyyyysskgk.',
+    '.kgkkkkkkkkkkgk.',
+    '.kggggggggggggk.',
+    '.kkkkkkkkkkkkkk.',
+    '......kddk......',
+    'kkkkkkkkkkkkkkkk',
+    'kgkklbbbbbbbkkgk',
+    'kgkklkkkkkkbkkgk',
+    'kgkklksyrskbkkgk',
+    'kgkklksGGskbkkgk',
+    'kgkklkkkkkkbkkgk',
+    'krkkbbbbbbbbkkrk',
+    '.k.kkkkkkkkkk.k.',
+    '....kdk..kdk....',
+    '....kdk..kdk....',
+    '...kkkk..kkkk...',
+  ];
+  const VARIANTES = {
+    normal: {},
+    clin: { 8: 'rkgksssssyyskgkr', 9: 'rkgksyyssyyskgkr' },
+  };
+  // Point d'interrogation en pixels, posé à droite de la tête
+  const QUESTION = ['.rrr.', 'r...r', '....r', '...r.', '..r..', '.....', '..r..'];
+
+  function dessiner(carte, taille, extra) {
+    const largeur = 16 + (extra ? 7 : 0);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', `0 0 ${largeur} ${carte.length}`);
+    svg.setAttribute('width', largeur * taille);
+    svg.setAttribute('height', carte.length * taille);
+    svg.setAttribute('class', 'pixel');
+    let d = {};
+    carte.forEach((ligne, y) => [...ligne].forEach((c, x) => {
+      if (c === '.') return;
+      (d[c] = d[c] || []).push(`M${x} ${y}h1v1h-1z`);
+    }));
+    if (extra) extra.forEach((ligne, y) => [...ligne].forEach((c, x) => {
+      if (c === '.') return;
+      (d[c] = d[c] || []).push(`M${x + 18} ${y}h1v1h-1z`);
+    }));
+    for (const c in d) {
+      const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('fill', PALETTE[c]);
+      p.setAttribute('d', d[c].join(''));
+      svg.append(p);
+    }
+    return svg;
+  }
+  document.querySelectorAll('[data-octet]').forEach(hote => {
+    const v = hote.dataset.octet;
+    const carte = OCTET.slice();
+    const remp = VARIANTES[v] || {};
+    for (const i in remp) carte[i] = remp[i];
+    hote.replaceWith(dessiner(carte, +hote.dataset.taille, v === 'question' ? QUESTION : null));
+  });
+
+  // Baies de serveurs, pour l'encadré du grand labo
+  const BAIE = [
+    'kkkkkkkkkk', 'kddddddddk', 'kdssssssdk', 'kdsGsysGdk', 'kdssssssdk', 'kddddddddk',
+    'kdssssssdk', 'kdsysGsydk', 'kdssssssdk', 'kddddddddk', 'kdssssssdk', 'kdsGsGsGdk',
+    'kdssssssdk', 'kddddddddk', 'kkkkkkkkkk', '.kk....kk.',
+  ];
+  const baies = document.getElementById('baies');
+  for (let i = 0; i < 7; i++) {
+    const s = dessiner(BAIE.map(l => l.padEnd(16, '.')), 4);
+    s.setAttribute('viewBox', `0 0 10 ${BAIE.length}`);
+    s.setAttribute('width', 40);
+    baies.append(s);
+  }
+
+  function echapper(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function rendu(s) {
+    return echapper(s).replace(/ /g, '<span class="espace">␣</span>').replace(/\n/g, '<span class="espace">↵</span>');
+  }
+  function blocs(conteneur, morceaux) {
+    conteneur.innerHTML = morceaux.map((m, i) =>
+      `<span class="bloc c${i % 4}">${rendu(m)}</span>`).join('');
+  }
+
+  // Illustration : phrase, jetons, nombres
+  const phrase = 'Le forgeron frappe le métal';
+  const decoupe = B.decouper(phrase, 120);
+  const flecheBas = '<svg class="pixel" width="15" height="15" viewBox="0 0 5 5" aria-hidden="true"><path fill="#1A1A1A" d="M2 0h1v2h2v1H4v1H3v1H2V4H1V3H0V2h2z"/></svg>';
+  document.getElementById('illu').innerHTML = decoupe.map((j, i) =>
+    `<span class="paire"><span class="bloc c${i % 4}">${rendu(j.texte)}</span>${flecheBas}<span class="bloc nombre">${j.id}</span></span>`).join('');
+
+  // Comparaison lettres, mots, BPE
+  const exemple = "Le forgeron frappe le métal sur l'enclume.";
+  const lettres = B.decouper(exemple, 0).map(j => j.texte);
+  const mots = B.preDecouper(exemple);
+  const bpe = B.decouper(exemple, 60).map(j => j.texte);
+  blocs(document.getElementById('cmp-lettres'), lettres);
+  blocs(document.getElementById('cmp-mots'), mots);
+  blocs(document.getElementById('cmp-bpe'), bpe);
+  document.getElementById('nb-lettres').textContent = lettres.length + ' morceaux';
+  document.getElementById('nb-mots').textContent = mots.length + ' morceaux, vocabulaire infini';
+  document.getElementById('nb-bpe').textContent = bpe.length + ' morceaux, 60 fusions';
+
+  // La figure
+  const saisie = document.getElementById('saisie');
+  const fusions = document.getElementById('fusions');
+  const sortie = document.getElementById('sortie');
+  const jetonsEl = document.getElementById('jetons');
+  const compte = document.getElementById('compte');
+  const journal = document.getElementById('journal');
+  const numeros = document.getElementById('numeros');
+  const astuce = document.getElementById('astuce');
+  fusions.max = B.maxFusions;
+
+  function maj() {
+    const k = +fusions.value;
+    sortie.textContent = k;
+    const jetons = B.decouper(saisie.value, k);
+    const derniere = k > 0 ? B.fusions[k - 1].ab : null;
+    jetonsEl.innerHTML = jetons.map((j, i) =>
+      `<span class="jeton${derniere && j.texte === derniere ? ' neuf' : ''}" data-jeton title="numéro ${j.id}">` +
+      `<span class="txt c${i % 4}">${rendu(j.texte)}</span><span class="id">${j.id}</span></span>`).join('');
+    const n = [...saisie.value].length;
+    compte.innerHTML = `<b>${jetons.length}</b> ${jetons.length > 1 ? 'jetons' : 'jeton'} pour <b>${n}</b> ${n > 1 ? 'caractères' : 'caractère'}`;
+    if (k === 0) {
+      journal.innerHTML = '<li>Aucune fusion pour l’instant.</li>';
+    } else {
+      const lignes = [];
+      for (let i = k; i > Math.max(0, k - 3); i--) {
+        const f = B.fusions[i - 1];
+        lignes.push(`<li>fusion ${i} : ${rendu(f.a)} + ${rendu(f.b)} → ${rendu(f.ab)}</li>`);
+      }
+      journal.innerHTML = lignes.join('');
+    }
+    // Octet commente ce qui vient de se passer
+    const plusLong = jetons.reduce((a, j) => (j.texte.trim().length > a.trim().length ? j.texte : a), '');
+    if (k === 0) astuce.textContent = 'Pour l’instant, chaque lettre est un jeton. Pousse le curseur rouge !';
+    else if (plusLong.trim().length >= 4) astuce.textContent = `Regarde : « ${plusLong.trim()} » tient maintenant en un seul jeton. Essaie aussi avec ton prénom !`;
+    else astuce.textContent = 'Les premières fusions collent les paires les plus fréquentes, comme « es » ou « en ». Continue !';
+  }
+  saisie.addEventListener('input', maj);
+  fusions.addEventListener('input', maj);
+  numeros.addEventListener('change', () => jetonsEl.classList.toggle('avec-numeros', numeros.checked));
+  maj();
+})();
+</script>
+</body>
+</html>
