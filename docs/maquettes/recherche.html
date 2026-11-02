@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rechercher, La Forge IA</title>
+<style>
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 500; font-display: swap; src: url('polices/gabarito-latin-500-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 600; font-display: swap; src: url('polices/gabarito-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 700; font-display: swap; src: url('polices/gabarito-latin-700-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 800; font-display: swap; src: url('polices/gabarito-latin-800-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Newsreader Variable"; font-style: normal; font-weight: 200 800; font-display: swap; src: url('polices/newsreader-latin-opsz-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Newsreader Variable"; font-style: italic; font-weight: 200 800; font-display: swap; src: url('polices/newsreader-latin-opsz-italic.woff2') format('woff2'); }
+
+  :root {
+    --papier: #FFFFFF;
+    --indigo: #232057;
+    --indigo-doux: #5B5888;
+    --lavande: #8F8CB8;
+    --brume: #E6E5F0;
+    --brume-claire: #F5F4FA;
+    --soleil: #FFC93C;
+    --soleil-vif: #FFB800;
+    --soleil-pale: #FFF4D6;
+    --menthe: #1C6E58;
+    --menthe-pale: #E2F5EF;
+    --corail: #B8342D;
+    --corail-pale: #FDECEA;
+    --teinte-a: #E4E2F4;
+    --teinte-b: #F2E9D8;
+    --teinte-a-trait: #C9C5EA;
+    --teinte-b-trait: #E2CFAA;
+    --titres: "Gabarito", system-ui, sans-serif;
+    --texte: "Newsreader Variable", "Newsreader", Georgia, serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-padding-top: 5rem; }
+  body {
+    margin: 0;
+    background: var(--papier);
+    color: var(--indigo);
+    font-family: var(--texte);
+    font-size: 20px;
+    line-height: 1.6;
+    font-optical-sizing: auto;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: inherit; text-underline-offset: .2em; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--indigo); outline-offset: 3px; border-radius: 3px; }
+  p { margin: 0 0 1em; }
+  h1, h2, h3, h4 { font-family: var(--titres); line-height: 1.15; margin: 0; }
+  .vh { position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .evitement { position: absolute; left: 12px; top: -80px; z-index: 20; background: var(--indigo); color: var(--papier); font-family: var(--titres); font-weight: 700; padding: 10px 16px; border-radius: 8px; text-decoration: none; }
+  .evitement:focus { top: 12px; }
+
+  /* Bandeau de la maquette : il ne fait pas partie du site. */
+  .maquette { background: var(--brume-claire); border-bottom: 1px dashed var(--lavande); font-family: var(--titres); font-size: 14px; line-height: 1.3; color: var(--indigo-doux); }
+  .maquette-in { max-width: 1180px; margin: 0 auto; padding: 8px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .maquette p { margin: 0 6px 0 0; }
+  .maquette button { font-family: var(--titres); font-weight: 600; font-size: 14px; color: var(--indigo); background: var(--papier); border: 1px solid var(--lavande); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+  .maquette button[aria-pressed="true"] { background: var(--indigo); border-color: var(--indigo); color: var(--papier); }
+
+  /* Barre du haut, la même sur toutes les pages hors chapitre. */
+  .barre { position: sticky; top: 0; z-index: 5; background: var(--papier); border-bottom: 1px solid var(--brume); }
+  .barre-in { max-width: 1180px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 28px; font-family: var(--titres); line-height: 1.3; }
+  .marque { font-weight: 800; font-size: 19px; letter-spacing: -.01em; text-decoration: none; }
+  .nav { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 24px; font-size: 16px; font-weight: 600; }
+  .nav a { text-decoration: none; padding: 4px 0; }
+  .nav a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
+  .nav svg { vertical-align: -3px; margin-right: 7px; }
+  @font-face { font-family: "JetBrains Mono Variable"; font-style: normal; font-weight: 100 800; font-display: swap; src: url('polices/jetbrains-mono-latin-wght-normal.woff2') format('woff2'); }
+  code { font-family: "JetBrains Mono Variable", ui-monospace, Consolas, monospace; font-size: .82em; background: var(--brume-claire); padding: 1px 5px; border-radius: 4px; }
+  .nav a[aria-current] { text-decoration: underline; text-decoration-thickness: 3px; text-decoration-color: var(--lavande); }
+
+  .bloc {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 660px) 236px;
+    column-gap: 44px;
+    max-width: 1040px;
+    margin-inline: auto;
+    padding-inline: 24px;
+    box-sizing: content-box;
+  }
+  .bloc > .texte { grid-column: 2; min-width: 0; }
+  .bloc > .note { grid-column: 3; align-self: start; font-size: 16px; line-height: 1.5; color: var(--indigo-doux); padding-top: 8px; }
+  .note p { margin: 0 0 .8em; }
+
+  .tete { padding-top: 64px; }
+  h1 { font-weight: 800; font-size: clamp(44px, 6vw, 72px); line-height: .96; letter-spacing: -.03em; margin: 0 0 28px; }
+  .tete .note { padding-top: 104px; }
+
+  /* Le champ : on y tape, il est donc jaune, comme le champ de l'atelier. */
+  .champ label { display: block; font-family: var(--titres); font-weight: 600; font-size: 17px; color: var(--indigo-doux); margin-bottom: 6px; }
+  .champ-ligne { position: relative; }
+  .champ input {
+    width: 100%; -webkit-appearance: none; appearance: none;
+    font-family: var(--texte); font-style: italic; font-size: 32px; line-height: 1.3; color: var(--indigo);
+    background: var(--soleil-pale);
+    border: 0; border-bottom: 4px solid var(--soleil);
+    border-radius: 8px 8px 0 0;
+    padding: 12px 56px 10px 16px;
+  }
+  .champ input::-webkit-search-cancel-button { display: none; }
+  .champ input::placeholder { color: #77738F; opacity: 1; }
+  .champ input:hover { background: #FFEDBC; }
+  .champ input:focus-visible { outline: none; background: #FFEDBC; border-bottom-color: var(--indigo); }
+  .loupe { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--indigo); }
+  .essais { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 14px 0 0; font-family: var(--titres); font-size: 16px; color: var(--indigo-doux); }
+  .bascule {
+    font-family: var(--titres); font-weight: 600; font-size: 16px; color: var(--indigo);
+    background: none; border: 0; border-radius: 4px; padding: 0 2px; cursor: pointer;
+    text-decoration: underline; text-decoration-color: var(--soleil);
+    text-decoration-thickness: 4px; text-underline-offset: 4px; text-decoration-skip-ink: none;
+  }
+  .bascule:hover { background: var(--soleil-pale); text-decoration-color: var(--soleil-vif); }
+
+  /* Résultats */
+  .resultats { padding-top: 44px; }
+  .bilan { font-family: var(--titres); font-weight: 600; font-size: 17px; color: var(--indigo-doux); margin: 0 0 18px; padding-bottom: 12px; border-bottom: 2px solid var(--indigo); }
+  .bilan strong { color: var(--indigo); font-weight: 800; }
+  .chapitre-trouve { margin-bottom: 40px; }
+  .chapitre-trouve h2 { font-weight: 700; font-size: 28px; line-height: 1.2; margin: 0 0 2px; }
+  .chapitre-trouve h2 a { text-decoration: underline; text-decoration-thickness: 3px; text-decoration-color: var(--lavande); text-underline-offset: .2em; }
+  .chapitre-trouve h2 a:hover { text-decoration-color: var(--indigo); }
+  .chapitre-trouve h2 a { text-decoration: none; }
+  .chapitre-trouve h2 .t { text-decoration: underline; text-decoration-thickness: 3px; text-decoration-color: var(--lavande); text-underline-offset: .2em; }
+  .chapitre-trouve h2 a:hover .t { text-decoration-color: var(--indigo); }
+  .chapitre-trouve h2 .n { color: var(--indigo-doux); margin-right: 12px; font-variant-numeric: tabular-nums; }
+  .chapitre-trouve .ou { font-family: var(--titres); font-size: 15px; color: var(--indigo-doux); margin: 0 0 12px; }
+  .passages { list-style: none; margin: 0; padding: 0; }
+  .passages li { border-top: 1px solid var(--brume); }
+  .passages li:last-child { border-bottom: 1px solid var(--brume); }
+  .passages a { display: grid; grid-template-columns: 2.2em minmax(0, 1fr); column-gap: 8px; padding: 14px 0 15px; text-decoration: none; }
+  .passages .n-etape { font-family: var(--titres); font-weight: 800; font-size: 30px; line-height: 1; color: var(--lavande); font-variant-numeric: tabular-nums; }
+  .passages .t-etape { display: block; font-family: var(--titres); font-weight: 700; font-size: 19px; line-height: 1.3; }
+  .passages a:hover .t-etape { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+  .passages .extrait { display: block; font-size: 18px; line-height: 1.55; color: var(--indigo-doux); margin-top: 4px; }
+  mark { color: var(--indigo); background: var(--teinte-a); border-radius: 4px; padding: 0 3px; box-shadow: inset 0 -2px 0 var(--teinte-a-trait); }
+
+  .sommaire-trouve h2 { font-weight: 700; font-size: 22px; margin: 0 0 4px; }
+  .sommaire-trouve > p { font-size: 17px; color: var(--indigo-doux); margin: 0 0 10px; }
+  .sommaire-trouve ol { list-style: none; margin: 0; padding: 0; }
+  .sommaire-trouve li { display: grid; grid-template-columns: 3.2em minmax(0, 1fr) auto; column-gap: 10px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--brume); font-size: 18px; color: var(--indigo-doux); }
+  .sommaire-trouve li:last-child { border-bottom: 1px solid var(--brume); }
+  .sommaire-trouve .num { font-family: var(--titres); font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; }
+  .sommaire-trouve .etat { font-family: var(--titres); font-size: 15px; }
+  .sommaire-trouve a { color: var(--indigo); font-weight: 600; }
+
+  .vide h2 { font-weight: 800; font-size: 30px; line-height: 1.15; margin: 0 0 10px; }
+  .vide p { font-size: 19px; max-width: 34em; }
+
+  .pied-site { margin-top: 110px; border-top: 1px solid var(--brume); background: var(--brume-claire); }
+  .pied-in { max-width: 1180px; margin: 0 auto; padding: 30px 24px 48px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 40px; font-size: 16px; line-height: 1.5; color: var(--indigo-doux); }
+  .pied-in p { margin: 0; }
+  .pied-in strong { font-family: var(--titres); color: var(--indigo); }
+  .pied-in a { color: var(--indigo); }
+
+  @media (max-width: 1140px) {
+    .bloc { grid-template-columns: 56px minmax(0, 660px); max-width: 760px; }
+    .bloc > .note { grid-column: 2; margin-top: 18px; padding: 0 0 0 1.2em; font-size: 15px; }
+    .tete .note { padding-top: 0; }
+  }
+  @media (max-width: 720px) {
+    body { font-size: 18px; }
+    .barre-in { padding: 10px 20px; gap: 6px 16px; }
+    .nav { gap: 4px 16px; font-size: 15px; }
+    .maquette-in { padding: 8px 20px; }
+    .bloc { grid-template-columns: minmax(0, 1fr); padding-inline: 20px; }
+    .bloc > .texte, .bloc > .note { grid-column: 1; }
+    .tete { padding-top: 36px; }
+    .champ input { font-size: 24px; }
+    .chapitre-trouve h2 { font-size: 24px; }
+    .passages a { grid-template-columns: 1.7em minmax(0, 1fr); }
+    .passages .n-etape { font-size: 24px; }
+    .passages .extrait { font-size: 17px; }
+    .sommaire-trouve li { grid-template-columns: 3em minmax(0, 1fr); font-size: 17px; }
+    .sommaire-trouve .etat { grid-column: 2; }
+    .pied-in { grid-template-columns: minmax(0, 1fr); padding: 26px 20px 40px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="maquette" role="region" aria-label="Réglage de la maquette">
+  <div class="maquette-in">
+    <p>Maquette : le champ marche pour de vrai, sur le texte du chapitre 1.3 et les titres du parcours. Essaie aussi « images », « 1.4 » ou « xyz ».</p>
+  </div>
+</div>
+
+<a class="evitement" href="#contenu">Aller au contenu</a>
+
+<header class="barre">
+  <div class="barre-in">
+    <a class="marque" href="accueil-a.html">La Forge IA</a>
+    <nav class="nav" aria-label="Pages du site">
+      <a href="accueil-a.html#parcours">Le parcours</a>
+      <a href="recherche.html" aria-current="page"><svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M11 11l4.6 4.6" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>Rechercher</a>
+    </nav>
+  </div>
+</header>
+
+<main id="contenu">
+  <div class="bloc tete">
+    <div class="texte">
+      <h1>Rechercher</h1>
+      <form class="champ" role="search" action="recherche.html" id="formulaire">
+        <label for="q">Un mot, une notion ou un numéro de chapitre</label>
+        <div class="champ-ligne">
+          <input type="search" id="q" name="q" value="fusions" autocomplete="off" spellcheck="false" placeholder="jetons, transformer, 1.3…">
+          <svg class="loupe" width="24" height="24" viewBox="0 0 17 17" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M11 11l4.6 4.6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </div>
+        <p class="essais"><span>Essaie :</span> <button type="button" class="bascule" data-essai="jetons">jetons</button> <button type="button" class="bascule" data-essai="BPE">BPE</button> <button type="button" class="bascule" data-essai="zip">zip</button> <button type="button" class="bascule" data-essai="labo">labo</button></p>
+      </form>
+    </div>
+    <aside class="note">
+      <p>La recherche porte sur les chapitres parus. Les titres des chapitres à venir sont cherchés aussi, pour savoir où une notion arrivera.</p>
+      <p>Un numéro, comme 1.4, mène droit au chapitre.</p>
+    </aside>
+  </div>
+
+  <div class="bloc resultats">
+    <div class="texte" id="resultats"></div>
+  </div>
+</main>
+
+<footer class="pied-site">
+  <div class="pied-in">
+    <p><strong>La Forge IA</strong>, un parcours en français pour construire une IA de zéro.</p>
+    <p>Code sous licence MIT, textes sous licence CC BY 4.0. Tout le code est sur GitHub.</p>
+    <p>Ta progression reste dans ce navigateur, sans compte.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (s, r = document) => r.querySelector(s);
+  const FINE = String.fromCharCode(0x202F), INSEC = String.fromCharCode(0xA0), APOS = String.fromCharCode(0x2019);
+  const fr = s => s.replace(/(\p{L})'(\p{L})/gu, '$1' + APOS + '$2').replace(/ ([:;!?»])/g, FINE + '$1').replace(/« /g, '«' + FINE).replace(/(^|[^\p{L}])(Partie|chapitre|Chapitre) (\d)/gu, '$1$2' + INSEC + '$3');
+  function el(tag, attrs, ...enfants) {
+    const n = document.createElement(tag);
+    for (const k in attrs || {}) {
+      if (k === 'texte') n.textContent = fr(attrs[k]);
+      else if (k === 'classe') n.className = attrs[k];
+      else n.setAttribute(k, attrs[k]);
+    }
+    for (const e of enfants) if (e != null) n.append(e);
+    return n;
+  }
+
+  /* L'index de la maquette : le vrai texte du chapitre 1.3 (site/src/content/chapitres/1-3.mdx),
+     étape par étape. Sur le site, c'est Pagefind qui l'indexe au moment de la construction. */
+  const PASSAGES = [
+    [1, 'Pourquoi découper ?', "Un réseau de neurones fait des calculs. Pour qu'il puisse travailler sur « Le forgeron frappe le métal », il faut transformer cette phrase en une suite de nombres, puis savoir refaire le chemin inverse pour afficher sa réponse. L'outil qui fait cette traduction s'appelle un tokenizer, et les morceaux qu'il produit s'appellent des jetons (tokens en anglais)."],
+    [2, 'Lettres ou mots ?', "La méthode utilisée par presque tous les grands modèles, le BPE (Byte Pair Encoding, « encodage par paires »), choisit un entre-deux. On part des lettres. On cherche la paire de symboles voisins la plus fréquente dans un grand texte, on la fusionne en un nouveau symbole, et on recommence."],
+    [3, 'Fais ton pari', "Notre petit tokenizer a appris ses fusions sur un texte d'une quinzaine de lignes. Avant de le manipuler, parie. Avec 30 fusions apprises, en combien de jetons est découpé « les forgerons » ?"],
+    [4, 'À toi de découper', "À zéro fusion, chaque lettre est un jeton. Plus tu ajoutes de fusions, plus les morceaux fréquents (« es », « ent », « le ») deviennent des jetons entiers, et plus la suite raccourcit. Les mots rares, eux, restent découpés."],
+    [5, 'Vérifie ton intuition', "Avec les 165 fusions, le mot rare « reforgeronnes » devient-il un seul jeton ? Le mot n'apparaît jamais dans le texte d'apprentissage : aucune fusion ne le colle en entier."],
+    [6, 'Le code', "Une seconde fonction choisit, dans ce compte, la paire la plus fréquente. C'est elle qui décide de la prochaine fusion. `zip(symboles, symboles[1:])` donne chaque paire de voisins : (f, o), (o, r), (r, g)…"],
+    [7, 'À grande échelle', "Les tokenizers des grands modèles comptent bien plus de morceaux que le tien : environ 128 000 pour Llama 3 de Meta, 151 669 pour Qwen3 d'Alibaba. Encadré : Et chez un grand labo ?"],
+  ];
+  const TITRES = [
+    ['0.1', "Python pour l'IA", 'Les bases'], ['0.2', 'Les maths utiles (vecteurs, matrices, dérivées, probabilités)', 'Les bases'], ['0.3', 'Installer son poste : GPU, CUDA, PyTorch', 'Les bases'], ['0.4', 'Tenseurs et calcul sur GPU', 'Les bases'], ['0.5', 'Premier réseau de neurones, à la main puis avec PyTorch', 'Les bases'],
+    ['1.1', "Ce qu'est vraiment un modèle de langage"], ['1.2', 'Les données : où les trouver, les nettoyer, les licences'], ['1.3', 'Le tokenizer (BPE)'], ['1.4', 'Le transformer, pièce par pièce'], ['1.5', 'Le pré-entraînement sur ton GPU'], ['1.6', 'Évaluer son modèle'],
+    ['1.7', 'Apprendre à converser (instructions, format chat)'], ['1.8', "L'aligner : préférences et récompenses"], ['1.9', 'Le faire raisonner'], ['1.10', 'Le faire coder'],
+    ['1.11', 'Compresser les images (autoencodeur)'], ['1.12', 'Générer des images par diffusion'], ['1.13', "Guider l'image par le texte"], ['1.14', 'Passer à la vidéo'], ['1.15', 'Comprendre les images (vision)'],
+    ['1.16', 'Les outils (appeler des fonctions)'], ['1.17', "La boucle d'agent et la mémoire"], ['1.18', 'Plusieurs agents qui coopèrent'], ['1.19', 'Gérer un projet de A à Z en autonomie'],
+    ['1.20', 'Accélérer, compresser, servir le modèle'], ['1.21', 'Sécurité et garde-fous'],
+    ['2.1', 'Choisir un modèle ouvert'], ['2.2', "L'affiner sur 16 Go (LoRA, QLoRA)"], ['2.3', "Affiner un générateur d'images"], ['2.4', 'La vidéo à partir de modèles ouverts'],
+    ['3.1', 'Faire tourner des modèles en local'], ['3.2', 'Brancher texte, image et vidéo'], ['3.3', 'Agents et outils (MCP…)'], ['3.4', 'Un système qui mène des projets seul'],
+  ];
+  const PARUS = ['1.3'];
+
+  // Comparaison sans accents ni majuscules ; « fusions » trouve aussi « fusion » et « fusionne ».
+  const plat = s => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+  const racine = m => { const p = plat(m); return p.length > 4 ? p.replace(/(s|x)$/, '') : p; };
+  const MOT = /[\p{L}\p{N}]+/gu;
+
+  function correspondances(texte, racines) {
+    const trouves = [];
+    for (const m of texte.matchAll(MOT)) {
+      const p = plat(m[0]);
+      if (racines.some(r => p.startsWith(r))) trouves.push({ debut: m.index, fin: m.index + m[0].length });
+    }
+    return trouves;
+  }
+
+  // Un extrait d'une trentaine de mots autour de la première correspondance.
+  function extrait(texte, trouves) {
+    const mots = [...texte.matchAll(/\S+/g)];
+    const i0 = Math.max(0, mots.findIndex(m => m.index + m[0].length > trouves[0].debut) - 10);
+    let i1 = Math.min(mots.length, i0 + 30);
+    if (i1 < mots.length && mots[i1 - 1][0] === String.fromCharCode(171)) i1--;
+    const debut = mots[i0].index, fin = i1 < mots.length ? mots[i1 - 1].index + mots[i1 - 1][0].length : texte.length;
+    const span = el('span', { classe: 'extrait' });
+    if (i0 > 0) span.append('… ');
+    let pos = debut;
+    const ajouter = t => { t.split(/(`[^`]+`)/).forEach((b, k) => { if (!b) return; span.append(k % 2 ? el('code', {}, b.slice(1, -1)) : fr(b)); }); };
+    trouves.filter(t => t.debut >= debut && t.fin <= fin).forEach(t => {
+      ajouter(texte.slice(pos, t.debut));
+      span.append(el('mark', {}, texte.slice(t.debut, t.fin)));
+      pos = t.fin;
+    });
+    ajouter(texte.slice(pos, fin));
+    if (i1 < mots.length) span.append(' …');
+    return span;
+  }
+
+  function chercher(requete) {
+    const z = $('#resultats');
+    z.replaceChildren();
+    const q = requete.trim();
+    if (!q) return;
+    // Un numéro de chapitre : on y va tout droit.
+    const num = q.match(/^\d\.\d{1,2}$/);
+    const racines = (q.match(MOT) || []).map(racine).filter(r => r.length > 1);
+    const passages = num ? [] : PASSAGES.map(([n, t, texte]) => ({ n, t, texte, trouves: correspondances(texte, racines) })).filter(p => p.trouves.length);
+    const titres = TITRES.filter(([n, t]) => num ? n === q : racines.length && correspondances(t, racines).length);
+
+    const nb = passages.length;
+    const bilan = el('p', { classe: 'bilan', 'aria-live': 'polite' });
+    if (nb) bilan.append(el('strong', {}, `${nb} passage${nb > 1 ? 's' : ''}`), fr(` pour « ${q} », dans le chapitre 1.3`));
+    else if (titres.length) bilan.append(fr(`Aucun passage pour « ${q} » dans les chapitres parus, mais `), el('strong', {}, `${titres.length} chapitre${titres.length > 1 ? 's' : ''}`), fr(' du parcours en parle' + (titres.length > 1 ? 'nt' : '') + '.'));
+    z.append(bilan);
+
+    if (nb) {
+      const art = el('article', { classe: 'chapitre-trouve', 'data-resultat': '' },
+        el('h2', {}, el('a', { href: '#' }, el('span', { classe: 'n' }, '1.3'), el('span', { classe: 't' }, 'Le tokenizer (BPE)'))),
+        el('p', { classe: 'ou', texte: 'Partie 1, Le cœur : un modèle de langage' }),
+        el('ol', { classe: 'passages' }, ...passages.map(p => el('li', {}, el('a', { href: '#etape-' + p.n },
+          el('span', { classe: 'n-etape', 'aria-hidden': 'true' }, String(p.n)),
+          el('span', {}, el('span', { classe: 't-etape' }, el('span', { classe: 'vh' }, `Étape ${p.n}, `), fr(p.t)), extrait(p.texte, p.trouves)))))));
+      z.append(art);
+    }
+    if (titres.length) {
+      const s = el('section', { classe: 'sommaire-trouve', 'aria-labelledby': 't-sommaire' },
+        el('h2', { id: 't-sommaire', texte: num ? 'Dans le parcours' : 'Dans les titres du parcours' }),
+        el('p', { texte: num ? 'Le chapitre qui porte ce numéro.' : 'Ces chapitres en parlent dans leur titre.' }),
+        el('ol', {}, ...titres.map(([n, t]) => {
+          const paru = PARUS.includes(n);
+          return el('li', { 'data-resultat': '' }, el('span', { classe: 'num' }, n), paru ? el('a', { href: '#', texte: t }) : el('span', { texte: t }), el('span', { classe: 'etat', texte: paru ? 'disponible' : 'à venir' }));
+        })));
+      z.append(s);
+    }
+    if (!nb && !titres.length) {
+      z.replaceChildren(el('div', { classe: 'vide', 'aria-live': 'polite' },
+        el('h2', { texte: `Rien sur « ${q} » pour l'instant.` }),
+        el('p', { texte: 'Seuls les chapitres parus sont cherchés en entier, et un seul l’est aujourd’hui : 1.3, Le tokenizer. Essaie un mot plus court, ou un mot de ce chapitre, comme « jetons » ou « fusions ».' })));
+    }
+  }
+
+  const champ = $('#q');
+  const params = new URLSearchParams(location.search);
+  if (params.get('q') !== null) champ.value = params.get('q');
+  let minuterie;
+  champ.addEventListener('input', () => { clearTimeout(minuterie); minuterie = setTimeout(() => chercher(champ.value), 120); });
+  $('#formulaire').addEventListener('submit', e => { e.preventDefault(); chercher(champ.value); });
+  document.querySelectorAll('[data-essai]').forEach(b => b.addEventListener('click', () => { champ.value = b.dataset.essai; chercher(champ.value); champ.focus(); }));
+  chercher(champ.value);
+})();
+</script>
+</body>
+</html>

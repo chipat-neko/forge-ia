@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Partie 1, Créer son IA de zéro, La Forge IA</title>
+<style>
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 500; font-display: swap; src: url('polices/gabarito-latin-500-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 600; font-display: swap; src: url('polices/gabarito-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 700; font-display: swap; src: url('polices/gabarito-latin-700-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 800; font-display: swap; src: url('polices/gabarito-latin-800-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Newsreader Variable"; font-style: normal; font-weight: 200 800; font-display: swap; src: url('polices/newsreader-latin-opsz-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Newsreader Variable"; font-style: italic; font-weight: 200 800; font-display: swap; src: url('polices/newsreader-latin-opsz-italic.woff2') format('woff2'); }
+
+  :root {
+    --papier: #FFFFFF;
+    --indigo: #232057;
+    --indigo-doux: #5B5888;
+    --lavande: #8F8CB8;
+    --brume: #E6E5F0;
+    --brume-claire: #F5F4FA;
+    --soleil: #FFC93C;
+    --soleil-vif: #FFB800;
+    --soleil-pale: #FFF4D6;
+    --menthe: #1C6E58;
+    --menthe-pale: #E2F5EF;
+    --corail: #B8342D;
+    --corail-pale: #FDECEA;
+    --teinte-a: #E4E2F4;
+    --teinte-b: #F2E9D8;
+    --teinte-a-trait: #C9C5EA;
+    --teinte-b-trait: #E2CFAA;
+    --titres: "Gabarito", system-ui, sans-serif;
+    --texte: "Newsreader Variable", "Newsreader", Georgia, serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-padding-top: 5rem; }
+  body {
+    margin: 0;
+    background: var(--papier);
+    color: var(--indigo);
+    font-family: var(--texte);
+    font-size: 20px;
+    line-height: 1.6;
+    font-optical-sizing: auto;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: inherit; text-underline-offset: .2em; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--indigo); outline-offset: 3px; border-radius: 3px; }
+  p { margin: 0 0 1em; }
+  h1, h2, h3, h4 { font-family: var(--titres); line-height: 1.15; margin: 0; }
+  .vh { position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .evitement { position: absolute; left: 12px; top: -80px; z-index: 20; background: var(--indigo); color: var(--papier); font-family: var(--titres); font-weight: 700; padding: 10px 16px; border-radius: 8px; text-decoration: none; }
+  .evitement:focus { top: 12px; }
+
+  /* Bandeau de la maquette : il ne fait pas partie du site. */
+  .maquette { background: var(--brume-claire); border-bottom: 1px dashed var(--lavande); font-family: var(--titres); font-size: 14px; line-height: 1.3; color: var(--indigo-doux); }
+  .maquette-in { max-width: 1180px; margin: 0 auto; padding: 8px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .maquette p { margin: 0 6px 0 0; }
+  .maquette button { font-family: var(--titres); font-weight: 600; font-size: 14px; color: var(--indigo); background: var(--papier); border: 1px solid var(--lavande); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+  .maquette button[aria-pressed="true"] { background: var(--indigo); border-color: var(--indigo); color: var(--papier); }
+
+  /* Barre du haut, la même sur toutes les pages hors chapitre. */
+  .barre { position: sticky; top: 0; z-index: 5; background: var(--papier); border-bottom: 1px solid var(--brume); }
+  .barre-in { max-width: 1180px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 28px; font-family: var(--titres); line-height: 1.3; }
+  .marque { font-weight: 800; font-size: 19px; letter-spacing: -.01em; text-decoration: none; }
+  .nav { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 24px; font-size: 16px; font-weight: 600; }
+  .nav a { text-decoration: none; padding: 4px 0; }
+  .nav a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
+  .nav svg { vertical-align: -3px; margin-right: 7px; }
+  .ou { font-size: 15px; font-weight: 500; color: var(--indigo-doux); }
+  .chap-barre { display: flex; align-items: center; gap: 7px; flex: 1 1 200px; max-width: 300px; }
+  .chap-barre span { display: flex; gap: 3px; flex: var(--n); }
+  .chap-barre a { flex: 1; height: 7px; border-radius: 2px; background: var(--brume); position: relative; }
+  .chap-barre a::after { content: ""; position: absolute; inset: -10px 0; }
+  .chap-barre a.dispo { background: var(--indigo); }
+  .chap-barre a.fait { background: var(--menthe); }
+  .barre .nav { margin-left: auto; }
+  .fait-mini { font-size: 15px; font-weight: 600; }
+  .fait-mini strong { font-weight: 800; }
+
+  .pips { display: inline-flex; gap: 4px; }
+  .pips i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--lavande); }
+  .pips i.plein { background: var(--menthe); border-color: var(--menthe); }
+
+  /* Grille du gabarit de chapitre : numéro suspendu, colonne de lecture, marge de notes. */
+  .bloc {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 660px) 236px;
+    column-gap: 44px;
+    max-width: 1040px;
+    margin-inline: auto;
+    padding-inline: 24px;
+    box-sizing: content-box;
+  }
+  .bloc > .texte { grid-column: 2; min-width: 0; }
+  .bloc > .note { grid-column: 3; align-self: start; }
+  .bloc > .num-etape { grid-column: 1; grid-row: 1; justify-self: end; }
+  .bloc > .large { grid-column: 2 / 4; min-width: 0; }
+
+  /* Ouverture */
+  .titre-partie { padding-top: 64px; }
+  /* La pastille de la partie, la même que sur le plan de l'accueil. */
+  .pastille {
+    width: 56px; height: 56px; border-radius: 50%; margin-top: 10px;
+    display: grid; place-items: center;
+    font-family: var(--titres); font-weight: 800; font-size: 28px; line-height: 1;
+    background: var(--indigo); color: var(--papier);
+  }
+  h1 { text-wrap: balance; font-weight: 800; font-size: clamp(46px, 7vw, 84px); line-height: .96; letter-spacing: -.03em; margin: 0 0 26px; }
+  .chapeau { font-size: 24px; line-height: 1.48; margin: 0 0 14px; }
+  .programme { font-family: var(--titres); font-size: 17px; font-weight: 500; color: var(--indigo-doux); margin: 0; }
+  .note { font-size: 16px; line-height: 1.5; color: var(--indigo-doux); padding-top: 8px; }
+  .note p { margin: 0 0 .8em; }
+  .titre-partie .note { padding-top: 112px; }
+
+  /* Ce que ton IA saura faire : ses savoirs, écrits comme des jetons numérotés. */
+  .savoirs { padding-top: 56px; }
+  .savoirs h2 { font-weight: 700; font-size: 20px; color: var(--indigo-doux); margin: 0 0 10px; }
+  .phrase-savoirs { font-size: 34px; line-height: 1.3; font-variation-settings: "opsz" 48; margin: 0; }
+  .savoir { display: inline-flex; align-items: flex-start; vertical-align: top; margin: 0 2px 12px; white-space: nowrap; }
+  .savoir .col { display: inline-flex; flex-direction: column; align-items: center; white-space: normal; }
+  .savoir .morceau { padding: 0 8px 1px; background: var(--teinte-a); border-radius: 6px; }
+  .savoir.b .morceau { background: var(--teinte-b); }
+  .savoir .ch-num { font-family: var(--titres); font-weight: 600; font-size: 14px; line-height: 1; margin-top: 6px; color: var(--indigo-doux); font-variant-numeric: tabular-nums; }
+  .savoir.acquis .morceau { background: var(--menthe-pale); box-shadow: inset 0 -3px 0 var(--menthe); }
+  .savoir.acquis .ch-num { color: var(--menthe); }
+  .savoir.acquis .ch-num::before { content: "\2713\00a0"; font-weight: 800; }
+  .legende-savoirs { font-family: var(--titres); font-size: 16px; line-height: 1.45; color: var(--indigo-doux); margin: 8px 0 0; max-width: 46em; }
+
+  /* Les cinq étapes de la partie */
+  .etape { padding-top: 76px; }
+  .num-etape {
+    font-family: var(--titres); font-weight: 800; font-size: 44px; line-height: 1;
+    color: var(--lavande); font-variant-numeric: tabular-nums; padding-top: 1px; position: relative;
+  }
+  .etape.ouverte .num-etape { color: var(--indigo); }
+  .num-etape.pastille { color: var(--papier); font-size: 28px; padding-top: 0; }
+  .etape h2 { font-weight: 700; font-size: 31px; line-height: 1.15; letter-spacing: -.012em; margin: 0 0 8px; }
+  .etape .gain { font-size: 20px; margin: 0 0 18px; }
+  .etape .plage { font-family: var(--titres); font-weight: 500; font-size: 16px; color: var(--indigo-doux); margin: 0 0 6px; }
+
+  .chapitres { list-style: none; margin: 0; padding: 0; border-bottom: 1px solid var(--brume); }
+  .chap { display: grid; grid-template-columns: 3.2em minmax(0, 1fr) auto; column-gap: 12px; align-items: baseline; padding: 14px 0 15px; border-top: 1px solid var(--brume); }
+  .chap .num { font-family: var(--titres); font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; color: var(--indigo-doux); }
+  .chap .titre { display: block; font-family: var(--titres); font-weight: 700; font-size: 21px; line-height: 1.25; text-decoration: none; }
+  .chap .resume { font-size: 17px; line-height: 1.5; color: var(--indigo-doux); margin: 4px 0 0; }
+  .chap .etat { font-family: var(--titres); font-weight: 500; font-size: 15px; color: var(--indigo-doux); white-space: nowrap; }
+  .chap[data-etat="a-venir"] .titre { color: var(--indigo-doux); font-weight: 600; }
+  .chap[data-etat="disponible"], .chap[data-etat="fait"] { padding: 20px 0 22px; }
+  .chap[data-etat="disponible"] .num, .chap[data-etat="fait"] .num { color: var(--indigo); }
+  .chap a.titre { font-size: 26px; text-decoration: underline; text-decoration-thickness: 3px; text-decoration-color: var(--lavande); text-underline-offset: .2em; }
+  .chap a.titre:hover { text-decoration-color: var(--indigo); }
+  .chap[data-etat="disponible"] .resume, .chap[data-etat="fait"] .resume { color: var(--indigo); font-size: 18px; margin-top: 8px; }
+  .chap .infos { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 10px 0 0; font-family: var(--titres); font-size: 15px; color: var(--indigo-doux); }
+  .chap[data-etat="disponible"] .etat { font-weight: 700; color: var(--indigo); }
+  .chap[data-etat="fait"] .etat { font-weight: 700; color: var(--menthe); }
+  .chap[data-etat="fait"] .num::after { content: " \2713"; color: var(--menthe); font-weight: 800; }
+
+  /* Pied : parties voisines */
+  .pied { padding-top: 88px; }
+  .voisins { display: flex; justify-content: space-between; gap: 24px; border-top: 2px solid var(--indigo); padding-top: 20px; }
+  .voisins a { text-decoration: none; display: block; max-width: 48%; }
+  .voisins a:last-child { text-align: right; }
+  .voisins span { display: block; font-family: var(--titres); font-size: 15px; color: var(--indigo-doux); }
+  .voisins strong { font-family: var(--titres); font-weight: 700; font-size: 24px; line-height: 1.2; }
+  .voisins a:hover strong { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; }
+
+  .pied-site { margin-top: 110px; border-top: 1px solid var(--brume); background: var(--brume-claire); }
+  .pied-in { max-width: 1180px; margin: 0 auto; padding: 30px 24px 48px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 40px; font-size: 16px; line-height: 1.5; color: var(--indigo-doux); }
+  .pied-in p { margin: 0; }
+  .pied-in strong { font-family: var(--titres); color: var(--indigo); }
+  .lien-texte { font-family: var(--texte); font-size: inherit; color: var(--indigo); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: .2em; }
+
+  @media (max-width: 1140px) {
+    .bloc { grid-template-columns: 56px minmax(0, 660px); max-width: 760px; }
+    .bloc > .note { grid-column: 2; margin-top: 16px; padding: 0 0 0 1.2em; font-size: 15px; }
+    .titre-partie .note { padding-top: 0; }
+    .bloc > .large { grid-column: 2; }
+  }
+  @media (max-width: 720px) {
+    body { font-size: 18px; }
+    .barre-in { padding: 10px 20px; gap: 8px 16px; }
+    .ou { display: none; }
+    .chap-barre { order: 3; flex-basis: 100%; max-width: none; }
+    .maquette-in { padding: 8px 20px; }
+    .bloc { grid-template-columns: minmax(0, 1fr); padding-inline: 20px; }
+    .bloc > .texte, .bloc > .note, .bloc > .large { grid-column: 1; }
+    .bloc > .num-etape { grid-column: 1; grid-row: auto; justify-self: start; font-size: 34px; margin-bottom: 6px; }
+    .titre-partie { padding-top: 36px; }
+    .titre-partie .num-etape.pastille { width: 44px; height: 44px; font-size: 22px; margin: 0 0 14px; }
+    .chapeau { font-size: 20px; }
+    .phrase-savoirs { font-size: 22px; }
+    .etape { padding-top: 56px; }
+    .etape h2 { font-size: 26px; }
+    .etape .gain { font-size: 18px; }
+    .chap { grid-template-columns: 2.9em minmax(0, 1fr); }
+    .chap .etat { grid-column: 2; margin-top: 6px; }
+    .chap .titre { font-size: 19px; }
+    .chap a.titre { font-size: 22px; }
+    .voisins { flex-direction: column; }
+    .voisins a { max-width: none; }
+    .voisins a:last-child { text-align: left; }
+    .pied-in { grid-template-columns: minmax(0, 1fr); padding: 26px 20px 40px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="maquette" role="region" aria-label="Réglage de la maquette">
+  <div class="maquette-in">
+    <p>Maquette, progression simulée :</p>
+    <button type="button" data-progression="aucune" aria-pressed="true">aucune</button>
+    <button type="button" data-progression="commence" aria-pressed="false">1.3 commencé</button>
+    <button type="button" data-progression="fait" aria-pressed="false">1.3 fait</button>
+  </div>
+</div>
+
+<a class="evitement" href="#contenu">Aller au contenu</a>
+
+<header class="barre">
+  <div class="barre-in">
+    <a class="marque" href="accueil-a.html">La Forge IA</a>
+    <span class="ou">Partie 1 sur 4</span>
+    <nav class="chap-barre" id="chap-barre" aria-label="Chapitres de la partie"></nav>
+    <span class="fait-mini" id="fait-mini"></span>
+    <nav class="nav" aria-label="Pages du site">
+      <a href="recherche.html"><svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M11 11l4.6 4.6" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>Rechercher</a>
+    </nav>
+  </div>
+</header>
+
+<main id="contenu">
+  <div class="bloc titre-partie">
+    <span class="num-etape pastille" aria-hidden="true">1</span>
+    <div class="texte">
+      <h1><span class="vh">Partie 1, </span>Créer son IA de zéro</h1>
+      <p class="chapeau">La partie principale du site. Tu y fabriques une seule IA, « ton IA », et tu la fais grandir de chapitre en chapitre : elle naît en 1.5 avec le découpeur de 1.3, puis elle apprend à converser, à raisonner, à coder, à voir et à agir.</p>
+      <p class="programme" id="programme">21 chapitres en 5 étapes. 1 paru pour l’instant, les autres paraissent par vagues.</p>
+    </div>
+    <aside class="note">
+      <p>Tout se fait pour de vrai, en petit, sur ton PC : une carte graphique de 16 Go suffit. Chaque chapitre montre aussi ce que la même étape demande chez un grand labo.</p>
+    </aside>
+  </div>
+
+  <section class="bloc savoirs" aria-labelledby="t-savoirs">
+    <div class="large">
+      <h2 id="t-savoirs" class="vh">Ce que ton IA saura faire</h2>
+      <p class="phrase-savoirs" id="phrase-savoirs"></p>
+      <p class="legende-savoirs">Sous chaque savoir, le chapitre où ton IA l’apprend. Il se coche quand tu as fini ce chapitre.</p>
+    </div>
+  </section>
+
+  <div id="etapes"></div>
+
+  <footer class="bloc pied">
+    <nav class="texte voisins" aria-label="Parties voisines">
+      <a href="#"><span>Partie précédente</span><strong>0, Les bases</strong></a>
+      <a href="#"><span>Partie suivante</span><strong>2, Hybride</strong></a>
+    </nav>
+  </footer>
+</main>
+
+<footer class="pied-site">
+  <div class="pied-in">
+    <p><strong>La Forge IA</strong>, un parcours en français pour construire une IA de zéro.</p>
+    <p>Code sous licence MIT, textes sous licence CC BY 4.0. Tout le code est sur GitHub.</p>
+    <p>Ta progression reste dans ce navigateur, sans compte. <button type="button" class="lien-texte" data-progression="aucune">Effacer ma progression</button></p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (s, r = document) => r.querySelector(s);
+  const FINE = String.fromCharCode(0x202F), INSEC = String.fromCharCode(0xA0), APOS = String.fromCharCode(0x2019);
+  const fr = s => s.replace(/(\p{L})'(\p{L})/gu, '$1' + APOS + '$2').replace(/ ([:;!?»])/g, FINE + '$1').replace(/« /g, '«' + FINE).replace(/(^|[^\p{L}])(Partie|chapitre) (\d)/gu, '$1$2' + INSEC + '$3');
+  function el(tag, attrs, ...enfants) {
+    const n = document.createElement(tag);
+    for (const k in attrs || {}) {
+      if (k === 'texte') n.textContent = fr(attrs[k]);
+      else if (k === 'classe') n.className = attrs[k];
+      else n.setAttribute(k, attrs[k]);
+    }
+    for (const e of enfants) if (e != null) n.append(e);
+    return n;
+  }
+
+  /* Titres : section 4 de la spécification. Résumés et notes : propositions à valider. */
+  const ETAPES = [
+    { nom: 'Le cœur : un modèle de langage', gain: 'Les données, le découpeur, le transformer, puis le premier entraînement : à la fin, ton IA complète un texte, jeton après jeton.',
+      note: 'Ton IA naît en 1.5, avec le découpeur de 1.3. Son entraînement peut durer des heures : il se met en pause et reprend au même point.',
+      chapitres: [
+        ['1.1', "Ce qu'est vraiment un modèle de langage", 'Un programme qui prédit le morceau de texte suivant. Tout le reste part de là.'],
+        ['1.2', 'Les données : où les trouver, les nettoyer, les licences', 'Choisir des textes qu’on a le droit d’utiliser, puis les préparer pour l’entraînement.'],
+        ['1.3', 'Le tokenizer (BPE)', 'Une IA ne lit pas des lettres : elle lit des nombres. Tu construis l’outil qui découpe le texte en morceaux numérotés.'],
+        ['1.4', 'Le transformer, pièce par pièce', 'L’architecture du modèle, montée pièce par pièce, avec l’attention en animation.'],
+        ['1.5', 'Le pré-entraînement sur ton GPU', 'Le premier entraînement de ton IA. Un tout petit modèle apprend aussi sous tes yeux, dans la page.'],
+        ['1.6', 'Évaluer son modèle', 'Mesurer ce qu’il sait faire, et repérer ce qu’il ne sait pas.'],
+      ] },
+    { nom: 'Le rendre utile', gain: 'Le même modèle apprend à converser, à préférer les bonnes réponses, à raisonner et à coder.',
+      note: 'Ces quatre chapitres reprennent le même modèle et l’affinent : rien n’est refait de zéro.',
+      chapitres: [
+        ['1.7', 'Apprendre à converser (instructions, format chat)', 'Le format d’une conversation, et l’habitude de suivre une consigne.'],
+        ['1.8', "L'aligner : préférences et récompenses", 'Lui faire préférer les réponses que l’on juge meilleures.'],
+        ['1.9', 'Le faire raisonner', 'L’entraîner à écrire ses étapes avant de répondre.'],
+        ['1.10', 'Le faire coder', 'L’entraîner à écrire du code qui tourne.'],
+      ] },
+    { nom: 'Voir et créer des images', gain: 'De petits modèles d’images et de vidéo, entraînés de zéro, puis des yeux pour ton IA.',
+      note: 'Les images et la vidéo ont leurs propres petits modèles. En 1.15, ton IA apprend à s’en servir.',
+      chapitres: [
+        ['1.11', 'Compresser les images (autoencodeur)', 'Résumer une image en peu de nombres, puis la reconstruire.'],
+        ['1.12', 'Générer des images par diffusion', 'Partir du bruit et le retirer pas à pas, en animation.'],
+        ['1.13', "Guider l'image par le texte", 'Faire dessiner ce que décrit une phrase.'],
+        ['1.14', 'Passer à la vidéo', 'Des images qui se suivent et restent cohérentes.'],
+        ['1.15', 'Comprendre les images (vision)', 'Brancher ces modèles à ton IA : elle apprend à voir.'],
+      ] },
+    { nom: 'Agir seul', gain: 'Des outils, une boucle d’agent, une mémoire : toute la mécanique pour agir seule.',
+      note: 'Un modèle entraîné sur un PC ne mènera pas seul un vrai projet. Ces chapitres en construisent toute la mécanique, sur des tâches simples. La version vraiment capable vient avec les Parties 2 et 3.',
+      chapitres: [
+        ['1.16', 'Les outils (appeler des fonctions)', 'Lui apprendre à demander un calcul, une recherche, un fichier.'],
+        ['1.17', "La boucle d'agent et la mémoire", 'Observer, décider, agir, recommencer : la boucle, en animation.'],
+        ['1.18', 'Plusieurs agents qui coopèrent', 'Répartir une tâche entre plusieurs agents.'],
+        ['1.19', 'Gérer un projet de A à Z en autonomie', 'Toute la mécanique d’un projet, essayée sur des tâches simples.'],
+      ] },
+    { nom: 'Le mettre en service', gain: 'Plus rapide, plus légère, et sûre.',
+      note: 'Pour servir le modèle, certains outils demandent WSL2 : son installation est expliquée à ce moment-là.',
+      chapitres: [
+        ['1.20', 'Accélérer, compresser, servir le modèle', 'La rendre plus rapide et plus légère, puis la servir depuis ton PC.'],
+        ['1.21', 'Sécurité et garde-fous', 'Ce qu’elle doit refuser, et comment le vérifier.'],
+      ] },
+  ];
+  // Ce que ton IA saura faire, et le chapitre où elle l'apprend.
+  const SAVOIRS = [['découper un texte en jetons', '1.3'], ['compléter un texte', '1.5'], ['converser', '1.7'], ['préférer les bonnes réponses', '1.8'], ['raisonner', '1.9'], ['coder', '1.10'], ['voir les images', '1.15'], ['se servir d’outils', '1.16'], ['mener seule une tâche simple', '1.19']];
+
+  const PARUS = { '1.3': { programme: '7 étapes, 4 paris, environ 15 minutes', acquis: 5 } };
+  const SIMULATIONS = { aucune: {}, commence: { '1.3': 3 }, fait: { '1.3': 5 } };
+  let progression = {};
+  const etatDe = n => !PARUS[n] ? 'a-venir' : (progression[n] || 0) >= PARUS[n].acquis ? 'fait' : 'disponible';
+  function pips(n, total) {
+    const s = el('span', { classe: 'pips', 'aria-hidden': 'true' });
+    for (let i = 0; i < total; i++) s.append(el('i', { classe: i < n ? 'plein' : '' }));
+    return s;
+  }
+
+  function dessinerSavoirs() {
+    const p = $('#phrase-savoirs');
+    p.replaceChildren(fr('À la fin de cette partie, ton IA saura '));
+    SAVOIRS.forEach(([texte, n], i) => {
+      const acquis = etatDe(n) === 'fait';
+      // La ponctuation reste collée au savoir qui la précède.
+      const ponct = i === SAVOIRS.length - 1 ? '.' : i === SAVOIRS.length - 2 ? '' : ',';
+      p.append(el('span', { classe: 'savoir' + (i % 2 ? ' b' : '') + (acquis ? ' acquis' : '') },
+        el('span', { classe: 'col' },
+          el('span', { classe: 'morceau', texte }),
+          el('span', { classe: 'ch-num' }, el('span', { classe: 'vh' }, ' (chapitre '), n, el('span', { classe: 'vh' }, acquis ? ', fait)' : ')'))),
+        ponct));
+      p.append(i === SAVOIRS.length - 2 ? ' et ' : ' ');
+    });
+  }
+
+  function ligne([n, titre, resume]) {
+    const etat = etatDe(n);
+    const li = el('li', { classe: 'chap', 'data-chapitre-carte': n, 'data-etat': etat });
+    li.append(el('span', { classe: 'num' }, n));
+    const corps = el('div');
+    if (etat === 'a-venir') {
+      corps.append(el('span', { classe: 'titre', texte: titre }));
+      corps.append(el('p', { classe: 'resume', texte: resume }));
+      li.append(corps, el('span', { classe: 'vh', texte: ', à venir' }));
+      return li;
+    }
+    const paru = PARUS[n], f = progression[n] || 0;
+    corps.append(el('a', { classe: 'titre', href: '#', texte: titre }), el('p', { classe: 'resume', texte: resume }));
+    const infos = el('p', { classe: 'infos' });
+    if (etat === 'fait') infos.append(pips(paru.acquis, paru.acquis), fr(`Ce que tu sais : ${paru.acquis} sur ${paru.acquis}`));
+    else if (f > 0) infos.append(pips(f, paru.acquis), fr(`Ce que tu sais : ${f} sur ${paru.acquis}, reprends où tu t’es arrêté`));
+    else infos.append(fr(paru.programme));
+    corps.append(infos);
+    li.append(corps, el('span', { classe: 'etat', texte: etat === 'fait' ? 'fait' : f > 0 ? 'commencé' : 'disponible' }));
+    return li;
+  }
+
+  function dessinerEtapes() {
+    const z = $('#etapes');
+    z.replaceChildren();
+    ETAPES.forEach((e, i) => {
+      const premier = e.chapitres[0][0], dernier = e.chapitres[e.chapitres.length - 1][0];
+      const parus = e.chapitres.filter(([n]) => PARUS[n]).length;
+      const s = el('section', { classe: 'bloc etape' + (parus ? ' ouverte' : ''), id: 'etape-' + (i + 1), 'aria-labelledby': 'te' + (i + 1) });
+      s.append(el('span', { classe: 'num-etape', 'aria-hidden': 'true' }, String(i + 1)));
+      s.append(el('div', { classe: 'texte' },
+        el('h2', { id: 'te' + (i + 1), texte: e.nom }),
+        el('p', { classe: 'plage', texte: `Chapitres ${premier} à ${dernier}, ${parus ? parus + ' paru sur ' + e.chapitres.length : 'à venir'}` }),
+        el('p', { classe: 'gain', texte: e.gain }),
+        el('ol', { classe: 'chapitres' }, ...e.chapitres.map(ligne))));
+      s.append(el('aside', { classe: 'note' }, el('p', { texte: e.note })));
+      z.append(s);
+    });
+  }
+
+  function dessinerBarre() {
+    const b = $('#chap-barre');
+    b.replaceChildren();
+    let faits = 0;
+    ETAPES.forEach(e => {
+      const g = el('span', { style: '--n:' + e.chapitres.length });
+      e.chapitres.forEach(([n, t]) => {
+        const etat = etatDe(n);
+        if (etat === 'fait') faits++;
+        g.append(el('a', { href: '#', classe: etat === 'fait' ? 'fait' : etat === 'disponible' ? 'dispo' : '', 'aria-label': fr(`${n} ${t}, ${etat === 'a-venir' ? 'à venir' : etat}`) }));
+      });
+      b.append(g);
+    });
+    $('#fait-mini').replaceChildren(el('strong', {}, String(faits)), fr(` fait${faits > 1 ? 's' : ''} sur 21`));
+  }
+
+  function simuler(cle) {
+    progression = Object.assign({}, SIMULATIONS[cle]);
+    try { localStorage.setItem('maquette-forge-progression', cle); } catch (e) { /* sans stockage */ }
+    document.querySelectorAll('.maquette [data-progression]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.progression === cle)));
+    dessinerSavoirs(); dessinerEtapes(); dessinerBarre();
+  }
+  document.querySelectorAll('[data-progression]').forEach(b => b.addEventListener('click', () => simuler(b.dataset.progression)));
+  let depart = 'aucune';
+  try { depart = localStorage.getItem('maquette-forge-progression') || 'aucune'; } catch (e) { /* idem */ }
+  const params = new URLSearchParams(location.search);
+  if (params.get('progression')) depart = params.get('progression');
+  if (!SIMULATIONS[depart]) depart = 'aucune';
+  simuler(depart);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La Forge IA, construire une IA de zéro</title>
+<style>
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 500; font-display: swap; src: url('polices/gabarito-latin-500-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 600; font-display: swap; src: url('polices/gabarito-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 700; font-display: swap; src: url('polices/gabarito-latin-700-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 800; font-display: swap; src: url('polices/gabarito-latin-800-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Newsreader Variable"; font-style: normal; font-weight: 200 800; font-display: swap; src: url('polices/newsreader-latin-opsz-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Newsreader Variable"; font-style: italic; font-weight: 200 800; font-display: swap; src: url('polices/newsreader-latin-opsz-italic.woff2') format('woff2'); }
+
+  :root {
+    --papier: #FFFFFF;
+    --indigo: #232057;
+    --indigo-doux: #5B5888;
+    --lavande: #8F8CB8;
+    --brume: #E6E5F0;
+    --brume-claire: #F5F4FA;
+    --soleil: #FFC93C;
+    --soleil-vif: #FFB800;
+    --soleil-pale: #FFF4D6;
+    --menthe: #1C6E58;
+    --menthe-pale: #E2F5EF;
+    --corail: #B8342D;
+    --corail-pale: #FDECEA;
+    --teinte-a: #E4E2F4;
+    --teinte-b: #F2E9D8;
+    --teinte-a-trait: #C9C5EA;
+    --teinte-b-trait: #E2CFAA;
+    --titres: "Gabarito", system-ui, sans-serif;
+    --texte: "Newsreader Variable", "Newsreader", Georgia, serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-padding-top: 5rem; }
+  body {
+    margin: 0;
+    background: var(--papier);
+    color: var(--indigo);
+    font-family: var(--texte);
+    font-size: 20px;
+    line-height: 1.6;
+    font-optical-sizing: auto;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: inherit; text-underline-offset: .2em; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--indigo); outline-offset: 3px; border-radius: 3px; }
+  p { margin: 0 0 1em; }
+  h1, h2, h3, h4 { font-family: var(--titres); line-height: 1.15; margin: 0; }
+  .vh { position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .evitement { position: absolute; left: 12px; top: -80px; z-index: 20; background: var(--indigo); color: var(--papier); font-family: var(--titres); font-weight: 700; padding: 10px 16px; border-radius: 8px; text-decoration: none; }
+  .evitement:focus { top: 12px; }
+
+  /* Bandeau de la maquette : il ne fait pas partie du site. */
+  .maquette { background: var(--brume-claire); border-bottom: 1px dashed var(--lavande); font-family: var(--titres); font-size: 14px; line-height: 1.3; color: var(--indigo-doux); }
+  .maquette-in { max-width: 1180px; margin: 0 auto; padding: 8px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .maquette p { margin: 0 6px 0 0; }
+  .maquette button { font-family: var(--titres); font-weight: 600; font-size: 14px; color: var(--indigo); background: var(--papier); border: 1px solid var(--lavande); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+  .maquette button[aria-pressed="true"] { background: var(--indigo); border-color: var(--indigo); color: var(--papier); }
+
+  /* Barre du haut, la même sur toutes les pages hors chapitre. */
+  .barre { position: sticky; top: 0; z-index: 5; background: var(--papier); border-bottom: 1px solid var(--brume); }
+  .barre-in { max-width: 1180px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 28px; font-family: var(--titres); line-height: 1.3; }
+  .marque { font-weight: 800; font-size: 19px; letter-spacing: -.01em; text-decoration: none; }
+  .nav { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 24px; font-size: 16px; font-weight: 600; }
+  .nav a { text-decoration: none; padding: 4px 0; }
+  .nav a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
+  .nav svg { vertical-align: -3px; margin-right: 7px; }
+  .bouton {
+    display: inline-block; text-decoration: none;
+    font-family: var(--titres); font-weight: 700; font-size: 19px; line-height: 1.2;
+    color: var(--papier); background: var(--indigo);
+    border-radius: 10px; padding: 15px 22px 14px;
+  }
+  .bouton:hover { background: #34307A; }
+  .pips { display: inline-flex; gap: 4px; }
+  .pips i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--lavande); }
+  .pips i.plein { background: var(--menthe); border-color: var(--menthe); }
+
+  /* ---------- Ouverture : un pari, tout de suite ---------- */
+  .pari-ouverture { background: var(--soleil-pale); }
+  .pari-in { max-width: 860px; margin: 0 auto; padding: 64px 24px 56px; }
+  .phrase-pari {
+    font-size: clamp(36px, 5.1vw, 62px); line-height: 1.12; letter-spacing: -.01em;
+    font-variation-settings: "opsz" 72;
+    margin: 0 0 30px;
+  }
+  .phrase-pari .guill { color: var(--indigo-doux); }
+  @media (min-width: 1200px) { .phrase-pari { margin-right: -140px; } }
+  .phrase-pari .mot { display: inline-block; white-space: nowrap; }
+  .phrase-pari .mot.debut .jeton:first-child { margin-left: -.25em; }
+  .sans-anim *, .sans-anim { animation: none !important; transition: none !important; }
+  .jeton { display: inline-flex; flex-direction: column; vertical-align: top; }
+  .jeton .morceau { white-space: pre; border-bottom: .07em solid transparent; }
+  .jeton .num { align-self: center; font-family: var(--titres); font-weight: 600; font-size: max(13px, .24em); line-height: 1; color: var(--indigo-doux); font-variant-numeric: tabular-nums; margin-top: .28em; visibility: hidden; }
+  .phrase-pari.decoupee .jeton { margin-right: .09em; }
+  .phrase-pari.decoupee .jeton .morceau { border-bottom-color: var(--teinte-a-trait); }
+  .phrase-pari.decoupee .jeton.b .morceau { border-bottom-color: var(--teinte-b-trait); }
+  .phrase-pari.decoupee .jeton .num { visibility: visible; }
+
+  .pari-ouverture h1 { font-weight: 700; font-size: 32px; line-height: 1.22; letter-spacing: -.01em; max-width: 21em; margin: 0 0 8px; }
+  .precision { font-size: 19px; color: var(--indigo-doux); margin: 0 0 24px; }
+  .choix { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; max-width: 600px; }
+  .choix button {
+    cursor: pointer;
+    font-family: var(--titres); font-weight: 700; line-height: 1.15;
+    background: var(--papier); color: var(--indigo);
+    border: 2px solid var(--indigo); border-radius: 12px;
+    padding: 14px 12px;
+    box-shadow: 0 4px 0 var(--indigo);
+    transition: transform .08s ease, box-shadow .08s ease, background-color .15s ease;
+  }
+  .choix .gros { display: block; font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -.02em; }
+  .choix .petit { display: block; font-size: 16px; font-weight: 500; margin-top: 4px; }
+  .choix .rep { display: block; font-size: 14px; font-weight: 600; margin-top: 6px; }
+  .choix button:hover:not(:disabled) { background: var(--soleil); }
+  .choix button:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--indigo); }
+  .choix button:disabled { cursor: default; }
+  .choix button.juste { background: var(--menthe-pale); border-color: var(--menthe); box-shadow: 0 4px 0 var(--menthe); color: var(--menthe); }
+  .choix button.faux { background: var(--corail-pale); border-color: var(--corail); box-shadow: 0 4px 0 var(--corail); color: var(--corail); }
+  .choix button.attenue { color: #6E6B95; border-color: #C9C7DD; box-shadow: 0 4px 0 #C9C7DD; }
+  .verdict { margin-top: 26px; padding: 18px 20px; border-radius: 12px; background: var(--papier); font-size: 19px; max-width: 40em; }
+  .verdict[hidden] { display: none; }
+  .verdict .titre-v { display: block; font-family: var(--titres); font-weight: 800; font-size: 22px; margin-bottom: 4px; }
+  .verdict.ok .titre-v { color: var(--menthe); }
+  .verdict.ko .titre-v { color: var(--corail); }
+  .verdict p:last-child { margin-bottom: 0; }
+  .verdict a { font-family: var(--titres); font-weight: 700; }
+
+  .avant-propos { max-width: 860px; margin: 0 auto; padding: 56px 24px 0; }
+  .avant-propos p { font-size: 24px; line-height: 1.48; max-width: 34em; margin: 0; }
+
+  /* ---------- Le sommaire, comme celui d'un livre ---------- */
+  .sommaire { max-width: 860px; margin: 0 auto; padding: 88px 24px 0; }
+  .sommaire > header { border-bottom: 2px solid var(--indigo); padding-bottom: 18px; margin-bottom: 8px; }
+  .sommaire h2 { font-weight: 800; font-size: 46px; letter-spacing: -.02em; margin-bottom: 8px; }
+  .sommaire > header p { font-size: 19px; color: var(--indigo-doux); margin: 0; }
+  .sommaire > header .lecture { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 6px; font-family: var(--titres); font-size: 16px; }
+  .sommaire > header .lecture strong { color: var(--indigo); }
+
+  .partie { position: relative; padding-top: 52px; }
+  .partie > h3 { font-weight: 800; font-size: 30px; letter-spacing: -.015em; line-height: 1.1; margin-bottom: 8px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
+  .partie > h3 .quand { font-weight: 500; font-size: 16px; letter-spacing: 0; color: var(--indigo-doux); }
+  .chiffre {
+    position: absolute; right: calc(100% + 34px); top: 40px;
+    font-family: var(--titres); font-weight: 800; font-size: 96px; line-height: .8; letter-spacing: -.04em;
+    color: var(--lavande); font-variant-numeric: tabular-nums;
+  }
+  .p1 .chiffre { font-size: 168px; top: 38px; color: var(--indigo); }
+  .partie > .desc { font-size: 19px; line-height: 1.5; color: var(--indigo-doux); max-width: 36em; margin: 0 0 16px; }
+  .p1 > h3 { font-size: 44px; letter-spacing: -.025em; }
+  .p1 > .desc { font-size: 21px; color: var(--indigo); margin-bottom: 8px; }
+
+  .groupe { padding-top: 22px; }
+  .groupe h4 { font-family: var(--texte); font-style: italic; font-weight: 500; font-size: 23px; line-height: 1.3; margin-bottom: 4px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; }
+  .groupe h4 .quand { font-family: var(--titres); font-style: normal; font-weight: 500; font-size: 15px; color: var(--indigo-doux); }
+
+  .chapitres { list-style: none; margin: 0; padding: 0; }
+  .ch { position: relative; display: grid; grid-template-columns: 3.1em minmax(0, max-content) minmax(24px, 1fr) auto; align-items: baseline; column-gap: 10px; padding: 6px 0; border-top: 1px solid var(--brume); font-size: 19px; line-height: 1.4; color: var(--indigo-doux); }
+  .ch:last-child { border-bottom: 1px solid var(--brume); }
+  .p1 .ch { font-size: 21px; padding: 8px 0; }
+  .ch .num { font-family: var(--titres); font-weight: 600; font-size: .86em; font-variant-numeric: tabular-nums; }
+  .ch .titre { min-width: 0; }
+  .ch .points { align-self: end; margin-bottom: .5em; border-bottom: 2px dotted var(--lavande); }
+  .ch .etat { font-family: var(--titres); font-weight: 700; font-size: 16px; color: var(--indigo); display: inline-flex; align-items: center; gap: 8px; }
+  .ch[data-etat="a-venir"] { grid-template-columns: 3.1em minmax(0, 1fr); }
+  .ch[data-etat="disponible"], .ch[data-etat="fait"] { color: var(--indigo); }
+  .ch a.titre { font-weight: 600; text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: var(--lavande); text-underline-offset: .22em; }
+  .ch a.titre:hover { text-decoration-color: var(--indigo); }
+  .ch[data-etat="fait"] .etat { color: var(--menthe); }
+  .ch[data-etat="fait"] .num::after { content: " \2713"; color: var(--menthe); font-weight: 800; }
+
+  /* Le signet : il marque où reprendre la lecture. */
+  .signet {
+    position: absolute; left: -46px; top: -1px; width: 22px; height: 54px;
+    background: var(--indigo);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+  }
+
+  .annexes-liste .ch .num { font-weight: 700; }
+
+  /* ---------- Pied ---------- */
+  .pied-site { margin-top: 110px; border-top: 1px solid var(--brume); background: var(--brume-claire); }
+  .pied-in { max-width: 1180px; margin: 0 auto; padding: 30px 24px 48px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 40px; font-size: 16px; line-height: 1.5; color: var(--indigo-doux); }
+  .pied-in p { margin: 0; }
+  .pied-in strong { font-family: var(--titres); color: var(--indigo); }
+  .lien-texte { font-family: var(--texte); font-size: inherit; color: var(--indigo); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: .2em; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .phrase-pari .jeton { transition: margin .35s cubic-bezier(.2, .8, .3, 1.1); }
+    .phrase-pari .jeton .morceau { transition: border-color .35s ease .15s; }
+    .phrase-pari.decoupee .num { animation: tombe .35s cubic-bezier(.2, .8, .3, 1.3) both; animation-delay: calc(var(--i) * 22ms + .2s); }
+    @keyframes tombe { from { opacity: 0; transform: translateY(-.4em); } to { opacity: 1; transform: none; } }
+    .revele { animation: revele .35s cubic-bezier(.2, .8, .3, 1.2); }
+    @keyframes revele { from { transform: scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .choix button { transition: none; }
+  }
+
+  @media (max-width: 1160px) {
+    .chiffre { position: static; display: block; font-size: 64px; margin-bottom: 6px; }
+    .p1 .chiffre { font-size: 96px; }
+    .signet { left: -22px; width: 14px; height: 40px; }
+    .sommaire, .avant-propos, .pari-in { padding-left: 40px; }
+  }
+  @media (max-width: 720px) {
+    body { font-size: 18px; }
+    .barre-in { padding: 10px 20px; gap: 6px 16px; }
+    .nav { gap: 4px 16px; font-size: 15px; }
+    .nav .large { display: none; }
+    .maquette-in { padding: 8px 20px; }
+    .pari-in { padding: 40px 20px 40px; }
+    .pari-ouverture h1 { font-size: 25px; }
+    .precision { font-size: 17px; }
+    .choix { gap: 8px; }
+    .choix button { padding: 12px 6px; }
+    .choix .gros { font-size: 34px; }
+    .avant-propos { padding: 40px 20px 0; }
+    .avant-propos p { font-size: 20px; }
+    .sommaire { padding: 64px 20px 0; }
+    .sommaire h2 { font-size: 36px; }
+    .partie { padding-top: 40px; }
+    .partie > h3 { font-size: 26px; }
+    .p1 > h3 { font-size: 32px; }
+    .p1 > .desc { font-size: 19px; }
+    .chiffre { font-size: 52px; }
+    .p1 .chiffre { font-size: 76px; }
+    .groupe h4 { font-size: 20px; }
+    .ch, .p1 .ch { font-size: 17px; grid-template-columns: 3.1em minmax(0, 1fr); }
+    .ch .points { display: none; }
+    .ch .etat { grid-column: 2; font-size: 15px; margin-top: 2px; }
+    .signet { left: -17px; width: 10px; height: 34px; }
+    .pied-in { grid-template-columns: minmax(0, 1fr); padding: 26px 20px 40px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="maquette" role="region" aria-label="Réglage de la maquette">
+  <div class="maquette-in">
+    <p>Maquette, progression simulée :</p>
+    <button type="button" data-progression="aucune" aria-pressed="true">aucune</button>
+    <button type="button" data-progression="commence" aria-pressed="false">1.3 commencé</button>
+    <button type="button" data-progression="fait" aria-pressed="false">1.3 fait</button>
+    <button type="button" id="rejouer">rejouer le pari</button>
+  </div>
+</div>
+
+<a class="evitement" href="#contenu">Aller au contenu</a>
+
+<header class="barre">
+  <div class="barre-in">
+    <a class="marque" href="accueil-b.html" aria-current="page">La Forge IA</a>
+    <nav class="nav" aria-label="Pages du site">
+      <a href="#sommaire">Sommaire</a>
+      <a href="#annexes" class="large">Annexes</a>
+      <a href="recherche.html"><svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M11 11l4.6 4.6" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>Rechercher</a>
+    </nav>
+  </div>
+</header>
+
+<main id="contenu">
+  <section class="pari-ouverture" aria-labelledby="q-accueil">
+    <div class="pari-in">
+      <p class="phrase-pari" id="phrase-pari"><span class="vh">Construis ton IA de zéro.</span><span id="phrase-jetons" aria-hidden="true"></span></p>
+      <h1 id="q-accueil">Une IA va lire cette phrase. En combien de morceaux la découpe-t-elle ?</h1>
+      <p class="precision">La phrase fait 25 caractères, espaces et point compris. Parie avant de regarder.</p>
+      <div class="choix" role="group" aria-labelledby="q-accueil" id="choix"></div>
+      <div class="verdict" id="verdict" hidden aria-live="polite"></div>
+    </div>
+  </section>
+
+  <div class="avant-propos">
+    <p>La Forge IA est un parcours pour construire une IA de zéro, sur ton PC, en comprenant chaque pièce : les données, ce découpeur, le modèle, son entraînement, puis la conversation, les images, les outils et les agents. Chaque chapitre te fait parier comme tu viens de le faire : un pari, même faux, fait mieux retenir qu’une lecture seule.</p>
+  </div>
+
+  <section class="sommaire" id="sommaire" aria-labelledby="t-sommaire">
+    <header>
+      <h2 id="t-sommaire">Sommaire</h2>
+      <p>Quatre parties, trente-quatre chapitres, quatre annexes. Les chapitres paraissent au fur et à mesure.</p>
+      <p class="lecture" id="lecture"></p>
+    </header>
+    <div id="parties"></div>
+  </section>
+</main>
+
+<footer class="pied-site">
+  <div class="pied-in">
+    <p><strong>La Forge IA</strong>, un parcours en français pour construire une IA de zéro.</p>
+    <p>Code sous licence MIT, textes sous licence CC BY 4.0. Tout le code est sur GitHub.</p>
+    <p>Ta progression reste dans ce navigateur, sans compte. <button type="button" class="lien-texte" data-progression="aucune">Effacer ma progression</button></p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (s, r = document) => r.querySelector(s);
+  const fr = s => s.replace(/(\p{L})'(\p{L})/gu, '$1’$2').replace(/ ([:;!?»])/g, ' $1').replace(/« /g, '« ').replace(/\b(Partie|chapitre) (\d)/g, '$1 $2');
+  function el(tag, attrs, ...enfants) {
+    const n = document.createElement(tag);
+    for (const k in attrs || {}) {
+      if (k === 'texte') n.textContent = fr(attrs[k]);
+      else if (k === 'classe') n.className = attrs[k];
+      else n.setAttribute(k, attrs[k]);
+    }
+    for (const e of enfants) if (e != null) n.append(e);
+    return n;
+  }
+
+  /* ---------- Le parcours (titres de la section 4 de la spécification) ---------- */
+  const PARCOURS = [
+    { numero: 0, titre: 'Les bases', desc: 'Python, les maths utiles, ton poste de travail et un premier réseau de neurones. Si tu les connais déjà, passe directement à la Partie 1.', chapitres: [
+      ['0.1', "Python pour l'IA"],
+      ['0.2', 'Les maths utiles (vecteurs, matrices, dérivées, probabilités)'],
+      ['0.3', 'Installer son poste : GPU, CUDA, PyTorch'],
+      ['0.4', 'Tenseurs et calcul sur GPU'],
+      ['0.5', 'Premier réseau de neurones, à la main puis avec PyTorch'],
+    ] },
+    { numero: 1, titre: 'Créer son IA de zéro', desc: 'La partie principale. Une seule IA, la tienne, que tu fais grandir de chapitre en chapitre : elle naît en 1.5, apprend à converser, à raisonner et à coder, puis à voir et à agir.', groupes: [
+      { nom: 'Le cœur : un modèle de langage', chapitres: [
+        ['1.1', "Ce qu'est vraiment un modèle de langage"],
+        ['1.2', 'Les données : où les trouver, les nettoyer, les licences'],
+        ['1.3', 'Le tokenizer (BPE)'],
+        ['1.4', 'Le transformer, pièce par pièce'],
+        ['1.5', 'Le pré-entraînement sur ton GPU'],
+        ['1.6', 'Évaluer son modèle'],
+      ] },
+      { nom: 'Le rendre utile', chapitres: [
+        ['1.7', 'Apprendre à converser (instructions, format chat)'],
+        ['1.8', "L'aligner : préférences et récompenses"],
+        ['1.9', 'Le faire raisonner'],
+        ['1.10', 'Le faire coder'],
+      ] },
+      { nom: 'Voir et créer des images', chapitres: [
+        ['1.11', 'Compresser les images (autoencodeur)'],
+        ['1.12', 'Générer des images par diffusion'],
+        ['1.13', "Guider l'image par le texte"],
+        ['1.14', 'Passer à la vidéo'],
+        ['1.15', 'Comprendre les images (vision)'],
+      ] },
+      { nom: 'Agir seul', chapitres: [
+        ['1.16', 'Les outils (appeler des fonctions)'],
+        ['1.17', "La boucle d'agent et la mémoire"],
+        ['1.18', 'Plusieurs agents qui coopèrent'],
+        ['1.19', 'Gérer un projet de A à Z en autonomie'],
+      ] },
+      { nom: 'Le mettre en service', chapitres: [
+        ['1.20', 'Accélérer, compresser, servir le modèle'],
+        ['1.21', 'Sécurité et garde-fous'],
+      ] },
+    ] },
+    { numero: 2, titre: 'Hybride', desc: 'Partir d’un modèle ouvert et l’affiner sur ta carte de 16 Go.', chapitres: [
+      ['2.1', 'Choisir un modèle ouvert'],
+      ['2.2', "L'affiner sur 16 Go (LoRA, QLoRA)"],
+      ['2.3', "Affiner un générateur d'images"],
+      ['2.4', 'La vidéo à partir de modèles ouverts'],
+    ] },
+    { numero: 3, titre: 'Assemblage', desc: 'Brancher des modèles existants entre eux, jusqu’à un système qui mène des projets.', chapitres: [
+      ['3.1', 'Faire tourner des modèles en local'],
+      ['3.2', 'Brancher texte, image et vidéo'],
+      ['3.3', 'Agents et outils (MCP…)'],
+      ['3.4', 'Un système qui mène des projets seul'],
+    ] },
+  ];
+  const ANNEXES = [['A', 'Glossaire'], ['B', 'Annuaire des données, modèles et outils'], ['C', 'Calculateur de coût'], ['D', 'Matériel : quoi acheter, quoi louer']];
+
+  const PARUS = { '1.3': { programme: '7 étapes, 4 paris, environ 15 minutes', acquis: 5 } };
+  const SIMULATIONS = { aucune: {}, commence: { '1.3': 3 }, fait: { '1.3': 5 } };
+  let progression = {};
+  const etatDe = n => !PARUS[n] ? 'a-venir' : (progression[n] || 0) >= PARUS[n].acquis ? 'fait' : 'disponible';
+  function pips(n, total) {
+    const s = el('span', { classe: 'pips', 'aria-hidden': 'true' });
+    for (let i = 0; i < total; i++) s.append(el('i', { classe: i < n ? 'plein' : '' }));
+    return s;
+  }
+
+  /* ---------- Le pari d'ouverture ----------
+     Découpage et choix calculés par le code du chapitre 1.3 (site/src/lib/bpe.ts :
+     tokenizer13 avec ses 165 fusions, puis choixNombreDeJetons). Sur le site, ils
+     seront calculés au moment de la construction, jamais écrits à la main. */
+  const JETONS = [['C',8,0],['ons',136,0],['t',34,0],['r',32,0],['uis',108,0],[' t',112,1],['on',49,1],[' ',1,2],['I',9,2],['A',7,2],[' de',76,3],[' ',1,4],['z',39,4],['é',42,4],['r',32,4],['o',29,4],['.',5,5]];
+  const CHOIX = [{ n: 5, juste: false }, { n: 17, juste: true }, { n: 25, juste: false }];
+  const zone = $('#phrase-jetons');
+  const FINE = String.fromCharCode(0x202F);
+  let mot = null, m0 = -1;
+  JETONS.forEach(([texte, id, m], i) => {
+    // La ponctuation reste collée au mot qui la précède (pas de « . » seul en début de ligne).
+    if (m !== m0 && !(i > 0 && /^[.,;:!?]+$/.test(texte))) { mot = el('span', { classe: 'mot' }); zone.append(mot); }
+    m0 = m;
+    if (i === 0) mot.append(el('span', { classe: 'guill' }, String.fromCharCode(171) + FINE));
+    const j = el('span', { classe: 'jeton' + (i % 2 ? ' b' : ''), style: `--i:${i}` }, el('span', { classe: 'morceau' }, texte), el('span', { classe: 'num' }, String(id)));
+    mot.append(j);
+  });
+  mot.append(el('span', { classe: 'guill' }, FINE + String.fromCharCode(187)));
+  // Un mot qui commence une ligne laisse pendre son espace de tête dans la marge.
+  function pendre() {
+    let haut = null;
+    zone.querySelectorAll('.mot').forEach(m => {
+      m.classList.remove('debut');
+      if (haut !== null && m.offsetTop > haut + 4 && m.textContent.startsWith(' ')) m.classList.add('debut');
+      haut = m.offsetTop;
+    });
+  }
+  window.addEventListener('resize', pendre);
+  pendre();
+  if (document.fonts) document.fonts.ready.then(pendre);
+
+  const choix = $('#choix'), verdict = $('#verdict');
+  function construireChoix() {
+    choix.replaceChildren();
+    CHOIX.forEach(c => {
+      const b = el('button', { type: 'button' }, el('span', { classe: 'gros' }, String(c.n)), el('span', { classe: 'petit' }, 'jetons'));
+      b.addEventListener('click', () => repondre(c, b));
+      choix.append(b);
+    });
+    verdict.hidden = true;
+    $('#phrase-pari').classList.remove('decoupee');
+  }
+  function repondre(c, bouton, sansAnimation) {
+    [...choix.children].forEach((b, i) => {
+      b.disabled = true;
+      const r = CHOIX[i];
+      if (r.juste) { b.classList.add('juste'); b.append(el('span', { classe: 'rep', texte: b === bouton ? 'ton choix, juste' : 'bonne réponse' })); }
+      else if (b === bouton) { b.classList.add('faux'); b.append(el('span', { classe: 'rep', texte: 'ton choix' })); }
+      else b.classList.add('attenue');
+    });
+    $('#phrase-pari').classList.toggle('sans-anim', !!sansAnimation);
+    $('#phrase-pari').classList.add('decoupee');
+    pendre();
+    verdict.hidden = false;
+    verdict.className = 'verdict ' + (c.juste ? 'ok' : 'ko') + (sansAnimation ? '' : ' revele');
+    verdict.replaceChildren(
+      el('span', { classe: 'titre-v', texte: c.juste ? 'Juste.' : 'Pas tout à fait.' }),
+      el('p', { texte: 'Le petit découpeur du chapitre 1.3 la coupe en 17 morceaux, et chaque morceau devient un nombre : c’est tout ce que lit une IA. Les assemblages fréquents de son texte d’apprentissage restent collés, comme « ons » ou « de » avec son espace. « IA » et « zéro », qu’il n’a jamais vus, partent en lettres.' }),
+      el('p', {}, el('a', { href: '#', texte: 'Construire ce découpeur, chapitre 1.3' })));
+    try { localStorage.setItem('maquette-forge-pari', String(CHOIX.indexOf(c))); } catch (e) { /* sans stockage */ }
+  }
+  construireChoix();
+  try {
+    const deja = localStorage.getItem('maquette-forge-pari');
+    if (deja !== null && CHOIX[+deja]) repondre(CHOIX[+deja], choix.children[+deja], true);
+  } catch (e) { /* idem */ }
+  $('#rejouer').addEventListener('click', () => {
+    try { localStorage.removeItem('maquette-forge-pari'); } catch (e) { /* idem */ }
+    construireChoix();
+  });
+
+  /* ---------- Le sommaire ---------- */
+  function ligne(n, titre) {
+    const etat = etatDe(n);
+    const li = el('li', { classe: 'ch', 'data-chapitre-carte': n, 'data-etat': etat });
+    li.append(el('span', { classe: 'num' }, n));
+    if (etat === 'a-venir') {
+      li.append(el('span', { classe: 'titre', texte: titre }), el('span', { classe: 'vh', texte: ', à venir' }));
+      return li;
+    }
+    li.append(el('a', { classe: 'titre', href: '#', texte: titre }), el('span', { classe: 'points', 'aria-hidden': 'true' }));
+    const f = progression[n] || 0, total = PARUS[n].acquis;
+    let etatTxt;
+    if (etat === 'fait') etatTxt = el('span', { classe: 'etat', texte: `fait, ${total} acquis sur ${total}` });
+    else if (f > 0) etatTxt = el('span', { classe: 'etat' }, pips(f, total), fr(`reprends ici, ${f} acquis sur ${total}`));
+    else etatTxt = el('span', { classe: 'etat', texte: 'commence ici, environ 15 minutes' });
+    li.append(etatTxt);
+    if (etat !== 'fait') li.prepend(el('span', { classe: 'signet', 'aria-hidden': 'true' }));
+    return li;
+  }
+  function compte(chapitres) {
+    const parus = chapitres.filter(([n]) => PARUS[n]).length;
+    return parus === 0 ? 'à venir' : `${parus} paru sur ${chapitres.length}`;
+  }
+  function dessiner() {
+    const z = $('#parties');
+    z.replaceChildren();
+    PARCOURS.forEach(p => {
+      const tous = p.chapitres || p.groupes.flatMap(g => g.chapitres);
+      const s = el('section', { classe: 'partie p' + p.numero, 'aria-labelledby': 'sp' + p.numero });
+      s.append(el('span', { classe: 'chiffre', 'aria-hidden': 'true' }, String(p.numero)));
+      const h = el('h3', { id: 'sp' + p.numero }, el('span', { classe: 'vh' }, `Partie ${p.numero}, `), fr(p.titre));
+      if (!p.groupes) h.append(el('span', { classe: 'quand', texte: `${tous.length} chapitres, ${compte(tous)}` }));
+      s.append(h, el('p', { classe: 'desc', texte: p.desc }));
+      if (p.groupes) {
+        p.groupes.forEach(g => {
+          s.append(el('div', { classe: 'groupe' },
+            el('h4', {}, fr(g.nom), el('span', { classe: 'quand', texte: `${g.chapitres[0][0]} à ${g.chapitres[g.chapitres.length - 1][0]}, ${compte(g.chapitres)}` })),
+            el('ol', { classe: 'chapitres' }, ...g.chapitres.map(([n, t]) => ligne(n, t)))));
+        });
+      } else {
+        s.append(el('ol', { classe: 'chapitres' }, ...p.chapitres.map(([n, t]) => ligne(n, t))));
+      }
+      z.append(s);
+    });
+    const a = el('section', { classe: 'partie annexes-liste', id: 'annexes', 'aria-labelledby': 'sa' },
+      el('h3', { id: 'sa' }, 'Annexes', el('span', { classe: 'quand', texte: 'à venir' })),
+      el('p', { classe: 'desc', texte: 'À garder sous la main pendant tout le parcours.' }),
+      el('ol', { classe: 'chapitres' }, ...ANNEXES.map(([l, t]) => el('li', { classe: 'ch', 'data-etat': 'a-venir' }, el('span', { classe: 'num' }, l), el('span', { classe: 'titre', texte: t }), el('span', { classe: 'vh', texte: ', à venir' })))));
+    z.append(a);
+
+    let faits = 0;
+    Object.keys(PARUS).forEach(n => { if (etatDe(n) === 'fait') faits++; });
+    $('#lecture').replaceChildren(el('strong', { texte: `Ta lecture : ${faits} chapitre${faits > 1 ? 's' : ''} fait${faits > 1 ? 's' : ''} sur 34.` }), fr(' Un seul est paru pour l’instant, le 1.3.'));
+  }
+
+  function simuler(cle) {
+    progression = Object.assign({}, SIMULATIONS[cle]);
+    try { localStorage.setItem('maquette-forge-progression', cle); } catch (e) { /* sans stockage */ }
+    document.querySelectorAll('.maquette [data-progression]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.progression === cle)));
+    dessiner();
+  }
+  document.querySelectorAll('[data-progression]').forEach(b => b.addEventListener('click', () => simuler(b.dataset.progression)));
+  let depart = 'aucune';
+  try { depart = localStorage.getItem('maquette-forge-progression') || 'aucune'; } catch (e) { /* idem */ }
+  const params = new URLSearchParams(location.search);
+  if (params.get('progression')) depart = params.get('progression');
+  if (!SIMULATIONS[depart]) depart = 'aucune';
+  simuler(depart);
+  if (params.get('pari') !== null && CHOIX[+params.get('pari')]) { construireChoix(); repondre(CHOIX[+params.get('pari')], choix.children[+params.get('pari')], true); }
+})();
+</script>
+</body>
+</html>

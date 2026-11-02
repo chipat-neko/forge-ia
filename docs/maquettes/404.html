@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page introuvable, La Forge IA</title>
+<style>
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 500; font-display: swap; src: url('polices/gabarito-latin-500-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 600; font-display: swap; src: url('polices/gabarito-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 700; font-display: swap; src: url('polices/gabarito-latin-700-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 800; font-display: swap; src: url('polices/gabarito-latin-800-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Newsreader Variable"; font-style: normal; font-weight: 200 800; font-display: swap; src: url('polices/newsreader-latin-opsz-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Newsreader Variable"; font-style: italic; font-weight: 200 800; font-display: swap; src: url('polices/newsreader-latin-opsz-italic.woff2') format('woff2'); }
+
+  :root {
+    --papier: #FFFFFF;
+    --indigo: #232057;
+    --indigo-doux: #5B5888;
+    --lavande: #8F8CB8;
+    --brume: #E6E5F0;
+    --brume-claire: #F5F4FA;
+    --soleil: #FFC93C;
+    --soleil-vif: #FFB800;
+    --soleil-pale: #FFF4D6;
+    --menthe: #1C6E58;
+    --menthe-pale: #E2F5EF;
+    --corail: #B8342D;
+    --corail-pale: #FDECEA;
+    --teinte-a: #E4E2F4;
+    --teinte-b: #F2E9D8;
+    --teinte-a-trait: #C9C5EA;
+    --teinte-b-trait: #E2CFAA;
+    --titres: "Gabarito", system-ui, sans-serif;
+    --texte: "Newsreader Variable", "Newsreader", Georgia, serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-padding-top: 5rem; }
+  body {
+    margin: 0;
+    background: var(--papier);
+    color: var(--indigo);
+    font-family: var(--texte);
+    font-size: 20px;
+    line-height: 1.6;
+    font-optical-sizing: auto;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: inherit; text-underline-offset: .2em; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--indigo); outline-offset: 3px; border-radius: 3px; }
+  p { margin: 0 0 1em; }
+  h1, h2, h3, h4 { font-family: var(--titres); line-height: 1.15; margin: 0; }
+  .vh { position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .evitement { position: absolute; left: 12px; top: -80px; z-index: 20; background: var(--indigo); color: var(--papier); font-family: var(--titres); font-weight: 700; padding: 10px 16px; border-radius: 8px; text-decoration: none; }
+  .evitement:focus { top: 12px; }
+
+  /* Bandeau de la maquette : il ne fait pas partie du site. */
+  .maquette { background: var(--brume-claire); border-bottom: 1px dashed var(--lavande); font-family: var(--titres); font-size: 14px; line-height: 1.3; color: var(--indigo-doux); }
+  .maquette-in { max-width: 1180px; margin: 0 auto; padding: 8px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .maquette p { margin: 0 6px 0 0; }
+  .maquette button { font-family: var(--titres); font-weight: 600; font-size: 14px; color: var(--indigo); background: var(--papier); border: 1px solid var(--lavande); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+  .maquette button[aria-pressed="true"] { background: var(--indigo); border-color: var(--indigo); color: var(--papier); }
+
+  /* Barre du haut, la même sur toutes les pages hors chapitre. */
+  .barre { position: sticky; top: 0; z-index: 5; background: var(--papier); border-bottom: 1px solid var(--brume); }
+  .barre-in { max-width: 1180px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 28px; font-family: var(--titres); line-height: 1.3; }
+  .marque { font-weight: 800; font-size: 19px; letter-spacing: -.01em; text-decoration: none; }
+  .nav { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 24px; font-size: 16px; font-weight: 600; }
+  .nav a { text-decoration: none; padding: 4px 0; }
+  .nav a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
+  .nav svg { vertical-align: -3px; margin-right: 7px; }
+  @font-face { font-family: "JetBrains Mono Variable"; font-style: normal; font-weight: 100 800; font-display: swap; src: url('polices/jetbrains-mono-latin-wght-normal.woff2') format('woff2'); }
+  .maquette button { font-family: var(--titres); font-weight: 600; font-size: 14px; color: var(--indigo); background: var(--papier); border: 1px solid var(--lavande); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+
+  .bloc {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 660px) 236px;
+    column-gap: 44px;
+    max-width: 1040px;
+    margin-inline: auto;
+    padding-inline: 24px;
+    box-sizing: content-box;
+  }
+  .bloc > .texte { grid-column: 2; min-width: 0; }
+  .bloc > .note { grid-column: 3; align-self: start; font-size: 16px; line-height: 1.5; color: var(--indigo-doux); }
+  .bloc > .large { grid-column: 2 / 4; min-width: 0; }
+  .note p { margin: 0 0 .8em; }
+  .note code { font-size: 14px; color: var(--indigo); }
+
+  /* « 404 », tel que le lit le découpeur du chapitre 1.3 : trois inconnus. */
+  .inconnus { padding-top: 56px; }
+  .inconnus figure { margin: 0; }
+  .nombre { display: flex; gap: 14px; font-family: var(--titres); font-weight: 800; font-size: clamp(110px, 17vw, 230px); line-height: .9; letter-spacing: -.04em; }
+  .jeton { display: inline-flex; flex-direction: column; }
+  .jeton .morceau { padding: 0 .03em .04em; border-bottom: 10px solid var(--teinte-a-trait); }
+  .jeton.b .morceau { border-bottom-color: var(--teinte-b-trait); }
+  .jeton .num { align-self: center; font-weight: 600; font-size: 19px; letter-spacing: 0; line-height: 1; margin-top: 12px; color: var(--indigo-doux); }
+  .inconnus figcaption { font-family: var(--titres); font-size: 17px; line-height: 1.45; color: var(--indigo-doux); margin-top: 18px; max-width: 38em; }
+
+  .message { padding-top: 48px; }
+  h1 { font-weight: 800; font-size: clamp(36px, 5vw, 56px); line-height: 1.02; letter-spacing: -.025em; margin: 0 0 16px; text-wrap: balance; }
+  .adresse { font-family: "JetBrains Mono Variable", ui-monospace, Consolas, monospace; font-size: 17px; background: var(--brume-claire); border-radius: 6px; padding: 4px 10px; display: inline-block; margin: 0 0 18px; overflow-wrap: anywhere; }
+  .message .texte p { font-size: 20px; }
+  .message .chapitre-attendu { font-size: 22px; line-height: 1.45; }
+  .message .chapitre-attendu strong { font-family: var(--titres); font-weight: 700; }
+
+  .sorties { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 26px; margin: 26px 0 0; }
+  .bouton {
+    display: inline-block; text-decoration: none;
+    font-family: var(--titres); font-weight: 700; font-size: 19px; line-height: 1.2;
+    color: var(--papier); background: var(--indigo);
+    border-radius: 10px; padding: 15px 22px 14px;
+  }
+  .bouton:hover { background: #34307A; }
+  .sorties a:not(.bouton) { font-family: var(--titres); font-weight: 600; font-size: 18px; text-decoration-thickness: 2px; text-decoration-color: var(--lavande); }
+  .sorties a:not(.bouton):hover { text-decoration-color: var(--indigo); }
+
+  .cherche { margin-top: 34px; max-width: 520px; }
+  .cherche label { display: block; font-family: var(--titres); font-weight: 600; font-size: 16px; color: var(--indigo-doux); margin-bottom: 6px; }
+  .cherche .ligne { display: flex; gap: 10px; }
+  .cherche input {
+    flex: 1; min-width: 0; -webkit-appearance: none; appearance: none;
+    font-family: var(--texte); font-style: italic; font-size: 20px; color: var(--indigo);
+    background: var(--soleil-pale); border: 0; border-bottom: 3px solid var(--soleil); border-radius: 6px 6px 0 0; padding: 8px 12px 6px;
+  }
+  .cherche input::placeholder { color: #77738F; opacity: 1; }
+  .cherche input:hover { background: #FFEDBC; }
+  .cherche input:focus-visible { outline: none; background: #FFEDBC; border-bottom-color: var(--indigo); }
+  .cherche button { font-family: var(--titres); font-weight: 700; font-size: 17px; color: var(--indigo); background: var(--papier); border: 2px solid var(--indigo); border-radius: 10px; padding: 8px 16px; cursor: pointer; box-shadow: 0 3px 0 var(--indigo); }
+  .cherche button:hover { background: var(--soleil); }
+  .cherche button:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--indigo); }
+
+  /* Le petit pari */
+  .pari-bloc { padding-top: 64px; }
+  .pari { background: var(--soleil-pale); border-radius: 18px; padding: 24px 26px 26px; }
+  .pari .q { font-family: var(--titres); font-weight: 700; font-size: 23px; line-height: 1.28; margin: 0 0 6px; }
+  .pari .q-detail { font-size: 17px; color: var(--indigo-doux); margin: 0 0 18px; }
+  .choix { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .choix button {
+    cursor: pointer; font-family: var(--titres); font-weight: 700; line-height: 1.15;
+    background: var(--papier); color: var(--indigo);
+    border: 2px solid var(--indigo); border-radius: 12px; padding: 12px 10px;
+    box-shadow: 0 4px 0 var(--indigo);
+    transition: transform .08s ease, box-shadow .08s ease, background-color .15s ease;
+  }
+  .choix .gros { display: block; font-size: 36px; font-weight: 800; line-height: 1; letter-spacing: -.02em; }
+  .choix .petit { display: block; font-size: 15px; font-weight: 500; margin-top: 4px; }
+  .choix .rep { display: block; font-size: 14px; font-weight: 600; margin-top: 6px; }
+  .choix button:hover:not(:disabled) { background: var(--soleil); }
+  .choix button:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--indigo); }
+  .choix button:disabled { cursor: default; }
+  .choix button.juste { background: var(--menthe-pale); border-color: var(--menthe); box-shadow: 0 4px 0 var(--menthe); color: var(--menthe); }
+  .choix button.faux { background: var(--corail-pale); border-color: var(--corail); box-shadow: 0 4px 0 var(--corail); color: var(--corail); }
+  .choix button.attenue { color: #6E6B95; border-color: #C9C7DD; box-shadow: 0 4px 0 #C9C7DD; }
+  .verdict { margin-top: 20px; padding: 16px 18px; border-radius: 10px; background: var(--papier); font-size: 18px; }
+  .verdict[hidden] { display: none; }
+  .verdict .titre-v { display: block; font-family: var(--titres); font-weight: 800; font-size: 21px; margin-bottom: 4px; }
+  .verdict.ok .titre-v { color: var(--menthe); }
+  .verdict.ko .titre-v { color: var(--corail); }
+  .verdict p:last-child { margin-bottom: 0; }
+  .mini { display: flex; flex-wrap: wrap; gap: 6px 4px; margin: 10px 0 12px; font-size: 24px; }
+  .mini .j { display: inline-flex; flex-direction: column; align-items: center; }
+  .mini .morceau { padding: 0 6px; border-radius: 5px; background: var(--teinte-a); }
+  .mini .j:nth-child(even) .morceau { background: var(--teinte-b); }
+  .mini .num { font-family: var(--titres); font-weight: 500; font-size: 13px; color: var(--indigo-doux); margin-top: 4px; }
+
+  .pied-site { margin-top: 110px; border-top: 1px solid var(--brume); background: var(--brume-claire); }
+  .pied-in { max-width: 1180px; margin: 0 auto; padding: 30px 24px 48px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 40px; font-size: 16px; line-height: 1.5; color: var(--indigo-doux); }
+  .pied-in p { margin: 0; }
+  .pied-in strong { font-family: var(--titres); color: var(--indigo); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .revele { animation: revele .35s cubic-bezier(.2, .8, .3, 1.2); }
+    @keyframes revele { from { transform: scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .choix button, .cherche button { transition: none; }
+  }
+  @media (max-width: 1140px) {
+    .bloc { grid-template-columns: 56px minmax(0, 660px); max-width: 760px; }
+    .bloc > .note { grid-column: 2; margin-top: 22px; padding: 0 0 0 1.2em; font-size: 15px; }
+    .bloc > .large { grid-column: 2; }
+  }
+  @media (max-width: 720px) {
+    body { font-size: 18px; }
+    .barre-in { padding: 10px 20px; gap: 6px 16px; }
+    .nav { gap: 4px 16px; font-size: 15px; }
+    .maquette-in { padding: 8px 20px; }
+    .bloc { grid-template-columns: minmax(0, 1fr); padding-inline: 20px; }
+    .bloc > .texte, .bloc > .note, .bloc > .large { grid-column: 1; }
+    .inconnus { padding-top: 32px; }
+    .nombre { gap: 8px; font-size: 104px; }
+    .jeton .morceau { border-bottom-width: 7px; }
+    .jeton .num { font-size: 15px; }
+    .message { padding-top: 32px; }
+    .message p { font-size: 18px; }
+    .message .chapitre-attendu { font-size: 19px; }
+    .pari { padding: 20px 16px; margin-inline: -4px; }
+    .pari .q { font-size: 20px; }
+    .choix { gap: 8px; }
+    .choix .gros { font-size: 30px; }
+    .pied-in { grid-template-columns: minmax(0, 1fr); padding: 26px 20px 40px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="maquette" role="region" aria-label="Réglage de la maquette">
+  <div class="maquette-in">
+    <p>Maquette, adresse demandée :</p>
+    <button type="button" data-adresse="/forge-ia/nimporte-quoi/" aria-pressed="true">une adresse inconnue</button>
+    <button type="button" data-adresse="/forge-ia/partie-1/1-4/" aria-pressed="false">un chapitre à venir</button>
+  </div>
+</div>
+
+<a class="evitement" href="#contenu">Aller au contenu</a>
+
+<header class="barre">
+  <div class="barre-in">
+    <a class="marque" href="accueil-a.html">La Forge IA</a>
+    <nav class="nav" aria-label="Pages du site">
+      <a href="accueil-a.html#parcours">Le parcours</a>
+      <a href="recherche.html"><svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M11 11l4.6 4.6" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>Rechercher</a>
+    </nav>
+  </div>
+</header>
+
+<main id="contenu">
+  <div class="bloc inconnus">
+    <figure class="large">
+      <div class="nombre" aria-hidden="true">
+        <span class="jeton"><span class="morceau">4</span><span class="num">inconnu</span></span>
+        <span class="jeton b"><span class="morceau">0</span><span class="num">inconnu</span></span>
+        <span class="jeton"><span class="morceau">4</span><span class="num">inconnu</span></span>
+      </div>
+      <figcaption>« 404 », tel que le lit le petit découpeur du chapitre 1.3 : trois caractères qu’il n’a jamais vus, donc trois jetons inconnus. Il n’a appris aucun chiffre.</figcaption>
+    </figure>
+  </div>
+
+  <div class="bloc message">
+    <div class="texte">
+      <h1>Cette adresse ne mène à aucune page.</h1>
+      <p><span class="adresse" id="adresse">/forge-ia/nimporte-quoi/</span></p>
+      <p id="explication"></p>
+      <div class="sorties">
+        <a class="bouton" href="accueil-a.html">Retour à l’accueil</a>
+        <a href="accueil-a.html#parcours">Voir tout le parcours</a>
+      </div>
+      <form class="cherche" role="search" action="recherche.html">
+        <label for="q404">Ou cherche ce qui t’amenait</label>
+        <div class="ligne">
+          <input type="search" id="q404" name="q" placeholder="jetons, fusions, 1.3…" autocomplete="off">
+          <button type="submit">Chercher</button>
+        </div>
+      </form>
+    </div>
+    <aside class="note">
+      <p>Les adresses du site suivent le parcours : <code>partie-1/1-3/</code> mène au chapitre 1.3.</p>
+    </aside>
+  </div>
+
+  <div class="bloc pari-bloc">
+    <div class="texte">
+      <div class="pari">
+        <p class="q" id="q-pari">Pendant que tu es là, un pari : en combien de morceaux le même découpeur coupe-t-il « introuvable » ?</p>
+        <p class="q-detail">Le mot fait 11 lettres. Il n’apparaît pas dans le court texte où le découpeur a appris.</p>
+        <div class="choix" role="group" aria-labelledby="q-pari" id="choix"></div>
+        <div class="verdict" id="verdict" hidden aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="pied-site">
+  <div class="pied-in">
+    <p><strong>La Forge IA</strong>, un parcours en français pour construire une IA de zéro.</p>
+    <p>Code sous licence MIT, textes sous licence CC BY 4.0. Tout le code est sur GitHub.</p>
+    <p>Ta progression reste dans ce navigateur, sans compte.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (s, r = document) => r.querySelector(s);
+  const FINE = String.fromCharCode(0x202F), INSEC = String.fromCharCode(0xA0), APOS = String.fromCharCode(0x2019);
+  const fr = s => s.replace(/(\p{L})'(\p{L})/gu, '$1' + APOS + '$2').replace(/ ([:;!?»])/g, FINE + '$1').replace(/« /g, '«' + FINE).replace(/(^|[^\p{L}])(Partie|chapitre) (\d)/gu, '$1$2' + INSEC + '$3');
+  function el(tag, attrs, ...enfants) {
+    const n = document.createElement(tag);
+    for (const k in attrs || {}) {
+      if (k === 'texte') n.textContent = fr(attrs[k]);
+      else if (k === 'classe') n.className = attrs[k];
+      else n.setAttribute(k, attrs[k]);
+    }
+    for (const e of enfants) if (e != null) n.append(e);
+    return n;
+  }
+
+  /* Une adresse de chapitre à venir est reconnue : on dit lequel, au lieu d'un message vague.
+     Sur le site, la liste vient du parcours (site/src/lib/parcours.ts). */
+  const A_VENIR = { '1-4': ['1.4', 'Le transformer, pièce par pièce'] };
+  function montrer(adresse) {
+    $('#adresse').textContent = adresse;
+    const m = adresse.match(/partie-(\d)\/(\d-\d{1,2})\/?$/);
+    const ch = m && A_VENIR[m[2]];
+    const p = $('#explication');
+    p.className = ch ? 'chapitre-attendu' : '';
+    if (ch) {
+      p.replaceChildren(fr('Tu cherchais le chapitre '), el('strong', { texte: `${ch[0]}, ${ch[1]}` }), fr(' ? Il n’est pas encore paru. Le seul chapitre disponible pour l’instant est le 1.3, Le tokenizer.'));
+    } else {
+      p.replaceChildren(fr('Le lien est peut-être ancien, ou l’adresse a été mal recopiée. Tout le site part de l’accueil.'));
+    }
+    document.querySelectorAll('[data-adresse]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.adresse === adresse)));
+  }
+  document.querySelectorAll('[data-adresse]').forEach(b => b.addEventListener('click', () => montrer(b.dataset.adresse)));
+  const params = new URLSearchParams(location.search);
+  montrer(params.get('adresse') || '/forge-ia/nimporte-quoi/');
+
+  /* Le pari, calculé par le code du chapitre 1.3 (site/src/lib/bpe.ts : tokenizer13 et ses
+     165 fusions, puis choixNombreDeJetons). Sur le site, calculé à la construction. */
+  const JETONS = [['i', 23], ['n', 28], ['t', 34], ['r', 32], ['ou', 65], ['v', 36], ['ab', 181], ['le', 72]];
+  const CHOIX = [{ n: 1, mot: 'jeton', juste: false }, { n: 8, mot: 'jetons', juste: true }, { n: 11, mot: 'jetons', juste: false }];
+  const choix = $('#choix'), verdict = $('#verdict');
+  CHOIX.forEach(c => {
+    const b = el('button', { type: 'button' }, el('span', { classe: 'gros' }, String(c.n)), el('span', { classe: 'petit' }, c.mot));
+    b.addEventListener('click', () => repondre(c, b));
+    choix.append(b);
+  });
+  function repondre(c, bouton) {
+    [...choix.children].forEach((b, i) => {
+      b.disabled = true;
+      const r = CHOIX[i];
+      if (r.juste) { b.classList.add('juste'); b.append(el('span', { classe: 'rep', texte: b === bouton ? 'ton choix, juste' : 'bonne réponse' })); }
+      else if (b === bouton) { b.classList.add('faux'); b.append(el('span', { classe: 'rep', texte: 'ton choix' })); }
+      else b.classList.add('attenue');
+    });
+    verdict.hidden = false;
+    verdict.className = 'verdict revele ' + (c.juste ? 'ok' : 'ko');
+    const mini = el('div', { classe: 'mini', 'aria-hidden': 'true' }, ...JETONS.map(([t, id]) => el('span', { classe: 'j' }, el('span', { classe: 'morceau' }, t), el('span', { classe: 'num' }, String(id)))));
+    verdict.replaceChildren(
+      el('span', { classe: 'titre-v', texte: c.juste ? 'Juste.' : 'Pas tout à fait.' }),
+      el('p', { texte: '« introuvable » part en 8 morceaux :' }), mini,
+      el('p', { texte: 'Le découpeur n’a jamais vu ce mot entier. Il l’écrit avec ce qu’il connaît : des lettres seules, et trois assemblages appris sur d’autres mots, « ou », « ab » et « le ». C’est tout l’objet du chapitre 1.3.' }));
+  }
+})();
+</script>
+</body>
+</html>
