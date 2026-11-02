@@ -1,0 +1,105 @@
+---
+// L'encadré « Et chez un grand labo ? » : la même étape à grande échelle,
+// avec des chiffres sourcés et datés.
+import { typographier } from '../../lib/typo';
+
+interface Source {
+  titre: string;
+  url: string;
+  /** Date de la vérification, au format AAAA-MM-JJ (par exemple 2026-11-02). */
+  verifieLe: string;
+}
+
+interface Props {
+  sources: Source[];
+}
+
+const { sources } = Astro.props;
+
+const MOIS = [
+  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+];
+
+// « 2026-11-02 » devient « 2 novembre 2026 » ; le premier du mois, « 1er ».
+function dateEnFrancais(date: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date.trim());
+  if (!m || Number(m[2]) < 1 || Number(m[2]) > 12) return date;
+  const jour = Number(m[3]);
+  return `${jour === 1 ? '1er' : jour} ${MOIS[Number(m[2]) - 1]} ${m[1]}`;
+}
+
+const dates = [...new Set(sources.map((s) => s.verifieLe))];
+const memeDate = dates.length === 1;
+---
+
+<aside class="labo">
+  <h3>{typographier('Et chez un grand labo ?')}</h3>
+  <slot />
+  {
+    sources.length > 0 && (
+      <p class="sources">
+        {memeDate
+          ? typographier(`Sources, vérifiées le ${dateEnFrancais(dates[0])} : `)
+          : typographier('Sources : ')}
+        {sources.map((s, i) => (
+          <>
+            <a href={s.url}>{typographier(s.titre)}</a>
+            {!memeDate && ` (vérifiée le ${dateEnFrancais(s.verifieLe)})`}
+            {i < sources.length - 1 ? (memeDate ? ', ' : typographier(' ; ')) : '.'}
+          </>
+        ))}
+      </p>
+    )
+  }
+</aside>
+
+<style is:global>
+  .labo {
+    background: var(--indigo);
+    color: var(--brume-claire);
+    border-radius: 14px;
+    padding: 30px 32px 32px;
+    margin: 26px 0 6px;
+  }
+
+  .labo h3 {
+    color: var(--papier);
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 1.15;
+    letter-spacing: -0.012em;
+    margin: 0 0 12px;
+  }
+
+  .labo p {
+    font-size: 19px;
+  }
+
+  .labo a {
+    color: var(--papier);
+  }
+
+  /* Sur le fond indigo, le contour de focus indigo serait invisible. */
+  .labo :focus-visible {
+    outline-color: var(--papier);
+  }
+
+  .labo .sources {
+    font-family: var(--titres);
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--brume);
+    margin: 18px 0 0;
+  }
+
+  @media (max-width: 720px) {
+    .labo {
+      padding: 24px 20px;
+    }
+
+    .labo h3 {
+      font-size: 22px;
+    }
+  }
+</style>

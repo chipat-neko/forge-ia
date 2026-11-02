@@ -1,0 +1,312 @@
+---
+// Un pari : le lecteur s'engage sur une réponse avant de la voir. Le slot par
+// défaut est l'explication, révélée après le pari par le script du chapitre.
+//
+// Dans `question`, `precision` et les textes des choix, un passage entre
+// accents graves (`zip(a, b)`) s'affiche comme du code, sans typographie.
+import { typographier } from '../../lib/typo';
+
+interface Choix {
+  texte: string;
+  juste?: boolean;
+}
+
+interface Props {
+  id: string;
+  question: string;
+  precision?: string;
+  choix: Choix[];
+  /** Clé de l'acquis gagné en pariant (juste ou non : l'explication enseigne). */
+  acquis?: string;
+  /** Nom du verrou ouvert par ce pari (voir Verrou.astro). */
+  ouvre?: string;
+}
+
+const { id, question, precision, choix, acquis, ouvre } = Astro.props;
+
+if (choix.filter((c) => c.juste === true).length !== 1) {
+  throw new Error('Pari ' + id + ' : il faut exactement un choix juste');
+}
+
+interface Morceau {
+  texte: string;
+  code: boolean;
+}
+
+// Découpe un texte en morceaux ordinaires (typographiés) et en code.
+function morceaux(texte: string): Morceau[] {
+  return texte
+    .split('`')
+    .map((t, i) => ({ texte: i % 2 === 1 ? t : typographier(t), code: i % 2 === 1 }))
+    .filter((m) => m.texte !== '');
+}
+
+// « 9 jetons » s'affiche en grand chiffre au-dessus de son unité, comme dans
+// la maquette. L'espace entre les deux garde le texte lisible tel quel.
+function chiffreEtUnite(texte: string): { chiffre: string; unite: string } | null {
+  const m = /^(\d[\d\u202F\u00A0]*)\s+([^`\d].*)$/.exec(texte);
+  return m ? { chiffre: m[1], unite: typographier(m[2]) } : null;
+}
+
+const avecCode = choix.some((c) => c.texte.includes('`'));
+const longs = choix.some((c) => c.texte.length > 16);
+const classeChoix = ['choix', avecCode ? 'choix-code' : longs ? 'choix-longs' : ''].join(' ').trim();
+const idQuestion = `question-${id}`;
+const bonne = choix.find((c) => c.juste === true)!;
+---
+
+<div class="pari" data-pari={id} data-acquis={acquis} data-ouvre={ouvre}>
+  <p class="q" id={idQuestion}>
+    {morceaux(question).map((m) => (m.code ? <code>{m.texte}</code> : m.texte))}
+    {
+      precision && (
+        <small>{morceaux(precision).map((m) => (m.code ? <code>{m.texte}</code> : m.texte))}</small>
+      )
+    }
+  </p>
+  <div class={classeChoix} role="group" aria-labelledby={idQuestion}>
+    {
+      choix.map((c, i) => {
+        const chiffre = avecCode ? null : chiffreEtUnite(c.texte);
+        return (
+          <button type="button" data-choix={i} data-juste={c.juste === true ? '' : undefined}>
+            {chiffre ? (
+              <>
+                <span class="gros">{chiffre.chiffre}</span> <span class="petit">{chiffre.unite}</span>
+              </>
+            ) : (
+              morceaux(c.texte).map((m) => (m.code ? <code>{m.texte}</code> : m.texte))
+            )}
+          </button>
+        );
+      })
+    }
+  </div>
+  <div class="verdict" hidden tabindex="-1">
+    {/* Sans JavaScript, on ne peut pas parier : la réponse est donnée d'emblée. */}
+    <p class="titre-v">
+      {typographier('Réponse : ')}{morceaux(bonne.texte).map((m) => (m.code ? <code>{m.texte}</code> : m.texte))}
+    </p>
+    <div class="explication"><slot /></div>
+  </div>
+</div>
+
+<style is:global>
+  .pari {
+    background: var(--soleil-pale);
+    border-radius: 18px;
+    padding: 24px 26px 26px;
+    margin: 26px 0 6px;
+  }
+
+  .pari .q {
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 1.28;
+    margin: 0 0 18px;
+  }
+
+  .pari .q small {
+    display: block;
+    font-family: var(--texte);
+    font-weight: 400;
+    font-size: 17px;
+    color: var(--indigo-doux);
+    margin-top: 6px;
+  }
+
+  .pari code {
+    font-size: 0.85em;
+  }
+
+  .choix {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  .choix button {
+    cursor: pointer;
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 21px;
+    line-height: 1.15;
+    background: var(--papier);
+    color: var(--indigo);
+    border: 2px solid var(--indigo);
+    border-radius: 12px;
+    padding: 14px 12px;
+    box-shadow: 0 4px 0 var(--indigo);
+    transition:
+      transform 0.08s ease,
+      box-shadow 0.08s ease,
+      background-color 0.15s ease;
+  }
+
+  .choix button .gros {
+    display: block;
+    font-size: 40px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  .choix button .petit {
+    display: block;
+    font-size: 16px;
+    font-weight: 500;
+    margin-top: 4px;
+  }
+
+  .choix button:hover:not(:disabled) {
+    background: var(--soleil);
+  }
+
+  .choix button:active:not(:disabled) {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 var(--indigo);
+  }
+
+  .choix button:disabled {
+    cursor: default;
+  }
+
+  .choix button.juste {
+    background: var(--menthe-pale);
+    border-color: var(--menthe);
+    box-shadow: 0 4px 0 var(--menthe);
+    color: var(--menthe);
+  }
+
+  .choix button.faux {
+    background: var(--corail-pale);
+    border-color: var(--corail);
+    box-shadow: 0 4px 0 var(--corail);
+    color: var(--corail);
+  }
+
+  .choix button.attenue {
+    color: var(--indigo-doux);
+    border-color: color-mix(in srgb, var(--lavande) 50%, var(--papier));
+    box-shadow: 0 4px 0 color-mix(in srgb, var(--lavande) 50%, var(--papier));
+  }
+
+  .choix button .rep {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 6px;
+  }
+
+  .choix-code {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .choix-code button {
+    text-align: left;
+    font-size: 17px;
+    padding: 12px 16px;
+  }
+
+  .pari .choix button code {
+    font-size: 1em;
+    background: none;
+    padding: 0;
+  }
+
+  .verdict {
+    margin-top: 20px;
+    padding: 16px 18px;
+    border-radius: 10px;
+    background: var(--papier);
+    font-size: 19px;
+  }
+
+  .verdict[hidden] {
+    display: none;
+  }
+
+  .verdict .titre-v {
+    font-family: var(--titres);
+    font-weight: 800;
+    font-size: 22px;
+    margin: 0 0 4px;
+  }
+
+  .verdict.ok .titre-v {
+    color: var(--menthe);
+  }
+
+  .verdict.ko .titre-v {
+    color: var(--corail);
+  }
+
+  .verdict .explication > :last-child {
+    margin-bottom: 0;
+  }
+
+  /* Sans JavaScript, la réponse et l'explication restent lisibles. */
+  @media (scripting: none) {
+    .verdict[hidden] {
+      display: block;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .verdict.revele {
+      animation: revele 0.35s cubic-bezier(0.2, 0.8, 0.3, 1.2);
+    }
+
+    @keyframes revele {
+      from {
+        transform: scale(0.95);
+        opacity: 0;
+      }
+
+      to {
+        transform: none;
+        opacity: 1;
+      }
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .choix button {
+      transition: none;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .pari {
+      padding: 20px 16px;
+      margin-inline: -4px;
+    }
+
+    .pari .q {
+      font-size: 21px;
+    }
+
+    .choix {
+      grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+      gap: 8px;
+    }
+
+    .choix button {
+      padding: 12px 6px;
+    }
+
+    .choix button .gros {
+      font-size: 32px;
+    }
+
+    .choix-longs,
+    .choix-code {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .choix-code button {
+      padding: 12px 14px;
+    }
+  }
+</style>

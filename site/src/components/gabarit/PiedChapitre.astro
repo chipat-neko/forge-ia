@@ -1,0 +1,102 @@
+---
+// Pied du chapitre : chapitres précédent et suivant dans le parcours.
+// Un chapitre qui n'a pas encore de fichier MDX s'affiche « à venir », sans lien.
+import { getCollection } from 'astro:content';
+import { hrefChapitre, voisins, type Chapitre } from '../../lib/parcours';
+import { typographier } from '../../lib/typo';
+
+interface Props {
+  numero: string;
+}
+
+const { numero } = Astro.props;
+const { precedent, suivant } = voisins(numero);
+const ecrits = new Set((await getCollection('chapitres')).map((entree) => entree.data.numero));
+
+// Titre court, comme dans la maquette : « Les données » plutôt que
+// « Les données : où les trouver, les nettoyer, les licences ».
+function titreCourt(chapitre: Chapitre): string {
+  return typographier(`${chapitre.numero} ${chapitre.titre.split(/ : | \(/)[0]}`);
+}
+
+const liens = [
+  { chapitre: precedent, sens: 'Précédent', classe: 'precedent' },
+  { chapitre: suivant, sens: 'Suivant', classe: 'suivant' },
+];
+---
+
+<footer class="bloc pied">
+  <nav class="texte voisins" aria-label="Chapitres voisins">
+    {
+      liens.map(({ chapitre, sens, classe }) =>
+        !chapitre ? (
+          <span class={`voisin ${classe}`} />
+        ) : ecrits.has(chapitre.numero) ? (
+          <a class={`voisin ${classe}`} href={hrefChapitre(chapitre.numero)}>
+            <span>{sens}</span> <strong>{titreCourt(chapitre)}</strong>
+          </a>
+        ) : (
+          <div class={`voisin ${classe} a-venir`}>
+            <span>{sens}, à venir</span> <strong>{titreCourt(chapitre)}</strong>
+          </div>
+        ),
+      )
+    }
+  </nav>
+</footer>
+
+<style is:global>
+  .pied {
+    padding-top: 64px;
+    padding-bottom: 80px;
+  }
+
+  .voisins {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    border-top: 2px solid var(--indigo);
+    padding-top: 20px;
+  }
+
+  .voisin {
+    display: block;
+    max-width: 48%;
+    text-decoration: none;
+  }
+
+  .voisin.suivant {
+    text-align: right;
+  }
+
+  .voisin span {
+    display: block;
+    font-family: var(--titres);
+    font-size: 15px;
+    color: var(--indigo-doux);
+  }
+
+  .voisin strong {
+    display: block;
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 1.2;
+  }
+
+  .voisin.a-venir strong {
+    color: var(--indigo-doux);
+  }
+
+  a.voisin:hover strong {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 5px;
+  }
+
+  @media (max-width: 720px) {
+    .voisin strong {
+      font-size: 19px;
+    }
+  }
+</style>

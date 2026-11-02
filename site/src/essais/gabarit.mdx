@@ -1,0 +1,70 @@
+---
+partie: 1
+numero: "1.3"
+titre: "Page d'essai du gabarit"
+chapeau: "Cette page sert aux parcours de test du gabarit de chapitre : deux étapes, deux paris, une zone verrouillée et un encadré. Elle n'est jamais publiée."
+programme: "2 étapes, 2 paris, environ 2 minutes."
+acquis:
+  - cle: a1
+    texte: "Un pari se joue une seule fois, puis la réponse s'explique."
+    ou: "à l'étape 1, au premier pari"
+  - cle: a2
+    texte: "Même un pari perdu fait gagner sa notion."
+    ou: "à l'étape 1, au second pari"
+  - cle: fusions
+    texte: "Une démo peut faire gagner une notion à elle seule."
+    ou: "à l'étape 2, dans la zone qui s'ouvre"
+---
+
+<Etape numero={1} titre="Parier avant de voir">
+
+Pourquoi parier avant de voir ? Parce qu'une réponse qu'on a devinée, même de travers, se retient mieux qu'une réponse qu'on a seulement lue. Chaque pari se joue une seule fois : les boutons se figent, et l'explication apparaît juste en dessous.
+
+<Pari
+  id="p1"
+  question="Quelle lettre ouvre la zone verrouillée de l'étape 2 ?"
+  precision="Un seul essai : la bonne réponse est la deuxième lettre de l'alphabet."
+  choix={[{ texte: 'A' }, { texte: 'B', juste: true }, { texte: 'C' }]}
+  acquis="a1"
+  ouvre="zone"
+>
+
+C'est B. Ce pari ouvre la zone de l'étape 2, qui restait floue et inerte tant qu'on n'avait pas parié.
+
+</Pari>
+
+<Pari
+  id="p2"
+  question="Entre X et Y, laquelle est la bonne réponse ?"
+  precision="C'est X : ce pari sert à essayer une réponse fausse."
+  choix={[{ texte: 'X', juste: true }, { texte: 'Y' }]}
+  acquis="a2"
+>
+
+C'est X. Même perdu, un pari fait gagner sa notion : l'explication l'enseigne, que la réponse soit juste ou non. Ce qui compte, c'est de s'être engagé avant de lire.
+
+</Pari>
+
+<Fragment slot="note">
+
+Une note de marge : sur grand écran, elle se tient à droite du texte ; sur un téléphone, elle passe dessous.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={2} titre="Ce qui s'ouvre">
+
+La zone ci-dessous reste floue tant que le premier pari n'est pas joué. Sans JavaScript, elle est lisible tout de suite : c'est le script qui pose le verrou, jamais le HTML.
+
+<Verrou nom="zone" message="Fais le premier pari de l'étape 1 : cette zone s'ouvre juste après.">
+  <button type="button" class="essai-dedans">Dedans</button>
+</Verrou>
+
+<EncadreLabo sources={[{ titre: 'Spécification de La Forge IA', url: 'https://github.com/chipat-neko/forge-ia', verifieLe: '2026-11-02' }]}>
+
+Un grand labo ferait la même chose à une autre échelle : des milliers de paris, des millions de lecteurs. Le principe reste exactement celui de cette page.
+
+</EncadreLabo>
+
+</Etape>

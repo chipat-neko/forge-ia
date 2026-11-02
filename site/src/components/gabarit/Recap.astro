@@ -1,0 +1,159 @@
+---
+// « Ce que tu sais maintenant » : la liste des acquis du chapitre. Le script
+// passe data-gagne à « oui » quand un acquis est gagné, tient le total à jour
+// et branche le bouton qui efface la progression du chapitre.
+import { typographier } from '../../lib/typo';
+
+interface Props {
+  acquis: { cle: string; texte: string; ou: string }[];
+}
+
+const { acquis } = Astro.props;
+---
+
+<section class="bloc recap" id="recap" aria-labelledby="titre-recap">
+  <div class="texte">
+    <h2 id="titre-recap">Ce que tu sais maintenant</h2>
+    <p class="total" data-total aria-live="polite">{acquis.length === 0 ? 'Rien à gagner dans ce chapitre.' : `0 sur ${acquis.length}`}</p>
+    <ol>
+      {
+        acquis.map((a) => (
+          <li data-acquis={a.cle} data-gagne="non">
+            <span class="coche" aria-hidden="true" />
+            <span>
+              {typographier(a.texte)} <span class="ou-gagner">à gagner {typographier(a.ou)}</span>
+            </span>
+          </li>
+        ))
+      }
+    </ol>
+    <button type="button" class="effacer" data-effacer hidden>Effacer ma progression pour ce chapitre</button>
+  </div>
+</section>
+
+<style is:global>
+  .recap {
+    padding-top: 72px;
+  }
+
+  .recap h2 {
+    font-weight: 700;
+    font-size: 31px;
+    line-height: 1.15;
+    letter-spacing: -0.012em;
+    margin: 0 0 4px;
+  }
+
+  .recap .total {
+    font-family: var(--titres);
+    font-weight: 500;
+    font-size: 17px;
+    color: var(--indigo-doux);
+    margin: 0 0 18px;
+  }
+
+  .recap ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .recap li {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    padding: 12px 0;
+    border-top: 1px solid var(--brume);
+    color: var(--indigo-doux);
+  }
+
+  .recap li:last-child {
+    border-bottom: 1px solid var(--brume);
+  }
+
+  .recap .coche {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--lavande);
+    display: grid;
+    place-items: center;
+    font-family: var(--titres);
+    font-weight: 800;
+    font-size: 15px;
+    line-height: 1;
+    color: var(--papier);
+    margin-top: 2px;
+  }
+
+  .recap li[data-gagne='oui'] {
+    color: var(--indigo);
+  }
+
+  .recap li[data-gagne='oui'] .coche {
+    background: var(--menthe);
+    border-color: var(--menthe);
+  }
+
+  .recap li[data-gagne='oui'] .coche::after {
+    content: '\2713';
+  }
+
+  .recap .ou-gagner {
+    display: block;
+    font-family: var(--titres);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--indigo-doux);
+  }
+
+  .recap li[data-gagne='oui'] .ou-gagner {
+    display: none;
+  }
+
+  .recap .effacer {
+    margin-top: 18px;
+    padding: 4px 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    font-family: var(--titres);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--indigo-doux);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+
+  .recap .effacer:hover {
+    color: var(--indigo);
+  }
+
+  .recap .effacer[hidden] {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .recap li.vient .coche {
+      animation: coche 0.45s cubic-bezier(0.2, 0.8, 0.3, 1.5);
+    }
+
+    @keyframes coche {
+      from {
+        transform: scale(0.2);
+      }
+
+      to {
+        transform: none;
+      }
+    }
+  }
+
+  @media (max-width: 720px) {
+    .recap h2 {
+      font-size: 26px;
+    }
+  }
+</style>

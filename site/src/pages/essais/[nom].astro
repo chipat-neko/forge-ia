@@ -1,0 +1,32 @@
+---
+// Pages d'essai des composants : /forge-ia/essais/<nom>/ pour chaque fichier
+// src/essais/<nom>.mdx. Elles ne sont construites qu'avec FORGE_ESSAIS=1
+// (npm run build:essais, lancé par Playwright) et jamais publiées.
+// Leur frontmatter est celui d'un chapitre, vérifié par le même schéma.
+import type { MDXInstance } from 'astro';
+import LayoutChapitre from '../../layouts/LayoutChapitre.astro';
+import Etape from '../../components/gabarit/Etape.astro';
+import Pari from '../../components/gabarit/Pari.astro';
+import Verrou from '../../components/gabarit/Verrou.astro';
+import EncadreLabo from '../../components/gabarit/EncadreLabo.astro';
+import { schemaChapitre } from '../../content.config';
+
+export async function getStaticPaths() {
+  if (import.meta.env.FORGE_ESSAIS !== '1') return [];
+  const modules = import.meta.glob<MDXInstance<Record<string, unknown>>>('../../essais/*.mdx');
+  return Promise.all(
+    Object.entries(modules).map(async ([chemin, charger]) => ({
+      params: { nom: chemin.replace(/^.*\/|\.mdx$/g, '') },
+      props: { module: await charger() },
+    })),
+  );
+}
+
+const { module } = Astro.props;
+const donnees = schemaChapitre.parse(module.frontmatter);
+const Contenu = module.Content;
+---
+
+<LayoutChapitre {...donnees}>
+  <Contenu components={{ Etape, Pari, Verrou, EncadreLabo }} />
+</LayoutChapitre>

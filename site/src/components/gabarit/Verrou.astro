@@ -1,0 +1,86 @@
+---
+// Une zone verrouillée jusqu'à un pari (celui dont `ouvre` vaut `nom`).
+// Le HTML ne verrouille rien : sans JavaScript, tout reste lisible et
+// utilisable. C'est le script du chapitre qui pose le verrou (flou, opacité
+// réduite, `inert`, message) et qui l'ôte quand le canal ouverture(nom) passe
+// à vrai.
+//
+// Le cadre autour de la zone sert à superposer le message à la zone floue :
+// le message est posé à côté de la zone, et non dedans, sinon `inert` le
+// cacherait aussi aux lecteurs d'écran.
+import { typographier } from '../../lib/typo';
+
+interface Props {
+  nom: string;
+  message: string;
+}
+
+const { nom, message } = Astro.props;
+---
+
+<div class="verrou-cadre">
+  <div data-verrou={nom} data-message={typographier(message)}><slot /></div>
+</div>
+
+<style is:global>
+  .verrou-cadre {
+    display: grid;
+    margin-top: 4px;
+  }
+
+  /* La zone et son message occupent la même case : le message passe dessus. */
+  .verrou-cadre > * {
+    grid-area: 1 / 1;
+    min-width: 0;
+  }
+
+  [data-verrou].verrouille {
+    filter: blur(3px);
+    opacity: 0.4;
+    user-select: none;
+  }
+
+  /* Le flou ne s'efface en douceur que quand le lecteur vient de parier. */
+  [data-verrou].anime {
+    transition:
+      filter 0.35s ease,
+      opacity 0.35s ease;
+  }
+
+  .verrou-msg {
+    z-index: 1;
+    align-self: start;
+    justify-self: center;
+    padding: 56px 16px 16px;
+  }
+
+  .verrou-msg p {
+    margin: 0;
+    max-width: 24rem;
+    text-align: center;
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 1.4;
+    background: var(--papier);
+    border: 2px solid var(--indigo);
+    border-radius: 12px;
+    padding: 14px 18px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-verrou].anime {
+      transition: none;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .verrou-msg {
+      padding: 32px 8px 8px;
+    }
+
+    .verrou-msg p {
+      font-size: 17px;
+    }
+  }
+</style>

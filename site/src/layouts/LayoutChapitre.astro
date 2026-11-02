@@ -1,0 +1,195 @@
+---
+// Gabarit d'un chapitre (direction « fusion énergie », maquette 10) :
+// barre du haut, ouverture, étapes, récapitulatif des acquis et pied.
+//
+// Mise en page : une seule grille pour tout l'article, avec une marge de
+// gauche pour les grands numéros, une colonne de lecture d'environ 75 signes (80 au plus)
+// et une marge de droite pour les notes. Les blocs (titre, étapes,
+// récapitulatif, pied) reprennent cette grille sur toute la largeur ; tout
+// autre contenu MDX posé entre les étapes se range dans la colonne de lecture.
+import Base from './Base.astro';
+import BarreHaut from '../components/gabarit/BarreHaut.astro';
+import Recap from '../components/gabarit/Recap.astro';
+import PiedChapitre from '../components/gabarit/PiedChapitre.astro';
+import type { DonneesChapitre } from '../content.config';
+import { typographier } from '../lib/typo';
+
+type Props = DonneesChapitre;
+
+const { numero, titre, chapeau, programme, acquis } = Astro.props;
+---
+
+<Base titre={typographier(`${numero} ${titre}`)} description={typographier(chapeau)}>
+  <BarreHaut numero={numero} acquis={acquis} />
+  <main>
+    <article class="chapitre" data-chapitre={numero}>
+      <div class="bloc titre">
+        <div class="texte">
+          <h1>{typographier(titre)}</h1>
+          <p class="chapeau">{typographier(chapeau)}</p>
+          <p class="programme">{typographier(programme)}</p>
+          {
+            Astro.slots.has('ouverture') && (
+              <div class="ouverture">
+                <slot name="ouverture" />
+              </div>
+            )
+          }
+        </div>
+      </div>
+      <slot />
+      <Recap acquis={acquis} />
+      <PiedChapitre numero={numero} />
+    </article>
+  </main>
+  <script>
+    import '../scripts/chapitre';
+  </script>
+</Base>
+
+<style is:global>
+  .chapitre {
+    --col-num: 56px;
+    --gout: clamp(28px, 3vw, 44px);
+    --col-texte: 29.5em; /* environ 75 signes par ligne, 80 au plus */
+    --col-note: clamp(190px, 18vw, 236px);
+    --marge: 24px;
+    /* Les suffixes -start et -end sont imposés par CSS : ce sont eux qui
+       créent les zones nommées « plein », « num », « texte » et « note ». */
+    --grille:
+      [plein-start] minmax(var(--marge), 1fr)
+      [num-start] var(--col-num) [num-end] var(--gout)
+      [texte-start] minmax(0, var(--col-texte)) [texte-end] var(--gout)
+      [note-start] var(--col-note) [note-end]
+      minmax(var(--marge), 1fr) [plein-end];
+
+    display: grid;
+    grid-template-columns: var(--grille);
+  }
+
+  .chapitre > * {
+    grid-column: texte;
+    min-width: 0;
+  }
+
+  .chapitre > .bloc {
+    grid-column: plein;
+    display: grid;
+    grid-template-columns: var(--grille);
+  }
+
+  .bloc > .num-etape {
+    grid-column: num;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .bloc > .texte {
+    grid-column: texte;
+    min-width: 0;
+  }
+
+  .bloc > .note {
+    grid-column: note;
+    grid-row: 1;
+    align-self: start;
+    min-width: 0;
+  }
+
+  /* Ouverture du chapitre. */
+  .titre {
+    padding-top: 64px;
+  }
+
+  .titre h1 {
+    font-weight: 800;
+    font-size: clamp(50px, 8vw, 84px);
+    line-height: 0.96;
+    letter-spacing: -0.03em;
+    margin: 0 0 26px;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+
+  .titre .chapeau {
+    font-size: 24px;
+    line-height: 1.48;
+    margin: 0 0 14px;
+  }
+
+  .titre .programme {
+    font-family: var(--titres);
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--indigo-doux);
+    margin: 0;
+  }
+
+  .ouverture {
+    margin: 40px 0 0;
+  }
+
+  /* Le texte courant. */
+  .chapitre {
+    line-height: 1.62;
+  }
+
+  /* Pas de mot seul (ni de « 2 ? ») sur la dernière ligne d'un titre ou d'une question. */
+  .chapitre :is(h1, h2, h3, .pari .q) {
+    text-wrap: balance;
+  }
+
+  .chapitre p {
+    text-wrap: pretty;
+  }
+
+  .chapitre :not(pre) > code {
+    font-size: 0.8em;
+    background: var(--brume-claire);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  /* En dessous de 900 px, les notes passent sous le texte. */
+  @media (max-width: 899.98px) {
+    .chapitre {
+      --grille:
+        [plein-start] minmax(var(--marge), 1fr)
+        [num-start] var(--col-num) [num-end] var(--gout)
+        [texte-start note-start] minmax(0, var(--col-texte)) [texte-end note-end]
+        minmax(var(--marge), 1fr) [plein-end];
+    }
+
+    .bloc > .note {
+      grid-row: auto;
+    }
+  }
+
+  /* Sur téléphone, une seule colonne : le numéro passe au-dessus du titre. */
+  @media (max-width: 720px) {
+    body {
+      font-size: 1.125rem;
+    }
+
+    .chapitre {
+      --marge: 20px;
+      --grille:
+        [plein-start] var(--marge)
+        [num-start texte-start note-start] minmax(0, 1fr) [num-end texte-end note-end]
+        var(--marge) [plein-end];
+    }
+
+    .bloc > .num-etape {
+      grid-row: auto;
+      justify-self: start;
+    }
+
+    .titre {
+      padding-top: 40px;
+    }
+
+    .titre .chapeau {
+      font-size: 20px;
+    }
+  }
+</style>

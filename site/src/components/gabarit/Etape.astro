@@ -1,0 +1,144 @@
+---
+// Une étape numérotée du chapitre : grand numéro dans la marge de gauche,
+// texte dans la colonne de lecture, note dans la marge de droite (sous le
+// texte en dessous de 900 px). Le script du chapitre la coche une fois faite.
+import { typographier } from '../../lib/typo';
+
+interface Props {
+  numero: number;
+  titre: string;
+}
+
+const { numero, titre } = Astro.props;
+const titreTypo = typographier(titre);
+const idTitre = `titre-etape-${numero}`;
+---
+
+<section class="bloc etape" id={`etape-${numero}`} data-titre={titreTypo} aria-labelledby={idTitre}>
+  <span class="num-etape" aria-hidden="true">{numero}</span>
+  <div class="texte">
+    <h2 id={idTitre}>{titreTypo}</h2>
+    <slot />
+  </div>
+  {
+    Astro.slots.has('note') && (
+      <aside class="note">
+        <slot name="note" />
+      </aside>
+    )
+  }
+</section>
+
+<style is:global>
+  .etape {
+    position: relative; /* repère de la fin d'étape, posé par le script */
+    padding-top: 60px;
+  }
+
+  .num-etape {
+    font-family: var(--titres);
+    font-weight: 800;
+    font-size: 44px;
+    line-height: 1;
+    color: var(--lavande); /* grand texte : 3,2 suffit */
+    font-variant-numeric: tabular-nums;
+    padding-top: 1px;
+    position: relative;
+  }
+
+  .etape.ici .num-etape,
+  .etape.faite .num-etape {
+    color: var(--indigo);
+  }
+
+  .etape.faite .num-etape::after {
+    content: '\2713';
+    position: absolute;
+    right: -19px;
+    top: -2px;
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--menthe);
+  }
+
+  .etape h2 {
+    font-weight: 700;
+    font-size: 31px;
+    line-height: 1.15;
+    letter-spacing: -0.012em;
+    margin: 0 0 14px;
+  }
+
+  .etape .texte > :last-child {
+    margin-bottom: 0;
+  }
+
+  /* Repère invisible de la fin de l'étape (étapes sans pari). */
+  .fin-etape {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+  }
+
+  /* Notes de marge. */
+  .note {
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--indigo-doux);
+    padding-top: 8px;
+  }
+
+  .note p {
+    margin: 0 0 0.8em;
+  }
+
+  .note > :last-child,
+  .note > :last-child > :last-child {
+    margin-bottom: 0;
+  }
+
+  .note strong {
+    font-family: var(--titres);
+    font-weight: 600;
+    color: var(--indigo);
+  }
+
+  .note ul {
+    list-style: none;
+    margin: 0.3em 0 0;
+    padding: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .note code {
+    font-size: 14px;
+    color: var(--indigo);
+  }
+
+  @media (max-width: 899.98px) {
+    .note {
+      margin-top: 16px;
+      padding: 0 0 0 1.2em;
+      font-size: 15px;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .num-etape {
+      font-size: 34px;
+      margin-bottom: 6px;
+    }
+
+    .etape.faite .num-etape::after {
+      top: 0;
+      right: -20px;
+    }
+
+    .etape h2 {
+      font-size: 26px;
+    }
+  }
+</style>
