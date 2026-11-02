@@ -5,7 +5,7 @@
 
 import type { Root } from 'mdast';
 import { visit } from 'unist-util-visit';
-import { typographier } from './typo';
+import { typographier } from './typo.ts';
 
 export function remarkTypoFr() {
   return (arbre: Root): void => {
