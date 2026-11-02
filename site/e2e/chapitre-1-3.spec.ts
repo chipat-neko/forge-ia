@@ -104,6 +104,9 @@ test('le défi se vérifie en direct, avec toutes les fusions', async ({ page })
   await saisie.fill('Les enfants apprennent à lire.'); // 30 caractères, 11 jetons
   await expect(defi).toHaveClass(/\breussi\b/);
   expect(await texteEtat()).toBe(`Défi réussi${FINE}: 30 caractères en 11 jetons.`);
+  // Le texte de l'atelier ne promet pas plus que ce tokenizer ne sait faire :
+  // un caractère absent du corpus reste « inconnu ».
+  await expect(page.locator('[data-atelier]')).toContainText('n’importe quel mot fait de caractères déjà vus');
   // Les 11 jetons sont ceux de la bande avec toutes les fusions…
   const nombre = page.locator('[data-test="fusions"]');
   await nombre.focus();
@@ -128,9 +131,14 @@ test('le code : régions « compter » et « choisir », tirées du fichier test
     // L'extrait se lit seul : aucun alias de type défini ailleurs dans le fichier.
     expect(attendu).not.toMatch(/\b(Mot|Paire)\b/);
   }
-  // L'explication du départage allume la ligne du min().
+  // L'explication du départage dit la règle du code (l'ordre des points de
+  // code, où « é » vient après « z »), pas l'ordre alphabétique, et allume
+  // la ligne du min().
   const choisir = page.locator('.code-explique').nth(1);
-  await choisir.locator('.explications li', { hasText: 'En cas d’égalité' }).hover();
+  const departage = choisir.locator('.explications li', { hasText: 'En cas d’égalité' });
+  await expect(departage).toContainText('dans l’ordre des numéros des caractères');
+  await expect(departage).toContainText('sauf que « é » passe après « z »');
+  await departage.hover();
   const allumees = await choisir.locator('[data-l].allumee').allTextContents();
   expect(allumees.join('\n')).toContain('return min(compte, key=lambda paire: (-compte[paire], paire))');
   await expect(page.getByRole('link', { name: 'Le projet complet' })).toHaveAttribute(
@@ -165,6 +173,9 @@ test('marge et labo : les autres vues du nombre de fusions le suivent', async ({
   await page.keyboard.press('Home');
   await expect(page.locator('[data-test="fusions"]')).toHaveAttribute('aria-valuenow', '0');
   await expect(page.locator('#etape-4 .note [data-dernieres-fusions]')).toContainText('aucune pour l’instant');
+  // Les chiffres du labo ne sont pas tous comptés de la même façon (jetons
+  // spéciaux compris ou non) : celui de Llama 3 est donné en ordre de grandeur.
+  await expect(labo).toContainText('environ 128 000 pour Llama 3');
   // Les sources du labo sont datées du jour de la vérification.
   expect(await labo.locator('.sources a').count()).toBeGreaterThanOrEqual(3);
   expect((await labo.locator('.sources').textContent()) ?? '').toContain('vérifiées le 2 novembre 2026');

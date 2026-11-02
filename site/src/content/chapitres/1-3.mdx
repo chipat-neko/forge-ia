@@ -136,7 +136,7 @@ Tape une phrase, puis augmente le nombre de fusions.
   avecDernieresFusions={false}
 >
 
-À zéro fusion, chaque lettre est un jeton. Plus tu ajoutes de fusions, plus les morceaux fréquents (« es », « ent », « le ») deviennent des jetons entiers, et plus la suite raccourcit. Les mots rares, eux, restent découpés : c'est ce qui permet d'écrire n'importe quel mot avec un vocabulaire limité.
+À zéro fusion, chaque lettre est un jeton. Plus tu ajoutes de fusions, plus les morceaux fréquents (« es », « ent », « le ») deviennent des jetons entiers, et plus la suite raccourcit. Les mots rares, eux, restent découpés : c'est ce qui permet d'écrire n'importe quel mot fait de caractères déjà vus, avec un vocabulaire limité.
 
 </AtelierTokenizer>
 
@@ -207,7 +207,7 @@ Une seconde fonction choisit, dans ce compte, la paire la plus fréquente. C'est
   <li data-lignes="1">La fonction reçoit le compte des paires et renvoie une seule paire, la gagnante.</li>
   <li data-lignes="8">`min` renvoie la paire dont la clé est la plus petite. Ici, la clé est un couple : d'abord `-compte[paire]`, puis la paire elle-même.</li>
   <li data-lignes="7-8">Le signe moins retourne l'ordre : une paire vue 12 fois a une clé qui commence par −12, plus petit que le −5 d'une paire vue 5 fois. `min` prend donc la plus fréquente.</li>
-  <li data-lignes="4-5, 8">En cas d'égalité, on prend la paire la plus petite dans l'ordre alphabétique : le résultat est ainsi toujours le même, sur ton PC comme dans cette page.</li>
+  <li data-lignes="4-5, 8">En cas d'égalité, on prend la paire la plus petite dans l'ordre des numéros des caractères (presque l'ordre alphabétique, sauf que « é » passe après « z ») : le résultat est ainsi toujours le même, sur ton PC comme dans cette page.</li>
 </CodeExplique>
 
 <Fragment slot="note">
@@ -233,7 +233,7 @@ Tu as fait tourner un vrai tokenizer, de l'apprentissage au découpage. Voici ce
   ]}
 >
 
-Les tokenizers des grands modèles comptent bien plus de morceaux que le tien : 128&#8239;000 pour Llama 3 de Meta, 151&#8239;669 pour Qwen3 d'Alibaba, 201&#8239;088 pour gpt-oss d'OpenAI et environ 262&#8239;000 pour Gemma 4 de Google. Ils sont appris sur beaucoup plus de texte, dans de nombreuses langues, et travaillent souvent sur les octets plutôt que sur les lettres : ils peuvent ainsi écrire n'importe quel caractère, emoji compris. Le principe reste exactement celui que tu viens de manipuler.
+Les tokenizers des grands modèles comptent bien plus de morceaux que le tien : environ 128&#8239;000 pour Llama 3 de Meta, 151&#8239;669 pour Qwen3 d'Alibaba, 201&#8239;088 pour gpt-oss d'OpenAI et environ 262&#8239;000 pour Gemma 4 de Google. Ils sont appris sur beaucoup plus de texte, dans de nombreuses langues, et travaillent souvent sur les octets plutôt que sur les lettres : ils peuvent ainsi écrire n'importe quel caractère, emoji compris. Le principe reste exactement celui que tu viens de manipuler.
 
 <EchelleVocabulaire client:load verrou="atelier" grandModele={{ nom: 'Gemma 4', taille: 262144 }} />
 
