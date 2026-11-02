@@ -145,12 +145,19 @@ const transformers = [
   }
 
   .code-explique pre code {
-    display: flex;
-    flex-direction: column;
+    display: block;
     min-width: max-content;
   }
 
+  /* Les retours à la ligne entre les lignes restent rendus (on n'utilise ni flex ni
+     grille) : copier le bloc garde donc les lignes vides. Chaque ligne est
+     un bloc en ligne aussi large que le code : une ligne allumée couvre
+     toute la largeur, même quand le code défile. */
   .code-explique [data-l] {
+    display: inline-block;
+    width: 100%;
+    box-sizing: border-box;
+    vertical-align: top;
     min-height: var(--hauteur-ligne); /* une ligne vide garde sa hauteur */
     padding: 0 22px 0 12px;
     transition: background-color 0.12s ease;
@@ -231,14 +238,19 @@ const transformers = [
     }
     const explications = [...figure.querySelectorAll<HTMLElement>('.explications > li[data-lignes]')];
 
-    // Les explications actives (survolées ou focalisées) : si deux le sont à
-    // la fois, leurs lignes restent toutes allumées.
-    const actives = new Set<HTMLElement>();
+    // Deux ensembles distincts : une explication est active si elle est
+    // survolée OU focalisée. Quitter la souris ne doit pas éteindre une
+    // explication qui garde le focus, et inversement. Si deux explications
+    // sont actives, leurs lignes restent toutes allumées.
+    const survolees = new Set<HTMLElement>();
+    const focalisees = new Set<HTMLElement>();
 
     function majLumiere(): void {
       const voulues = new Set<number>();
-      for (const li of actives) {
-        for (const n of lignesVisees(li.dataset.lignes!)) voulues.add(n);
+      for (const li of explications) {
+        const active = survolees.has(li) || focalisees.has(li);
+        li.classList.toggle('active', active);
+        if (active) for (const n of lignesVisees(li.dataset.lignes!)) voulues.add(n);
       }
       for (const [n, ligne] of lignes) ligne.classList.toggle('allumee', voulues.has(n));
     }
@@ -256,16 +268,15 @@ const transformers = [
       quelles.textContent = `${libelleDesLignes(li.dataset.lignes!)}. `;
       li.prepend(quelles);
 
-      const allumer = (on: boolean) => () => {
-        if (on) actives.add(li);
-        else actives.delete(li);
-        li.classList.toggle('active', on);
+      const suivre = (ensemble: Set<HTMLElement>, present: boolean) => () => {
+        if (present) ensemble.add(li);
+        else ensemble.delete(li);
         majLumiere();
       };
-      li.addEventListener('mouseenter', allumer(true));
-      li.addEventListener('mouseleave', allumer(false));
-      li.addEventListener('focus', allumer(true));
-      li.addEventListener('blur', allumer(false));
+      li.addEventListener('mouseenter', suivre(survolees, true));
+      li.addEventListener('mouseleave', suivre(survolees, false));
+      li.addEventListener('focus', suivre(focalisees, true));
+      li.addEventListener('blur', suivre(focalisees, false));
     }
   }
 

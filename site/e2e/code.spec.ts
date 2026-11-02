@@ -27,6 +27,19 @@ test('le code affiché est identique à la région du fichier testé', async ({ 
   expect(texte).not.toMatch(/# region|# fin/);
 });
 
+test('copier le code donne la région du fichier, lignes vides comprises', async ({ page }) => {
+  await page.goto(PAGE);
+  // Ce que le lecteur copie vers Colab : la sélection de tout le bloc, pas son textContent.
+  const copie = await page.locator('.code-explique pre').evaluate((pre) => {
+    const selection = getSelection()!;
+    selection.removeAllRanges();
+    selection.selectAllChildren(pre);
+    return selection.toString();
+  });
+  expect(attendu).toContain('\n\n'); // la région de test a bien une ligne vide
+  expect(copie).toBe(attendu);
+});
+
 test('chaque ligne porte son numéro, de 1 à N', async ({ page }) => {
   await page.goto(PAGE);
   const numeros = await page.$$eval('.code-explique pre [data-l]', (els) => els.map((e) => e.getAttribute('data-l')));
@@ -80,6 +93,45 @@ test('le focus clavier d’une explication allume ses lignes, le quitter les ét
   await expect(page.locator('.code-explique [data-l].allumee')).not.toHaveCount(0);
   await explications.nth(2).blur();
   await expect(page.locator('.code-explique [data-l].allumee')).toHaveCount(0);
+});
+
+test('focus, puis souris qui passe et repart : les lignes restent allumées tant que le focus y est', async ({ page }) => {
+  await page.goto(PAGE);
+  const explication = page.locator('.code-explique li').nth(1);
+  await explication.focus();
+  await expect(explication).toBeFocused();
+  const avant = await lignesAllumees(page);
+  expect(avant.length).toBeGreaterThan(0);
+  // La souris survole l'explication, puis s'en va : le focus, lui, reste.
+  await explication.hover();
+  await page.mouse.move(0, 0);
+  await expect(explication).toBeFocused();
+  expect(await lignesAllumees(page)).toEqual(avant);
+  // Le focus parti, la lumière s'éteint.
+  await explication.blur();
+  await expect(page.locator('.code-explique [data-l].allumee')).toHaveCount(0);
+});
+
+test('un clic donne le focus à l’explication : la souris qui repart n’éteint rien', async ({ page }) => {
+  await page.goto(PAGE);
+  const explication = page.locator('.code-explique li').nth(1);
+  await explication.click();
+  await expect(explication).toBeFocused();
+  const avant = await lignesAllumees(page);
+  expect(avant.length).toBeGreaterThan(0);
+  await page.mouse.move(0, 0);
+  await expect(explication).toBeFocused();
+  expect(await lignesAllumees(page)).toEqual(avant);
+});
+
+test('deux explications actives (focus sur l’une, souris sur l’autre) : les lignes des deux sont allumées', async ({ page }) => {
+  await page.goto(PAGE);
+  const explications = page.locator('.code-explique li');
+  await explications.nth(1).focus(); // lignes 4 à 5
+  await explications.nth(2).hover(); // ligne 7
+  await expect.poll(() => lignesAllumees(page)).toEqual([4, 5, 7]);
+  await page.mouse.move(0, 0);
+  await expect.poll(() => lignesAllumees(page)).toEqual([4, 5]);
 });
 
 test('on atteint les explications au clavier, avec un focus visible', async ({ page }) => {
