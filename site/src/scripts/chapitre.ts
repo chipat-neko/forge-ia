@@ -261,6 +261,12 @@ function demarrer(article: HTMLElement): void {
     boutonEffacer.addEventListener('click', () => {
       efface = true;
       effacer(numero);
+      // Recharger en haut de la page et sans ancre. Sinon le navigateur rend
+      // la position d'avant (près du récapitulatif) : la fin d'une étape sans
+      // pari serait déjà au-dessus du milieu de l'écran, et l'étape aussitôt
+      // notée comme faite dans la progression qu'on vient d'effacer.
+      history.replaceState(history.state, '', location.pathname + location.search);
+      window.scrollTo(0, 0);
       location.reload();
     });
   }

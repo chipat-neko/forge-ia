@@ -1,9 +1,63 @@
 // Parcours du gabarit de chapitre, sur la page d'essai /forge-ia/essais/gabarit/
 // (construite seulement avec FORGE_ESSAIS=1, voir src/essais/gabarit.mdx).
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { plusLongueLigne, verifierAxe, verifierSansDebordement } from './outils';
 
-// Les tests du brief de la tâche 5, tels quels.
+const PAGE = '/forge-ia/essais/gabarit/';
+const CLE_PROGRESSION = 'forge-ia:progression:v1';
+
+type FenetreMarquee = Window & { marque?: boolean };
+
+// Une marque posée sur window disparaît quand la page est vraiment rechargée
+// (nouveau document), et survit à un simple changement d'ancre.
+async function marquer(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    (window as FenetreMarquee).marque = true;
+  });
+}
+
+async function estNouveauDocument(page: Page): Promise<boolean> {
+  return page.evaluate(() => (window as FenetreMarquee).marque === undefined);
+}
+
+// Laisse passer les premières notifications des IntersectionObserver (elles
+// arrivent après le script, au rendu suivant) avant de vérifier une absence.
+async function laisserLaPageSeStabiliser(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>((fini) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(fini, 150))),
+      ),
+  );
+}
+
+async function jouerLesDeuxParis(page: Page): Promise<void> {
+  await page.locator('[data-pari="p1"] [data-juste]').click();
+  await page.locator('[data-pari="p2"] [data-juste]').click();
+}
+
+// Après les deux paris : tout est restauré, verrou ouvert, étape 1 faite.
+async function verifierRestauration(page: Page): Promise<void> {
+  await expect(page.locator('[data-pari="p1"] .verdict')).toContainText('Juste.');
+  await expect(page.locator('[data-pari="p2"] .verdict')).toContainText('Juste.');
+  await expect(page.locator('[data-pari="p1"] [data-juste]')).toBeDisabled();
+  const zone = page.locator('[data-verrou="zone"]');
+  await expect(zone).not.toHaveAttribute('inert', '');
+  await expect(zone).not.toHaveClass(/\bverrouille\b/);
+  await expect(page.locator('.verrou-msg')).toHaveCount(0);
+  const liens = page.locator('header nav a');
+  await expect(liens).toHaveCount(2);
+  await expect(liens.first()).toHaveClass(/\bfaite\b/);
+  await expect(liens.first()).toHaveAttribute('aria-label', /, faite$/);
+  await expect(liens.first()).not.toHaveAttribute('aria-current', 'step');
+  await expect(liens.nth(1)).toHaveAttribute('aria-current', 'step');
+  await expect(page.locator('#etape-1')).toHaveClass(/\bfaite\b/);
+  await expect(page.locator('#recap')).toContainText('2 sur 3');
+}
+
+// Les tests du brief de la tâche 5. Ceux du lien direct et d'« Effacer » ont
+// été renforcés à la relecture : le premier ne rechargeait pas vraiment la
+// page, le second ne vérifiait pas que la progression était vide.
 
 test('pari juste : verdict, boutons figés, acquis, verrou ouvert', async ({ page }) => {
   await page.goto('/forge-ia/essais/gabarit/');
@@ -23,19 +77,45 @@ test('pari faux : « Pas tout à fait. » et bonne réponse signalée', async ({
   await expect(page.locator('[data-pari="p2"] [data-juste]')).toContainText('bonne réponse');
 });
 
-test('rechargement et lien direct : pari et verrou restaurés', async ({ page }) => {
-  await page.goto('/forge-ia/essais/gabarit/');
-  await page.locator('[data-pari="p1"] [data-juste]').click();
-  await page.goto('/forge-ia/essais/gabarit/#etape-2');
-  await expect(page.locator('[data-pari="p1"] .verdict')).toContainText('Juste.');
-  await expect(page.locator('[data-verrou="zone"]')).not.toHaveAttribute('inert', '');
+test('lien direct vers #etape-2 : pari, verrou et barre restaurés', async ({ page }) => {
+  await page.goto(PAGE);
+  await jouerLesDeuxParis(page);
+  // Passer par about:blank : sinon aller à #etape-2 depuis la même adresse
+  // n'est qu'un changement d'ancre, sans nouveau document.
+  await page.goto('about:blank');
+  const reponse = await page.goto(PAGE + '#etape-2');
+  expect(reponse, 'une vraie navigation renvoie une réponse').not.toBeNull();
+  await verifierRestauration(page);
 });
 
-test('effacer la progression', async ({ page }) => {
-  await page.goto('/forge-ia/essais/gabarit/');
-  await page.locator('[data-pari="p1"] [data-juste]').click();
-  await page.getByRole('button', { name: 'Effacer ma progression pour ce chapitre' }).click();
+test('rechargement : pari, verrou et barre restaurés', async ({ page }) => {
+  await page.goto(PAGE);
+  await jouerLesDeuxParis(page);
+  await marquer(page);
+  await page.reload();
+  expect(await estNouveauDocument(page)).toBe(true);
+  await verifierRestauration(page);
+});
+
+test('effacer la progression : rien ne reste, même en effaçant depuis le bas de la page', async ({ page }) => {
+  await page.goto(PAGE);
+  await jouerLesDeuxParis(page);
+  // En bas de page, la fin de l'étape 2 (sans pari) est passée au-dessus du milieu.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(page.locator('#etape-2')).toHaveClass(/\bfaite\b/);
+  const bouton = page.getByRole('button', { name: 'Effacer ma progression pour ce chapitre' });
+  await bouton.scrollIntoViewIfNeeded();
+  await marquer(page);
+  await Promise.all([page.waitForEvent('load'), bouton.click()]);
+  expect(await estNouveauDocument(page)).toBe(true);
+  await laisserLaPageSeStabiliser(page);
   await expect(page.locator('[data-pari="p1"] [data-juste]')).toBeEnabled();
+  await expect(page.locator('[data-verrou="zone"]')).toHaveAttribute('inert', '');
+  await expect(page.locator('#recap')).toContainText('0 sur 3');
+  await expect(page.locator('section.etape.faite')).toHaveCount(0);
+  await expect(page.locator('header nav a.faite')).toHaveCount(0);
+  const brut = await page.evaluate((cle) => localStorage.getItem(cle), CLE_PROGRESSION);
+  expect(brut === null ? {} : JSON.parse(brut)).not.toHaveProperty(['1.3']);
 });
 
 test('sans JavaScript : tout est lisible, rien de verrouillé', async ({ browser }) => {
