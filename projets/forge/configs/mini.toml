@@ -1,0 +1,53 @@
+# Entraînement de la version courte de ton IA (preset « mini », environ 1 heure sur la carte graphique).
+#
+# Lancer, depuis projets/forge (après « . .\outils\env-forge.ps1 » à la racine du dépôt) :
+#   uv run --extra gpu python -m forge entrainer --config configs/mini.toml
+# Ctrl+C met en pause (le pas en cours se termine, puis tout est sauvegardé) ; pour reprendre :
+#   uv run --extra gpu python -m forge entrainer --config configs/mini.toml --reprendre
+#
+# Valeurs provisoires : jetons_total et micro_lot seront réglés en tâche 11, d'après la vitesse
+# mesurée en tâche 10, pour viser environ une heure.
+
+# Taille du modèle : « mini » = 23,2 millions de paramètres (dim 384, 6 couches, 6 têtes),
+# contexte de 512 jetons.
+preset = "mini"
+
+# Dossier des jetons, celui de « forge encoder --donnees court » (sous FORGE_DONNEES/jetons/).
+donnees = "court"
+
+# Jetons lus en tout : 200 millions, soit 1 526 pas de 131 072 jetons.
+jetons_total = 200_000_000
+
+# Jetons vus par pas d'optimisation (256 lignes de 512 jetons). Doit être un multiple de
+# micro_lot × 512.
+taille_lot_jetons = 131_072
+
+# Lignes de 512 jetons que la carte traite d'un coup : 16, donc 16 micro-lots accumulés par pas.
+# En cas de manque de mémoire, réduire à 8, 4, 2 ou 1, puis relancer avec --reprendre.
+micro_lot = 16
+
+# Taux d'apprentissage : montée de 0 à 0,001 pendant les 100 premiers pas, puis descente en
+# cosinus jusqu'à 0,0001 au dernier pas.
+taux_max = 1e-3
+echauffement = 100
+
+# Réglages d'AdamW et écrêtage des gradients (valeurs habituelles des modèles de langage).
+poids_decroissance = 0.1
+betas = [0.9, 0.95]
+ecretage = 1.0
+
+# Graine du hasard : poids de départ et ordre des données.
+graine = 1234
+
+# Perte de validation tous les 100 pas ; sauvegarde au moins tous les quarts d'heure.
+evaluation_tous_pas = 100
+sauvegarde_minutes = 15
+
+# « cuda » : la carte graphique (RTX 5070 Ti). « cpu » : le processeur, bien plus lent.
+appareil = "cuda"
+
+# « auto » : essayer torch.compile, et continuer sans s'il ne marche pas (triton manque sous Windows).
+compiler = "auto"
+
+# Dossier du journal et des sauvegardes (sous FORGE_DONNEES/entrainements/).
+sortie = "ton-ia-mini"

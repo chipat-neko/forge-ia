@@ -3,7 +3,7 @@
 Les commandes `donnees`, `tokenizer`, `encoder`, `mesurer`, `entrainer`,
 `evaluer` et `suivi` s'y branchent une par une, au fil des tâches du plan
 (chacune ajoute son sous-parseur dans `construire_parseur`). Déjà là :
-`donnees`, `tokenizer` et `encoder`.
+`donnees`, `tokenizer`, `encoder` et `entrainer`.
 """
 
 import argparse
@@ -244,6 +244,53 @@ def _ajouter_encoder(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_encoder)
 
 
+def _commande_entrainer(choix: argparse.Namespace) -> int:
+    """`forge entrainer` : entraîne ton IA ; Ctrl+C met en pause, `--reprendre` repart de là."""
+    # Imports ici : PyTorch est long à charger, les autres commandes n'en ont pas besoin.
+    from forge.chemins import PlaceInsuffisante
+    from forge.entrainement import CompilationImpossible, entrainer, lire_config
+    from forge.tokenizer.apprentissage import DonneesManquantes
+
+    reprise = f"python -m forge entrainer --config {choix.config} --reprendre"
+    try:
+        entrainer(lire_config(choix.config), reprendre=choix.reprendre)
+    except PlaceInsuffisante as erreur:
+        print(f"Erreur : {erreur}\nUne fois la place libérée : {reprise}", file=sys.stderr)
+        return 1
+    except (FileExistsError, FileNotFoundError, DonneesManquantes, CompilationImpossible, ValueError) as erreur:
+        print(f"Erreur : {erreur}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print(
+            "Arrêt immédiat par Ctrl+C : le pas en cours est perdu, la dernière sauvegarde "
+            f"complète reste bonne. Pour reprendre : {reprise}",
+            file=sys.stderr,
+        )
+        return 130
+    return 0
+
+
+def _ajouter_entrainer(sous_parseurs) -> None:
+    commande = _nouvelle_commande(
+        sous_parseurs,
+        "entrainer",
+        "Entraîne ton IA sur les jetons encodés. Ctrl+C met en pause (avec sauvegarde) ; "
+        "--reprendre repart de la dernière sauvegarde.",
+    )
+    commande.add_argument(
+        "--config",
+        required=True,
+        metavar="FICHIER",
+        help="fichier TOML de l'entraînement, par exemple configs/mini.toml",
+    )
+    commande.add_argument(
+        "--reprendre",
+        action="store_true",
+        help="reprendre à la dernière sauvegarde (après une pause, un plantage ou une coupure)",
+    )
+    commande.set_defaults(fonction=_commande_entrainer)
+
+
 def construire_parseur() -> argparse.ArgumentParser:
     """Construit le parseur principal et ses sous-commandes."""
     parseur = argparse.ArgumentParser(
@@ -271,6 +318,7 @@ def construire_parseur() -> argparse.ArgumentParser:
     _ajouter_donnees(sous_parseurs)
     _ajouter_tokenizer(sous_parseurs)
     _ajouter_encoder(sous_parseurs)
+    _ajouter_entrainer(sous_parseurs)
     return parseur
 
 

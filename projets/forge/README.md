@@ -89,6 +89,28 @@ Le résultat est dans `FORGE_DONNEES/jetons/echantillon/` (`train/`, `val/`, `in
 et `forge.donnees.jetons.lire_jetons(fichier)` ouvre un fichier sans le charger en mémoire.
 Détails dans `docs/donnees.md`.
 
+## Entraîner ton IA
+
+Un fichier TOML décrit l'entraînement (taille du modèle, jetons, lot, taux d'apprentissage,
+appareil) ; `configs/mini.toml` est commenté réglage par réglage :
+
+```powershell
+uv run --extra gpu python -m forge entrainer --config configs/mini.toml
+```
+
+Sur la carte graphique, les calculs se font en bf16, avec accumulation de gradient pour
+atteindre le lot voulu. Le journal (`journal.jsonl`, une ligne par pas) et les sauvegardes
+vont dans `FORGE_DONNEES/entrainements/<sortie>/`. On garde les deux dernières sauvegardes
+`etape-*.pt` et `meilleur.pt` (la plus petite perte de validation) ; chaque sauvegarde est
+écrite d'un coup, donc une coupure de courant n'en laisse jamais une à moitié.
+
+- **Pause :** Ctrl+C. Le pas en cours se termine, tout est sauvegardé, puis la commande de
+  reprise s'affiche.
+- **Reprise** (après une pause, un plantage ou une coupure) : la même commande avec
+  `--reprendre`. Le pas suivant est exactement celui qui aurait suivi sans la pause.
+- **Mémoire de la carte graphique insuffisante :** réduire `micro_lot` dans le TOML (les
+  jetons de chaque pas restent les mêmes), puis relancer avec `--reprendre`.
+
 ## Tester
 
 ```powershell
