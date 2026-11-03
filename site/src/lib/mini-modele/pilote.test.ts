@@ -8,8 +8,10 @@ import type { EtatInitialMini } from './apercu';
 import type { MessageDuTravailleur } from './boucle-travailleur';
 import {
   actionPrincipale,
+  estEnFrancais,
   etatDeDepart,
   MESSAGE_DIVERGENCE,
+  MESSAGE_ERREUR_IMPREVUE,
   MESSAGE_NOUVEAU_TAUX,
   MESSAGE_ONGLET,
   messageErreur,
@@ -269,7 +271,33 @@ describe('les messages du Worker', () => {
     expect(etat.phase).toBe('erreur');
     expect(etat.travailleur).toBe('arrete');
     expect(etat.message).toBe(`La démo s’est arrêtée${FINE}: mémoire pleine`);
-    expect(messageErreur('panne')).toBe(`La démo s’est arrêtée${FINE}: panne`);
+    expect(messageErreur('panne générale')).toBe(`La démo s’est arrêtée${FINE}: panne générale`);
+  });
+
+  it('erreur : un message natif en anglais laisse place à un message en français', () => {
+    for (const natif of [
+      "Cannot read properties of undefined (reading 'pas')",
+      'Invalid array length',
+      'Maximum call stack size exceeded',
+      'Failed to fetch dynamically imported module: http://127.0.0.1/x.js',
+      '',
+    ]) {
+      expect(estEnFrancais(natif), natif).toBe(false);
+      expect(messageErreur(natif)).toBe(MESSAGE_ERREUR_IMPREVUE);
+    }
+    expect(MESSAGE_ERREUR_IMPREVUE).toBe(
+      `La démo s’est arrêtée${FINE}: une erreur imprévue est survenue dans ton navigateur. Recharge la page pour la relancer.`,
+    );
+    // Les messages du moteur sont en français : ils passent tels quels.
+    for (const francais of [
+      'ReglagesMini : graine doit être un entier de 0 à 2^32 − 1 (reçu -1).',
+      'Préréglage inconnu : « x ». Choisis « complet » ou « avant-gout ».',
+      'cos n’est définie ici que de 0 à π (reçu 4).',
+      'perte_et_gradient : aucune séquence.',
+    ]) {
+      expect(estEnFrancais(francais), francais).toBe(true);
+      expect(messageErreur(francais)).toBe(`La démo s’est arrêtée${FINE}: ${francais}`);
+    }
   });
 });
 
@@ -400,7 +428,10 @@ describe('les aides d’affichage', () => {
     expect(actionPrincipale(enCours)).toEqual({ texte: 'Pause', evenement: { type: 'pause', raison: 'lecteur' } });
     expect(actionPrincipale(enPause)).toEqual({ texte: 'Reprendre', evenement: { type: 'lancer' } });
     expect(actionPrincipale(fini)).toEqual({ texte: 'Terminé', evenement: null });
-    expect(actionPrincipale(jouer(enCours, [etatW(1, 'diverge')]).etat).evenement).toBeNull();
+    // Après une explosion ou une erreur, le bouton ne dit pas « Terminé » : l'entraînement n'est pas allé au bout.
+    expect(actionPrincipale(jouer(enCours, [etatW(1, 'diverge')]).etat)).toEqual({ texte: 'Entraînement arrêté', evenement: null });
+    const enErreur = jouer(enCours, [{ type: 'message', message: { type: 'erreur', generation: 1, message: 'panne' } }]).etat;
+    expect(actionPrincipale(enErreur)).toEqual({ texte: 'Démo arrêtée', evenement: null });
   });
 
   it('prenomAffiche : une capitale au début et après chaque trait d’union ; un prénom vide se voit', () => {

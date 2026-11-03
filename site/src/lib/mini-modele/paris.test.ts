@@ -135,4 +135,28 @@ describe('le pari « taux trop grand »', { timeout: 60_000 }, () => {
     expect(texte).toContain(formaterPerte(r.normal));
     expect(texte).not.toMatch(/explosé/);
   });
+
+  it('sans explosion, sous l’erreur de départ : le grand taux apprend aussi, mais bien plus lentement', () => {
+    const depart = etatInitial('complet').perteValidation;
+    const r: ResultatTauxTropGrand = { ...resultatTauxTropGrand(), grand: depart - 0.5, explosionAuPas: null, verdict: 'moins-bien' };
+    const texte = explicationTauxTropGrand(r);
+    expect(texte).toContain(formaterPerte(depart));
+    expect(texte).toContain('bien plus lentement');
+    expect(texte).not.toMatch(/au lieu de s’en approcher|n’apprend plus/);
+    // Le vrai résultat du moteur est dans ce cas : 0,3 se rapproche des bonnes valeurs, lentement.
+    const vrai = resultatTauxTropGrand();
+    if (vrai.explosionAuPas === null && vrai.grand < depart) {
+      expect(explicationTauxTropGrand()).toContain('bien plus lentement');
+    }
+  });
+
+  it('sans explosion, au-dessus de l’erreur de départ : le grand taux n’apprend plus rien', () => {
+    const depart = etatInitial('complet').perteValidation;
+    const r: ResultatTauxTropGrand = { ...resultatTauxTropGrand(), grand: depart + 0.1, explosionAuPas: null, verdict: 'moins-bien' };
+    const texte = explicationTauxTropGrand(r);
+    expect(texte).toContain(formaterPerte(depart + 0.1));
+    expect(texte).toContain('n’apprend plus rien');
+    expect(texte).not.toMatch(/lentement/);
+    expect(texte).not.toMatch(/ [:;?!»]|« /);
+  });
 });

@@ -1,0 +1,38 @@
+---
+// La démo du mini-modèle qui apprend, prête à poser dans un MDX :
+//   <DemoMiniModele verrou="mini" acquis="entraine" />
+//   <DemoMiniModele preset="avant-gout" nom="avant-gout" />
+//
+// Elle calcule ici, au moment de la construction, l'état du pas 0 (l'erreur
+// de départ et les prénoms inventés avant tout entraînement) : sans
+// JavaScript, la page les montre déjà. Le moteur et la liste des prénoms ne
+// servent qu'ici et dans le Worker ; l'îlot ne reçoit que cet état, des
+// nombres et des textes.
+//
+// Elle cherche aussi si le chapitre 1.5 est paru, pour le lien de
+// l'avant-goût : un îlot Svelte ne peut pas lire la collection des chapitres.
+import MiniModele from './MiniModele.svelte';
+import { etatInitial } from '../../lib/mini-modele/apercu';
+import type { NomPreset } from '../../lib/mini-modele/reglages';
+import { chapitresParus } from '../../lib/chapitres-parus';
+import { hrefChapitre } from '../../lib/parcours';
+
+interface Props {
+  /** « complet » par défaut : 3 000 pas, avec le réglage du taux. */
+  preset?: NomPreset;
+  /** Le nom de l'instance (data-mini, canal du taux) ; « mini » par défaut. */
+  nom?: string;
+  /** Le verrou qui désactive le réglage du taux tant que son pari n'est pas fait. */
+  verrou?: string;
+  /** La clé de l'acquis gagné à la fin du premier entraînement. */
+  acquis?: string;
+}
+
+const { preset = 'complet', nom = 'mini', verrou, acquis } = Astro.props;
+
+const parus = await chapitresParus();
+const lien15 = parus.has('1.5') ? hrefChapitre('1.5') : null;
+const initial = etatInitial(preset);
+---
+
+<MiniModele client:load preset={preset} nom={nom} verrou={verrou} acquis={acquis} initial={initial} lien15={lien15} />

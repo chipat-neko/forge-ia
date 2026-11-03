@@ -1,0 +1,77 @@
+---
+partie: 1
+numero: "1.5"
+titre: "Page d'essai du mini-modèle"
+chapeau: "Cette page sert aux parcours de test de la démo du mini-modèle : un tout petit transformer apprend à inventer des prénoms, dans ton navigateur. Elle n'est jamais publiée."
+programme: "3 étapes, 2 paris, environ 5 minutes."
+acquis:
+  - cle: depart
+    texte: "Avant tout entraînement, un modèle devine au hasard : son erreur est celle du hasard."
+    ou: "à l'étape 1, au pari"
+  - cle: entraine
+    texte: "L'entraînement fait baisser l'erreur, vite au début, puis de plus en plus lentement."
+    ou: "à l'étape 2, à la fin d'un entraînement"
+  - cle: taux
+    texte: "Un taux d'apprentissage trop grand fait apprendre moins bien, ou plus du tout."
+    ou: "à l'étape 2, au pari sur le taux"
+---
+
+import DemoMiniModele from '../components/demos/DemoMiniModele.astro';
+import { nombre } from '../lib/nombres';
+import { etatInitial } from '../lib/mini-modele/apercu';
+import { PRESETS_MINI } from '../lib/mini-modele/reglages';
+import {
+  choixErreurDeDepart,
+  choixTauxTropGrand,
+  explicationTauxTropGrand,
+  formaterPerte,
+  questionTauxTropGrand,
+} from '../lib/mini-modele/paris';
+
+export const depart = etatInitial('complet');
+export const complet = PRESETS_MINI.complet;
+
+<Etape numero={1} titre="Avant de lancer">
+
+Le mini-modèle lit un prénom caractère par caractère, et devine à chaque fois le caractère suivant. Il en connaît {depart.tailleVocabulaire} : les lettres, les accents, le trait d'union, et un bord qui marque le début et la fin d'un prénom. Son erreur dit à quel point il se trompe : plus elle est basse, mieux il devine.
+
+<Pari
+  id="depart"
+  question="Avant tout entraînement, quelle erreur le modèle fera-t-il sur des prénoms qu'il n'a jamais vus ?"
+  precision="L'erreur vaut 0 quand il devine toujours le bon caractère, et grandit à mesure qu'il se trompe."
+  choix={choixErreurDeDepart()}
+  acquis="depart"
+  ouvre="mini"
+>
+
+Avant tout entraînement, ses {nombre(depart.nbParametres)} poids sont tirés au hasard : il donne à peu près la même chance à chacun des {depart.tailleVocabulaire} caractères. Son erreur est donc proche de celle du pur hasard, ln {depart.tailleVocabulaire} = {formaterPerte(depart.perteHasard)}. Mesurée sur {nombre(complet.nbValidation)} prénoms qu'il ne voit jamais pendant l'entraînement, elle vaut {formaterPerte(depart.perteValidation)} : c'est le premier point de la courbe, juste en dessous.
+
+</Pari>
+
+</Etape>
+
+<Etape numero={2} titre="L'entraînement">
+
+À chaque pas, le modèle lit {complet.lot} prénoms, mesure son erreur et corrige un peu chacun de ses poids. Lance-le, et regarde la courbe descendre : les prénoms inventés changent tous les {complet.validationTous} pas.
+
+<Verrou nom="mini" message="Fais le pari juste au-dessus : l'entraînement s'ouvre juste après.">
+  <DemoMiniModele verrou="mini" acquis="entraine" />
+</Verrou>
+
+<Pari id="taux" question={questionTauxTropGrand()} choix={choixTauxTropGrand()} acquis="taux">
+
+<p>{explicationTauxTropGrand()}</p>
+
+Essaie-le dans la démo : règle le taux sur 0,3, relance, et compare avec la courbe d'avant, en pointillé.
+
+</Pari>
+
+</Etape>
+
+<Etape numero={3} titre="L'avant-goût du chapitre 0.5">
+
+Au chapitre 0.5, la même démo sert d'avant-goût : {nombre(PRESETS_MINI['avant-gout'].pasTotal)} pas, toujours vite, sans rien à régler.
+
+<DemoMiniModele preset="avant-gout" nom="avant-gout" />
+
+</Etape>

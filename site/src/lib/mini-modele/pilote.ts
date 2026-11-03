@@ -36,9 +36,28 @@ export function messageTermine(pasTotal: number, dureeMs: number): string {
   return `Terminé${FINE}: ${nombre(pasTotal)} pas en ${nombre(Math.round(dureeMs / 1000))} s.`;
 }
 
-/** « La démo s'est arrêtée : … », avec le message du moteur. */
+/** Le message d'une erreur dont le texte n'est pas en français (une erreur native du navigateur). */
+export const MESSAGE_ERREUR_IMPREVUE =
+  `La démo s’est arrêtée${FINE}: une erreur imprévue est survenue dans ton navigateur. Recharge la page pour la relancer.`;
+
+/**
+ * Vrai si le message d'erreur est écrit en français, comme tous ceux du
+ * moteur : il a une lettre accentuée, une apostrophe courbe, des guillemets
+ * « », ou une espace devant « : ; ? ! ». Les erreurs natives du navigateur
+ * (« Cannot read properties of undefined », « Invalid array length ») n'en
+ * ont pas.
+ */
+export function estEnFrancais(message: string): boolean {
+  return /[àâäçéèêëîïôöùûüÿœæ’«»]|[ \u00A0\u202F][:;?!]/i.test(message);
+}
+
+/**
+ * « La démo s'est arrêtée : … », avec le message du moteur. Un message qui
+ * n'est pas en français (une erreur native, en anglais) laisse place à
+ * MESSAGE_ERREUR_IMPREVUE : la page ne montre que du français.
+ */
 export function messageErreur(message: string): string {
-  return `La démo s’est arrêtée${FINE}: ${message}`;
+  return estEnFrancais(message) ? `La démo s’est arrêtée${FINE}: ${message}` : MESSAGE_ERREUR_IMPREVUE;
 }
 
 /** Où en est la démo. « pret » : l'essai n'a pas encore été lancé. */
@@ -251,7 +270,8 @@ export function reduire(etat: EtatDemo, ev: Evenement, preset: NomPreset): Reduc
 /**
  * Le bouton principal de la démo : son texte, et l'événement d'un clic
  * (null : le bouton est désactivé). Après un changement de taux, la démo est
- * prête : le bouton dit « Lancer l'entraînement ».
+ * prête : le bouton dit « Lancer l'entraînement ». Après une explosion ou une
+ * erreur, il ne dit pas « Terminé » : l'entraînement n'est pas allé au bout.
  */
 export function actionPrincipale(etat: EtatDemo): { texte: string; evenement: Evenement | null } {
   switch (etat.phase) {
@@ -261,8 +281,12 @@ export function actionPrincipale(etat: EtatDemo): { texte: string; evenement: Ev
       return { texte: 'Pause', evenement: { type: 'pause', raison: 'lecteur' } };
     case 'en-pause':
       return { texte: 'Reprendre', evenement: { type: 'lancer' } };
-    default:
+    case 'termine':
       return { texte: 'Terminé', evenement: null };
+    case 'diverge':
+      return { texte: 'Entraînement arrêté', evenement: null };
+    case 'erreur':
+      return { texte: 'Démo arrêtée', evenement: null };
   }
 }
 

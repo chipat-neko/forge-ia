@@ -5,7 +5,7 @@
 // est en tête de la page.
 import { readFileSync } from 'node:fs';
 import { test, expect, type Page } from '@playwright/test';
-import { plusLongueLigne, verifierAxe, verifierSansDebordement } from './outils';
+import { attendreHydratation, plusLongueLigne, verifierAxe, verifierSansDebordement } from './outils';
 
 const PAGE = '/forge-ia/essais/gabarit/';
 const PHRASE = 'Les forgerons découpent le texte en jetons.';
@@ -40,12 +40,6 @@ function reference(texte: string, k: number): { morceaux: string[]; numeros: str
 function ligneFusion(n: number): string {
   const [a, b] = attendus.fusions[n - 1];
   return `fusion ${n}${FINE}: ${visible(a)} + ${visible(b)} → ${visible(a + b)}`;
-}
-
-// L'atelier est un îlot Svelte : tant qu'il n'est pas hydraté, la saisie et
-// le clavier ne font rien. Astro retire l'attribut ssr une fois l'îlot hydraté.
-async function attendreHydratation(page: Page): Promise<void> {
-  await expect(page.locator('astro-island[ssr]')).toHaveCount(0);
 }
 
 async function ouvrirAtelier(page: Page): Promise<void> {

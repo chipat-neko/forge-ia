@@ -12,6 +12,11 @@
   // Tant que le verrou nommé n'est pas ouvert (le pari dont `ouvre` vaut ce
   // nom), le nombre est désactivé : hors de la tabulation, aria-disabled, et
   // sourd au clavier comme au glissé.
+  //
+  // La valeur du canal est un nombre, mais ce qui s'affiche peut être un autre
+  // texte (prop `texte`) : le mini-modèle règle l'indice d'un taux (0 à 5) et
+  // montre le taux lui-même (« 0,01 »). Ce texte est aussi celui que lisent
+  // les lecteurs d'écran (aria-valuetext).
   import { untrack } from 'svelte';
   import { readable } from 'svelte/store';
   import { canal as canalNomme, ouverture } from '../../lib/canal';
@@ -31,9 +36,11 @@
     verrou?: string;
     /** Valeur de data-test, pour les parcours de test. */
     testId?: string;
+    /** Le texte affiché pour une valeur (et lu par aria-valuetext) ; la valeur elle-même par défaut. */
+    texte?: (v: number) => string;
   }
 
-  const { canal: nomDuCanal, min, max, initiale, etiquette, pas = 1, verrou, testId }: Props = $props();
+  const { canal: nomDuCanal, min, max, initiale, etiquette, pas = 1, verrou, testId, texte }: Props = $props();
 
   const PIXELS_PAR_UNITE = 6;
   const SAUT_PAGE = 10;
@@ -49,8 +56,19 @@
   const actif = $derived($ouvert);
 
   // Assez large pour le plus long nombre possible : la phrase ne bouge pas
-  // pendant qu'on fait glisser le nombre de 9 à 10, ou de 99 à 100.
-  const chiffres = $derived(Math.max(String(min).length, String(max).length));
+  // pendant qu'on fait glisser le nombre de 9 à 10, ou de 99 à 100. Avec un
+  // texte, c'est le plus long des textes de min à max (de 1 en 1, si l'écart
+  // ne dépasse pas 200 ; au-delà, celui de min ou celui de max).
+  const ECART_MESURE_MAX = 200;
+  const chiffres = $derived.by(() => {
+    if (texte === undefined) return Math.max(String(min).length, String(max).length);
+    let longueur = Math.max(texte(min).length, texte(max).length);
+    if (max - min <= ECART_MESURE_MAX) {
+      for (let v = min; v < max; v += 1) longueur = Math.max(longueur, texte(v).length);
+    }
+    return longueur;
+  });
+  const affiche = $derived(texte === undefined ? String($valeur) : texte($valeur));
 
   let element: HTMLSpanElement | undefined = $state();
   let glisse = $state(false);
@@ -117,6 +135,7 @@
   aria-valuemin={min}
   aria-valuemax={max}
   aria-valuenow={$valeur}
+  aria-valuetext={texte === undefined ? undefined : affiche}
   aria-disabled={actif ? undefined : 'true'}
   data-test={testId}
   onkeydown={auClavier}
@@ -124,7 +143,7 @@
   onpointermove={bouge}
   onpointerup={lache}
   onpointercancel={lache}
-  onlostpointercapture={lache}>{$valeur}</span
+  onlostpointercapture={lache}>{affiche}</span
 >
 
 <style>

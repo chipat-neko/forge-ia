@@ -174,7 +174,9 @@ export function questionTauxTropGrand(): string {
 /**
  * L'explication du pari sur le taux, avec les nombres calculés. Si l'erreur
  * du grand taux a explosé, elle dit au pas où, sans citer d'erreur (ni NaN ni
- * Infinity) pour ce taux.
+ * Infinity) pour ce taux. Sinon, elle compare les deux erreurs au pas 200, et
+ * dit si le grand taux apprend quand même (son erreur passe sous celle du
+ * départ : il apprend, bien plus lentement) ou plus du tout.
  */
 export function explicationTauxTropGrand(r: ResultatTauxTropGrand = resultatTauxTropGrand()): string {
   verifierVerdict(r);
@@ -190,9 +192,19 @@ export function explicationTauxTropGrand(r: ResultatTauxTropGrand = resultatTaux
       `et il n’apprend plus rien. ${normal}`
     );
   }
-  return (
+  const comparaison =
     `Au pas ${nombre(PAS_COMPARES)}, l’erreur de validation vaut ${formaterPerte(r.grand)} au taux de ` +
-    `${texteTaux(r.tauxGrand)}, contre ${formaterPerte(r.normal)} au taux de ${texteTaux(r.tauxNormal)}${FINE}: ` +
-    'avec des corrections trop grandes, le modèle saute par-dessus les bonnes valeurs au lieu de s’en approcher.'
+    `${texteTaux(r.tauxGrand)}, contre ${formaterPerte(r.normal)} au taux de ${texteTaux(r.tauxNormal)}.`;
+  if (r.grand < depart) {
+    // Le grand taux apprend aussi (son erreur passe sous celle du départ), seulement bien plus lentement.
+    return (
+      `${comparaison} Les deux partent de ${formaterPerte(depart)}${FINE}: le grand taux apprend aussi, ` +
+      'mais bien plus lentement, car ses corrections trop grandes font sauter le modèle par-dessus ' +
+      'les bonnes valeurs au lieu de s’y poser.'
+    );
+  }
+  return (
+    `${comparaison} Au départ, elle valait ${formaterPerte(depart)}${FINE}: avec des corrections trop grandes, ` +
+    'le modèle saute par-dessus les bonnes valeurs sans s’en approcher, et il n’apprend plus rien.'
   );
 }

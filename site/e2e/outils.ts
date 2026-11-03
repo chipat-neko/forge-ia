@@ -1,5 +1,5 @@
 // Aides communes aux parcours de test.
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 /** Échoue sur toute violation des règles WCAG 2 de niveaux A et AA. */
@@ -65,6 +65,30 @@ export async function plusLongueLigne(page: Page): Promise<{ longueur: number; l
     }
     return { longueur: plusLongue.length, ligne: plusLongue };
   });
+}
+
+/**
+ * Attend que tous les îlots Svelte de la page soient hydratés : tant qu'ils
+ * ne le sont pas, la saisie, les boutons et le clavier ne font rien. Astro
+ * retire l'attribut ssr d'un îlot une fois hydraté.
+ */
+export async function attendreHydratation(page: Page): Promise<void> {
+  await expect(page.locator('astro-island[ssr]')).toHaveCount(0);
+}
+
+/**
+ * Vérifie la typographie française du texte affiché d'une zone (innerText) :
+ * aucune espace ordinaire ni insécable (U+0020, U+00A0) devant ; : ! ? % »,
+ * aucune après «, et aucun nombre dont les milliers sont séparés par une
+ * espace ordinaire (« 3 000 » doit s'écrire avec une espace fine, U+202F).
+ * Les deux premiers motifs sont ceux du parcours du chapitre 1.3.
+ */
+export async function verifierTypographie(zone: Locator): Promise<void> {
+  const texte = await zone.innerText();
+  expect(texte.length, 'la zone à vérifier est vide').toBeGreaterThan(0);
+  expect(texte.match(/.{0,30}[ \u00A0][;:!?%].{0,10}/g) ?? []).toEqual([]);
+  expect(texte.match(/.{0,10}«[ \u00A0].{0,30}|.{0,30}[ \u00A0]».{0,10}/g) ?? []).toEqual([]);
+  expect(texte.match(/.{0,20}\d \d{3}\b.{0,20}/g) ?? []).toEqual([]);
 }
 
 /** Vérifie que la page ne déborde pas en largeur : pas de défilement horizontal. */
