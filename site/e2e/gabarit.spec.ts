@@ -118,10 +118,10 @@ test('effacer la progression : rien ne reste, même en effaçant depuis le bas d
   expect(brut === null ? {} : JSON.parse(brut)).not.toHaveProperty(['1.3']);
 });
 
-test('sans JavaScript : tout est lisible, rien de verrouillé', async ({ browser }) => {
-  const ctx = await browser.newContext({ javaScriptEnabled: false });
+test('sans JavaScript : tout est lisible, rien de verrouillé', async ({ browser, baseURL }) => {
+  const ctx = await browser.newContext({ javaScriptEnabled: false, baseURL });
   const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:8531/forge-ia/essais/gabarit/');
+  await page.goto(PAGE);
   await expect(page.locator('[data-verrou="zone"]')).not.toHaveAttribute('inert', '');
   await expect(page.getByText('Dedans')).toBeVisible();
   await ctx.close();
@@ -233,10 +233,10 @@ test('progression obsolète : pari inconnu et choix hors limites ignorés', asyn
   await expect(page.locator('[data-pari="p2"] .verdict')).toContainText('Juste.');
 });
 
-test('sans JavaScript : la réponse et l’explication des paris sont lisibles', async ({ browser }) => {
-  const ctx = await browser.newContext({ javaScriptEnabled: false });
+test('sans JavaScript : la réponse et l’explication des paris sont lisibles', async ({ browser, baseURL }) => {
+  const ctx = await browser.newContext({ javaScriptEnabled: false, baseURL });
   const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:8531/forge-ia/essais/gabarit/');
+  await page.goto(PAGE);
   const verdict = page.locator('[data-pari="p1"] .verdict');
   await expect(verdict).toBeVisible();
   await expect(verdict).toContainText('Réponse');

@@ -200,10 +200,10 @@ test('les liens du projet sont du texte simple : ni flèche, ni point médian', 
   expect(textes.join('')).not.toMatch(/[→·•]/);
 });
 
-test('sans JavaScript : le code et les explications restent lisibles', async ({ browser }) => {
-  const contexte = await browser.newContext({ javaScriptEnabled: false });
+test('sans JavaScript : le code et les explications restent lisibles', async ({ browser, baseURL }) => {
+  const contexte = await browser.newContext({ javaScriptEnabled: false, baseURL });
   const page = await contexte.newPage();
-  await page.goto(`http://127.0.0.1:8531${PAGE}`);
+  await page.goto(PAGE);
   await expect(page.locator('.code-explique pre')).toHaveText(attendu);
   await expect(page.locator('.code-explique li').first()).toBeVisible();
   await contexte.close();

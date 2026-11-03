@@ -8,7 +8,9 @@ import { defineConfig } from '@playwright/test';
 // Pour rejouer des parcours contre un site déjà en ligne, on fixe
 // PLAYWRIGHT_BASE_URL (par exemple https://chipat-neko.github.io) : Playwright
 // ne construit ni ne sert alors rien. Seuls les parcours qui ne lisent que la
-// page s'y prêtent ; ceux qui visent 127.0.0.1:8531 ou lisent dist/ non.
+// page s'y prêtent ; ceux qui lisent dist/ ou visent les pages d'essai non.
+// Les parcours « sans JavaScript », qui ouvrent leur propre contexte, lui
+// passent la baseURL de cette configuration : ils suivent la même adresse.
 const adressePublique = process.env.PLAYWRIGHT_BASE_URL;
 
 export default defineConfig({

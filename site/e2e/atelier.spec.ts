@@ -319,10 +319,10 @@ test('le mouvement suit le lecteur : rien sans action, rien si on le demande', a
   }
 });
 
-test('sans JavaScript : l’atelier reste lisible, découpé au départ', async ({ browser }) => {
-  const ctx = await browser.newContext({ javaScriptEnabled: false });
+test('sans JavaScript : l’atelier reste lisible, découpé au départ', async ({ browser, baseURL }) => {
+  const ctx = await browser.newContext({ javaScriptEnabled: false, baseURL });
   const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:8531' + PAGE);
+  await page.goto(PAGE);
   await expect(saisie(page)).toHaveValue(PHRASE_INITIALE);
   // Rendu au départ, à 20 fusions : entre les 18 jetons de 165 fusions et les 42 de 0 fusion.
   const n = await jetons(page).count();
@@ -334,11 +334,11 @@ test('sans JavaScript : l’atelier reste lisible, découpé au départ', async 
   await ctx.close();
 });
 
-test('phrase découpée d’ouverture : calculée à la construction, fidèle au Python', async ({ browser }) => {
+test('phrase découpée d’ouverture : calculée à la construction, fidèle au Python', async ({ browser, baseURL }) => {
   // Sans JavaScript : la preuve que le découpage est fait à la construction.
-  const ctx = await browser.newContext({ javaScriptEnabled: false });
+  const ctx = await browser.newContext({ javaScriptEnabled: false, baseURL });
   const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:8531' + PAGE);
+  await page.goto(PAGE);
   const { morceaux, numeros } = reference(PHRASE_INITIALE, NB_FUSIONS);
   const figure = page.locator('figure.phrase-decoupee');
   await expect(figure.locator('[data-jeton] .morceau')).toHaveText(morceaux);

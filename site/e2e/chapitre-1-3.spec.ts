@@ -279,10 +279,10 @@ test('typographie française dans tout le texte (hors code)', async ({ page }) =
   expect(textes).not.toMatch(/[\u201C\u201D]/);
 });
 
-test('sans JavaScript : tout le texte reste lisible', async ({ browser }) => {
-  const ctx = await browser.newContext({ javaScriptEnabled: false });
+test('sans JavaScript : tout le texte reste lisible', async ({ browser, baseURL }) => {
+  const ctx = await browser.newContext({ javaScriptEnabled: false, baseURL });
   const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:8531' + PAGE);
+  await page.goto(PAGE);
   // Pas de verrou : l'atelier et son défi sont là, nets.
   await expect(page.locator('[data-verrou="atelier"]')).not.toHaveAttribute('inert', '');
   await expect(page.locator('[data-test="defi"]')).toBeVisible();
