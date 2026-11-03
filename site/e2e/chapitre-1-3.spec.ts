@@ -2,7 +2,7 @@
 // le premier vrai chapitre, qui assemble tout le gabarit (paris, verrou,
 // atelier, code expliqué, encadré labo, récapitulatif).
 import { readFileSync } from 'node:fs';
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { extraireRegion } from '../src/lib/regions';
 import { plusLongueLigne, terminerChapitre13, verifierAxe, verifierSansDebordement } from './outils';
 
@@ -28,6 +28,23 @@ function ligneFusion(n: number): string {
   return `fusion ${n}${FINE}: ${visible(a)} + ${visible(b)} → ${visible(a + b)}`;
 }
 
+/**
+ * Le texte qui se voit à l'écran dans un élément : sans ce qui est caché ni
+ * ce qui est réservé aux lecteurs d'écran (une boîte d'un pixel).
+ */
+async function texteAffiche(element: Locator): Promise<string> {
+  return element.evaluate((racine) => {
+    let texte = '';
+    const marcheur = document.createTreeWalker(racine, NodeFilter.SHOW_TEXT);
+    for (let n = marcheur.nextNode(); n; n = marcheur.nextNode()) {
+      const boite = n.parentElement?.getBoundingClientRect();
+      if (!boite || boite.width <= 1 || boite.height <= 1) continue;
+      texte += n.textContent ?? '';
+    }
+    return texte.replace(/\s+/g, ' ').trim();
+  });
+}
+
 // Les îlots Svelte (atelier, marge, labo) répondent au clavier une fois
 // hydratés : Astro retire alors l'attribut ssr.
 async function attendreHydratation(page: Page): Promise<void> {
@@ -49,10 +66,18 @@ async function ouvrirAtelier(page: Page): Promise<void> {
 // - Playwright ramène toutes les espaces du nom accessible (U+202F comprise)
 //   à une espace ordinaire : le titre se cherche avec \s, et l'espace fine se
 //   vérifie à part, sur le texte du titre.
-test('chapitre 1.3 complet', async ({ page }) => {
+test('chapitre 1.3 complet', async ({ page }, info) => {
   await page.goto('/forge-ia/partie-1/1-3/');
   await attendreHydratation(page);
   await expect(page.locator('header')).toContainText('Partie 1, chapitre 1.3 sur 21');
+  // La position se voit aussi sur téléphone, en forme courte (le texte
+  // complet reste lu par les lecteurs d'écran) : toContainText ne suffit pas,
+  // il lit aussi le texte caché.
+  const position = page.locator('header .ou');
+  await expect(position).toBeVisible();
+  expect(await texteAffiche(position)).toBe(
+    info.project.name === 'mobile' ? '1.3 sur 21' : 'Partie 1, chapitre 1.3 sur 21',
+  );
   const titre = page.getByRole('heading', { level: 2, name: /Pourquoi découper\s\?/ });
   await expect(titre).toBeVisible();
   expect(await titre.textContent()).toBe('Pourquoi découper\u202F?');
