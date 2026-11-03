@@ -41,6 +41,23 @@ sous-dossiers au besoin (`dossier`) et vérifie la place libre avant un travail
 long (`verifier_place`) : s'il en manque, il s'arrête avec un message qui dit
 combien de Go libérer.
 
+## Télécharger les données
+
+Trois sources, lues en flux depuis Hugging Face sans télécharger les jeux entiers : 75 %
+de français du web, 10 % de Wikipédia française et 15 % de code Python sous licence
+permissive (sources, licences et liens dans `docs/donnees.md`). Les textes sont nettoyés,
+dédoublonnés et écrits dans `FORGE_DONNEES/textes/<dossier>/<source>/`, par fragments
+d'environ 100 Mo :
+
+```powershell
+uv run --extra gpu python -m forge donnees --octets 300M --dossier echantillon
+```
+
+Une coupure (réseau, courant, disque plein) ne perd rien : on relance la même commande, qui
+reprend là où elle s'est arrêtée, sans doublon. Une source n'est terminée que lorsque son
+fichier `.complet` existe. Le mélange par défaut est défini une seule fois, dans
+`forge.donnees.melange.MELANGE_PAR_DEFAUT`.
+
 ## Le tokenizer de ton IA
 
 Le paquet `forge.tokenizer` contient le tokenizer de ton IA : un BPE sur les

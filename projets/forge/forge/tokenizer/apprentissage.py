@@ -11,22 +11,13 @@ import json
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
-from forge.chemins import racine_donnees
+from forge.donnees.melange import MELANGE_PAR_DEFAUT
+from forge.donnees.telechargement import dossier_des_textes
 from forge.tokenizer.bpe_octets import TokenizerOctets, entrainer_tokenizer
-
-# Part de chaque source dans les textes lus : le mélange par défaut des données
-# de ton IA (75 % de web français, 10 % de Wikipédia française, 15 % de code
-# Python), dans cet ordre de lecture.
-PROPORTIONS = {"web_fr": 0.75, "wikipedia_fr": 0.10, "code_python": 0.15}
 
 
 class DonneesManquantes(Exception):
     """Les textes attendus sont absents, ou leur téléchargement n'est pas fini."""
-
-
-def dossier_des_textes(dossier: Path) -> Path:
-    """`FORGE_DONNEES/textes/<dossier>` (un chemin absolu est gardé tel quel)."""
-    return racine_donnees() / "textes" / dossier
 
 
 def verifier_dossier(dossier: Path) -> None:
@@ -41,7 +32,7 @@ def verifier_dossier(dossier: Path) -> None:
             f"Le dossier des textes {dossier} est introuvable. Télécharge d'abord les "
             f"textes avec : {relancer}"
         )
-    for source in PROPORTIONS:
+    for source in MELANGE_PAR_DEFAUT:
         dossier_source = dossier / source
         if not dossier_source.is_dir():
             raise DonneesManquantes(
@@ -69,7 +60,7 @@ def lire_textes_du_melange(
     octets_max: int | None,
     journal: Callable[[str], None] | None = None,
 ) -> Iterator[str]:
-    """Lit les textes des trois sources de `dossier`, dans les parts de `PROPORTIONS`.
+    """Lit les textes des trois sources de `dossier`, dans les parts de `MELANGE_PAR_DEFAUT`.
 
     Avec `octets_max`, chaque source donne des documents tant qu'elle n'a pas
     atteint sa part (en octets UTF-8) : le dernier document peut la dépasser un
@@ -77,7 +68,7 @@ def lire_textes_du_melange(
     """
     verifier_dossier(dossier)
     ecrire = journal if journal is not None else (lambda _message: None)
-    for source, part in PROPORTIONS.items():
+    for source, part in MELANGE_PAR_DEFAUT.items():
         budget = None if octets_max is None else round(octets_max * part)
         lus = 0
         for texte in lire_fragments(dossier / source):

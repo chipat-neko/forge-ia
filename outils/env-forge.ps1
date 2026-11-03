@@ -11,6 +11,9 @@ if (-not $env:FORGE_DONNEES) {
 $env:UV_CACHE_DIR = Join-Path $env:FORGE_DONNEES 'cache\uv'
 $env:HF_HOME = Join-Path $env:FORGE_DONNEES 'cache\huggingface'
 
+# Python écrit en UTF-8 (et pas en cp1252) dans les journaux redirigés vers un fichier.
+$env:PYTHONUTF8 = '1'
+
 # Création des dossiers qui n'existent pas encore.
 foreach ($dossier in @($env:FORGE_DONNEES, $env:UV_CACHE_DIR, $env:HF_HOME)) {
     if (-not (Test-Path -LiteralPath $dossier)) {
@@ -28,6 +31,7 @@ Write-Host 'Environnement des données de ton IA'
 Write-Host ('  FORGE_DONNEES = {0}' -f $env:FORGE_DONNEES)
 Write-Host ('  UV_CACHE_DIR  = {0}' -f $env:UV_CACHE_DIR)
 Write-Host ('  HF_HOME       = {0}' -f $env:HF_HOME)
+Write-Host ('  PYTHONUTF8    = {0}' -f $env:PYTHONUTF8)
 Write-Host ('  Place libre sur {0} : {1} Go' -f $racine, $libreGo)
 
 if ($libreGo -lt 35) {
