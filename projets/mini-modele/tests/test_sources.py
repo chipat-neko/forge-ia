@@ -6,6 +6,15 @@ floor, ldexp et frexp (exacts : ils ne touchent qu'à l'exposant) et les
 opérations entières y sont permis. Le motif est cherché partout, commentaires
 compris : un exemple de code interdit dans un commentaire serait vite recopié.
 Le jumeau TypeScript a le même test (site/src/lib/mini-modele/sources.test.ts).
+
+Règle des divisions entières, qu'aucun scan ne peut vérifier (le signe d'une
+variable ne se lit pas dans le texte) : les indices sont toujours positifs, et
+`%` et `//` ne servent que sur des entiers positifs (ou nuls pour le dividende).
+Là, Python et JavaScript donnent le même résultat : `a % b` des deux côtés,
+`a // b` en Python face à `Math.floor(a / b)` en TypeScript. Ailleurs, le `%` de
+Python prend le signe du diviseur et celui de JavaScript le signe du dividende,
+et le `//` d'un flottant n'est pas toujours floor(a / b) : on écrit alors
+math.floor(a / b), et a - b * math.floor(a / b), des deux côtés.
 """
 
 import pathlib
@@ -23,6 +32,17 @@ OBLIGATOIRES = ["calcul"]
 # Les seuls noms du module math permis. Toute autre fonction de math (atan,
 # hypot, prod, sumprod, fma…) peut arrondir autrement que le TypeScript.
 MATH_PERMIS = {"sqrt", "floor", "ldexp", "frexp", "inf", "nan", "isnan", "isinf", "isfinite"}
+# Les fonctions intégrées interdites, et ce qu'on écrit à leur place. pow fait le
+# même appel à la libm que **, max et min traitent −0 autrement qu'une boucle
+# « if v > m », round arrondit au pair : le TypeScript ne les refait pas au bit près.
+INTEGREES_INTERDITES = re.compile(r"\b(pow|max|min|round|divmod)\(")
+A_LA_PLACE = {
+    "pow": "une boucle de produits (p = p * b, à chaque pas, comme b1t et b2t dans AdamW)",
+    "max": "une boucle « if v > m » (maximum de mini_modele.calcul)",
+    "min": "une boucle « if v < m », écrite de la même façon en TypeScript",
+    "round": "math.floor(x + 0.5), écrit de la même façon en TypeScript",
+    "divmod": "a // b et a % b, sur des entiers positifs seulement (voir la règle en tête de ce fichier)",
+}
 # Un marqueur de région est seul sur sa ligne : « # region: nom » ou « # fin: nom ».
 MARQUEUR = re.compile(r"\s*# (region|fin): ([a-z0-9_]+)")
 
@@ -57,6 +77,15 @@ def test_aucune_fonction_non_reproductible():
             f"mini_modele/{nom}.py, ligne {numero_de_ligne(texte, trouve.start())} : « {trouve.group()} » "
             "n'est pas reproductible d'une machine à l'autre. Utilise exp, log, cos, somme ou Hasard de "
             "mini_modele.calcul, et des arguments explicites au lieu de **."
+        )
+
+
+def test_aucune_fonction_integree_non_reproductible():
+    for nom, texte in sources_verifiees():
+        trouve = INTEGREES_INTERDITES.search(texte)
+        assert trouve is None, (
+            f"mini_modele/{nom}.py, ligne {numero_de_ligne(texte, trouve.start())} : « {trouve.group()} » "
+            f"ne se refait pas au bit près en TypeScript. Écris à la place {A_LA_PLACE[trouve.group(1)]}."
         )
 
 
@@ -100,3 +129,9 @@ def test_le_motif_attrape_les_interdits():
         assert INTERDITS.search(interdit), interdit
     for permis in ("math.sqrt(x)", "math.floor(x)", "somme(v)", "s += v", "Hasard(1234)", "a * b"):
         assert not INTERDITS.search(permis), permis
+    for interdit in ("pow(beta1, t)", "max(a, b)", "min(v)", "round(x)", "divmod(a, b)", "x = max(0.0, s)",
+                     "builtins.pow(b, t)"):
+        assert INTEGREES_INTERDITES.search(interdit), interdit
+        assert INTEGREES_INTERDITES.search(interdit).group(1) in A_LA_PLACE
+    for permis in ("maximum(v)", "minimum(v)", "deux_puissance(k)", "empower(x)", "arrondi(x)", "self.b1t * r.beta1"):
+        assert not INTEGREES_INTERDITES.search(permis), permis

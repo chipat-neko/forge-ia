@@ -108,8 +108,17 @@ def test_hasard_graine():
     # Deux tirages d'une même graine sont identiques ; deux graines différentes, non.
     assert [Hasard(42).suivant32() for _ in range(3)] == [Hasard(42).suivant32()] * 3
     assert Hasard(42).suivant32() != Hasard(43).suivant32()
-    with pytest.raises(TypeError, match="entier"):
-        Hasard(1.5)
+    # Les mêmes graines qu'en TypeScript : un entier sûr de JavaScript, de −(2^53 − 1) à 2^53 − 1.
+    assert Hasard(2**53 - 1).suivant32() == Hasard(0xFFFFFFFF).suivant32()
+    assert Hasard(-(2**53 - 1)).suivant32() == Hasard(1).suivant32()
+    # 7.0 et 7 sont le même nombre en JavaScript : ils donnent la même suite ici aussi.
+    assert Hasard(7.0).suivant32() == Hasard(7).suivant32()
+    for mauvaise in (1.5, math.nan, math.inf, -math.inf, True, False, "7"):
+        with pytest.raises(TypeError, match="entier"):
+            Hasard(mauvaise)
+    for trop_grande in (2**53, -(2**53), 2**64, float(2**53)):
+        with pytest.raises(ValueError, match="entiers sûrs"):
+            Hasard(trop_grande)
 
 
 def test_sommes_et_hex():

@@ -46,7 +46,10 @@ def test_attendus_calcul_au_complet():
         "SQRT_DEMI": "3fe6a09e667f3bcd",
         "PI": "400921fb54442d18",
     }
-    assert (len(a["exp"]), len(a["log"]), len(a["cos"])) == (22 + 200, 16 + 200, 9 + 100)
+    coefficients = a["coefficients"]
+    assert (len(coefficients["C_EXP"]), len(coefficients["C_LOG"]), len(coefficients["C_COS"])) == (14, 12, 13)
+    assert coefficients["C_EXP"][0] == coefficients["C_LOG"][0] == coefficients["C_COS"][0] == "3ff0000000000000"
+    assert (len(a["exp"]), len(a["log"]), len(a["cos"])) == (27 + 200, 17 + 200, 9 + 100)
     hasard = a["hasard"]
     assert hasard["graine"] == 1234
     for cle in ("suivant32", "uniforme", "gaussienne", "gaussienne_0_08", "entier_10"):
@@ -55,6 +58,7 @@ def test_attendus_calcul_au_complet():
     assert len(a["empreinte"]["valeurs"]) == 10
     assert a["empreinte_texte"]["texte"] == "Élodie, Zoé et Maël"
     motifs = [m for nom in ("exp", "log", "cos") for paire in a[nom] for m in paire]
+    motifs += [m for table in coefficients.values() for m in table]
     motifs += hasard["uniforme"] + hasard["gaussienne"] + hasard["gaussienne_0_08"] + a["empreinte"]["valeurs"]
     assert all(re.fullmatch(r"[0-9a-f]{16}", m) for m in motifs)
     assert re.fullmatch(r"[0-9a-f]{8}", a["empreinte"]["empreinte"])

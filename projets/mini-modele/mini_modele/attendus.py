@@ -19,6 +19,9 @@ from collections.abc import Callable
 from pathlib import Path
 
 from mini_modele.calcul import (
+    C_COS,
+    C_EXP,
+    C_LOG,
     INV_LN2,
     LN2_BAS,
     LN2_HAUT,
@@ -36,13 +39,16 @@ from mini_modele.calcul import (
 DOSSIER_TESTS = Path(__file__).resolve().parent.parent / "tests"
 
 # Entrées fixes : les cas limites (sous-normaux, débordements, −0, très petits et très grands).
+# Pour exp, -745.0, -744.4, -740.0, -720.0 et -709.0 donnent des k de -1075 à -1023
+# (la branche des résultats sous-normaux), 709.7 et 709.78 un k de 1024.
 ENTREES_EXP = [
-    -745.2, -745.0, -708.5, -50.0, -10.0, -1.0, -0.5, -1e-10, -0.0, 0.0, 1e-300, 1e-10,
-    0.25, 0.5, 1.0, 2.0, 10.0, 50.0, 700.0, 709.7, 709.79, 710.0,
+    -745.2, -745.0, -744.4, -740.0, -720.0, -709.0, -708.5, -50.0, -10.0, -1.0, -0.5, -1e-10,
+    -0.0, 0.0, 1e-300, 1e-10, 0.25, 0.5, 1.0, 2.0, 10.0, 50.0, 700.0, 709.7, 709.78, 709.79, 710.0,
 ]
+# Pour log, 2.225073858507201e-308 est le plus grand sous-normal.
 ENTREES_LOG = [
-    5e-324, 1e-310, 1e-300, 1e-10, 0.1, 0.5, SQRT_DEMI, 0.75, 1.0, 1.0000001, 1.5, 2.0,
-    10.0, 1e10, 1e300, 1.7976931348623157e308,
+    5e-324, 1e-310, 2.225073858507201e-308, 1e-300, 1e-10, 0.1, 0.5, SQRT_DEMI, 0.75, 1.0,
+    1.0000001, 1.5, 2.0, 10.0, 1e10, 1e300, 1.7976931348623157e308,
 ]
 ENTREES_COS = [0.0, 1e-8, 0.5, 1.0, PI * 0.25, PI * 0.5, 2.0, 3.0, PI]
 # Les valeurs de l'empreinte : des signes, des sous-normaux, des infinis.
@@ -80,6 +86,12 @@ def calculer_attendus_calcul() -> dict:
             "INV_LN2": vers_hex(INV_LN2),
             "SQRT_DEMI": vers_hex(SQRT_DEMI),
             "PI": vers_hex(PI),
+        },
+        # Les tables des séries : le TypeScript doit construire exactement les mêmes.
+        "coefficients": {
+            "C_EXP": [vers_hex(c) for c in C_EXP],
+            "C_LOG": [vers_hex(c) for c in C_LOG],
+            "C_COS": [vers_hex(c) for c in C_COS],
         },
         "exp": paires(exp, entrees_exp),
         "log": paires(log, entrees_log),

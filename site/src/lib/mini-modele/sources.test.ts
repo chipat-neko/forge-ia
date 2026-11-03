@@ -5,6 +5,15 @@
 // navigateurs : seuls + − × ÷, Math.sqrt, Math.floor, Math.imul et les
 // opérations entières y sont permis. Le motif est cherché partout,
 // commentaires compris.
+//
+// Règle des divisions entières, qu'aucun scan ne peut vérifier (le signe d'une
+// variable ne se lit pas dans le texte) : les indices sont toujours positifs,
+// et `%` et `//` ne servent que sur des entiers positifs (ou nuls pour le
+// dividende). Là, les deux langages donnent le même résultat : `a % b` des deux
+// côtés, `a // b` en Python face à `Math.floor(a / b)` ici. Ailleurs, le `%` de
+// Python prend le signe du diviseur et celui de JavaScript le signe du
+// dividende, et le `//` d'un flottant n'est pas toujours floor(a / b) : on
+// écrit alors Math.floor(a / b), et a - b * Math.floor(a / b), des deux côtés.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';

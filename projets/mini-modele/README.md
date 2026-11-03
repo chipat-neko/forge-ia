@@ -55,7 +55,18 @@ navigateurs.
   différente d'une simple boucle. Toute somme est donc une boucle `s += v`,
   dans l'ordre des indices.
 - `max()` et `Math.max` traitent −0 différemment : un maximum est une boucle
-  `if v > m`.
+  `if v > m`. Les fonctions intégrées `pow`, `max`, `min`, `round` et
+  `divmod` sont refusées dans les fichiers vérifiés. Une puissance devient une
+  boucle de produits (`p = p * b` à chaque pas), et un arrondi un
+  `math.floor(x + 0.5)` écrit de la même façon des deux côtés.
+- Les divisions entières suivent une règle qu'aucun test ne peut vérifier
+  (le signe d'une variable ne se lit pas dans le code) : les indices sont
+  toujours positifs, et `%` et `//` ne servent que sur des entiers positifs.
+  Là, les deux langages donnent le même résultat : `a % b` des deux côtés, et
+  `a // b` en Python face à `Math.floor(a / b)` en TypeScript. Sur un nombre
+  négatif ou à virgule, le `%` de Python prend le signe du diviseur et celui
+  de JavaScript le signe du dividende ; on écrit alors `floor` explicitement,
+  des deux côtés : `math.floor(a / b)`, et `a - b * math.floor(a / b)`.
 - Le hasard vient de `Hasard` (SplitMix32), jamais de `random` : Python ne
   garantit pas ses tirages d'une version à l'autre.
 

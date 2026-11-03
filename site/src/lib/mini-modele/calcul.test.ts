@@ -7,6 +7,9 @@
 import { describe, expect, it } from 'vitest';
 import attendus from '../../../../projets/mini-modele/tests/attendus-calcul.json';
 import {
+  C_COS,
+  C_EXP,
+  C_LOG,
   cos,
   depuisHex,
   deuxPuissance,
@@ -32,12 +35,12 @@ const fonctions = { exp, log, cos };
 // Les entrées des attendus, refaites comme dans mini_modele/attendus.py.
 const FIXES = {
   exp: [
-    -745.2, -745.0, -708.5, -50.0, -10.0, -1.0, -0.5, -1e-10, -0.0, 0.0, 1e-300, 1e-10, 0.25, 0.5, 1.0, 2.0,
-    10.0, 50.0, 700.0, 709.7, 709.79, 710.0,
+    -745.2, -745.0, -744.4, -740.0, -720.0, -709.0, -708.5, -50.0, -10.0, -1.0, -0.5, -1e-10, -0.0, 0.0, 1e-300,
+    1e-10, 0.25, 0.5, 1.0, 2.0, 10.0, 50.0, 700.0, 709.7, 709.78, 709.79, 710.0,
   ],
   log: [
-    5e-324, 1e-310, 1e-300, 1e-10, 0.1, 0.5, SQRT_DEMI, 0.75, 1.0, 1.0000001, 1.5, 2.0, 10.0, 1e10, 1e300,
-    1.7976931348623157e308,
+    5e-324, 1e-310, 2.225073858507201e-308, 1e-300, 1e-10, 0.1, 0.5, SQRT_DEMI, 0.75, 1.0, 1.0000001, 1.5, 2.0,
+    10.0, 1e10, 1e300, 1.7976931348623157e308,
   ],
   cos: [0.0, 1e-8, 0.5, 1.0, PI * 0.25, PI * 0.5, 2.0, 3.0, PI],
 };
@@ -78,6 +81,12 @@ describe('jumeau du Python : attendus-calcul.json, au bit près', () => {
     expect(versHex(INV_LN2)).toBe('3ff71547652b82fe');
     expect(versHex(SQRT_DEMI)).toBe('3fe6a09e667f3bcd');
     expect(versHex(PI)).toBe('400921fb54442d18');
+  });
+
+  it('les tables de coefficients sont celles du Python', () => {
+    expect({ C_EXP: C_EXP.map(versHex), C_LOG: C_LOG.map(versHex), C_COS: C_COS.map(versHex) }).toEqual(
+      attendus.coefficients,
+    );
   });
 
   it('les entrées sont celles du Python, tirées au hasard de la même façon', () => {
@@ -257,12 +266,23 @@ describe('Hasard', () => {
     expect(Array.from(typee)).toEqual(liste);
   });
 
-  it('ramène la graine à 32 bits comme le Python, et refuse une graine non entière', () => {
+  it('ramène la graine à 32 bits comme le Python', () => {
     expect(new Hasard(-1).suivant32()).toBe(new Hasard(0xffffffff).suivant32());
     expect(new Hasard(4294967296 + 5).suivant32()).toBe(new Hasard(5).suivant32());
     expect(new Hasard(42).suivant32()).not.toBe(new Hasard(43).suivant32());
-    expect(() => new Hasard(1.5)).toThrow('entier');
-    expect(() => new Hasard(1.5)).toThrow(TypeError);
+    expect(new Hasard(Number.MAX_SAFE_INTEGER).suivant32()).toBe(new Hasard(0xffffffff).suivant32());
+    expect(new Hasard(-Number.MAX_SAFE_INTEGER).suivant32()).toBe(new Hasard(1).suivant32());
+  });
+
+  it('refuse les mêmes graines que le Python', () => {
+    for (const mauvaise of [1.5, NaN, Infinity, -Infinity, true, false, '7'] as unknown as number[]) {
+      expect(() => new Hasard(mauvaise), String(mauvaise)).toThrow(TypeError);
+      expect(() => new Hasard(mauvaise), String(mauvaise)).toThrow('entier');
+    }
+    for (const tropGrande of [9007199254740992, -9007199254740992, 18446744073709551616]) {
+      expect(() => new Hasard(tropGrande), String(tropGrande)).toThrow(RangeError);
+      expect(() => new Hasard(tropGrande), String(tropGrande)).toThrow('entiers sûrs');
+    }
   });
 });
 

@@ -26,7 +26,8 @@ INV_LN2 = 1.4426950408889634  # 3ff71547652b82fe : 1 / ln 2
 SQRT_DEMI = 0.7071067811865476  # 3fe6a09e667f3bcd : la racine de 1/2
 PI = 3.141592653589793  # 400921fb54442d18
 
-# Coefficients des séries, calculés par des divisions (les mêmes en TypeScript).
+# Coefficients des séries, calculés par des divisions (les mêmes en TypeScript ;
+# leurs motifs sont dans les attendus, clé « coefficients »).
 # exp(r) = 1 + r + r^2/2! + … + r^13/13! : C_EXP[n] = 1/n!
 C_EXP = [1.0]
 for n in range(1, 14):
@@ -207,19 +208,33 @@ def empreinte_texte(texte: str) -> str:
     return f"{_fnv1a(FNV_DEPART, texte.encode('utf-8')):08x}"
 
 
+# Le plus grand entier sûr de JavaScript, 2^53 − 1 (Number.MAX_SAFE_INTEGER).
+ENTIER_SUR_MAX = 9007199254740991
+
+
 class Hasard:
     """Le hasard reproductible du mini-modèle : SplitMix32.
 
     Une même graine donne la même suite en Python et en TypeScript, sur toutes
     les machines. La graine est un entier, ramené à 32 bits (de 0 à 2^32 − 1).
+    Les graines refusées sont les mêmes qu'en TypeScript : ce qui n'est pas un
+    nombre entier (True compris), et les entiers au-delà des entiers sûrs de
+    JavaScript (2^53 − 1). Un flottant entier comme 7.0 est accepté, puisqu'en
+    JavaScript 7.0 et 7 sont le même nombre.
     """
 
     def __init__(self, graine: int) -> None:
-        if not isinstance(graine, int):
+        entier = isinstance(graine, int) or (isinstance(graine, float) and graine.is_integer())
+        if isinstance(graine, bool) or not entier:
             raise TypeError(
                 f"La graine du hasard doit être un entier (reçu {graine!r}). Donne un entier de 0 à 2^32 − 1."
             )
-        self.etat = graine & 0xFFFFFFFF
+        if not -ENTIER_SUR_MAX <= graine <= ENTIER_SUR_MAX:
+            raise ValueError(
+                f"La graine du hasard dépasse les entiers sûrs de JavaScript (reçu {graine!r}). "
+                "Donne un entier de 0 à 2^32 − 1."
+            )
+        self.etat = int(graine) & 0xFFFFFFFF
 
     def suivant32(self) -> int:
         """Le prochain entier sur 32 bits, de 0 à 2^32 − 1."""

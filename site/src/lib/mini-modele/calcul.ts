@@ -23,15 +23,19 @@ export const INV_LN2 = 1.4426950408889634; // 3ff71547652b82fe : 1 / ln 2
 export const SQRT_DEMI = 0.7071067811865476; // 3fe6a09e667f3bcd : la racine de 1/2
 export const PI = 3.141592653589793; // 400921fb54442d18
 
-// Coefficients des séries, calculés par des divisions (les mêmes en Python).
+// Coefficients des séries, calculés par des divisions (les mêmes en Python ;
+// leurs motifs sont dans les attendus, clé « coefficients »). Exportés en
+// lecture seule, pour que calcul.test.ts les compare à ceux du Python.
 // exp(r) = 1 + r + r^2/2! + … + r^13/13! : C_EXP[n] = 1/n!
-const C_EXP: number[] = [1.0];
-for (let n = 1; n < 14; n++) C_EXP.push(C_EXP[n - 1] / n);
+const cExp: number[] = [1.0];
+for (let n = 1; n < 14; n++) cExp.push(cExp[n - 1] / n);
+export const C_EXP: readonly number[] = Object.freeze(cExp);
 // ln m = 2s × (1 + z/3 + z^2/5 + … + z^11/23), avec s = (m − 1)/(m + 1) et z = s × s.
-const C_LOG: number[] = Array.from({ length: 12 }, (_, n) => 1.0 / (2 * n + 1));
+export const C_LOG: readonly number[] = Object.freeze(Array.from({ length: 12 }, (_, n) => 1.0 / (2 * n + 1)));
 // cos t = 1 − t^2/2! + t^4/4! − … + t^24/24! : C_COS[n] = (−1)^n / (2n)!
-const C_COS: number[] = [1.0];
-for (let n = 1; n < 13; n++) C_COS.push(-C_COS[n - 1] / ((2 * n - 1) * (2 * n)));
+const cCos: number[] = [1.0];
+for (let n = 1; n < 13; n++) cCos.push(-cCos[n - 1] / ((2 * n - 1) * (2 * n)));
+export const C_COS: readonly number[] = Object.freeze(cCos);
 
 // 2^k pour k de -1074 à 1023 (indice k + 1074), construits depuis 1,0 par des
 // ×2 et des ÷2 : chacun est exact. C'est ce que fait math.ldexp(1.0, k) en Python.
@@ -248,14 +252,21 @@ export function empreinteTexte(texte: string): string {
  *
  * Une même graine donne la même suite en Python et en TypeScript, dans tous
  * les navigateurs. La graine est un entier, ramené à 32 bits (de 0 à 2^32 − 1).
+ * Les graines refusées sont les mêmes qu'en Python : ce qui n'est pas un nombre
+ * entier (true compris), et les entiers au-delà des entiers sûrs (2^53 − 1).
  * Math.imul multiplie modulo 2^32, et « >>> 0 » relit le résultat sans signe.
  */
 export class Hasard {
   etat: number;
 
   constructor(graine: number) {
-    if (!Number.isSafeInteger(graine)) {
+    if (typeof graine !== 'number' || !Number.isInteger(graine)) {
       throw new TypeError(`La graine du hasard doit être un entier (reçu ${graine}). Donne un entier de 0 à 2^32 − 1.`);
+    }
+    if (!Number.isSafeInteger(graine)) {
+      throw new RangeError(
+        `La graine du hasard dépasse les entiers sûrs de JavaScript (reçu ${graine}). Donne un entier de 0 à 2^32 − 1.`,
+      );
     }
     this.etat = graine >>> 0;
   }
