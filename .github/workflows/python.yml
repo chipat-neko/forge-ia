@@ -41,7 +41,14 @@ jobs:
             nombre=$((nombre + 1))
             echo "::group::${dossier}"
             # --locked : échoue si uv.lock ne correspond plus à pyproject.toml.
-            if ! (cd "$dossier" && uv run --locked pytest -q); then
+            # Un projet qui déclare l'extra « cpu » (PyTorch en deux versions,
+            # carte graphique ou processeur) est testé avec les roues CPU :
+            # les machines de l'intégration continue n'ont pas de carte NVIDIA.
+            options=""
+            if grep -Eq '^cpu[[:space:]]*=' "${dossier}pyproject.toml"; then
+              options="--extra cpu"
+            fi
+            if ! (cd "$dossier" && uv run --locked $options pytest -q); then
               echo "::error::Tests en échec dans ${dossier}"
               echec=1
             fi
