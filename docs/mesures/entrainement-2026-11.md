@@ -22,6 +22,7 @@ taille demande sur le disque. Il ne recommande aucune taille ni aucun appareil�
   pas avec ce calcul (il manque 7,0 Go au moins, 26,3 Go dans le cas le plus prudent), qui compte le
   texte brut sans compression. Sur le disque, ce texte est compressé environ 3 fois : compté ainsi,
   « tres_grand » tient, avec 8,9 Go de marge (voir « Le choix du 3 novembre 2026 »).
+- **Le corpus principal est prêt** (3 novembre 2026) : 36 830 Mo de texte (web, Wikipédia, code Python) devenus 8,84 milliards de jetons d'entraînement et 44,5 millions de jetons de validation. L'entraînement en lit 98,1 % : une seule époque. Il pèse 12,8 Go de texte compressé (gardé) et 16,6 Go de jetons sur D:, où il reste 349,7 Go libres (voir « Le corpus principal : les volumes réels »).
 - **Une nuit de 10 h sur la carte** fait lire 4,98 milliards de jetons à « petit », 2,25 à « moyen », 1,18 à
   « grand » et 0,64 à « tres_grand ». Rapporté à la taille du modèle, cela fait 120, 20, 5 et 1,5 jetons
   par paramètre.
@@ -266,6 +267,101 @@ texte est déjà effacé : il ne dépend pas de la compression. Pour 44,4 Go l
 marge, sans rien libérer de plus.
 Cette marge suppose qu'aucun autre programme ne remplit D: pendant l'entraînement. S'il manque de la
 place, l'entraînement s'arrête proprement et dit combien il en manque.
+
+## Le corpus principal : les volumes réels
+
+Le corpus de `principal.toml` a été téléchargé, puis encodé, le 3 novembre 2026 (`python -m forge donnees --octets 36830M --dossier principal`, puis `python -m forge encoder --donnees principal`). Cette section dit ce qu'il pèse vraiment, et le compare à l'estimation de la section précédente.
+
+**Ce qui a été demandé.** 36 830 Mo de texte (38 619 054 080 octets), calculés pour que l'entraînement trouve ses 8 671 723 520 jetons : jetons visés ÷ (1 − 0,5017 % de validation) × 4,3655 octets par jeton (mesuré sur la version courte) × 1,015 de marge, arrondis au Mo au-dessus. Le mélange est celui par défaut : 75 % de web français (27 622,5 Mo), 10 % de Wikipédia (3 683,0 Mo) et 15 % de code Python sous licence permissive (5 524,5 Mo). Aucune source ne s'est épuisée : les trois ont donné tout ce qu'on leur demandait.
+
+### Le texte téléchargé
+
+Dans `textes/principal`, un fichier compressé (gzip) par fragment de 100 Mo de texte environ :
+
+| Source | Texte écrit | Documents gardés (lus) | Fragments | Sur le disque (gzip) | Compression |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| web_fr | 27 622,5 Mo | 8 802 931 (8 802 961) | 277 | 10,20 Go | 387,2 Mo par Go de texte |
+| wikipedia_fr | 3 683,0 Mo | 813 795 (836 091) | 37 | 1,29 Go | 365,9 Mo par Go de texte |
+| code_python | 5 524,5 Mo | 738 171 (19 096 922) | 56 | 1,21 Go | 229,9 Mo par Go de texte |
+| **Total** | **36 830,0 Mo** | **10 354 897** | **370** | **12,70 Go** | **361,5 Mo par Go de texte** |
+
+- Le dossier `textes/principal` pèse **12,77 Go** en tout : les 12,70 Go de fragments, plus les fichiers d'empreintes qui servent à écarter les doublons (79,0 Mo).
+- Les documents gardés sont ceux que le nettoyage et le dédoublonnage laissent passer. Pour le code, le tri est sévère : il a fallu lire 19,1 millions de fichiers (toutes langues, toutes licences) pour en garder 738 171 (Python, licence permissive), soit un sur vingt-six.
+- Le texte se compresse à 35,3 % de sa taille, comme sur la version courte (353 Mo pour 1 000 Mo). Le code se compresse le mieux (230 Mo par Go de texte), le web le moins bien (387).
+
+### Les jetons
+
+Dans `jetons/principal`, un fichier de jetons d'entraînement et un de validation par fragment de texte (370 de chaque), à 2 octets par jeton :
+
+| Source | Jetons d'entraînement | Part | Jetons de validation | Octets de texte par jeton |
+| --- | ---: | ---: | ---: | ---: |
+| web_fr | 6 351 849 281 | 71,8 % | 31 653 109 | 4,54 |
+| wikipedia_fr | 934 672 689 | 10,6 % | 4 561 107 | 4,11 |
+| code_python | 1 554 695 397 | 17,6 % | 8 276 775 | 3,71 |
+| **Total** | **8 841 217 367** | **100 %** | **44 490 991** | **4,35** |
+
+- Le dossier `jetons/principal` pèse **16,55 Go** : 16,47 Go d'entraînement et 0,08 Go de validation, plus l'index et les marqueurs de chaque fragment.
+- Le mélange en jetons n'est pas celui en octets. Le code a plus de jetons par octet de texte (3,7 octets par jeton contre 4,5 pour le web, séparateurs de fin de document compris) : il pèse donc 17,6 % des jetons pour 15 % du texte, et le web 71,8 % pour 75 %.
+- Le marqueur `.complet` donne 4,3513 octets par jeton pour l'ensemble, contre 4,3655 sur la version courte : 0,3 % de jetons en plus pour le même texte.
+
+### Il tient en une seule époque
+
+L'entraînement lit `jetons_total` = 8 671 723 520 jetons (16 540 pas de 524 288). Le corpus en contient **8 841 217 367** d'entraînement d'après `.complet` : **169 493 847 de plus (+1,95 %)**. L'entraînement en lit donc 98,1 % : il n'a pas besoin d'une deuxième époque, et aucun morceau n'est lu deux fois.
+
+Le compte exact se fait en morceaux, car le chargeur coupe chaque fichier en morceaux de 2 049 jetons (une ligne de 2 048 jetons et le jeton qui la suit) et laisse de côté la fin trop courte. Le corpus contient 4 314 705 morceaux utilisables (8 836 515 840 jetons) ; l'entraînement en lit 16 540 × 256 = 4 234 240. Il en reste **80 465 jamais lus** (164 792 320 jetons, 1,9 %). La marge de 1,5 % demandée au téléchargement, et les 0,3 % de jetons gagnés par la compression, laissent donc un peu plus de jetons qu'il n'en faut, sans qu'il en manque.
+
+### Le téléchargement, et sa reprise
+
+| Étape | Heure | Durée | Débit |
+| --- | --- | ---: | ---: |
+| `web_fr` (27 622,5 Mo) | 16 h 08 à 16 h 47 | 38 min 16 s | 12,0 Mo/s |
+| `wikipedia_fr` (3 683,0 Mo) | 16 h 47 à 16 h 52 | 4 min 48 s | 12,8 Mo/s |
+| `code_python`, première partie (4 501,2 Mo, fragments 0 à 44) | 16 h 52 à 17 h 34 | 42 min 34 s | 1,8 Mo/s |
+| arrêt volontaire | 17 h 34 à 17 h 50 | 15 min 33 s | |
+| `code_python`, reprise (1 023,3 Mo, fragments 45 à 55) | 17 h 50 à 18 h 17 | 27 min 32 s | 0,6 Mo/s |
+| **Téléchargement actif en tout** | | **1 h 53 min 10 s** | 5,4 Mo/s |
+
+- **Le code a pris 70 minutes sur 113**, pour 15 % du texte : le flux contient tous les langages et toutes les licences, et il faut le lire en entier pour trouver les fichiers Python sous licence permissive. Le web et Wikipédia vont à 12 Mo/s.
+- **L'estimation était de 80 minutes** (0,13 s par Mo, mesurés sur la version courte, où le code ne pesait que 150 Mo). Le réel a pris 41 % de plus : le code est plus lent que le web, et la reprise a coûté environ 18 minutes de relecture (voir plus bas).
+- **Interruption et reprise.** Le téléchargement a été interrompu à la main à 17 h 34, pendant `code_python`, parce que tu voulais te servir du PC. La même commande, relancée à 17 h 50, a repris après 15 579 564 documents lus et a fini à 18 h 17 : `web_fr` et `wikipedia_fr` ont répondu « déjà complet », seuls les fragments manquants de `code_python` ont été écrits. Le corpus final le confirme : 56 fragments numérotés de 0 à 55 sans trou, 738 171 documents sans aucun doublon, et le nombre de documents et d'octets de `etat.json` est exactement celui des fragments (vérifié en les relisant tous). La reprise marche donc sur le vrai corpus, pas seulement sur les tests.
+- **Ce que la reprise coûte.** Le flux est relu depuis le début du jeu pour sauter les documents déjà comptés : 18 minutes de lecture avant que le fragment 45 soit écrit (à 18 h 09). Une interruption tardive sur une grosse source coûte donc du temps, pas des données.
+
+### L'encodage
+
+| Mesure | Valeur |
+| --- | --- |
+| Heure | 18 h 49 à 19 h 03 |
+| Durée | 839 s (13 min 59 s en comptant le lancement) |
+| Texte encodé | 36 830,0 Mo (38 619 056 781 octets) |
+| Débit | 43,9 Mo de texte par seconde, soit 10,6 millions de jetons par seconde |
+| Fragments | 370, de 8 s à 48 s chacun |
+| Processus | 16 (un par cœur logique) |
+| Jetons écrits | 8 885 708 358 |
+| Documents | 10 354 897 (10 302 981 d'entraînement, 51 916 de validation) |
+
+- **Les 16 cœurs ont travaillé du début à la fin.** La sonde (`psutil`, un relevé toutes les 30 s) a fait 27 relevés pendant l'encodage : à chacun, les 16 cœurs logiques dépassaient 50 %, et même 86 % pour le moins occupé au premier relevé (les processus démarraient), puis 95 % au moins ensuite. La charge moyenne des cœurs est de 99,1 % après le premier relevé (88,9 % au premier). Un seul cœur occupé, on aurait vu 6 % de charge moyenne.
+- Les processus de l'encodage occupaient en moyenne 12,4 cœurs équivalents sur 16 (de 10,5 à 12,8 ; le premier relevé, pris avant que les processus existent, n'est pas compté) : comme pendant la mesure du processeur (12,9 à 13,1), le reste du temps de calcul revient aux programmes ouverts en arrière-plan. Cette explication n'a pas été isolée.
+- L'encodage tournait à priorité basse, pour ne pas gêner le reste du PC ; le débit est celui obtenu dans ces conditions.
+- **Le débit par processus est le même que sur la version courte** : 2,7 Mo/s par processus (30,0 Mo/s avec 11 processus, 43,9 avec 16). L'estimation était d'une vingtaine de minutes ; le réel a pris 14 minutes.
+
+### Estimation et réel
+
+| Grandeur | Estimation du 3 novembre | Réel |
+| --- | ---: | ---: |
+| Texte à télécharger | 36 830 Mo | 36 830,0 Mo |
+| Texte compressé sur le disque (fragments gzip) | 12,1 Go (343 Mo par Go de texte) | 12,7 Go (361,5 Mo par Go de texte) |
+| Jetons sur le disque | 16,2 Go | 16,6 Go |
+| Fin de l'encodage (texte compressé et jetons) | 28,2 Go | 29,3 Go |
+| Entraînement (jetons et 3 sauvegardes de 6,5 Go au plus) | 35,5 Go | 35,9 Go |
+| Octets de texte par jeton | 4,36 | 4,35 |
+| Jetons d'entraînement | 8,67 milliards visés | 8,84 milliards (+1,95 %) |
+| Durée du téléchargement | 80 minutes | 1 h 53 |
+| Durée de l'encodage | une vingtaine de minutes | 14 minutes |
+| Place libre sur D: | 44,4 Go | 349,7 Go à la fin de l'encodage |
+
+- **Les volumes sont à 5 % près de l'estimation** : le texte compressé est un peu plus gros (+5 %), parce que l'estimation partait de 343 Mo par Go mesurés sur les échantillons du tokenizer, et que le vrai mélange compresse à 361 Mo par Go. Les jetons le sont un peu aussi (+2 %), à cause de la marge de 1,5 % du téléchargement.
+- **La place n'est plus un problème.** Elle est passée de 44,4 Go à 366,6 Go avant la reprise du téléchargement (tu as libéré de la place), et il en reste 349,7 Go à la fin de l'encodage. Au pic des sauvegardes (19,4 Go de plus), il en restera encore 330,3 Go.
+- **Le texte brut n'a pas été effacé**, contrairement à l'ordre prévu (télécharger, encoder, effacer le texte, entraîner). L'effacement ne servait qu'à gagner de la place, et il y en a largement ; il est irréversible, et retélécharger prendrait près de 2 heures. Les 12,77 Go de `textes/principal` restent donc sur D:. Tu peux les effacer quand tu veux : l'entraînement n'a besoin que des jetons.
 
 ## Refaire la mesure
 
