@@ -126,11 +126,16 @@ Le rapport (`rapport.md` pour la lecture, `rapport.json` pour les programmes) va
 
 - la perte de validation (en nats par jeton), la perplexité (`exp(perte)`) et les bits par octet
   (`perte ÷ ln 2 ÷ octets par jeton`) : la perte ramenée à un octet de texte, la seule qui se compare
-  d'un tokenizer à l'autre. Elle est mesurée sur 1 024 morceaux fixes de `val/` au plus ;
+  d'un tokenizer à l'autre. C'est une estimation : les octets par jeton sont ceux du corpus entier, et la
+  perte compte aussi les fins de texte (écart attendu de l'ordre de quelques millièmes). La perte est mesurée
+  sur 1 024 morceaux fixes de `val/` au plus ;
 - les QCM français de FrenchBench (HellaSwag et ARC-Challenge, des traductions automatiques),
-  comparés au hasard (1 ÷ nombre de choix) avec la marge d'erreur à 95 % : avec peu de questions, un écart
-  au hasard plus petit que la marge ne prouve rien. `--qcm N` limite chaque test à N questions, `--qcm 0` n'en
-  passe aucune (et n'a pas besoin du réseau) ; sinon FrenchBench se télécharge la première fois, et la commande
+  comparés au hasard (1 ÷ nombre de choix). Le verdict est prudent : un score à moins de la marge du hasard
+  (l'intervalle à 95 %  d'un résultat dû au seul hasard, large quand il y a peu de questions) est « pas
+  différent du hasard ». C'est une mesure maison, comparable seulement entre nos modèles et au hasard, pas
+  aux scores publiés de FrenchBench (gabarit des questions, jeton de début et normalisation par octets sont les
+  nôtres). `--qcm N` limite chaque test à ses N premières questions (le rapport le dit), `--qcm 0` n'en passe
+  aucune (et n'a pas besoin du réseau) ; sinon FrenchBench se télécharge la première fois, et la commande
   lève elle-même `HF_HUB_OFFLINE` pour son processus ;
 - dix textes écrits par le modèle à partir de débuts fixes (huit phrases françaises, deux débuts
   de fonction Python), avec une graine fixe : mêmes réglages, mêmes textes.

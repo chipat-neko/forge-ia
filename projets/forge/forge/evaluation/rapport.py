@@ -32,7 +32,7 @@ from forge.entrainement.chargeur import ChargeurJetons
 from forge.entrainement.sauvegarde import charger, charger_derniere, nom_etape, remplacer
 from forge.evaluation.echantillons import TEMPERATURE, TOP_K, echantillons
 from forge.evaluation.perte import bits_par_octet, lire_octets_par_jeton, perplexite, perte_validation
-from forge.evaluation.qcm import charger_frenchbench, evaluer_qcm
+from forge.evaluation.qcm import TOTAL_DES_QUESTIONS, charger_frenchbench, evaluer_qcm
 from forge.modele import ConfigModele, Transformer, nombre_parametres
 from forge.tokenizer.bpe_octets import TokenizerOctets
 
@@ -204,9 +204,9 @@ def evaluer(
             try:
                 questions = charger_frenchbench(nom, n_qcm)
             except Exception as erreur:  # réseau coupé, Hugging Face indisponible, jeu changé…
-                qcm[nom] = {"erreur": f"{type(erreur).__name__} : {erreur}"}
+                qcm[nom] = {"erreur": f"{type(erreur).__name__}{_FINE}: {erreur}"}
                 continue
-            qcm[nom] = evaluer_qcm(modele, tok, questions)
+            qcm[nom] = {**evaluer_qcm(modele, tok, questions), "total_du_test": TOTAL_DES_QUESTIONS[nom]}
 
     textes = echantillons(modele, tok, GRAINE, JETONS_D_ECHANTILLON)
 
@@ -233,9 +233,27 @@ def evaluer(
         "secondes": round(time.perf_counter() - debut, 1),
     }
     sortie.mkdir(parents=True, exist_ok=True)
-    _ecrire_texte(sortie / "rapport.json", json.dumps(rapport, ensure_ascii=False, indent=2) + "\n")
+    _ecrire_texte(
+        sortie / "rapport.json",
+        json.dumps(_json_valide(rapport), ensure_ascii=False, indent=2, allow_nan=False) + "\n",
+    )
     _ecrire_texte(sortie / "rapport.md", rapport_markdown(rapport))
     return rapport
+
+
+def _json_valide(valeur):
+    """Copie de `valeur` où chaque nombre infini ou « NaN » devient `None` (`null` en JSON).
+
+    Python écrit `Infinity` et `NaN`, que JSON ne connaît pas : beaucoup d'analyseurs les refusent.
+    Cela arrive, par exemple, pour la perplexité d'un modèle dont la perte dépasse 709 nats.
+    """
+    if isinstance(valeur, float) and not math.isfinite(valeur):
+        return None
+    if isinstance(valeur, dict):
+        return {cle: _json_valide(element) for cle, element in valeur.items()}
+    if isinstance(valeur, list | tuple):
+        return [_json_valide(element) for element in valeur]
+    return valeur
 
 
 def _ecrire_texte(chemin: Path, texte: str) -> None:
@@ -251,9 +269,22 @@ def _ecrire_texte(chemin: Path, texte: str) -> None:
 # --- Raconter en français -----------------------------------------------------------------
 
 
-def _n(valeur: float, decimales: int = 1) -> str:
-    """Un nombre à la française : virgule décimale, espace fine entre les milliers."""
+def _n(valeur: float | None, decimales: int = 1) -> str:
+    """Un nombre à la française : virgule décimale, espace fine entre les milliers.
+
+    Un nombre infini s'écrit « ∞ » ; un nombre indéfini (`NaN`, ou `None` lu dans un rapport JSON)
+    « indéfini ».
+    """
+    if valeur is None or math.isnan(valeur):
+        return "indéfini"
+    if math.isinf(valeur):
+        return "∞" if valeur > 0 else "−∞"
     return f"{valeur:,.{decimales}f}".replace(",", _FINE).replace(".", ",")
+
+
+def _points(pourcentage: float) -> str:
+    """Une marge en points de pourcentage : « 8,5 points », « 0,9 point » (le pluriel commence à 2)."""
+    return f"{_n(pourcentage)} point{'s' if pourcentage >= 2 else ''}"
 
 
 def _pourcent(proportion: float) -> str:
@@ -264,14 +295,20 @@ def _guillemets(texte: str) -> str:
     return f"«{_FINE}{texte}{_FINE}»"
 
 
-def _verdict(mesures: dict) -> str:
-    """Au-dessus du hasard, en dessous, ou indistinguable : l'écart est comparé à la marge à 95 %."""
+def verdict(mesures: dict) -> str:
+    """« au-dessus du hasard », « en dessous du hasard » ou « pas différent du hasard ».
+
+    On compare l'exactitude normalisée au hasard, avec la marge du HASARD (`marge_hasard`, voir
+    `qcm.evaluer_qcm`) : on demande si un tirage au sort pourrait donner ce score. La marge de la
+    mesure elle-même s'annule à 0 ou 100 % de bonnes réponses et affirmerait « en dessous du hasard »
+    sur 0 bonne réponse sur 5, ce qui arrive une fois sur quatre au hasard avec 4 choix.
+    """
     ecart = mesures["exactitude_normalisee"] - mesures["hasard"]
-    if ecart > mesures["marge_95_normalisee"]:
+    if ecart > mesures["marge_hasard"]:
         return "au-dessus du hasard"
-    if ecart < -mesures["marge_95_normalisee"]:
+    if ecart < -mesures["marge_hasard"]:
         return "en dessous du hasard"
-    return "indistinguable du hasard"
+    return "pas différent du hasard"
 
 
 def _bloc_de_code(texte: str, langage: str) -> str:
@@ -309,8 +346,10 @@ def rapport_markdown(rapport: dict) -> str:
         f"| Perplexité | {_n(rapport['perplexite'])} | exp(perte){_FINE}: le modèle hésite comme s'il choisissait "
         "entre autant de jetons également probables |",
         f"| Octets par jeton | {_n(rapport['octets_par_jeton'], 2)} | la taille moyenne d'un jeton dans les données encodées |",
-        f"| Bits par octet | {_n(rapport['bits_par_octet'], 3)} | perte ÷ ln 2 ÷ octets par jeton{_FINE}: la perte "
-        "ramenée à un octet de texte, comparable d'un tokenizer à l'autre |",
+        f"| Bits par octet (estimation) | {_n(rapport['bits_par_octet'], 3)} | perte ÷ ln 2 ÷ octets par jeton{_FINE}: "
+        "la perte ramenée à un octet de texte, comparable d'un tokenizer à l'autre. "
+        f"Estimation{_FINE}: octets par jeton du corpus entier{_FINE}; la perte compte aussi les fins de texte "
+        "(écart attendu de l'ordre de quelques millièmes) |",
         "",
         "## Questions à choix multiples (FrenchBench)",
         "",
@@ -320,8 +359,8 @@ def rapport_markdown(rapport: dict) -> str:
         lignes += [f"QCM non évalués{_FINE}: cette évaluation a été lancée sans question (`n_qcm = 0`).", ""]
     else:
         lignes += [
-            "| Test | Questions | Exactitude | Exactitude normalisée | Hasard | Verdict |",
-            "| --- | --- | --- | --- | --- | --- |",
+            "| Test | Questions | Exactitude | Exactitude normalisée | Hasard | Marge du hasard | Verdict |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
         ]
         erreurs = []
         for nom, titre in TESTS_QCM.items():
@@ -331,18 +370,20 @@ def rapport_markdown(rapport: dict) -> str:
             if "erreur" in mesures:
                 erreurs.append(f"- **{titre}{_FINE}:** non évalué. {mesures['erreur']}")
                 continue
+            questions = _n(mesures["n"], 0)
+            if rapport["n_qcm"] is not None and mesures["n"] < mesures["total_du_test"]:
+                questions = f"{mesures['n']} premières questions sur {_n(mesures['total_du_test'], 0)}"
             lignes.append(
-                f"| {titre} | {_n(mesures['n'], 0)} "
-                f"| {_pourcent(mesures['exactitude'])} (± {_n(100 * mesures['marge_95'])}) "
-                f"| {_pourcent(mesures['exactitude_normalisee'])} (± {_n(100 * mesures['marge_95_normalisee'])}) "
-                f"| {_pourcent(mesures['hasard'])} | {_verdict(mesures)} |"
+                f"| {titre} | {questions} | {_pourcent(mesures['exactitude'])} "
+                f"| {_pourcent(mesures['exactitude_normalisee'])} | {_pourcent(mesures['hasard'])} "
+                f"| ± {_points(100 * mesures['marge_hasard'])} | {verdict(mesures)} |"
             )
         lignes.append("")
         if erreurs:
             lignes += [
                 *erreurs,
                 "",
-                "Relance `python -m forge evaluer` quand le réseau est de retour : la commande lève elle-même "
+                f"Relance `python -m forge evaluer` quand le réseau est de retour{_FINE}: la commande lève elle-même "
                 "`HF_HUB_OFFLINE` le temps de charger FrenchBench.",
                 "",
             ]
@@ -353,11 +394,16 @@ def rapport_markdown(rapport: dict) -> str:
             "le nombre d'octets du choix, pour ne pas favoriser les réponses courtes.",
             f"- **Hasard**{_FINE}: la part de bonnes réponses d'un tirage au sort (1 ÷ nombre de choix, en "
             "moyenne sur les questions).",
-            f"- **Marge**{_FINE}: entre parenthèses, la demi-largeur de l'intervalle à 95{_FINE}% de la mesure. "
-            "Le verdict compare l'exactitude normalisée au hasard : un écart plus petit que la marge ne "
-            "prouve rien.",
+            f"- **Marge du hasard**{_FINE}: la demi-largeur de l'intervalle à 95{_FINE}% d'un résultat qui ne devrait "
+            f"qu'au hasard, sur ces questions. Le verdict compare l'exactitude normalisée au hasard{_FINE}: à moins "
+            "d'une marge du hasard, le score ne se distingue pas du hasard (avec peu de questions, presque "
+            "tout score est dans ce cas).",
+            f"- **Mesure maison**{_FINE}: comparable seulement entre nos modèles et au hasard, pas aux scores "
+            f"publiés de FrenchBench{_FINE}; le gabarit des questions ({_guillemets(f'Question{_FINE}: … Réponse{_FINE}:')} "
+            "pour ARC, aucune étiquette d'activité pour HellaSwag), le jeton `<|fin_texte|>` placé en tête de chaque "
+            "séquence et la normalisation par octets sont les nôtres.",
             "- Les deux tests sont des traductions automatiques en français de HellaSwag et d'ARC-Challenge "
-            "(CroissantLLM, arXiv 2402.00786) : quelques questions sont mal traduites.",
+            f"(CroissantLLM, arXiv 2402.00786){_FINE}: quelques questions sont mal traduites.",
             "",
         ]
     g = rapport["generation"]
@@ -389,7 +435,8 @@ def resume_court(rapport: dict) -> str:
     lignes = [
         f"Perte de validation{_FINE}: {_n(rapport['perte_val'], 3)} nats par jeton",
         f"Perplexité{_FINE}: {_n(rapport['perplexite'])}",
-        f"Bits par octet{_FINE}: {_n(rapport['bits_par_octet'], 3)} ({_n(rapport['octets_par_jeton'], 2)} octets par jeton)",
+        f"Bits par octet{_FINE}: {_n(rapport['bits_par_octet'], 3)} (estimation, avec {_n(rapport['octets_par_jeton'], 2)} "
+        "octets par jeton)",
     ]
     for nom, titre in TESTS_QCM.items():
         mesures = rapport["qcm"].get(nom)
@@ -400,6 +447,6 @@ def resume_court(rapport: dict) -> str:
         else:
             lignes.append(
                 f"{titre}{_FINE}: {_pourcent(mesures['exactitude'])}, normalisée {_pourcent(mesures['exactitude_normalisee'])}, "
-                f"hasard {_pourcent(mesures['hasard'])}, sur {_n(mesures['n'], 0)} questions ({_verdict(mesures)})"
+                f"hasard {_pourcent(mesures['hasard'])}, sur {_n(mesures['n'], 0)} questions ({verdict(mesures)})"
             )
     return "\n".join(lignes)

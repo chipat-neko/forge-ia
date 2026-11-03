@@ -15,8 +15,14 @@ Deux façons de comparer les choix :
   pour la log-vraisemblance elle-même). On compare des « nats par octet ».
 
 Le hasard, lui, vaut `1 / nombre de choix` (en moyenne sur les questions). Un modèle qui ne
-sait rien tombe autour de cette valeur ; avec peu de questions, l'écart au hasard n'a de sens que
-s'il dépasse la marge d'erreur (`marge_95`).
+sait rien tombe autour de cette valeur, plus ou moins loin selon le nombre de questions : la
+marge du hasard (`marge_hasard`) est la demi-largeur de l'intervalle à 95 % d'un résultat qui ne
+devrait qu'au hasard. Seul un écart plus grand qu'elle dit quelque chose du modèle (le verdict du
+rapport s'appuie sur elle, voir `rapport.verdict`).
+
+Cette mesure est « maison » : le gabarit des questions, le jeton `<|fin_texte|>` en tête de
+chaque séquence et la normalisation par octets sont les nôtres, donc les scores ne se comparent
+qu'entre nos modèles et au hasard, pas aux scores publiés de FrenchBench.
 
 Les deux jeux sont des traductions automatiques en français (CroissantLLM, arXiv 2402.00786).
 """
@@ -48,6 +54,10 @@ JEUX = {
     "hellaswag": ("manu/french_bench_hellaswag", "validation"),
     "arc": ("manu/french_bench_arc_challenge", "test"),
 }
+
+# Nombre de questions de chaque partie, relevé le 03/11/2026 (le rapport dit « les N premières
+# questions sur … » quand il n'en passe qu'une partie).
+TOTAL_DES_QUESTIONS = {"hellaswag": 9338, "arc": 1169}
 
 
 @dataclass
@@ -237,8 +247,23 @@ def scores_qcm(modele, tokenizer, qcms: list[QCM], jetons_par_lot: int = JETONS_
 
 
 def _marge_95(exactitude: float, n: int) -> float:
-    """Demi-largeur de l'intervalle de confiance à 95 % d'une proportion mesurée sur `n` questions."""
+    """Demi-largeur de l'intervalle de confiance à 95 % d'une proportion mesurée sur `n` questions.
+
+    C'est la marge de Wald : elle s'annule quand l'exactitude vaut 0 ou 1, même sur 5 questions.
+    Pour juger un écart au hasard, on utilise `marge_hasard`.
+    """
     return 1.96 * math.sqrt(exactitude * (1 - exactitude) / n)
+
+
+def _marge_hasard(qcms: list[QCM]) -> float:
+    """Demi-largeur de l'intervalle à 95 % de l'exactitude d'un tirage au sort sur ces questions.
+
+    Chaque question est juste avec la probabilité `p = 1 / nombre de choix`, de variance
+    `p (1 - p)` ; ces variances s'additionnent d'une question à l'autre. Elle ne dépend que des
+    questions, jamais du résultat : elle ne s'annule pas à 0 bonne réponse.
+    """
+    variance = sum((1 / len(qcm.choix)) * (1 - 1 / len(qcm.choix)) for qcm in qcms)
+    return 1.96 * math.sqrt(variance) / len(qcms)
 
 
 def evaluer_qcm(modele, tokenizer, qcms: list[QCM], jetons_par_lot: int = JETONS_PAR_LOT) -> dict:
@@ -249,8 +274,11 @@ def evaluer_qcm(modele, tokenizer, qcms: list[QCM], jetons_par_lot: int = JETONS
       d'octets UTF-8 du choix ;
     - `hasard` : moyenne de `1 / nombre de choix` ;
     - `n` : nombre de questions ;
-    - `marge_95` et `marge_95_normalisee` : demi-largeur de l'intervalle à 95 % des deux
-      exactitudes. Un écart au hasard plus petit que cette marge ne prouve rien.
+    - `marge_95` et `marge_95_normalisee` : demi-largeur de l'intervalle à 95 % de chacune des
+      deux exactitudes (marge de Wald : nulle à 0 ou 100 %) ;
+    - `marge_hasard` : demi-largeur de l'intervalle à 95 % d'un résultat dû au seul hasard sur
+      ces questions. Une exactitude à moins de `marge_hasard` du `hasard` ne se distingue pas du
+      hasard ; c'est elle qui sert à juger (`rapport.verdict`).
 
     À égalité parfaite, le premier choix gagne.
     """
@@ -272,4 +300,5 @@ def evaluer_qcm(modele, tokenizer, qcms: list[QCM], jetons_par_lot: int = JETONS
         "n": n,
         "marge_95": _marge_95(exactitude, n),
         "marge_95_normalisee": _marge_95(normalisee, n),
+        "marge_hasard": _marge_hasard(qcms),
     }

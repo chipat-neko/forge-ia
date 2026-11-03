@@ -49,7 +49,7 @@ from forge.evaluation import (
 from forge.evaluation.perte import lire_octets_par_jeton
 from forge.evaluation.qcm import scores_qcm
 from forge.modele import ConfigModele, Transformer
-from forge.tokenizer import TokenizerOctets
+from forge.tokenizer import TokenizerOctets, entrainer_tokenizer
 
 RACINE_DU_PROJET = Path(__file__).resolve().parents[1]
 ESPACE_FINE = " "
@@ -84,28 +84,37 @@ class ModeleFactice(nn.Module):
         return self._scores(ids), None
 
 
-def MODELE_QUI_PREFERE(texte: str, contexte: int = 64) -> ModeleFactice:  # noqa: N802
-    """Un faux modèle dont les logits favorisent les octets de `texte`, dans l'ordre.
+def MODELE_QUI_PREFERE(texte: str, contexte: int = 64, tokenizer: TokenizerOctets = TOK_TEST) -> ModeleFactice:  # noqa: N802
+    """Un faux modèle dont les logits favorisent les jetons de `texte`, dans l'ordre.
 
     À chaque position, il cherche jusqu'où les derniers jetons déjà vus recopient le début de
-    `texte`, et donne un grand score (+10) à l'octet suivant de `texte` ; les autres octets
-    valent 0. Pour le texte « abc » : après « a » il favorise « b », après « ab » il
-    favorise « c ». Une réponse qui recopie `texte` est donc bien plus vraisemblable qu'une autre.
+    `texte` (encodé par `tokenizer` : des octets, avec le tokenizer d'octets purs), et donne un
+    grand score (+10) au jeton suivant de `texte` ; les autres jetons valent 0. Pour le texte
+    « abc » : après « a » il favorise « b », après « ab » il favorise « c ». Une réponse qui
+    recopie `texte` est donc bien plus vraisemblable qu'une autre.
+
+    Un jeton favorisé a pour log-probabilité `10 - ln(e^10 + V - 1)` (V : taille du vocabulaire),
+    tout autre `-ln(e^10 + V - 1)` : de quoi calculer à la main la note exacte d'une réponse.
     """
-    octets = list(texte.encode("utf-8"))
+    jetons = tokenizer.encoder(texte)
 
     def scores(ids: torch.Tensor) -> torch.Tensor:
-        logits = torch.zeros(*ids.shape, VOCABULAIRE)
+        logits = torch.zeros(*ids.shape, tokenizer.taille_vocabulaire)
         for b, ligne in enumerate(ids.tolist()):
             for t in range(len(ligne)):
                 recopies = max(
-                    k for k in range(min(len(octets), t + 1) + 1) if ligne[t + 1 - k : t + 1] == octets[:k]
+                    k for k in range(min(len(jetons), t + 1) + 1) if ligne[t + 1 - k : t + 1] == jetons[:k]
                 )
-                if recopies < len(octets):
-                    logits[b, t, octets[recopies]] = 10.0
+                if recopies < len(jetons):
+                    logits[b, t, jetons[recopies]] = 10.0
         return logits
 
-    return ModeleFactice(scores, contexte=contexte)
+    return ModeleFactice(scores, vocabulaire=tokenizer.taille_vocabulaire, contexte=contexte)
+
+
+def log_normalisation(vocabulaire: int = VOCABULAIRE) -> float:
+    """`ln(e^10 + V - 1)` : ce qu'on retranche aux logits du faux modèle pour avoir des log-probabilités."""
+    return math.log(math.exp(10) + vocabulaire - 1)
 
 
 def ecrire_donnees_test(dossier: Path) -> None:
@@ -145,6 +154,12 @@ def donnees_test(tmp_path_factory) -> Path:
     dossier = tmp_path_factory.mktemp("jetons")
     ecrire_donnees_test(dossier)
     return dossier
+
+
+@pytest.fixture(scope="module")
+def tok_fusions() -> TokenizerOctets:
+    """Un petit tokenizer AVEC fusions (150), appris sur le texte de test : des jetons de plusieurs octets."""
+    return entrainer_tokenizer(PARAGRAPHES, taille_vocabulaire=256 + 150 + 64)
 
 
 @pytest.fixture(scope="module")
@@ -321,6 +336,60 @@ def test_qcm_normalise_par_octets():
     assert r["exactitude"] == 0.0 and r["exactitude_normalisee"] == 1.0
 
 
+def test_qcm_note_exactement_les_jetons_du_choix():
+    """Valeurs exactes : la bonne réponse a 6 jetons favorisés ; l'autre, 1 favorisé et 5 ratés.
+
+    Après « est », le faux modèle favorise l'espace (premier jeton de « bleu. » comme de
+    « xqzv. ») ; ensuite « x » n'est pas le « b » attendu, et ainsi de suite.
+    """
+    ln = log_normalisation()
+    bonne, autre = scores_qcm(MODELE_QUI_PREFERE(" bleu."), TOK_TEST, [QCM(QUESTION_CIEL, [" bleu.", " xqzv."], 0)])[0]
+    assert bonne == pytest.approx(6 * (10 - ln), abs=1e-3)
+    assert autre == pytest.approx((10 - ln) + 5 * (-ln), abs=1e-3)
+
+
+def test_qcm_donne_au_modele_le_debut_le_contexte_puis_le_choix():
+    """La séquence passée au modèle : `<|fin_texte|>`, jetons du contexte, jetons du choix."""
+    vues = []
+    oracle = MODELE_QUI_PREFERE(" bleu.")
+
+    def scores(ids):
+        vues.extend(ids.tolist())
+        return oracle._scores(ids)
+
+    scores_qcm(ModeleFactice(scores), TOK_TEST, [QCM(QUESTION_CIEL, [" bleu.", " xqzv."], 0)])
+    contexte = TOK_TEST.encoder(QUESTION_CIEL)
+    attendues = [[FIN_DE_TEXTE, *contexte, *TOK_TEST.encoder(choix)] for choix in (" bleu.", " xqzv.")]
+    assert sorted(vues) == sorted(attendues)
+
+
+def test_encoder_le_contexte_puis_le_choix_donne_les_memes_jetons_que_le_tout(tok_fusions, monkeypatch):
+    """Le choix commence par son espace : la frontière tombe entre deux pré-mots, même avec des fusions."""
+    qcms = [QCM(QUESTION_CIEL, [" bleu.", " xqzv.", " le souffle du soufflet", " 5 grammes", " (a) l'enclume"], 0)]
+    faux_jeu(monkeypatch, [LIGNE_HELLASWAG_ACTIVITYNET, LIGNE_HELLASWAG_WIKIHOW, LIGNE_HELLASWAG_MARQUEURS_TRADUITS])
+    qcms += charger_frenchbench("hellaswag")
+    faux_jeu(monkeypatch, [LIGNE_ARC, {**LIGNE_ARC, "question": "Combien font 2 + 3 ?", "choices": ["5", "10"]}])
+    qcms += charger_frenchbench("arc")
+    assert len(qcms) == 6
+    assert len(tok_fusions.encoder(" le souffle du soufflet")) < len(" le souffle du soufflet".encode())  # des fusions servent
+    for qcm in qcms:
+        for choix in qcm.choix:
+            ensemble = tok_fusions.encoder(qcm.contexte + choix)
+            assert tok_fusions.encoder(qcm.contexte) + tok_fusions.encoder(choix) == ensemble, (qcm.contexte, choix)
+
+
+def test_qcm_note_exactement_les_jetons_du_choix_avec_des_fusions(tok_fusions):
+    """Avec des jetons de plusieurs octets : la note compte un terme par JETON du choix, ni plus ni moins."""
+    choix = " le souffle du soufflet"
+    jetons = tok_fusions.encoder(choix)
+    assert 2 < len(jetons) < len(choix.encode())
+    modele = MODELE_QUI_PREFERE(choix, tokenizer=tok_fusions)
+    note, autre = scores_qcm(modele, tok_fusions, [QCM(QUESTION_CIEL, [choix, " la forge et l'enclume"], 0)])[0]
+    ln = log_normalisation(tok_fusions.taille_vocabulaire)
+    assert note == pytest.approx(len(jetons) * (10 - ln), abs=1e-3)
+    assert autre < note
+
+
 def test_qcm_hasard_est_la_moyenne_des_inverses():
     qcms = [
         QCM(QUESTION_CIEL, [" a", " b", " c"], 0),
@@ -340,6 +409,40 @@ def test_qcm_donne_une_marge_d_erreur():
     r = evaluer_qcm(MODELE_QUI_PREFERE(" bleu."), TOK_TEST, qcms)
     assert r["exactitude"] == pytest.approx(0.6)
     assert r["marge_95"] == pytest.approx(1.96 * math.sqrt(0.6 * 0.4 / 100))
+
+
+def test_qcm_marge_du_hasard():
+    """La marge à 95 % d'un résultat QUI SERAIT dû au hasard : elle ne s'annule jamais, même à 0 bonne réponse."""
+    qcms = [QCM(QUESTION_CIEL, [" bleu.", " a", " b", " c"], 3)] * 5  # 0 bonne réponse sur 5, 4 choix
+    r = evaluer_qcm(MODELE_QUI_PREFERE(" bleu."), TOK_TEST, qcms)
+    assert r["exactitude"] == 0.0 and r["marge_95"] == 0.0  # la marge de Wald, elle, s'annule à 0
+    assert r["marge_hasard"] == pytest.approx(1.96 * math.sqrt(0.25 * 0.75 / 5))
+    # Questions à 2 et à 4 choix : la variance d'un tirage au sort est la somme de celles des questions.
+    melange = [QCM(QUESTION_CIEL, [" bleu.", " a"], 0)] * 3 + [QCM(QUESTION_CIEL, [" bleu.", " a", " b", " c"], 0)]
+    r = evaluer_qcm(MODELE_QUI_PREFERE(" bleu."), TOK_TEST, melange)
+    variance = 3 * 0.5 * 0.5 + 0.25 * 0.75
+    assert r["marge_hasard"] == pytest.approx(1.96 * math.sqrt(variance) / 4)
+
+
+def mesures_a_quatre_choix(n_justes: int, n: int) -> dict:
+    """`n` questions à 4 choix dont `n_justes` sont bien notées par le faux modèle (les autres, jamais)."""
+    juste = QCM(QUESTION_CIEL, [" bleu.", " a", " b", " c"], 0)
+    fausse = QCM(QUESTION_CIEL, [" bleu.", " a", " b", " c"], 3)
+    return evaluer_qcm(MODELE_QUI_PREFERE(" bleu."), TOK_TEST, [juste] * n_justes + [fausse] * (n - n_justes))
+
+
+def test_verdict_est_prudent_avec_peu_de_questions():
+    from forge.evaluation.rapport import verdict
+
+    # 0 sur 5 et 0 sur 10 (hasard : 25 %) : un tel score arrive souvent par hasard, on ne conclut rien.
+    assert verdict(mesures_a_quatre_choix(0, 5)) == "pas différent du hasard"
+    assert verdict(mesures_a_quatre_choix(0, 10)) == "pas différent du hasard"
+    assert verdict(mesures_a_quatre_choix(25, 100)) == "pas différent du hasard"
+    # Une seule question juste (hasard : 25 %) ne prouve rien non plus, dans l'autre sens.
+    assert verdict(mesures_a_quatre_choix(1, 1)) == "pas différent du hasard"
+    # Beaucoup de questions : l'écart se voit, dans les deux sens.
+    assert verdict(mesures_a_quatre_choix(40, 50)) == "au-dessus du hasard"
+    assert verdict(mesures_a_quatre_choix(0, 100)) == "en dessous du hasard"
 
 
 def test_qcm_contexte_plus_long_que_le_modele():
@@ -594,6 +697,17 @@ def lire_rapport(dossier: Path) -> tuple[dict, str]:
     return rapport, (dossier / "rapport.md").read_text(encoding="utf-8")
 
 
+def verifier_typographie(md: str) -> None:
+    """Espace fine insécable avant « : », « ; », « ! », « ? », « % » et dans les guillemets, jamais une
+    espace ordinaire (hors des blocs de code, où le modèle écrit ce qu'il veut)."""
+    texte = re.sub(r"(`{3,}).*?\1", "", md, flags=re.DOTALL)
+    for signe in (":", ";", "!", "?", "»", "%"):
+        if f" {signe}" in texte:
+            debut = texte.index(f" {signe}")
+            raise AssertionError(f"espace ordinaire avant {signe!r} : {texte[max(0, debut - 50) : debut + 10]!r}")
+    assert "« " not in texte
+
+
 def test_rapport_ecrit_json_et_markdown_en_francais(tmp_path, sauvegarde_minuscule, donnees_test, tok_fichier_test):
     r = evaluer(sauvegarde_minuscule, donnees_test, tok_fichier_test, tmp_path / "sortie", n_qcm=0, appareil="cpu")
     ecrit, md = lire_rapport(tmp_path / "sortie")
@@ -615,10 +729,10 @@ def test_rapport_ecrit_json_et_markdown_en_francais(tmp_path, sauvegarde_minuscu
     # … et la typographie française : espace fine insécable avant « : », « ; », « ! », « ? » et
     # dans les guillemets, jamais une espace ordinaire (hors des textes écrits par le modèle).
     assert f"Sauvegarde{ESPACE_FINE}:" in md
-    texte = re.sub(r"(`{3,}).*?\1", "", md, flags=re.DOTALL)
-    for signe in (":", ";", "!", "?", "»"):
-        assert f" {signe}" not in texte
-    assert "« " not in texte
+    verifier_typographie(md)
+    # Les bits par octet sont une estimation, et le rapport le dit.
+    assert "Bits par octet (estimation)" in md and "octets par jeton du corpus entier" in md
+    assert "la perte compte aussi les fins de texte" in md
     for invite in INVITES:
         assert invite.strip() in md
 
@@ -639,10 +753,19 @@ def test_rapport_avec_qcm(tmp_path, monkeypatch, sauvegarde_minuscule, donnees_t
     assert ecrit["qcm"] == json.loads(json.dumps(r["qcm"]))
     assert "HellaSwag" in md and "ARC-Challenge" in md and "hasard" in md.lower()
     assert f"33,3{ESPACE_FINE}%" in md  # le hasard, à la française
+    verifier_typographie(md)
+    # La marge du hasard a son unité ; le verdict est prudent (12 questions) ; la mesure n'est pas celle des autres.
+    assert re.search(r"± \d+,\d points?", md)
+    assert "pas différent du hasard" in md
+    assert "pas aux scores publiés" in md and "comparable seulement entre nos modèles et au hasard" in md
+    # Quand le nombre de questions est limité, le rapport dit sur combien de questions le test existe.
+    assert f"12 premières questions sur 9{ESPACE_FINE}338" in md and f"12 premières questions sur 1{ESPACE_FINE}169" in md
+    assert (r["qcm"]["hellaswag"]["total_du_test"], r["qcm"]["arc"]["total_du_test"]) == (9338, 1169)
     # Toutes les questions : `None` est transmis tel quel.
     appels.clear()
     evaluer(sauvegarde_minuscule, donnees_test, tok_fichier_test, tmp_path, n_qcm=None, appareil="cpu")
     assert appels == [("hellaswag", None), ("arc", None)]
+    assert "premières questions" not in lire_rapport(tmp_path)[1]  # toutes les questions : rien à préciser
 
 
 def test_rapport_garde_les_mesures_si_frenchbench_est_injoignable(
@@ -657,6 +780,29 @@ def test_rapport_garde_les_mesures_si_frenchbench_est_injoignable(
     assert r["perplexite"] > 1 and len(r["echantillons"]) == 10  # le reste est bien là
     _, md = lire_rapport(tmp_path)
     assert "huggingface.co" in md and "Relance" in md
+    assert f"ConnectionError{ESPACE_FINE}: Impossible" in md  # le nom de l'erreur, typographié
+    verifier_typographie(md)
+
+
+def test_rapport_ecrit_null_et_jamais_infinity(
+    tmp_path, monkeypatch, sauvegarde_minuscule, donnees_test, tok_fichier_test
+):
+    """Une perte énorme donne une perplexité infinie : le JSON écrit `null`, un JSON valide partout."""
+    monkeypatch.setattr("forge.evaluation.rapport.perte_validation", lambda *arguments, **options: 1000.0)
+    r = evaluer(sauvegarde_minuscule, donnees_test, tok_fichier_test, tmp_path, n_qcm=0, appareil="cpu")
+    assert r["perplexite"] == math.inf
+    texte = (tmp_path / "rapport.json").read_text(encoding="utf-8")
+    assert "Infinity" not in texte and "NaN" not in texte
+
+    def refuser(constante):
+        raise ValueError(f"constante non JSON : {constante}")
+
+    ecrit = json.loads(texte, parse_constant=refuser)  # un analyseur strict accepte le fichier
+    assert ecrit["perplexite"] is None and ecrit["perte_val"] == 1000.0
+    assert ecrit["bits_par_octet"] == pytest.approx(1000 / math.log(2))  # fini : écrit tel quel
+    md = (tmp_path / "rapport.md").read_text(encoding="utf-8")
+    assert "| Perplexité | ∞ |" in md
+    verifier_typographie(md)
 
 
 def test_rapport_lit_une_etape_ou_un_dossier(tmp_path, sauvegardes_minuscules, donnees_test, tok_fichier_test):
