@@ -11,6 +11,7 @@
 //    unité UTF-16 (comme le « < » de JavaScript sur les chaînes).
 
 import corpus from '../../../projets/1.3-tokenizer/donnees/corpus.txt?raw';
+import { comparerPointsDeCode } from './points-de-code';
 
 // Un « pré-jeton » est un mot qui garde l'espace qui le précède (comme dans GPT).
 // De gauche à droite, le motif essaie dans cet ordre :
@@ -55,24 +56,11 @@ interface Symbole {
   id: number | null;
 }
 
-/**
- * Compare deux textes par point de code, comme le fait Python.
- *
- * Le « < » de JavaScript compare les unités UTF-16 : il rangerait « 🙂 »
- * (D83D DE42) avant « U+FFFD », alors que son point de code (U+1F642) est plus
- * grand. Un texte qui est le début d'un autre passe avant lui.
- */
-export function comparerPointsDeCode(a: string, b: string): number {
-  let i = 0;
-  while (i < a.length && i < b.length) {
-    const pa = a.codePointAt(i) as number;
-    const pb = b.codePointAt(i) as number;
-    if (pa !== pb) return pa < pb ? -1 : 1;
-    // Deux points de code égaux occupent autant d'unités : i vaut pour a et pour b.
-    i += pa > 0xffff ? 2 : 1;
-  }
-  return Math.sign(a.length - b.length);
-}
+// Le comparateur par point de code vit dans un module sans effet de bord
+// (points-de-code.ts) : les démos l'utilisent sans charger ce tokenizer, qui
+// apprend ses fusions dès qu'on l'importe. On le ré-exporte ici : l'interface
+// de ce module ne change pas.
+export { comparerPointsDeCode };
 
 /** Découpe un texte en pré-jetons : « Le forgeron » donne ["Le", " forgeron"]. */
 export function preDecouper(texte: string): string[] {

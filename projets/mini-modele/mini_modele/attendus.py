@@ -35,6 +35,7 @@ from mini_modele.calcul import (
     log,
     vers_hex,
 )
+from mini_modele.donnees import FICHIER_PRENOMS, decoder, preparer, prenoms_du_texte
 
 DOSSIER_TESTS = Path(__file__).resolve().parent.parent / "tests"
 
@@ -116,9 +117,30 @@ def calculer_attendus_calcul() -> dict:
     }
 
 
+def calculer_attendus_donnees() -> dict:
+    """Les attendus des prénoms (tests/attendus-donnees.json) : le fichier, le vocabulaire et le partage."""
+    texte = FICHIER_PRENOMS.read_bytes().decode("utf-8")
+    donnees = preparer(prenoms_du_texte(texte))
+    entrainement = [decoder(s, donnees.vocabulaire) for s in donnees.entrainement]
+    validation = [decoder(s, donnees.vocabulaire) for s in donnees.validation]
+    return {
+        "nb_prenoms": len(entrainement) + len(validation),
+        "empreinte_fichier": empreinte_texte(texte),
+        "vocabulaire": donnees.vocabulaire,
+        "nb_entrainement": len(entrainement),
+        "nb_validation": len(validation),
+        "entrainement_10": entrainement[:10],
+        "validation_10": validation[:10],
+        # Toute la suite, dans l'ordre : un seul prénom déplacé change l'empreinte.
+        "empreinte_entrainement": empreinte_texte("\n".join(entrainement)),
+        "empreinte_validation": empreinte_texte("\n".join(validation)),
+    }
+
+
 # Chaque fichier tests/attendus-<nom>.json et la fonction qui le calcule.
 CALCULS: dict[str, Callable[[], dict]] = {
     "calcul": calculer_attendus_calcul,
+    "donnees": calculer_attendus_donnees,
 }
 
 

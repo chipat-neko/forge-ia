@@ -25,7 +25,7 @@ const INTERDITS =
 const VERIFIES = ['calcul', 'donnees', 'attention', 'modele', 'entrainement', 'exemple-attention'];
 // Les fichiers vérifiés qui doivent déjà exister : sans cette liste, un fichier
 // mal nommé ne serait jamais lu. Elle grandit à chaque tâche du plan 3.
-const OBLIGATOIRES = ['calcul'];
+const OBLIGATOIRES = ['calcul', 'donnees'];
 // Les seules fonctions de Math permises. Les autres (max, min, fround, cbrt…)
 // arrondissent autrement que le Python, ou traitent −0 autrement.
 const MATH_PERMIS = new Set(['sqrt', 'floor', 'imul']);

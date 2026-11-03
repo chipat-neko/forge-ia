@@ -1,0 +1,33 @@
+{
+ "nb_prenoms": 5279,
+ "empreinte_fichier": "da271fd0",
+ "vocabulaire": ".-abcdefghijklmnopqrstuvwxyzàâçèéëîïôöûü",
+ "nb_entrainement": 4752,
+ "nb_validation": 527,
+ "entrainement_10": [
+  "emmanuel",
+  "christ",
+  "félicia",
+  "aristide",
+  "jaden",
+  "jannah",
+  "wahib",
+  "joffrey",
+  "maho",
+  "natasha"
+ ],
+ "validation_10": [
+  "marine",
+  "chaïma",
+  "kayna",
+  "léandro",
+  "élio",
+  "anne-elisabeth",
+  "maureen",
+  "lila",
+  "gisèle",
+  "aaron"
+ ],
+ "empreinte_entrainement": "c453d332",
+ "empreinte_validation": "a5d2e589"
+}
