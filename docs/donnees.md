@@ -97,6 +97,16 @@ uv run --extra gpu python -m forge donnees --octets 300M --dossier echantillon
 La commande lève `HF_HUB_OFFLINE=1`, s'il est posé dans la session, pour ce téléchargement
 seulement : elle a besoin du réseau.
 
+Pour un volume hors mélange (par exemple assez de texte pour mesurer la compression sur 1 Mo
+de validation de chaque source), `--parts` remplace `--octets` et donne un volume par source :
+
+```powershell
+uv run --extra gpu python -m forge donnees --parts web_fr=400M,wikipedia_fr=350M,code_python=300M --dossier validation-tokenizer
+```
+
+Les trois sources doivent y figurer, dans n'importe quel ordre ; `--octets` et `--parts` ne se
+donnent pas ensemble.
+
 ## Ce que fait l'encodage
 
 L'encodage lit les fragments de texte et les écrit en jetons, avec le tokenizer de ton IA. Il

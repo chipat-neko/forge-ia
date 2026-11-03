@@ -661,6 +661,68 @@ def test_sous_commande_donnees(tmp_path, monkeypatch, capsys):
     assert sum(octets for _, octets, _ in appels) == 300 * 1024**2
 
 
+def test_parts_en_octets():
+    from forge.__main__ import parts_en_octets
+
+    attendu = {"web_fr": 400 * 1024**2, "wikipedia_fr": 350 * 1024**2, "code_python": 300 * 1024**2}
+    assert parts_en_octets("web_fr=400M,wikipedia_fr=350M,code_python=300M") == attendu
+    # Dans n'importe quel ordre, avec des espaces ; le résultat suit l'ordre du mélange.
+    lu = parts_en_octets(" code_python = 300M , web_fr=400m,wikipedia_fr=350Mo ")
+    assert lu == attendu and list(lu) == list(MELANGE_PAR_DEFAUT)
+    for texte, message in [
+        ("web_fr=400M,wikipedia_fr=350M", "code_python"),  # une source manque
+        ("web_fr=1M,wikipedia_fr=1M,code_python=1M,rust=1M", "rust"),  # source inconnue
+        ("web_fr=1M,web_fr=2M,wikipedia_fr=1M,code_python=1M", "deux fois"),
+        ("web_fr=1M,wikipedia_fr=1M,code_python", "nom=taille"),  # pas de « = »
+        ("web_fr=beaucoup,wikipedia_fr=1M,code_python=1M", "taille illisible"),
+        ("web_fr=0,wikipedia_fr=1M,code_python=1M", "positive"),
+        ("", "web_fr"),
+    ]:
+        with pytest.raises(Exception, match=message):
+            parts_en_octets(texte)
+
+
+def test_sous_commande_donnees_avec_un_volume_par_source(tmp_path, monkeypatch, capsys):
+    from forge.donnees import telechargement
+
+    monkeypatch.setenv("FORGE_DONNEES", str(tmp_path))
+    appels = []
+
+    def faux_telecharger(source, octets_max, dossier, lecteur=None, **options):
+        appels.append((source.nom, octets_max, dossier))
+        dossier.mkdir(parents=True, exist_ok=True)
+        (dossier / ".complet").write_text("", encoding="utf-8")
+        return dossier
+
+    monkeypatch.setattr(telechargement, "telecharger", faux_telecharger)
+    # Les volumes sont ceux demandés, pas ceux du mélange, et les sources se suivent dans l'ordre du mélange.
+    code = main(["donnees", "--parts", "code_python=3K,web_fr=1K,wikipedia_fr=2K", "--dossier", "large"])
+    assert code == 0
+    racine = tmp_path / "textes" / "large"
+    assert appels == [
+        ("web_fr", 1024, racine / "web_fr"),
+        ("wikipedia_fr", 2048, racine / "wikipedia_fr"),
+        ("code_python", 3072, racine / "code_python"),
+    ]
+    assert "Textes prêts" in capsys.readouterr().out
+    # --octets et --parts s'excluent, et l'un des deux est obligatoire : message français, code 2.
+    for arguments in (
+        ["donnees", "--octets", "1M", "--parts", "web_fr=1K,wikipedia_fr=1K,code_python=1K", "--dossier", "x"],
+        ["donnees", "--dossier", "x"],
+    ):
+        with pytest.raises(SystemExit) as sortie:
+            main(arguments)
+        assert sortie.value.code == 2
+        erreur = capsys.readouterr().err
+        assert "--octets" in erreur and "--parts" in erreur and "un seul des deux" in erreur
+    # Une part illisible est refusée avant tout téléchargement.
+    appels.clear()
+    with pytest.raises(SystemExit) as sortie:
+        main(["donnees", "--parts", "web_fr=1K", "--dossier", "x"])
+    assert sortie.value.code == 2 and appels == []
+    assert "code_python" in capsys.readouterr().err
+
+
 def test_sous_commande_donnees_leve_le_mode_hors_ligne(tmp_path, monkeypatch, capsys):
     from forge.donnees import telechargement
 

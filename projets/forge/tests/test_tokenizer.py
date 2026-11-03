@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from forge.__main__ import main, taille_en_octets
-from forge.donnees.melange import est_validation
+from forge.__main__ import construire_parseur, main, taille_en_octets
+from forge.donnees.melange import MELANGE_PAR_DEFAUT, est_validation
 from forge.donnees.nettoyage import empreinte_du_texte_nettoye
 from forge.tokenizer import (
     MOTIF_TON_IA,
@@ -467,6 +467,153 @@ def test_sous_commande_tokenizer(tmp_path, monkeypatch, capsys):
     # Données absentes : message français et code de sortie 1, sans trace Python.
     assert main(["tokenizer", "--donnees", "absent", "--sortie", str(sortie)]) == 1
     assert "python -m forge donnees" in capsys.readouterr().err
+
+
+# --- Mesure de la compression ---------------------------------------------------
+
+
+MOTIFS_PAR_SOURCE = {"web_fr": "forgeron", "wikipedia_fr": "enclume", "code_python": "def fusionner"}
+
+
+def _dossier_pour_compression(racine: Path) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """Un faux téléchargement où chaque source a son vocabulaire et mêle validation et apprentissage.
+
+    Renvoie, par source, les documents d'apprentissage et ceux de validation, dans l'ordre où ils
+    sont rangés dans le fragment (un document de validation toutes les sept lignes environ).
+    """
+    dossier = racine / "textes" / "compression"
+    apprentissage: dict[str, list[str]] = {}
+    validation: dict[str, list[str]] = {}
+    for source, motif in MOTIFS_PAR_SOURCE.items():
+        apprentissage[source] = _documents_a_motif(False, 30, motif)
+        validation[source] = _documents_a_motif(True, 4, motif)
+        a_ranger = iter(validation[source])
+        textes: list[str] = []
+        for i, texte in enumerate(apprentissage[source]):
+            textes.append(texte)
+            if i % 7 == 3:
+                textes.append(next(a_ranger))
+        (dossier / source).mkdir(parents=True)
+        _ecrire_fragment(dossier / source / "fragment-00000.jsonl.gz", textes)
+        (dossier / source / ".complet").write_text("", encoding="utf-8")
+    return apprentissage, validation
+
+
+def _premiers_jusqu_a(textes: list[str], minimum: int) -> list[str]:
+    """Les premiers documents entiers, jusqu'à atteindre `minimum` octets."""
+    pris: list[str] = []
+    octets = 0
+    for texte in textes:
+        pris.append(texte)
+        octets += len(texte.encode("utf-8"))
+        if octets >= minimum:
+            break
+    return pris
+
+
+def _tokenizer_de_mesure() -> TokenizerOctets:
+    return entrainer_tokenizer(CORPUS_DE_TEST, 256 + 64 + 100)
+
+
+def test_mesurer_compression_sur_la_validation(tmp_path):
+    from forge.tokenizer.compression import mesurer_compression
+
+    _, validation = _dossier_pour_compression(tmp_path)
+    tok = _tokenizer_de_mesure()
+    dossier = tmp_path / "textes" / "compression"
+    resultat = mesurer_compression(tok, dossier, 600)
+    assert resultat["partie"] == "validation" and resultat["octets_par_source"] == 600
+    assert resultat["tokenizer"] == tok.nom
+    total_octets = total_jetons = total_documents = 0
+    jetons_par_octet = 0.0
+    for source, part in MELANGE_PAR_DEFAUT.items():
+        pris = _premiers_jusqu_a(validation[source], 600)
+        octets = sum(len(t.encode("utf-8")) for t in pris)
+        jetons = sum(len(tok.encoder(t)) for t in pris)
+        mesure = resultat["sources"][source]
+        # Seuls les documents de validation comptent, entiers, dans l'ordre, jusqu'à 600 octets.
+        assert 1 < len(pris) < len(validation[source])
+        assert mesure["documents"] == len(pris)
+        assert mesure["octets"] == octets and mesure["jetons"] == jetons
+        assert mesure["caracteres"] == sum(len(t) for t in pris)
+        assert mesure["octets_par_jeton"] == pytest.approx(octets / jetons)
+        assert mesure["caracteres_par_jeton"] == pytest.approx(mesure["caracteres"] / jetons)
+        jetons_par_octet += part * jetons / octets
+        total_octets, total_jetons, total_documents = total_octets + octets, total_jetons + jetons, total_documents + len(pris)
+    # Le mélange pèse les sources par leurs parts (en octets) ; « bout à bout » les compte à égalité.
+    assert resultat["melange"]["octets_par_jeton"] == pytest.approx(1 / jetons_par_octet)
+    assert resultat["bout_a_bout"] == {
+        "documents": total_documents,
+        "octets": total_octets,
+        "jetons": total_jetons,
+        "octets_par_jeton": pytest.approx(total_octets / total_jetons),
+    }
+    # Les sources n'ont pas le même vocabulaire : leurs compressions diffèrent.
+    assert len({mesure["octets_par_jeton"] for mesure in resultat["sources"].values()}) == 3
+
+
+def test_mesurer_compression_sur_l_apprentissage_et_refus(tmp_path):
+    from forge.tokenizer.compression import mesurer_compression
+
+    apprentissage, validation = _dossier_pour_compression(tmp_path)
+    tok = _tokenizer_de_mesure()
+    dossier = tmp_path / "textes" / "compression"
+    resultat = mesurer_compression(tok, dossier, 600, partie="apprentissage")
+    assert resultat["partie"] == "apprentissage"
+    for source in MELANGE_PAR_DEFAUT:
+        pris = _premiers_jusqu_a(apprentissage[source], 600)
+        assert resultat["sources"][source]["documents"] == len(pris)
+        assert resultat["sources"][source]["octets"] == sum(len(t.encode("utf-8")) for t in pris)
+    # Pas assez de validation : la mesure échoue, elle ne se contente pas de moins.
+    with pytest.raises(ValueError, match=r"ne contient que .* octets de documents de validation") as erreur:
+        mesurer_compression(tok, dossier, 100_000)
+    assert "web_fr" in str(erreur.value) and "python -m forge donnees --parts" in str(erreur.value)
+    with pytest.raises(ValueError, match="positif"):
+        mesurer_compression(tok, dossier, 0)
+    with pytest.raises(ValueError, match="validation.*apprentissage"):
+        mesurer_compression(tok, dossier, 600, partie="test")
+    # Un téléchargement inachevé n'est jamais mesuré.
+    (dossier / "web_fr" / ".complet").unlink()
+    with pytest.raises(DonneesManquantes, match="complet"):
+        mesurer_compression(tok, dossier, 600)
+
+
+def test_sous_commande_compression(tmp_path, monkeypatch, capsys):
+    from forge.tokenizer.compression import mesurer_compression
+
+    monkeypatch.setenv("FORGE_DONNEES", str(tmp_path))
+    _dossier_pour_compression(tmp_path)
+    tok = _tokenizer_de_mesure()
+    fichier = tmp_path / "tok.json"
+    tok.enregistrer(fichier)
+    attendu = mesurer_compression(TokenizerOctets.charger(fichier), tmp_path / "textes" / "compression", 600)
+
+    assert main(["compression", "--donnees", "compression", "--tokenizer", str(fichier), "--octets", "600"]) == 0
+    sortie = capsys.readouterr().out
+    for source in MELANGE_PAR_DEFAUT:
+        ligne = next(ligne for ligne in sortie.splitlines() if ligne.startswith(source))
+        mesure = attendu["sources"][source]
+        assert f"{mesure['octets_par_jeton']:.2f}".replace(".", ",") in ligne
+        assert f"{mesure['caracteres_par_jeton']:.2f}".replace(".", ",") in ligne
+        assert str(mesure["documents"]) in ligne
+    assert "Mélange" in sortie and f"{attendu['melange']['octets_par_jeton']:.2f}".replace(".", ",") in sortie
+    assert "bout à bout" in sortie and "documents de validation" in sortie
+    # `--partie apprentissage` mesure les autres documents.
+    code = main(["compression", "--donnees", "compression", "--tokenizer", str(fichier), "--octets", "600",
+                 "--partie", "apprentissage"])
+    assert code == 0 and "documents d'apprentissage" in capsys.readouterr().out
+    # Erreurs : message français sur stderr, code 1, sans trace Python.
+    assert main(["compression", "--donnees", "absent", "--tokenizer", str(fichier)]) == 1
+    assert "python -m forge donnees" in capsys.readouterr().err
+    assert main(["compression", "--donnees", "compression", "--tokenizer", str(fichier), "--octets", "10M"]) == 1
+    erreur = capsys.readouterr().err
+    assert erreur.startswith("Erreur : ") and "ne contient que" in erreur and "Traceback" not in erreur
+    assert main(["compression", "--donnees", "compression", "--tokenizer", str(tmp_path / "absent.json")]) == 1
+    assert "introuvable" in capsys.readouterr().err
+    # Par défaut : le tokenizer figé du dépôt, et 1 Mo par source.
+    choix = construire_parseur().parse_args(["compression", "--donnees", "x"])
+    assert choix.octets == 1024**2 and choix.partie == "validation"
+    assert Path(choix.tokenizer).name == "tokenizer-ton-ia-v1.json" and Path(choix.tokenizer).is_file()
 
 
 def test_taille_en_octets():

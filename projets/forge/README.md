@@ -67,18 +67,32 @@ parts du mélange (75 % de web, 10 % de Wikipédia, 15 % de code) :
 
 ```powershell
 uv run --extra gpu python -m forge tokenizer --donnees echantillon-tokenizer `
-    --taille 32768 --nom ton-ia-v1 --sortie forge/ressources/tokenizer-ton-ia-v1.json --octets-max 300M
+    --taille 32768 --nom ton-ia-v1 --octets-max 300M --sortie "$env:FORGE_DONNEES\essai-tokenizer.json"
 ```
+
+Le fichier écrit ici est **hors du dépôt** (`essai-tokenizer.json`, sous `FORGE_DONNEES`) : le
+tokenizer définitif de ton IA, `ton-ia-v1`, est déjà appris sur 300 Mo de français et de code, et
+rangé dans le dépôt, `forge/ressources/tokenizer-ton-ia-v1.json`. **Il est figé** pour tout le
+reste du parcours (les tests de `tests/test_tokenizer_ton_ia.py` le vérifient octet pour octet),
+et il ne faut jamais l'écraser. Pour refaire l'expérience, on écrit ailleurs, puis on compare les
+empreintes (`Get-FileHash -Algorithm SHA256`) : voir `docs/mesures/tokenizer-ton-ia-v1.md`.
 
 Les documents de validation (ceux que `encoder` rangera dans `val/`, 0,5 % des documents) ne
 servent pas à apprendre, pour que la compression mesurée dessus soit honnête. Si les textes ne
 suffisent pas pour toutes les fusions, la commande échoue sans rien écrire.
 
-Le tokenizer définitif de ton IA, `ton-ia-v1`, est déjà appris sur 300 Mo de français et de
-code, et rangé dans le dépôt : `forge/ressources/tokenizer-ton-ia-v1.json`. **Il est figé** pour
-tout le reste du parcours (les tests de `tests/test_tokenizer_ton_ia.py` le vérifient octet pour
-octet) ; ses mesures sont dans `docs/mesures/tokenizer-ton-ia-v1.md`. Il n'y a donc pas à le
-réapprendre : la commande ci-dessus sert à refaire l'expérience.
+`compression` mesure les octets par jeton d'un tokenizer (celui du dépôt par défaut) sur environ
+1 Mo de documents de validation de chaque source, et pour le mélange. Il lui faut des textes
+téléchargés assez gros pour contenir 1 Mo de validation par source, donc un volume par source
+avec `--parts` (au lieu de `--octets`) :
+
+```powershell
+uv run --extra gpu python -m forge donnees --parts web_fr=400M,wikipedia_fr=350M,code_python=300M `
+    --dossier validation-tokenizer
+uv run --extra gpu python -m forge compression --donnees validation-tokenizer
+```
+
+Les chiffres du tokenizer figé sont dans `docs/mesures/tokenizer-ton-ia-v1.md`.
 
 Dans le code : `TokenizerOctets.charger(chemin)`, puis `encoder(texte)` et
 `decoder(ids)`. L'encodeur n'émet jamais de jeton spécial ; on les ajoute avec

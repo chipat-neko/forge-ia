@@ -56,13 +56,13 @@ l'Explorateur de Windows). Le téléchargement a duré 51,7 s.
 - **Estimation :** l'essai a pris 1,2 s pour lire et pré-découper 10 Mo, puis environ 1 s pour
   2 000 fusions. Pour 300 Mo (30 fois plus de texte) et 32 448 fusions (16 fois plus), on compte
   sans aucune économie : 36 s de lecture, plus 1 s × 16 × 30 = 480 s de fusions, soit un peu moins
-  de 9 minutes, bien sous la limite de 30 minutes fixée pour décider s'il fallait réduire
-  l'échantillon. En vrai, les dernières fusions sont très rapides (leurs paires sont rares) : la
+  de 9 minutes : assez court pour apprendre sur tout l'échantillon de 300 Mo, sans le réduire.
+  En vrai, les dernières fusions sont très rapides (leurs paires sont rares) : la
   durée réelle est environ neuf fois plus courte.
-- **Un seul fil :** l'apprentissage d'un BPE est une suite de choix qui dépendent les uns des
-  autres, il ne se répartit pas sur les 16 fils du processeur. Il ne dépasse pas 30 minutes, donc
-  la règle « essai sur carte graphique et sur processeur » ne s'applique pas ; la carte graphique
-  ne sert à rien ici.
+- **Un seul fil, sur le processeur :** choisir chaque fusion dépend des précédentes, donc cette
+  partie de l'apprentissage est séquentielle (seul le pré-découpage des textes pourrait se partager
+  entre plusieurs fils). Comme tout dure une minute environ, on n'a cherché ni à l'accélérer ni à
+  l'essayer sur la carte graphique.
 - **Déterminisme :** deux apprentissages sur le même échantillon donnent un fichier identique octet
   pour octet. Empreinte SHA-256 des deux fichiers :
   `3001e7ab40630739c4dec807c7a92c0d4fb469cc0fc4afa368704395391f21ba`.
@@ -73,12 +73,14 @@ On mesure les **octets par jeton** : les octets UTF-8 d'un texte divisés par 
 que donne `encoder` (sans le jeton `<|fin_texte|>` de chaque document). Plus le chiffre est grand,
 mieux le tokenizer compresse : un texte tient dans moins de jetons.
 
-Les textes de validation viennent d'un téléchargement plus large que l'échantillon (web 400 Mo,
-Wikipédia 350 Mo, code 300 Mo), car 0,5 % de l'échantillon ne suffit pas à fournir 1 Mo de
-Wikipédia ou de code (il n'y en a que 0,19 Mo et 0,26 Mo). C'est le même flux, avec le même
-nettoyage et le même dédoublonnage : le début de ce téléchargement est identique, document
-pour document, à l'échantillon d'apprentissage. On prend les documents de validation entiers,
-dans l'ordre du flux, jusqu'à dépasser 1 Mo.
+La mesure est faite par la commande `python -m forge compression` (voir « Refaire la mesure »
+plus bas). Les textes de validation viennent d'un téléchargement plus large que l'échantillon
+(web 400 Mo, Wikipédia 350 Mo, code 300 Mo, obtenu avec `python -m forge donnees --parts`), car
+0,5 % de l'échantillon ne suffit pas à fournir 1 Mo de Wikipédia ou de code (il n'y en a que
+0,19 Mo et 0,26 Mo). C'est le même flux, avec le même nettoyage et le même dédoublonnage : le
+début de ce téléchargement est identique, document pour document, à l'échantillon
+d'apprentissage. La commande prend les documents de validation entiers, dans l'ordre du flux,
+jusqu'à dépasser 1 Mo par source, et refuse de mesurer si une source en a moins.
 
 | Texte de validation | Documents | Octets | Jetons | Octets par jeton | Caractères par jeton |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -92,10 +94,10 @@ dans l'ordre du flux, jusqu'à dépasser 1 Mo.
   jetons par octet de chaque source, pondérée par les parts du mélange (en octets). Les trois
   textes « mis bout à bout » comptent chaque source à égalité (à peu près 1 Mo chacune) : le
   code, qui compresse moins, y pèse plus que dans l'entraînement.
-- **Pas de surapprentissage :** sur 1 Mo de documents d'apprentissage de chaque source (les
-  premiers de l'échantillon), le tokenizer compresse à peine mieux : 4,53 (web), 4,44 (Wikipédia),
-  3,84 (code), 4,41 pour le mélange. L'écart avec la validation est de 0,03 à 0,09 octet par
-  jeton selon la source : il a appris des habitudes de la langue et du code, pas des documents.
+- **Pas de signe de surapprentissage :** sur 1 Mo de documents d'apprentissage de chaque source
+  (les premiers de l'échantillon), le tokenizer compresse à peine mieux : 4,53 (web), 4,44
+  (Wikipédia), 3,84 (code), 4,41 pour le mélange. L'écart avec la validation est faible, de 0,03
+  à 0,09 octet par jeton selon la source.
 - Le français compresse à plus de 4 octets par jeton, soit environ 4,3 caractères par jeton.
   Le code en demande davantage (3,75) à cause de l'indentation, des symboles et des noms propres
   au code.
@@ -158,16 +160,40 @@ le même échantillon, obligerait à tout réencoder et à tout réentraîner.
 - Si un jour un autre tokenizer est vraiment nécessaire, il portera un autre nom (`ton-ia-v2`) et
   un autre fichier, à côté de celui-ci ; `ton-ia-v1` ne bouge pas.
 
-## Refaire l'expérience
+## Refaire l'apprentissage, sans toucher au fichier figé
 
-Depuis `projets/forge`, après `. .\outils\env-forge.ps1` à la racine :
+Les commandes se lancent depuis `projets/forge`, après `. .\outils\env-forge.ps1` à la racine du
+dépôt. Le nouveau fichier s'écrit **hors du dépôt** : celui de `forge/ressources/` est figé et ne
+doit jamais être écrasé.
 
 ```powershell
 uv run --extra gpu python -m forge donnees --octets 300M --dossier echantillon-tokenizer
 uv run --extra gpu python -m forge tokenizer --donnees echantillon-tokenizer `
-    --taille 32768 --nom ton-ia-v1 --sortie forge/ressources/tokenizer-ton-ia-v1.json --octets-max 300M
+    --taille 32768 --nom ton-ia-v1 --octets-max 300M --sortie "$env:FORGE_DONNEES\essai-tokenizer.json"
+Get-FileHash -Algorithm SHA256 forge\ressources\tokenizer-ton-ia-v1.json, "$env:FORGE_DONNEES\essai-tokenizer.json"
 ```
 
-Ces commandes refont l'apprentissage, mais le fichier du dépôt reste la référence : rien ne
-garantit que Hugging Face serve un jour exactement les mêmes textes dans le même ordre. Si le fichier
-obtenu diffère de celui du dépôt, c'est celui du dépôt qu'on garde.
+Les deux empreintes doivent être identiques (`3001e7ab…21ba`). Si elles diffèrent, c'est que
+Hugging Face ne sert plus exactement les mêmes textes dans le même ordre : on garde le fichier du
+dépôt, qui reste la référence, et on jette l'essai.
+
+## Refaire la mesure
+
+La compression se mesure avec la commande `compression`, qui lit le tokenizer du dépôt par
+défaut (`--tokenizer CHEMIN` pour en mesurer un autre). Il faut d'abord un téléchargement assez
+gros pour contenir 1 Mo de validation par source : 400 Mo de web, 350 Mo de Wikipédia et 300 Mo
+de code, soit environ 1 Go de texte (343 Mo sur le disque, compressé) et quelques minutes.
+
+```powershell
+uv run --extra gpu python -m forge donnees --parts web_fr=400M,wikipedia_fr=350M,code_python=300M `
+    --dossier validation-tokenizer
+uv run --extra gpu python -m forge compression --donnees validation-tokenizer
+uv run --extra gpu python -m forge compression --donnees echantillon-tokenizer --partie apprentissage
+```
+
+La deuxième commande donne les tableaux de validation de ce document (documents, octets, jetons,
+octets par jeton, caractères par jeton, mélange et « bout à bout »), la troisième la comparaison
+sur des documents d'apprentissage. Le 3 novembre 2026, ces commandes lancées de zéro, avec un
+téléchargement neuf dans un autre dossier, ont redonné exactement les mêmes chiffres. Si une source a moins de
+validation que le volume demandé (`--octets`, 1 Mo par défaut), la commande s'arrête avec un
+message qui dit combien elle en a trouvé, au lieu de mesurer sur moins de texte.

@@ -113,6 +113,35 @@ def test_jetons_exacts_de_quelques_textes():
 
 
 @pytest.mark.parametrize(
+    ("texte", "attendu"),
+    [
+        # Chiffres, date et groupes de milliers : les nombres se coupent par 3 chiffres au plus, l'espace
+        # des milliers est un jeton à part, et le symbole « € » prend l'espace qui le précède.
+        ("2026-11-03 : 1 000 000 €", [4631, 54, 45, 1525, 45, 4447, 431, 32, 49, 32, 1498, 32, 1498, 5177]),
+        # Fin de ligne Windows : le retour chariot et le saut de ligne restent deux jetons distincts.
+        ("Ligne\r\nDeux", [76, 1050, 13, 10, 8286]),
+        # Espace insécable (U+00A0, un jeton à lui seul) et espace fine insécable (U+202F, trois octets
+        # qui ne fusionnent pas : deux jetons) : le texte typographié français reste exact, mais coûte.
+        ("10 % ; 3 000 km", [899, 12287, 37, 767, 32, 51, 290, 175, 1498, 12287, 13030]),
+        # Un émoji n'a aucune fusion : ses quatre octets font quatre jetons.
+        ("Bravo 🙂 !", [26611, 2200, 32, 240, 159, 153, 130, 677]),
+        # Une élision isolée, puis des élisions en début de phrase, avec ’ et ' : seule l'apostrophe
+        # suivie d'une lettre s'attache au mot qui précède.
+        ("l’", [108, 296]),
+        ("n’importe quoi, qu’il l'a dit", [23979, 5076, 2719, 44, 662, 298, 341, 97, 1406]),
+    ],
+)
+def test_encodages_exacts_de_cas_limites(texte, attendu):
+    ids = TOK.encoder(texte)
+    assert ids == attendu
+    assert TOK.decoder(ids) == texte
+
+
+def test_espace_fine_insecable_est_coupee_en_octets():
+    assert [TOK.octets_du_jeton(i) for i in TOK.encoder("3 000")] == [b"3", b"\xe2\x80", b"\xaf", b"000"]
+
+
+@pytest.mark.parametrize(
     "texte",
     [
         PHRASE,

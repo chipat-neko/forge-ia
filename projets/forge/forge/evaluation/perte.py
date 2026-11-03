@@ -9,8 +9,9 @@ perte de `ln(32768) = 10,4` ; plus elle descend, mieux le modèle prédit.
   jetons également probables » ;
 - les bits par octet, `perte / ln 2 / octets_par_jeton`, ramènent la perte à un octet de texte
   au lieu d'un jeton. Un jeton ne vaut pas le même nombre d'octets d'un tokenizer à l'autre
-  (3,8 octets par jeton ici, 1 pour un tokenizer d'octets purs) : seuls les bits par octet
-  se comparent d'un tokenizer à l'autre.
+  (environ 4,4 octets par jeton ici sur le mélange, voir `docs/mesures/tokenizer-ton-ia-v1.md`,
+  1 pour un tokenizer d'octets purs) : seuls les bits par octet se comparent d'un tokenizer à
+  l'autre.
 
 La mesure se fait sur des morceaux fixes de `val/` (les mêmes à chaque fois, comme pendant
 l'entraînement) : deux évaluations du même modèle donnent le même nombre.

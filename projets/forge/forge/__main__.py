@@ -1,9 +1,9 @@
 """Point d'entrée en ligne de commande : `python -m forge <commande>`.
 
-Les commandes `donnees`, `tokenizer`, `encoder`, `mesurer`, `entrainer`,
-`evaluer` et `suivi` s'y branchent une par une, au fil des tâches du plan
-(chacune ajoute son sous-parseur dans `construire_parseur`). Déjà là :
-`donnees`, `tokenizer`, `encoder`, `entrainer` et `evaluer`.
+Les commandes `donnees`, `tokenizer`, `compression`, `encoder`, `mesurer`,
+`entrainer`, `evaluer` et `suivi` s'y branchent une par une, au fil des tâches
+du plan (chacune ajoute son sous-parseur dans `construire_parseur`). Déjà là :
+`donnees`, `tokenizer`, `compression`, `encoder`, `entrainer` et `evaluer`.
 """
 
 import argparse
@@ -38,6 +38,42 @@ def taille_en_octets(texte: str) -> int:
             "K, M ou G (par exemple 300M)."
         )
     return int(lu.group(1)) * _MULTIPLICATEURS[lu.group(2)]
+
+
+def parts_en_octets(texte: str) -> dict[str, int]:
+    """Lit « web_fr=400M,wikipedia_fr=350M,code_python=300M » : un volume par source.
+
+    Les trois sources du mélange doivent y être, chacune une fois ; le résultat suit l'ordre du
+    mélange (c'est l'ordre du téléchargement). Chaque taille se lit comme `taille_en_octets`.
+    """
+    from forge.donnees.melange import MELANGE_PAR_DEFAUT
+
+    exemple = "web_fr=400M,wikipedia_fr=350M,code_python=300M"
+    lues: dict[str, int] = {}
+    for morceau in (m for m in texte.split(",") if m.strip()):
+        nom, egal, taille = morceau.partition("=")
+        nom = nom.strip()
+        if not egal:
+            raise argparse.ArgumentTypeError(
+                f"part illisible : {morceau.strip()!r}. Chaque part s'écrit nom=taille, par exemple {exemple}."
+            )
+        if nom not in MELANGE_PAR_DEFAUT:
+            raise argparse.ArgumentTypeError(
+                f"source inconnue : {nom!r}. Les sources sont {', '.join(MELANGE_PAR_DEFAUT)}."
+            )
+        if nom in lues:
+            raise argparse.ArgumentTypeError(f"la source {nom!r} est écrite deux fois.")
+        octets = taille_en_octets(taille)
+        if octets <= 0:
+            raise argparse.ArgumentTypeError(f"la taille de {nom!r} doit être positive, pas {taille.strip()!r}.")
+        lues[nom] = octets
+    absentes = [nom for nom in MELANGE_PAR_DEFAUT if nom not in lues]
+    if absentes:
+        raise argparse.ArgumentTypeError(
+            f"il manque la source {', '.join(absentes)}. Donne un volume pour chacune des trois, "
+            f"par exemple {exemple}."
+        )
+    return {nom: lues[nom] for nom in MELANGE_PAR_DEFAUT}
 
 
 def _nouvelle_commande(sous_parseurs, nom: str, aide: str) -> argparse.ArgumentParser:
@@ -76,8 +112,13 @@ def _commande_donnees(choix: argparse.Namespace) -> int:
 
     # Cette commande a besoin du réseau : si la session coupe Hugging Face, on le permet pour ce processus.
     _lever_le_mode_hors_ligne(journal, "ce téléchargement")
+    if (choix.octets is None) == (choix.parts is None):
+        choix.parseur.error(
+            "donne un seul des deux : --octets TAILLE (réparti selon le mélange) "
+            "ou --parts (un volume par source)."
+        )
     racine = telechargement.dossier_des_textes(Path(choix.dossier))
-    budgets = repartir(choix.octets)
+    budgets = repartir(choix.octets) if choix.parts is None else choix.parts
     for nom, octets in budgets.items():
         journal(f"{nom} : {telechargement.en_mo(octets)} Mo de texte visés, dans {racine / nom}.")
         try:
@@ -112,10 +153,21 @@ def _ajouter_donnees(sous_parseurs) -> None:
     )
     commande.add_argument(
         "--octets",
-        required=True,
         type=taille_en_octets,
+        default=None,
         metavar="TAILLE",
         help="volume total de texte, par exemple 300M, réparti selon le mélange (75 %% web, 10 %% Wikipédia, 15 %% code)",
+    )
+    commande.add_argument(
+        "--parts",
+        type=parts_en_octets,
+        default=None,
+        metavar="SOURCE=TAILLE,…",
+        help=(
+            "au lieu de --octets, un volume par source, par exemple "
+            "web_fr=400M,wikipedia_fr=350M,code_python=300M (les trois sources, dans n'importe "
+            "quel ordre) : pour un volume hors mélange, comme de quoi trouver 1 Mo de validation par source"
+        ),
     )
     commande.add_argument(
         "--dossier",
@@ -123,7 +175,7 @@ def _ajouter_donnees(sous_parseurs) -> None:
         metavar="NOM",
         help="nom du dossier, sous FORGE_DONNEES/textes (celui de « forge tokenizer --donnees »)",
     )
-    commande.set_defaults(fonction=_commande_donnees)
+    commande.set_defaults(fonction=_commande_donnees, parseur=commande)
 
 
 def _commande_tokenizer(choix: argparse.Namespace) -> int:
@@ -175,6 +227,66 @@ def _ajouter_tokenizer(sous_parseurs) -> None:
         help="volume de texte à lire, par exemple 300M (tout par défaut), réparti selon le mélange",
     )
     commande.set_defaults(fonction=_commande_tokenizer)
+
+
+def _commande_compression(choix: argparse.Namespace) -> int:
+    """`forge compression` : mesure les octets par jeton d'un tokenizer sur les textes téléchargés."""
+    # Imports ici : les autres commandes n'ont pas besoin de la mesure.
+    from forge.donnees.telechargement import dossier_des_textes
+    from forge.tokenizer.apprentissage import DonneesManquantes
+    from forge.tokenizer.bpe_octets import TokenizerOctets
+    from forge.tokenizer.compression import mesurer_compression, tableau_de_compression
+
+    try:
+        tokenizer = TokenizerOctets.charger(choix.tokenizer)
+        resultat = mesurer_compression(
+            tokenizer, dossier_des_textes(Path(choix.donnees)), choix.octets, choix.partie
+        )
+    except (DonneesManquantes, FileNotFoundError, ValueError) as erreur:
+        print(f"Erreur : {erreur}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print("Mesure interrompue : rien n'est écrit. Relance la même commande.", file=sys.stderr)
+        return 130
+    print(tableau_de_compression(resultat))
+    return 0
+
+
+def _ajouter_compression(sous_parseurs) -> None:
+    commande = _nouvelle_commande(
+        sous_parseurs,
+        "compression",
+        "Mesure la compression du tokenizer (octets par jeton) sur ~1 Mo de documents de "
+        "validation de chaque source, et pour le mélange.",
+    )
+    commande.add_argument(
+        "--donnees",
+        required=True,
+        metavar="NOM",
+        help="dossier des textes, sous FORGE_DONNEES/textes (celui de « forge donnees --dossier »)",
+    )
+    commande.add_argument(
+        "--tokenizer",
+        type=Path,
+        default=Path(__file__).parent / "ressources" / "tokenizer-ton-ia-v1.json",
+        metavar="CHEMIN",
+        help="fichier JSON du tokenizer à mesurer (celui du dépôt par défaut)",
+    )
+    commande.add_argument(
+        "--octets",
+        type=taille_en_octets,
+        default=1024**2,
+        metavar="TAILLE",
+        help="volume de texte à mesurer par source (1M par défaut), en documents entiers",
+    )
+    commande.add_argument(
+        "--partie",
+        choices=("validation", "apprentissage"),
+        default="validation",
+        help="documents mesurés : « validation » (mis de côté, jamais appris ; par défaut) "
+        "ou « apprentissage » (tous les autres, pour comparer)",
+    )
+    commande.set_defaults(fonction=_commande_compression)
 
 
 def _commande_encoder(choix: argparse.Namespace) -> int:
@@ -443,6 +555,7 @@ def construire_parseur() -> argparse.ArgumentParser:
     sous_parseurs = parseur.add_subparsers(dest="commande", metavar="<commande>")
     _ajouter_donnees(sous_parseurs)
     _ajouter_tokenizer(sous_parseurs)
+    _ajouter_compression(sous_parseurs)
     _ajouter_encoder(sous_parseurs)
     _ajouter_entrainer(sous_parseurs)
     _ajouter_evaluer(sous_parseurs)
