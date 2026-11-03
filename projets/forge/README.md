@@ -135,6 +135,10 @@ vont dans `FORGE_DONNEES/entrainements/<sortie>/`. On garde les deux dernières 
 - **Mémoire de la carte graphique insuffisante :** réduire `micro_lot` dans le TOML (les
   jetons de chaque pas restent les mêmes), puis relancer avec `--reprendre`.
 
+La version courte (« mini », 23 millions de paramètres, une heure sur la carte graphique, `configs/mini.toml`)
+a été entraînée et évaluée le 3 novembre 2026 : durées, courbe, évaluation et échantillons sont dans
+`docs/mesures/ton-ia-mini.md`.
+
 ## Mesurer la vitesse avant d'entraîner
 
 Avant un entraînement de plusieurs heures, `mesurer` fait un essai chronométré de la vraie

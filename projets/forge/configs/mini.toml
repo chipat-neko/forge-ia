@@ -5,8 +5,10 @@
 # Ctrl+C met en pause (le pas en cours se termine, puis tout est sauvegardé) ; pour reprendre :
 #   uv run --extra gpu python -m forge entrainer --config configs/mini.toml --reprendre
 #
-# Valeurs provisoires : jetons_total et micro_lot seront réglés en tâche 11, d'après la vitesse
-# mesurée en tâche 10, pour viser environ une heure.
+# Réglé le 3 novembre 2026 d'après la mesure de « python -m forge mesurer --presets mini » sur la
+# RTX 5070 Ti : le micro-lot le plus rapide est 16 (231 934 jetons par seconde ; 32 donne
+# 224 780 et 8 donne 187 165), contre 2 707 jetons par seconde pour le processeur sur ses
+# 16 fils (86 fois moins). Une heure de carte graphique fait donc 835 millions de jetons.
 
 # Taille du modèle : « mini » = 23,2 millions de paramètres (dim 384, 6 couches, 6 têtes),
 # contexte de 512 jetons.
@@ -15,14 +17,17 @@ preset = "mini"
 # Dossier des jetons, celui de « forge encoder --donnees court » (sous FORGE_DONNEES/jetons/).
 donnees = "court"
 
-# Jetons lus en tout : 200 millions, soit 1 526 pas de 131 072 jetons.
-jetons_total = 200_000_000
+# Jetons lus en tout : 231 934 jetons par seconde × 3 600 secondes = 834 962 400, arrondi à
+# 6 370 pas de 131 072 jetons = 834 928 640 jetons, soit environ une heure. Les données courtes
+# font 239 242 872 jetons d'entraînement : chaque jeton est lu 3,5 fois en tout (au plus 4).
+jetons_total = 834_928_640
 
 # Jetons vus par pas d'optimisation (256 lignes de 512 jetons). Doit être un multiple de
 # micro_lot × 512.
 taille_lot_jetons = 131_072
 
-# Lignes de 512 jetons que la carte traite d'un coup : 16, donc 16 micro-lots accumulés par pas.
+# Lignes de 512 jetons que la carte traite d'un coup : 16 (le plus rapide mesuré, 4,4 Go de
+# mémoire), donc 16 micro-lots accumulés par pas.
 # En cas de manque de mémoire, réduire à 8, 4, 2 ou 1, puis relancer avec --reprendre.
 micro_lot = 16
 
