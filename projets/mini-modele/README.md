@@ -61,7 +61,9 @@ dixième du taux maximal. Le taux est le même code que
 `forge/entrainement/planning.py`, avec notre `cos` ; un test l'y compare, en
 lisant le fichier de forge sans l'importer. Le pas d'AdamW tient ses
 corrections de biais par des produits successifs (`b1t = b1t × beta1`), sans
-puissance.
+puissance. L'écrêtage, lui, diffère d'un rien : quand la norme du gradient
+dépasse 1, on le multiplie par `1 / norme`, alors que `clip_grad_norm_` de
+PyTorch, qu'utilise forge, le multiplie par `1 / (norme + 1e-6)`.
 
 **Résultat mesuré** (préréglage complet, taux 0,01, graine 1234), le même en
 Python et en TypeScript : l'erreur de validation (256 prénoms) passe de
@@ -107,11 +109,44 @@ la perte et tout le gradient d'un lot, la validation et des prénoms inventés.
 pas, l'empreinte de tous les paramètres au pas 20, la validation et les
 prénoms au départ et au pas 20), le taux à quelques pas de la montée, du
 cosinus et de la fin, un entraînement qui diverge (taux 1 000), et les
-préréglages eux-mêmes. Le résultat des 3 000 pas, trop long à refaire à chaque
-régénération, est écrit dans les deux tests longs
+préréglages eux-mêmes. Sa clé `court` ajoute 10 pas sur vingt prénoms de deux
+lettres, par lots de 4 et avec un écrêtage à 100 : l'ordre des prénoms y est
+remélangé (aux pas 5 et 9) et le gradient n'y est jamais écrêté, deux chemins
+que les 20 pas du préréglage complet ne prennent pas. Le résultat des 3 000
+pas, trop long à refaire à chaque régénération, est écrit dans les deux tests
+longs
 (`tests/test_entrainement.py` et `site/src/lib/mini-modele/entrainement-long.test.ts`) :
 si le code change, relance `uv run pytest -q -m lent`, puis recopie ses motifs
 dans les deux.
+
+`tests/attendus-attention.json` : tout le détail de l'exemple d'attention (voir
+plus bas), tête par tête. Les scores des cases masquées y sont `null`, et leurs
+poids valent `+0,0`.
+
+## L'exemple d'attention
+
+L'animation de l'attention du site montre deux têtes sur la phrase « Le
+forgeron chauffe le fer puis il le tord ». Seuls les vecteurs des mots et les
+matrices sont écrits à la main, dans `donnees/exemple-attention.json` :
+
+- chaque mot porte 8 traits, des 0 et des 1 (déterminant, nom, verbe, pronom,
+  sujet, objet, personne, chose) ;
+- chaque tête a trois matrices de 8 lignes (une par trait) et 4 colonnes,
+  d'entiers de −5 à 5 : `wq` pour les requêtes, `wk` pour les clés, `wv` pour
+  les valeurs ;
+- la tête « qui agit » : un verbe cherche son sujet. La tête « de qui on
+  parle » : un pronom cherche le nom qu'il remplace.
+
+Tout le reste (les scores, le masque, les poids et les sorties) est calculé
+par `mini_modele/exemple_attention.py`, avec les fonctions d'attention du
+mini-modèle (`scores_attention`, `softmax`, `melanger_valeurs`). Les tests
+(`tests/test_exemple_attention.py`) vérifient sur ces poids calculés que
+l'exemple dit vrai : « chauffe » regarde « forgeron », « tord » regarde ses
+deux sujets, « il » regarde « forgeron » plus que « fer », le nom le plus
+proche, et le second « le » regarde « fer ». Si tu changes une matrice,
+relance `uv run python -m mini_modele.attendus`, puis les tests des deux
+langages : les paris du site (`site/src/lib/mini-modele/paris-attention.ts`)
+arrêtent la construction si leur réponse n'est plus vraie.
 
 ## Pourquoi on n'utilise ni `math.exp` ni `sum`
 

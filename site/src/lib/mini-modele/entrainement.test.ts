@@ -3,12 +3,13 @@
 // Jumeau de projets/mini-modele/tests/test_entrainement.py. Les attendus sont
 // écrits par le Python (tests/attendus-modele.json, clé « entrainement ») :
 // 20 pas du préréglage complet (la perte de chaque lot, le taux de chaque pas,
-// l'empreinte de tous les paramètres), le planning du taux et une divergence
+// l'empreinte de tous les paramètres), le planning du taux, une divergence et
+// un entraînement court sur vingt prénoms (nouveaux mélanges, pas d'écrêtage)
 // doivent être les mêmes, au bit près. Le test long (3 000 pas) est dans
 // entrainement-long.test.ts.
 
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import attendus from '../../../../projets/mini-modele/tests/attendus-modele.json';
 import { depuisHex, empreinte, Hasard, log, versHex } from './calcul';
 import { decoder, donneesParDefaut, preparer, tailleVocabulaire } from './donnees';
@@ -63,15 +64,21 @@ function reglagesEnAttendus(r: ReglagesMini): Record<string, number | string> {
 
 describe('jumeau du Python : attendus-modele.json, clé « entrainement », au bit près', { timeout: 60_000 }, () => {
   const a = attendus.entrainement;
-  const e = new Entraineur(PRESETS_MINI.complet);
-  const validation0 = versHex(e.perteValidation());
-  const echantillons0 = e.echantillons();
+  let e: Entraineur;
+  let validation0 = '';
+  let echantillons0: string[] = [];
   const pertes: string[] = [];
   const tauxDesPas: string[] = [];
-  for (let i = 0; i < a.nb_pas; i++) {
-    pertes.push(versHex(e.faireUnPas()));
-    tauxDesPas.push(versHex(e.tauxCourant()));
-  }
+  // Les 20 pas tournent une seule fois, avant les tests (et pas pendant la collecte des fichiers).
+  beforeAll(() => {
+    e = new Entraineur(PRESETS_MINI.complet);
+    validation0 = versHex(e.perteValidation());
+    echantillons0 = e.echantillons();
+    for (let i = 0; i < a.nb_pas; i++) {
+      pertes.push(versHex(e.faireUnPas()));
+      tauxDesPas.push(versHex(e.tauxCourant()));
+    }
+  }, 60_000);
 
   it('le préréglage et le nombre de pas', () => {
     expect(a.preset).toBe('complet');
@@ -128,6 +135,40 @@ describe('jumeau du Python : attendus-modele.json, clé « entrainement », au b
     expect(hex(TAUX_PROPOSES)).toEqual(a.taux_proposes);
   });
 
+  it('vingt prénoms, lots de 4, écrêtage à 100 : 10 pas au bit près (nouveaux mélanges, pas d’écrêtage)', () => {
+    const c = a.court;
+    expect(c.prenoms).toEqual(VINGT);
+    const r = reglagesMini(10, 2, { lot: 4, ecretage: 100 });
+    expect(reglagesEnAttendus(r)).toEqual(c.reglages);
+    const court = new Entraineur(r, preparer(c.prenoms));
+    const pertesCourt: string[] = [];
+    const tauxCourt: string[] = [];
+    for (let i = 0; i < c.nb_pas; i++) {
+      pertesCourt.push(versHex(court.faireUnPas()));
+      tauxCourt.push(versHex(court.tauxCourant()));
+    }
+    expect(court.pas).toBe(10);
+    expect(pertesCourt).toEqual(c.pertes);
+    expect(tauxCourt).toEqual(c.taux);
+    expect(versHex(court.perteValidation())).toBe(c.validation);
+    expect(empreinte(court.params)).toBe(c.params_empreinte);
+    expect(hex(court.params.slice(0, 8))).toEqual(c.params_premiers);
+    expect(court.echantillons()).toEqual(c.echantillons);
+    expect(Object.keys(c).sort()).toEqual(
+      [
+        'prenoms',
+        'reglages',
+        'nb_pas',
+        'pertes',
+        'taux',
+        'validation',
+        'params_empreinte',
+        'params_premiers',
+        'echantillons',
+      ].sort(),
+    );
+  });
+
   it('toutes les clés des attendus sont comparées', () => {
     expect(Object.keys(attendus).sort()).toEqual(['entrainement', 'modele']);
     expect(Object.keys(a).sort()).toEqual(
@@ -146,6 +187,7 @@ describe('jumeau du Python : attendus-modele.json, clé « entrainement », au b
         'divergence',
         'presets',
         'taux_proposes',
+        'court',
       ].sort(),
     );
   });

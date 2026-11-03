@@ -23,9 +23,10 @@ import { extraireRegion } from '../regions';
 const INTERDITS =
   /Math\.(exp|log|log1p|log2|log10|expm1|cos|sin|tan|tanh|pow|hypot|random)\b|(?<!\/)\*\*|crypto\.getRandomValues/;
 const VERIFIES = ['calcul', 'donnees', 'attention', 'modele', 'entrainement', 'exemple-attention'];
-// Les fichiers vérifiés qui doivent déjà exister : sans cette liste, un fichier
-// mal nommé ne serait jamais lu. Elle grandit à chaque tâche du plan 3.
-const OBLIGATOIRES = ['calcul', 'donnees', 'attention', 'modele', 'entrainement'];
+// Les fichiers vérifiés qui doivent exister : sans cette liste, un fichier mal
+// nommé ne serait jamais lu. Elle a grandi à chaque tâche du plan 3 ; depuis la
+// tâche 5 (l'exemple d'attention), tous les fichiers vérifiés existent.
+const OBLIGATOIRES = ['calcul', 'donnees', 'attention', 'modele', 'entrainement', 'exemple-attention'];
 // Les seules fonctions de Math permises. Les autres (max, min, fround, cbrt…)
 // arrondissent autrement que le Python, ou traitent −0 autrement.
 const MATH_PERMIS = new Set(['sqrt', 'floor', 'imul']);
@@ -61,6 +62,13 @@ describe('fichiers vérifiés du mini-modèle', () => {
           'Renomme-le, ou corrige OBLIGATOIRES et VERIFIES dans sources.test.ts.',
       ).toBe(true);
     }
+  });
+
+  it('tous les fichiers vérifiés sont obligatoires', () => {
+    expect(
+      [...OBLIGATOIRES].sort(),
+      'Tous les fichiers vérifiés doivent exister : ajoute le nouveau nom à OBLIGATOIRES et à VERIFIES.',
+    ).toEqual([...VERIFIES].sort());
   });
 
   it('n’utilisent aucune fonction non reproductible, même en commentaire', () => {

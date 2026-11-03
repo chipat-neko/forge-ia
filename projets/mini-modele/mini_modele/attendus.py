@@ -38,6 +38,7 @@ from mini_modele.calcul import (
 )
 from mini_modele.donnees import FICHIER_PRENOMS, decoder, donnees_par_defaut, preparer, prenoms_du_texte
 from mini_modele.entrainement import PRESETS_MINI, TAUX_PROPOSES, Entraineur, ReglagesMini, taux
+from mini_modele.exemple_attention import charger_exemple, detailler_exemple
 from mini_modele.modele import (
     ConfigMini,
     avant,
@@ -203,8 +204,39 @@ def reglages_en_attendus(r: ReglagesMini) -> dict:
     return {nom: vers_hex(v) if isinstance(v, float) else v for nom, v in dataclasses.asdict(r).items()}
 
 
+# Un entraînement court sur vingt prénoms de deux lettres (18 en entraînement, 2 en validation),
+# pour comparer deux chemins que les 20 pas du préréglage complet ne prennent pas : avec des lots
+# de 4, l'ordre est remélangé aux pas 5 et 9 (16 + 4 > 18) ; avec un écrêtage à 100, le gradient
+# n'est jamais écrêté (sa norme reste sous 100). Dix pas sur 10 : la montée, le cosinus et la fin.
+PRENOMS_COURT = (
+    "an", "bo", "ci", "du", "el", "fa", "gu", "hi", "in", "jo", "ka", "lu", "ma", "ne", "ol", "pa", "qu", "ro", "su", "ti",
+)
+REGLAGES_COURT = ReglagesMini(pas_total=10, echauffement=2, lot=4, ecretage=100.0)
+
+
+def calculer_attendus_court() -> dict:
+    """La clé « court » de « entrainement » : 10 pas sur PRENOMS_COURT, lots de 4, écrêtage à 100."""
+    e = Entraineur(REGLAGES_COURT, preparer(list(PRENOMS_COURT)))
+    pertes = []
+    taux_des_pas = []
+    for _ in range(REGLAGES_COURT.pas_total):
+        pertes.append(vers_hex(e.faire_un_pas()))
+        taux_des_pas.append(vers_hex(e.taux_courant()))
+    return {
+        "prenoms": list(PRENOMS_COURT),
+        "reglages": reglages_en_attendus(REGLAGES_COURT),
+        "nb_pas": e.pas,
+        "pertes": pertes,
+        "taux": taux_des_pas,
+        "validation": vers_hex(e.perte_validation()),
+        "params_empreinte": empreinte(e.params),
+        "params_premiers": [vers_hex(p) for p in e.params[:8]],
+        "echantillons": e.echantillons(),
+    }
+
+
 def calculer_attendus_entrainement() -> dict:
-    """La clé « entrainement » : 20 pas du préréglage complet, le planning du taux, et une divergence."""
+    """La clé « entrainement » : 20 pas du préréglage complet, le planning du taux, une divergence, et le cas court."""
     reglages = PRESETS_MINI[PRESET_ENTRAINEMENT]
     e = Entraineur(reglages)
     validation_0 = e.perte_validation()
@@ -239,6 +271,7 @@ def calculer_attendus_entrainement() -> dict:
         "divergence": {"taux_max": vers_hex(TAUX_QUI_DIVERGE), "pas": fou.pas, "perte": vers_hex(perte_folle)},
         "presets": {nom: reglages_en_attendus(p) for nom, p in PRESETS_MINI.items()},
         "taux_proposes": [vers_hex(x) for x in TAUX_PROPOSES],
+        "court": calculer_attendus_court(),
     }
 
 
@@ -251,11 +284,38 @@ def calculer_attendus_modele() -> dict:
     return {"modele": calculer_attendus_du_modele(), "entrainement": calculer_attendus_entrainement()}
 
 
+def motifs(matrice: list) -> list[list[str | None]]:
+    """Chaque case en motif hexadécimal ; une case masquée (None) reste None, écrite null."""
+    return [[None if v is None else vers_hex(v) for v in ligne] for ligne in matrice]
+
+
+def calculer_attendus_attention() -> dict:
+    """Les attendus de l'exemple d'attention (tests/attendus-attention.json) : tout le détail de chaque tête.
+
+    Les scores masqués sont null ; les poids masqués valent +0,0 (motif 0000000000000000), comme dans le détail.
+    """
+    exemple = charger_exemple()
+    tetes = []
+    for tete, d in zip(exemple["tetes"], detailler_exemple(exemple)):
+        tetes.append({
+            "nom": tete["nom"],
+            "requetes": motifs(d.requetes),
+            "cles": motifs(d.cles),
+            "valeurs": motifs(d.valeurs),
+            "scores": motifs(d.scores),
+            "scores_echelles": motifs(d.scores_echelles),
+            "poids": motifs(d.poids),
+            "sorties": motifs(d.sorties),
+        })
+    return {"phrase": exemple["phrase"], "jetons": exemple["jetons"], "tetes": tetes}
+
+
 # Chaque fichier tests/attendus-<nom>.json et la fonction qui le calcule.
 CALCULS: dict[str, Callable[[], dict]] = {
     "calcul": calculer_attendus_calcul,
     "donnees": calculer_attendus_donnees,
     "modele": calculer_attendus_modele,
+    "attention": calculer_attendus_attention,
 }
 
 

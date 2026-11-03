@@ -311,6 +311,93 @@
    "3f9eb851eb851eb8",
    "3fb999999999999a",
    "3fd3333333333333"
-  ]
+  ],
+  "court": {
+   "prenoms": [
+    "an",
+    "bo",
+    "ci",
+    "du",
+    "el",
+    "fa",
+    "gu",
+    "hi",
+    "in",
+    "jo",
+    "ka",
+    "lu",
+    "ma",
+    "ne",
+    "ol",
+    "pa",
+    "qu",
+    "ro",
+    "su",
+    "ti"
+   ],
+   "reglages": {
+    "pas_total": 10,
+    "echauffement": 2,
+    "taux_max": "3f847ae147ae147b",
+    "lot": 4,
+    "ratio_min": "3fb999999999999a",
+    "beta1": "3feccccccccccccd",
+    "beta2": "3fee666666666666",
+    "epsilon": "3e45798ee2308c3a",
+    "poids_decroissance": "3fb999999999999a",
+    "ecretage": "4059000000000000",
+    "graine": 1234,
+    "validation_tous": 100,
+    "nb_validation": 256,
+    "nb_echantillons": 8
+   },
+   "nb_pas": 10,
+   "pertes": [
+    "400a610959d77508",
+    "4009e48be80dd17c",
+    "4006ef9b90f49965",
+    "4006cf53e5cd7a4c",
+    "400524db0b403fe6",
+    "4004e5819c160cab",
+    "4003efa6c08cd267",
+    "4004481108ead5a9",
+    "400442d23aac2083",
+    "400459da8b8536d9"
+   ],
+   "taux": [
+    "3f747ae147ae147b",
+    "3f847ae147ae147c",
+    "3f83c74a0e9deb40",
+    "3f81c7dbb305ec5c",
+    "3f7d94e51d928efe",
+    "3f76872b020c49bb",
+    "3f6ef2e1cd0c08ef",
+    "3f62fd3d3c19757a",
+    "3f55ff079b72f3da",
+    "3f50624dd2f1a9fc"
+   ],
+   "validation": "4005b4163fb58971",
+   "params_empreinte": "73dc3f45",
+   "params_premiers": [
+    "bfc30b51c56ac96c",
+    "bf8d2b92af1e733c",
+    "bfb10f13c7ad5e65",
+    "bf8a03c3aa658ebe",
+    "3f98181453bbca2d",
+    "3fa6540e88852964",
+    "bfa8249cd3a3402d",
+    "bfb06e869f0b193a"
+   ],
+   "echantillons": [
+    "gnq",
+    "fuu",
+    "oj",
+    "oatj",
+    "aql",
+    "",
+    "ko",
+    "pkfu"
+   ]
+  }
  }
 }

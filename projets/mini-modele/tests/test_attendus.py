@@ -12,12 +12,16 @@ import re
 
 from mini_modele.attendus import (
     CALCULS,
+    PRENOMS_COURT,
+    calculer_attendus_attention,
     calculer_attendus_calcul,
     calculer_attendus_donnees,
     calculer_attendus_modele,
 )
-from mini_modele.calcul import depuis_hex, empreinte_texte
-from mini_modele.donnees import donnees_par_defaut
+from mini_modele.calcul import depuis_hex, empreinte, empreinte_texte
+from mini_modele.donnees import donnees_par_defaut, preparer
+from mini_modele.entrainement import Entraineur, ReglagesMini
+from mini_modele.exemple_attention import charger_exemple
 from mini_modele.modele import ConfigMini, nombre_parametres
 
 DOSSIER = pathlib.Path(__file__).resolve().parent
@@ -32,6 +36,7 @@ def test_attendus_a_jour():
     assert CALCULS["calcul"] is calculer_attendus_calcul
     assert CALCULS["donnees"] is calculer_attendus_donnees
     assert CALCULS["modele"] is calculer_attendus_modele
+    assert CALCULS["attention"] is calculer_attendus_attention
     for nom, calculer in CALCULS.items():
         fichier = DOSSIER / f"attendus-{nom}.json"
         assert fichier.exists(), f"tests/attendus-{nom}.json est introuvable. {REGENERER}"
@@ -133,7 +138,7 @@ def test_attendus_entrainement_au_complet():
     assert set(a) == {
         "preset", "nb_pas", "pertes", "taux", "validation_0", "validation_20", "params_empreinte_20",
         "params_premiers_20", "echantillons_0", "echantillons_20", "taux_planning", "divergence", "presets",
-        "taux_proposes",
+        "taux_proposes", "court",
     }
     assert a["preset"] == "complet" and a["nb_pas"] == 20
     assert len(a["pertes"]) == len(a["taux"]) == 20
@@ -158,3 +163,68 @@ def test_attendus_entrainement_au_complet():
     assert len(a["echantillons_0"]) == len(a["echantillons_20"]) == 8
     for p in a["echantillons_0"] + a["echantillons_20"]:
         assert isinstance(p, str) and len(p) <= 15 and set(p) <= set(d.vocabulaire[1:])
+
+
+# Vingt prénoms de deux lettres (ceux de test_donnees.py et test_entrainement.py).
+VINGT = ["an", "bo", "ci", "du", "el", "fa", "gu", "hi", "in", "jo", "ka", "lu", "ma", "ne", "ol", "pa", "qu", "ro", "su", "ti"]
+
+
+def test_attendus_entrainement_court():
+    a = lire("modele")["entrainement"]["court"]
+    assert set(a) == {
+        "prenoms", "reglages", "nb_pas", "pertes", "taux", "validation", "params_empreinte", "params_premiers",
+        "echantillons",
+    }
+    assert a["prenoms"] == VINGT == list(PRENOMS_COURT)
+    r = a["reglages"]
+    # Des lots de 4 sur 18 prénoms : l'ordre est remélangé aux pas 5 et 9 (16 + 4 > 18).
+    assert r["lot"] == 4 and len(preparer(VINGT).entrainement) == 18
+    assert a["nb_pas"] == 10 and r["pas_total"] == 10 and r["echauffement"] == 2
+    assert depuis_hex(r["ecretage"]) == 100.0
+    assert len(a["pertes"]) == len(a["taux"]) == 10 and len(a["params_premiers"]) == 8
+    motifs = a["pertes"] + a["taux"] + a["params_premiers"] + [a["validation"]]
+    assert all(re.fullmatch(r"[0-9a-f]{16}", m) for m in motifs)
+    assert re.fullmatch(r"[0-9a-f]{8}", a["params_empreinte"])
+    # La montée (pas 1), le cosinus (pas 2 à 9) et la fin (pas 10, au taux minimal) : le planning entier.
+    taux = [depuis_hex(m) for m in a["taux"]]
+    assert taux[0] < taux[1] and taux[1] > taux[8] > taux[9] == 0.1 * 0.01
+    assert len(a["echantillons"]) == 8
+
+
+def test_l_entrainement_court_n_ecrete_jamais():
+    # Avec un écrêtage à 100, la branche « pas d'écrêtage » sert à chaque pas : un écrêtage
+    # bien plus grand donne les mêmes bits. À 1, il aurait servi (sinon le cas ne prouverait rien).
+    a = lire("modele")["entrainement"]["court"]
+    empreintes = {}
+    for ecretage in (100.0, 1e300, 1.0):
+        e = Entraineur(ReglagesMini(pas_total=10, echauffement=2, lot=4, ecretage=ecretage), preparer(VINGT))
+        for _ in range(10):
+            e.faire_un_pas()
+        empreintes[ecretage] = empreinte(e.params)
+    assert empreintes[100.0] == empreintes[1e300] == a["params_empreinte"]
+    assert empreintes[1.0] != a["params_empreinte"]
+
+
+def test_attendus_attention_au_complet():
+    a = lire("attention")
+    ex = charger_exemple()
+    assert set(a) == {"phrase", "jetons", "tetes"}
+    assert a["phrase"] == ex["phrase"] and a["jetons"] == ex["jetons"]
+    assert [t["nom"] for t in a["tetes"]] == [t["nom"] for t in ex["tetes"]] == ["qui agit", "de qui on parle"]
+    n = len(ex["jetons"])
+    for t in a["tetes"]:
+        assert set(t) == {"nom", "requetes", "cles", "valeurs", "scores", "scores_echelles", "poids", "sorties"}
+        for cle in ("requetes", "cles", "valeurs", "sorties"):
+            assert len(t[cle]) == n and all(len(ligne) == 4 for ligne in t[cle]), cle
+            assert all(re.fullmatch(r"[0-9a-f]{16}", m) for ligne in t[cle] for m in ligne), cle
+        for cle in ("scores", "scores_echelles", "poids"):
+            assert len(t[cle]) == n and all(len(ligne) == n for ligne in t[cle]), cle
+            for i in range(n):
+                for j in range(n):
+                    m = t[cle][i][j]
+                    if j > i and cle != "poids":
+                        assert m is None, (cle, i, j)  # une case masquée : null
+                    elif j > i:
+                        assert m == "0000000000000000", (i, j)  # un poids masqué vaut +0,0
+                    else:
+                        assert re.fullmatch(r"[0-9a-f]{16}", m), (cle, i, j)

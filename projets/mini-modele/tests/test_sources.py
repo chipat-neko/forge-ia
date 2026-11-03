@@ -26,9 +26,10 @@ INTERDITS = re.compile(
     r"math\.(exp|log|log1p|log2|log10|expm1|cos|sin|tan|tanh|pow|fsum)\b|\*\*|\bsum\(|numpy|\brandom\b|statistics"
 )
 VERIFIES = ["calcul", "donnees", "attention", "modele", "entrainement", "exemple_attention"]
-# Les fichiers vérifiés qui doivent déjà exister : sans cette liste, un fichier
-# mal nommé ne serait jamais lu. Elle grandit à chaque tâche du plan 3.
-OBLIGATOIRES = ["calcul", "donnees", "attention", "modele", "entrainement"]
+# Les fichiers vérifiés qui doivent exister : sans cette liste, un fichier mal
+# nommé ne serait jamais lu. Elle a grandi à chaque tâche du plan 3 ; depuis la
+# tâche 5 (l'exemple d'attention), tous les fichiers vérifiés existent.
+OBLIGATOIRES = ["calcul", "donnees", "attention", "modele", "entrainement", "exemple_attention"]
 # Les seuls noms du module math permis. Toute autre fonction de math (atan,
 # hypot, prod, sumprod, fma…) peut arrondir autrement que le TypeScript.
 MATH_PERMIS = {"sqrt", "floor", "ldexp", "frexp", "inf", "nan", "isnan", "isinf", "isfinite"}
@@ -68,6 +69,12 @@ def test_fichiers_obligatoires_presents():
             f"mini_modele/{nom}.py est introuvable. Un fichier vérifié a-t-il changé de nom ? "
             "Renomme-le, ou corrige OBLIGATOIRES et VERIFIES dans tests/test_sources.py."
         )
+
+
+def test_tous_les_fichiers_verifies_sont_obligatoires():
+    assert sorted(OBLIGATOIRES) == sorted(VERIFIES), (
+        "Tous les fichiers vérifiés doivent exister : ajoute le nouveau nom à OBLIGATOIRES et à VERIFIES."
+    )
 
 
 def test_aucune_fonction_non_reproductible():
