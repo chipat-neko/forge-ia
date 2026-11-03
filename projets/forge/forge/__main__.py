@@ -2,8 +2,7 @@
 
 Les commandes `donnees`, `tokenizer`, `compression`, `encoder`, `mesurer`,
 `entrainer`, `evaluer` et `suivi` s'y branchent une par une, au fil des tâches
-du plan (chacune ajoute son sous-parseur dans `construire_parseur`). Déjà là :
-`donnees`, `tokenizer`, `compression`, `encoder`, `mesurer`, `entrainer` et `evaluer`.
+du plan (chacune ajoute son sous-parseur dans `construire_parseur`). Toutes sont là.
 """
 
 import argparse
@@ -660,6 +659,37 @@ def _ajouter_evaluer(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_evaluer)
 
 
+def _commande_suivi(choix: argparse.Namespace) -> int:
+    """`forge suivi` : où en est l'entraînement, lu dans son journal."""
+    # Le suivi n'importe pas PyTorch : il reste léger, on peut le lancer pendant l'entraînement.
+    from forge.suivi import afficher, suivre
+
+    try:
+        texte = suivre(choix.config)
+    except (FileNotFoundError, PermissionError, ValueError) as erreur:
+        afficher(f"Erreur\u202f: {erreur}", sys.stderr)
+        return 1
+    afficher(texte)
+    return 0
+
+
+def _ajouter_suivi(sous_parseurs) -> None:
+    commande = _nouvelle_commande(
+        sous_parseurs,
+        "suivi",
+        "Montre où en est un entraînement, d'après son journal\u202f: état, pas, perte, débit, temps "
+        "restant estimé et dernière sauvegarde. Ne fait que lire\u202f: on peut le lancer pendant "
+        "l'entraînement.",
+    )
+    commande.add_argument(
+        "--config",
+        required=True,
+        metavar="FICHIER",
+        help="fichier TOML de l'entraînement, par exemple configs/principal.toml",
+    )
+    commande.set_defaults(fonction=_commande_suivi)
+
+
 def construire_parseur() -> argparse.ArgumentParser:
     """Construit le parseur principal et ses sous-commandes."""
     parseur = argparse.ArgumentParser(
@@ -691,6 +721,7 @@ def construire_parseur() -> argparse.ArgumentParser:
     _ajouter_mesurer(sous_parseurs)
     _ajouter_entrainer(sous_parseurs)
     _ajouter_evaluer(sous_parseurs)
+    _ajouter_suivi(sous_parseurs)
     return parseur
 
 
