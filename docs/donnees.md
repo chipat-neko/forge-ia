@@ -11,12 +11,13 @@ Les données ne sont jamais copiées dans ce dépôt ; seuls les modèles entr
 
 | Source | Nom dans le code | Part |
 | --- | --- | --- |
-| Français du web | `web_fr` | 75 % |
-| Wikipédia en français | `wikipedia_fr` | 10 % |
-| Code Python sous licence permissive | `code_python` | 15 % |
+| Français du web | `web_fr` | 75 % |
+| Wikipédia en français | `wikipedia_fr` | 10 % |
+| Code Python sous licence permissive | `code_python` | 15 % |
 
 Les parts sont définies une seule fois, dans `forge.donnees.melange.MELANGE_PAR_DEFAUT`.
-Le téléchargement, l'apprentissage du tokenizer et l'encodage les lisent là.
+Le téléchargement et l'apprentissage du tokenizer les lisent là ; l'encodage, qui viendra ensuite,
+fera de même.
 
 ## Français du web (`web_fr`)
 
@@ -56,13 +57,13 @@ Le téléchargement, l'apprentissage du tokenizer et l'encodage les lisent là.
   [CC0-1.0](https://spdx.org/licenses/CC0-1.0.html).
 - **Ce qui est gardé :** la colonne `code` des fichiers dont le langage (`language`) est
   `Python` et dont la licence est dans la liste ci-dessus. Le dépôt d'origine et le chemin du
-  fichier ne sont pas conservés dans nos fragments  on les retrouve dans la source.
-- **Combien il faut lire :** le Python permissif ne fait que 4,1 % des fichiers et 3,9 % des
+  fichier ne sont pas conservés dans nos fragments ; on les retrouve dans la source.
+- **Combien il faut lire :** le Python permissif ne fait que 4,1 % des fichiers et 3,9 % des
   octets de code (mesuré le 03/11/2026 sur 7 fichiers parquet répartis dans tout le jeu).
   Garder 1 Mo de code demande donc de lire environ 26 Mo de code, soit environ 9 Mo de parquet
   compressé. Les fichiers Python sont répartis partout, dans chaque groupe de lignes de chaque
-  fichier parquet  aucun fichier ni groupe de lignes ne peut être sauté, et la colonne `code`
-  fait 98 % du poids (garder seulement quelques colonnes n'économise presque rien).
+  fichier parquet : aucun fichier ni groupe de lignes ne peut être sauté, et la colonne `code`
+  fait 98 % du poids (garder seulement quelques colonnes n'économise presque rien).
 
 ## Ce que fait le téléchargement
 
@@ -75,14 +76,17 @@ Le téléchargement, l'apprentissage du tokenizer et l'encodage les lisent là.
   `{"texte": …}` par document. Chaque fichier est écrit sous un nom `.tmp`, puis renommé d'un
   coup. L'état (`etat.json`) n'est mis à jour qu'après le fragment qu'il compte.
 - **Reprise :** après une coupure (réseau, courant, disque plein), on relance la même commande.
-  Les documents déjà comptés sont sautés, et rien n'est écrit deux fois. Le marqueur `.complet`
-  n'est posé qu'à la fin  sans lui, une source n'est jamais tenue pour terminée.
+  Les documents déjà comptés sont sautés et rien n'est écrit deux fois ; seul le fragment en cours
+  (jusqu'à 100 Mo) est relu. Le marqueur `.complet` n'est posé qu'à la fin ; sans lui, une source
+  n'est jamais tenue pour terminée.
 - **Place :** avant chaque fragment, on vérifie qu'il reste de la place pour lui et 2 Go de
   marge. Sinon, la commande s'arrête avec un message qui dit combien de Go libérer.
 - **Où :** `FORGE_DONNEES/textes/<dossier>/<source>/` (par défaut `D:\forge-ia-donnees` sur
   ce PC), un sous-dossier par source.
-- **Validation :** `est_validation` met de côté 0,5 % des documents, d'après les 8 premiers
-  chiffres de leur empreinte (le même document tombe toujours du même côté).
+- **Validation :** le téléchargement ne met rien de côté : la séparation entre entraînement et
+  validation se fera à l'encodage (tâche suivante), avec `est_validation`, qui met de côté 0,5 % des
+  documents d'après les 8 premiers chiffres de leur empreinte (le même document tombe toujours du
+  même côté).
 
 ```powershell
 . .\outils\env-forge.ps1
@@ -91,4 +95,4 @@ uv run --extra gpu python -m forge donnees --octets 300M --dossier echantillon
 ```
 
 La commande lève `HF_HUB_OFFLINE=1`, s'il est posé dans la session, pour ce téléchargement
-seulement  elle a besoin du réseau.
+seulement : elle a besoin du réseau.

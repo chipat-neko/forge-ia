@@ -79,8 +79,8 @@ def _commande_donnees(choix: argparse.Namespace) -> int:
             return 1
         except KeyboardInterrupt:
             print(
-                f"Interrompu pendant « {nom} ». Rien n'est perdu : relance la même commande, "
-                "elle reprendra là où elle s'est arrêtée.",
+                f"Interrompu pendant « {nom} ». "
+                "Relance la même commande : seul le fragment en cours sera relu.",
                 file=sys.stderr,
             )
             return 130
@@ -88,7 +88,7 @@ def _commande_donnees(choix: argparse.Namespace) -> int:
             print(
                 f"Erreur pendant le téléchargement de « {nom} » ({type(erreur).__name__}) : {erreur}\n"
                 "Si le réseau ou Hugging Face est en cause, relance la même commande : elle "
-                "reprendra là où elle s'est arrêtée, sans doublon.",
+                "reprendra au dernier fragment écrit, sans doublon.",
                 file=sys.stderr,
             )
             return 1

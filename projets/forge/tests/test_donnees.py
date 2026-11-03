@@ -102,17 +102,47 @@ def test_les_trois_sources():
 
 def test_la_documentation_des_sources():
     doc = (Path(__file__).parents[3] / "docs" / "donnees.md").read_text(encoding="utf-8")
+    fine = "\N{NARROW NO-BREAK SPACE}"  # l'espace fine insécable (U+202F)
     for source in SOURCES.values():
         assert f"https://huggingface.co/datasets/{source.depot})" in doc, source.nom
         assert f"({source.url_licence})" in doc, source.nom
     for licence in LICENCES_PERMISSIVES:
         assert licence.lower() in doc.lower()
-    # Typographie française : espace fine insécable (U+202F) avant « ; » et dans les guillemets.
+    # Aucun caractère de contrôle (un \x01 s'était glissé à la place d'une ponctuation).
+    assert not re.search(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]", doc)
+    # Les phrases dont la ponctuation avait disparu sont entières.
+    for morceau in (
+        f"dans nos fragments{fine}; on les retrouve",
+        f"fichier parquet{fine}: aucun fichier",
+        f"à la fin{fine}; sans lui",
+        f"seulement{fine}: elle a besoin",
+    ):
+        assert morceau in doc, morceau
+    # Typographie française : espace fine insécable avant « ; : ! ? % » et dans les guillemets.
     assert (
-        "Les données ne sont jamais copiées dans ce dépôt ; "
+        f"Les données ne sont jamais copiées dans ce dépôt{fine}; "
         "seuls les modèles entraînés sont publiés."
     ) in doc
-    assert "« ton IA »" in doc and "« " not in doc and " »" not in doc
+    assert f"«{fine}ton IA{fine}»" in doc and "« " not in doc and " »" not in doc
+    sans_code = re.sub(r"```.*?```|`[^`]*`", "", doc, flags=re.S)
+    assert not re.search(r"[ \N{NO-BREAK SPACE}][;:!?%]", sans_code)
+    assert doc.count("%") >= 6 and all(doc[m.start() - 1] == fine for m in re.finditer("%", doc))
+    # Le téléchargement ne fait pas la séparation de validation : elle se fera à l'encodage.
+    validation = re.search(r"\*\*Validation.*?(?=\n- \*\*|\n\n)", doc, re.S).group(0)
+    assert "encodage" in validation and "ne met rien de côté" in validation
+    assert "et l'encodage les lisent" not in doc  # l'encodage n'existe pas encore : il ne lit pas déjà
+    assert "seul le fragment en cours" in doc  # une reprise relit le fragment en cours
+
+
+def test_aucun_caractere_de_controle_dans_les_fichiers_ecrits_a_la_main():
+    racine = Path(__file__).parents[1]
+    fichiers = [*racine.joinpath("forge").rglob("*.py"), *racine.joinpath("tests").glob("*.py")]
+    fichiers += [racine / "README.md", racine.parents[1] / "docs" / "donnees.md"]
+    assert len(fichiers) > 10
+    for fichier in fichiers:
+        texte = fichier.read_text(encoding="utf-8")
+        trouve = re.search(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", texte)
+        assert trouve is None, f"{fichier} : caractère de contrôle {trouve.group(0)!r}"
 
 
 # --- Nettoyage -------------------------------------------------------------------
@@ -671,13 +701,16 @@ def test_sous_commande_donnees_erreurs_en_francais(tmp_path, monkeypatch, capsys
     assert main(["donnees", "--octets", "1M", "--dossier", "essai"]) == 1
     erreur = capsys.readouterr().err
     assert "relance la même commande" in erreur and "Traceback" not in erreur
+    assert "dernier fragment écrit" in erreur
 
     def interrompu(*args, **kwargs):
         raise KeyboardInterrupt
 
     monkeypatch.setattr(telechargement, "telecharger", interrompu)
     assert main(["donnees", "--octets", "1M", "--dossier", "essai"]) == 130
-    assert "relance la même commande" in capsys.readouterr().err
+    interrompu = capsys.readouterr().err
+    assert "Relance la même commande : seul le fragment en cours sera relu." in interrompu
+    assert "Rien n'est perdu" not in interrompu
 
     # Sans --octets ou --dossier, argparse refuse (code 2).
     with pytest.raises(SystemExit) as sortie:

@@ -1,7 +1,7 @@
 """Le mélange des sources et la mise à part des documents de validation.
 
 `MELANGE_PAR_DEFAUT` est la seule définition des parts de chaque source : le
-téléchargement, l'apprentissage du tokenizer et l'encodage la lisent ici.
+téléchargement et l'apprentissage du tokenizer la lisent ici (l'encodage la lira aussi).
 """
 
 import math

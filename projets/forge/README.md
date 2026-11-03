@@ -53,9 +53,9 @@ d'environ 100 Mo :
 uv run --extra gpu python -m forge donnees --octets 300M --dossier echantillon
 ```
 
-Une coupure (réseau, courant, disque plein) ne perd rien : on relance la même commande, qui
-reprend là où elle s'est arrêtée, sans doublon. Une source n'est terminée que lorsque son
-fichier `.complet` existe. Le mélange par défaut est défini une seule fois, dans
+Une coupure (réseau, courant, disque plein) ne laisse ni trou ni doublon : on relance la même
+commande, qui reprend au dernier fragment écrit (seul le fragment en cours, jusqu'à 100 Mo, est
+relu). Une source n'est terminée que lorsque son fichier `.complet` existe. Le mélange par défaut est défini une seule fois, dans
 `forge.donnees.melange.MELANGE_PAR_DEFAUT`.
 
 ## Le tokenizer de ton IA
