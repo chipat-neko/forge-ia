@@ -629,7 +629,7 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
     try:
         validation = ChargeurJetons(config.dossier_donnees / "val", longueur, config.micro_lot, config.graine)
         depart_validation = validation.etat()  # la validation relit toujours les mêmes lots
-        lots_validation = min(LOTS_DE_VALIDATION, max(1, validation.jetons // (config.micro_lot * longueur)))
+        lots_validation = min(LOTS_DE_VALIDATION, max(1, validation.morceaux // config.micro_lot))
     except (DonneesManquantes, ValueError) as erreur:
         sans_validation = str(erreur)
 
