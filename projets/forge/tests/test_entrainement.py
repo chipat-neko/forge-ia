@@ -3,8 +3,7 @@
 Tout tourne sur le processeur, avec un modèle minuscule (vocabulaire 128, dim 32, 2 couches,
 contexte 16) et un petit corpus de jetons répétitifs écrit par le test, sauf le test marqué
 `gpu`. Le corpus a la forme de celui de `forge encoder` : `train/` et `val/`, `index.json` et
-`.complet`. Une époque fait 900 jetons : un peu plus de 14 pas de 64 jetons, donc les tests de
-reprise traversent un changement d'époque.
+`.complet`. Le chargeur pioche ses morceaux au hasard dans les trois fragments.
 """
 
 import errno
@@ -174,14 +173,61 @@ def test_planning_sans_echauffement():
 # --------------------------------------------------------------------------------------
 
 
+def ecrire_deux_sources(dossier: Path) -> None:
+    """Deux fichiers de « sources » différentes : 2 400 jetons de 0 à 49, 1 600 jetons de 100 à 149."""
+    hasard = np.random.default_rng(3)
+    (dossier / "train").mkdir(parents=True)
+    fichiers = {}
+    for k, (bas, nombre) in enumerate(((0, 2400), (100, 1600))):
+        nom = f"train/fragment-{k:05d}.bin"
+        hasard.integers(bas, bas + 50, size=nombre).astype("<u2").tofile(dossier / nom)
+        fichiers[nom] = nombre
+    (dossier / "index.json").write_text(json.dumps({"version": 1, "fichiers": fichiers}), encoding="utf-8")
+    (dossier / ".complet").write_text("{}", encoding="utf-8")
+
+
 def test_chargeur_lots_decales_d_un_jeton(tmp_path):
     ecrire_corpus(tmp_path)
-    chargeur = ChargeurJetons(tmp_path / "train", longueur=16, taille_lot=2, graine=1)
+    fichiers = [np.fromfile(f, dtype="<u2").tolist() for f in sorted((tmp_path / "train").glob("*.bin"))]
+    chargeur = ChargeurJetons(tmp_path / "train", longueur=16, taille_lot=8, graine=1)
     x, y = chargeur.lot()
-    assert x.shape == (2, 16) and y.shape == (2, 16) and x.dtype == torch.int64
-    # La cible de chaque position est le jeton suivant du ruban.
-    assert torch.equal(x[0, 1:], y[0, :-1])
-    assert torch.equal(x[1, 0], y[0, -1])
+    assert x.shape == (8, 16) and y.shape == (8, 16) and x.dtype == torch.int64
+    for ligne in range(8):
+        # La cible de chaque position est le jeton suivant…
+        assert torch.equal(x[ligne, 1:], y[ligne, :-1])
+        # … et chaque ligne est un morceau de 17 jetons qui se suivent dans UN fichier.
+        morceau = x[ligne].tolist() + [y[ligne, -1].item()]
+        assert any(
+            fichier[debut : debut + 17] == morceau for fichier in fichiers for debut in range(len(fichier) - 16)
+        )
+
+
+def test_chaque_lot_melange_les_sources(tmp_path):
+    ecrire_deux_sources(tmp_path)
+    chargeur = ChargeurJetons(tmp_path / "train", longueur=16, taille_lot=8, graine=0)
+
+    def sources(x):
+        return ["a" if ligne[0] < 100 else "b" for ligne in x.tolist()]
+
+    for _ in range(5):
+        assert set(sources(chargeur.lot()[0])) == {"a", "b"}
+    # Sur 200 morceaux, chaque source est piochée en proportion de son nombre de jetons (60 % / 40 %).
+    tirages = [s for _ in range(25) for s in sources(chargeur.lot()[0])]
+    assert tirages.count("a") / len(tirages) == pytest.approx(0.6, abs=0.1)
+    # Sur 100 000 morceaux, l'écart au poids exact (2 384 départs sur 3 968) devient minuscule.
+    beaucoup = ChargeurJetons(tmp_path / "train", longueur=16, taille_lot=1000, graine=1)
+    premiers_jetons = torch.cat([beaucoup.lot()[0][:, 0] for _ in range(100)])
+    assert (premiers_jetons < 100).float().mean().item() == pytest.approx(2384 / 3968, abs=0.01)
+
+
+def test_chargeur_meme_jetons_quelle_que_soit_la_taille_du_lot(tmp_path):
+    """Un lot de 4 lignes, ou deux lots de 2 : les mêmes morceaux, dans le même ordre."""
+    ecrire_corpus(tmp_path)
+    gros = ChargeurJetons(tmp_path / "train", longueur=16, taille_lot=4, graine=5)
+    petit = ChargeurJetons(tmp_path / "train", longueur=16, taille_lot=2, graine=5)
+    for _ in range(3):
+        attendu = gros.lot()[0]
+        assert torch.equal(torch.cat([petit.lot()[0], petit.lot()[0]]), attendu)
 
 
 def test_chargeur_reprend_au_meme_endroit(tmp_path):
@@ -191,27 +237,12 @@ def test_chargeur_reprend_au_meme_endroit(tmp_path):
         premier.lot()
     etat = premier.etat()
     json.dumps(etat)  # l'état tient en nombres simples
-    suite = [premier.lot() for _ in range(25)]  # traverse deux changements d'époque
+    suite = [premier.lot() for _ in range(25)]
 
     second = ChargeurJetons(tmp_path / "train", longueur=16, taille_lot=2, graine=3)
     second.restaurer(etat)
     for (x1, y1), (x2, y2) in zip(suite, (second.lot() for _ in range(25))):
         assert torch.equal(x1, x2) and torch.equal(y1, y2)
-
-
-def test_chargeur_tout_lire_une_fois_par_epoque(tmp_path):
-    ecrire_corpus(tmp_path)
-    # Un lot de 1 × 299 jetons (+1) : chaque époque se lit en 3 lots, à peu près un par fragment.
-    chargeur = ChargeurJetons(tmp_path / "train", longueur=299, taille_lot=1, graine=0)
-    ordres = []
-    for epoque in range(4):
-        debuts = [chargeur.lot()[0][0, :5].tolist() for _ in range(3)]
-        assert chargeur.etat()["epoque"] == epoque
-        ordres.append(tuple(map(tuple, debuts)))
-    # L'ordre des fragments change d'une époque à l'autre, mais il est tiré de la graine.
-    assert len(set(ordres)) > 1
-    autre = ChargeurJetons(tmp_path / "train", longueur=299, taille_lot=1, graine=0)
-    assert tuple(tuple(autre.lot()[0][0, :5].tolist()) for _ in range(3)) == ordres[0]
 
 
 def test_chargeur_refuse_un_encodage_inacheve(tmp_path):
@@ -224,7 +255,7 @@ def test_chargeur_refuse_un_encodage_inacheve(tmp_path):
 def test_chargeur_refuse_l_etat_d_autres_donnees(tmp_path):
     ecrire_corpus(tmp_path / "un")
     etat = ChargeurJetons(tmp_path / "un" / "train", longueur=16, taille_lot=2, graine=0).etat()
-    etat["jetons_par_epoque"] += 1
+    etat["jetons"] += 1
     chargeur = ChargeurJetons(tmp_path / "un" / "train", longueur=16, taille_lot=2, graine=0)
     with pytest.raises(ValueError, match="jetons"):
         chargeur.restaurer(etat)

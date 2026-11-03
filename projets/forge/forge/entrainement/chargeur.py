@@ -1,22 +1,29 @@
-"""Le chargeur de jetons : il découpe les fragments encodés en lots pour l'entraînement.
+"""Le chargeur de jetons : il pioche des morceaux de texte au hasard pour former les lots.
 
 `forge encoder` range les jetons dans `train/` et `val/` (des fichiers `fragment-*.bin` en
 `uint16`), avec `index.json` (le nombre de jetons de chaque fichier) et `.complet` à côté.
-Le chargeur lit l'un de ces deux dossiers comme un seul long ruban de jetons :
+Chaque fichier vient d'une seule source : du web, de Wikipédia ou du code.
 
-- les fragments sont mis bout à bout, dans un ordre tiré au hasard à partir de la graine.
-  Cet ordre change à chaque époque (une époque est un passage complet sur les données) ;
-- on avance dans le ruban sans jamais revenir en arrière. Un lot prend les
-  `taille_lot × longueur + 1` jetons suivants : les entrées `x` sont les `taille_lot × longueur`
-  premiers, les cibles `y` les mêmes décalés d'un jeton (la cible de chaque position est le
-  jeton qui la suit) ;
-- quand il ne reste plus de quoi faire un lot entier, l'époque suivante commence, avec un
-  nouvel ordre des fragments (les quelques jetons restants sont sautés).
+Si l'on lisait les fichiers l'un après l'autre, le modèle verrait des centaines de pas de
+web, puis des centaines de pas de code : il oublierait un peu l'un pendant qu'il apprend
+l'autre. On pioche donc des morceaux au hasard dans tout le corpus, pour que chaque lot
+mélange web, Wikipédia et code :
 
-Tout l'état tient en trois nombres : la graine, l'époque et la position dans le ruban de
-cette époque. Avec eux, `restaurer` retrouve exactement les mêmes lots après une pause. La
-position compte des jetons, pas des lots : on peut reprendre avec une autre `taille_lot`
-(un `micro_lot` réduit après un manque de mémoire), et les jetons suivants restent les mêmes.
+- chaque ligne d'un lot est un morceau de `longueur + 1` jetons qui se suivent, pris dans UN
+  fichier (jamais à cheval sur deux) ;
+- son point de départ est tiré au hasard, uniformément parmi toutes les positions possibles
+  de tous les fichiers : un fichier deux fois plus gros est pioché deux fois plus souvent ;
+- les entrées `x` sont les `longueur` premiers jetons du morceau, les cibles `y` les mêmes
+  décalés d'un jeton (la cible de chaque position est le jeton qui la suit).
+
+Le hasard vient d'un générateur NumPy (PCG64) lancé avec la graine. Tout l'état du chargeur
+est l'état de ce générateur : `etat()` le donne, `restaurer()` le remet, et les lots suivants
+sont exactement les mêmes qu'avant la pause. Chaque ligne consomme un tirage, quelle que soit
+la taille du lot : on peut reprendre avec un `micro_lot` réduit (après un manque de mémoire),
+les jetons de chaque pas restent les mêmes.
+
+Ce tirage se fait avec remise : sur un passage, certains morceaux sont vus deux fois et
+d'autres pas du tout, ce qui ne gêne pas un grand corpus.
 """
 
 import json
@@ -29,7 +36,7 @@ import torch
 from forge.donnees.jetons import lire_jetons
 from forge.tokenizer.apprentissage import DonneesManquantes
 
-VERSION_DE_L_ETAT = 1
+VERSION_DE_L_ETAT = 2
 
 
 def _lister_fragments(dossier: Path) -> tuple[list[Path], list[int]]:
@@ -64,12 +71,13 @@ def _lister_fragments(dossier: Path) -> tuple[list[Path], list[int]]:
 
 
 class ChargeurJetons:
-    """Découpe les jetons de `dossier` (`.../train` ou `.../val`) en lots, dans un ordre tiré de `graine`.
+    """Forme des lots de morceaux piochés au hasard dans `dossier` (`.../train` ou `.../val`).
 
     - `longueur` : nombre de positions de chaque ligne du lot (la longueur de contexte) ;
-    - `taille_lot` : nombre de lignes de chaque lot ;
+    - `taille_lot` : nombre de lignes (de morceaux) de chaque lot ;
+    - `graine` : la graine du générateur qui tire les points de départ ;
     - `lot()` renvoie `(x, y)`, deux tenseurs d'entiers `[taille_lot, longueur]` ;
-    - `etat()` et `restaurer(etat)` sauvegardent puis retrouvent la position exacte.
+    - `etat()` et `restaurer(etat)` sauvegardent puis retrouvent le hasard exact.
     """
 
     def __init__(self, dossier: Path, longueur: int, taille_lot: int, graine: int) -> None:
@@ -82,32 +90,23 @@ class ChargeurJetons:
         self.taille_lot = taille_lot
         self.graine = graine
         self._fichiers, self._tailles = _lister_fragments(self.dossier)
-        self.jetons_par_epoque = sum(self._tailles)
-        if self.jetons_par_epoque < self._jetons_par_lot + 1:
+        self.jetons = sum(self._tailles)
+        # Un morceau prend `longueur + 1` jetons d'un même fichier : un fichier de n jetons
+        # offre n - longueur points de départ. On les numérote à la suite, fichier après
+        # fichier ; `_departs_cumules[i]` est le premier numéro du fichier i.
+        self._departs_cumules = [0]
+        for taille in self._tailles:
+            self._departs_cumules.append(self._departs_cumules[-1] + max(0, taille - longueur))
+        if self._departs_cumules[-1] == 0:
             raise ValueError(
-                f"{self.dossier} ne contient que {self.jetons_par_epoque} jetons : pas assez pour "
-                f"un seul lot de {taille_lot} × {longueur} jetons. Réduis micro_lot, ou encode "
-                "davantage de textes."
+                f"Aucun fichier de {self.dossier} n'a plus de {longueur} jetons : pas de quoi "
+                f"faire un seul morceau de {longueur + 1} jetons. Encode davantage de textes."
             )
+        self._hasard = np.random.Generator(np.random.PCG64(graine))
         self._ouverts: dict[int, np.memmap] = {}
-        self.epoque = 0
-        self.position = 0
-        self._preparer_epoque()
-
-    @property
-    def _jetons_par_lot(self) -> int:
-        return self.taille_lot * self.longueur
-
-    def _preparer_epoque(self) -> None:
-        """Tire l'ordre des fragments de l'époque en cours : il ne dépend que de (graine, époque)."""
-        hasard = np.random.default_rng([self.graine, self.epoque])
-        self._ordre = [int(rang) for rang in hasard.permutation(len(self._fichiers))]
-        self._debuts = [0]  # position, dans le ruban de l'époque, du début de chaque fragment
-        for rang in self._ordre:
-            self._debuts.append(self._debuts[-1] + self._tailles[rang])
 
     def _ouvrir(self, rang: int) -> np.memmap:
-        """Ouvre le fragment `rang` une seule fois, sans le charger en mémoire."""
+        """Ouvre le fichier `rang` une seule fois, sans le charger en mémoire."""
         if rang not in self._ouverts:
             jetons = lire_jetons(self._fichiers[rang])
             if len(jetons) != self._tailles[rang]:
@@ -119,50 +118,34 @@ class ChargeurJetons:
             self._ouverts[rang] = jetons
         return self._ouverts[rang]
 
-    def _lire(self, debut: int, nombre: int) -> np.ndarray:
-        """Lit `nombre` jetons du ruban de l'époque à partir de `debut`, à cheval sur des fragments au besoin."""
-        morceaux = []
-        place = bisect_right(self._debuts, debut) - 1  # le fragment qui contient `debut`
-        while nombre > 0:
-            rang = self._ordre[place]
-            decalage = debut - self._debuts[place]
-            pris = self._ouvrir(rang)[decalage : decalage + nombre]
-            morceaux.append(pris)
-            nombre -= len(pris)
-            debut += len(pris)
-            place += 1
-        return np.concatenate(morceaux)
+    def _morceau(self, numero: int) -> np.ndarray:
+        """Les `longueur + 1` jetons qui partent du point de départ numéro `numero`."""
+        rang = bisect_right(self._departs_cumules, numero) - 1  # le fichier qui le contient
+        debut = numero - self._departs_cumules[rang]
+        return self._ouvrir(rang)[debut : debut + self.longueur + 1]
 
     def lot(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Le lot suivant : `(x, y)`, entiers `int64` de forme `[taille_lot, longueur]`."""
-        besoin = self._jetons_par_lot + 1
-        if self.position + besoin > self.jetons_par_epoque:
-            self.epoque += 1
-            self.position = 0
-            self._preparer_epoque()
-        ruban = torch.from_numpy(self._lire(self.position, besoin).astype(np.int64))
-        self.position += self._jetons_par_lot
-        x = ruban[:-1].view(self.taille_lot, self.longueur)
-        y = ruban[1:].view(self.taille_lot, self.longueur)
-        return x, y
+        numeros = self._hasard.integers(0, self._departs_cumules[-1], size=self.taille_lot)
+        morceaux = torch.from_numpy(np.stack([self._morceau(int(n)) for n in numeros]).astype(np.int64))
+        return morceaux[:, :-1].contiguous(), morceaux[:, 1:].contiguous()
 
     def etat(self) -> dict:
-        """Ce qu'il faut garder pour reprendre au même endroit (des nombres simples)."""
+        """Ce qu'il faut garder pour reprendre au même endroit : l'état du générateur, et de quoi vérifier."""
         return {
             "version": VERSION_DE_L_ETAT,
             "graine": self.graine,
-            "epoque": self.epoque,
-            "position": self.position,
+            "hasard": self._hasard.bit_generator.state,
             "fragments": len(self._fichiers),
-            "jetons_par_epoque": self.jetons_par_epoque,
+            "jetons": self.jetons,
         }
 
     def restaurer(self, etat: dict) -> None:
-        """Replace le chargeur à la position décrite par `etat` (venu de `etat()`)."""
+        """Remet le générateur dans l'état décrit par `etat` (venu de `etat()`)."""
         if etat.get("version") != VERSION_DE_L_ETAT:
             raise ValueError(
-                f"État du chargeur de version {etat.get('version')!r}, celle-ci lit la version "
-                f"{VERSION_DE_L_ETAT}."
+                f"État du chargeur de version {etat.get('version')!r}, cette version de la forge lit "
+                f"la version {VERSION_DE_L_ETAT}."
             )
         if etat["graine"] != self.graine:
             raise ValueError(
@@ -170,13 +153,11 @@ class ChargeurJetons:
                 f"donne {self.graine} : remets graine = {etat['graine']} pour reprendre le même "
                 "entraînement."
             )
-        if (etat["fragments"], etat["jetons_par_epoque"]) != (len(self._fichiers), self.jetons_par_epoque):
+        if (etat["fragments"], etat["jetons"]) != (len(self._fichiers), self.jetons):
             raise ValueError(
                 f"Les jetons de {self.dossier} ne sont plus ceux de la sauvegarde : "
-                f"{etat['fragments']} fragments et {etat['jetons_par_epoque']} jetons alors, "
-                f"{len(self._fichiers)} fragments et {self.jetons_par_epoque} jetons maintenant. "
+                f"{etat['fragments']} fragments et {etat['jetons']} jetons alors, "
+                f"{len(self._fichiers)} fragments et {self.jetons} jetons maintenant. "
                 "Reprends avec les mêmes données (le même `donnees` dans la configuration)."
             )
-        self.epoque = int(etat["epoque"])
-        self.position = int(etat["position"])
-        self._preparer_epoque()
+        self._hasard.bit_generator.state = etat["hasard"]

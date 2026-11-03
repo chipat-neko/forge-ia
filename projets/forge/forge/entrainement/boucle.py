@@ -579,6 +579,10 @@ def entrainer(config: ConfigEntrainement, reprendre: bool = False, arreter_apres
 
     Ctrl+C met en pause (voir le début du module). Un manque de mémoire sur la carte
     graphique affiche la marche à suivre, puis quitte avec `SystemExit(2)`.
+
+    Sur GPU, deux entraînements identiques peuvent différer légèrement (certains calculs de
+    la carte additionnent dans un ordre qui varie) ; la reprise, elle, repart exactement du
+    point sauvegardé.
     """
     appareil = _verifier_appareil(config)
     manque_de_memoire = False
@@ -625,7 +629,7 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
     try:
         validation = ChargeurJetons(config.dossier_donnees / "val", longueur, config.micro_lot, config.graine)
         depart_validation = validation.etat()  # la validation relit toujours les mêmes lots
-        lots_validation = min(LOTS_DE_VALIDATION, max(1, validation.jetons_par_epoque // (config.micro_lot * longueur)))
+        lots_validation = min(LOTS_DE_VALIDATION, max(1, validation.jetons // (config.micro_lot * longueur)))
     except (DonneesManquantes, ValueError) as erreur:
         sans_validation = str(erreur)
 
