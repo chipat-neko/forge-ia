@@ -16,8 +16,8 @@ Les données ne sont jamais copiées dans ce dépôt ; seuls les modèles entr
 | Code Python sous licence permissive | `code_python` | 15 % |
 
 Les parts sont définies une seule fois, dans `forge.donnees.melange.MELANGE_PAR_DEFAUT`.
-Le téléchargement et l'apprentissage du tokenizer les lisent là ; l'encodage, qui viendra ensuite,
-fera de même.
+Le téléchargement et l'apprentissage du tokenizer les lisent là ; l'encodage
+(`python -m forge encoder`) les lit aussi, pour savoir quelles sources encoder.
 
 ## Français du web (`web_fr`)
 
@@ -84,7 +84,7 @@ fera de même.
 - **Où :** `FORGE_DONNEES/textes/<dossier>/<source>/` (par défaut `D:\forge-ia-donnees` sur
   ce PC), un sous-dossier par source.
 - **Validation :** le téléchargement ne met rien de côté : la séparation entre entraînement et
-  validation se fera à l'encodage (tâche suivante), avec `est_validation`, qui met de côté 0,5 % des
+  validation se fait à l'encodage (voir plus bas), avec `est_validation`, qui met de côté 0,5 % des
   documents d'après les 8 premiers chiffres de leur empreinte (le même document tombe toujours du
   même côté).
 
@@ -96,3 +96,30 @@ uv run --extra gpu python -m forge donnees --octets 300M --dossier echantillon
 
 La commande lève `HF_HUB_OFFLINE=1`, s'il est posé dans la session, pour ce téléchargement
 seulement : elle a besoin du réseau.
+
+## Ce que fait l'encodage
+
+L'encodage lit les fragments de texte et les écrit en jetons, avec le tokenizer de ton IA. Il
+travaille hors du dépôt, sous `FORGE_DONNEES/jetons/<dossier>/`.
+
+- **Fichiers :** `train/fragment-00000.bin` et `val/fragment-00000.bin`, en `uint16`
+  (petit-boutiste), lisibles avec `forge.donnees.jetons.lire_jetons`. Chaque document est suivi
+  du jeton `<|fin_texte|>`. Un document va dans `val/` quand `est_validation` le dit (0,5 % des
+  documents) ; un fichier qui n'aurait aucun jeton n'est pas écrit.
+- **Numéros :** le fragment de sortie `k` vient du `k`-ième fragment d'entrée, quand on range les
+  sources par nom, puis les fragments par nom. `index.json` donne le nombre de jetons de chaque
+  fichier et d'où il vient.
+- **Parallélisme :** un fragment à la fois par processus, tous les cœurs par défaut
+  (`--processus N` pour en changer). Le résultat est le même quel que soit le nombre de processus.
+- **Reprise :** chaque fragment encodé a son marqueur `fragment-00000.fait`, posé après ses
+  fichiers de jetons. Après une coupure, on relance la même commande : les fragments dont le
+  marqueur correspond encore au fragment de texte et au tokenizer sont sautés, les autres sont
+  refaits. `.complet` n'est posé qu'à la fin.
+- **Place :** avant chaque fichier, on vérifie qu'il reste de la place pour lui et 2 Go de marge.
+- **Refus :** une source sans `.complet` n'est jamais encodée, et un dossier de sortie déjà
+  rempli avec un autre tokenizer n'est jamais réécrit sans que tu le décides (supprime-le, ou
+  choisis-en un autre).
+
+```powershell
+uv run --extra gpu python -m forge encoder --donnees echantillon --tokenizer forge/ressources/tokenizer-ton-ia-v1.json
+```

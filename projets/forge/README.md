@@ -74,6 +74,21 @@ Dans le code : `TokenizerOctets.charger(chemin)`, puis `encoder(texte)` et
 `decoder(ids)`. L'encodeur n'émet jamais de jeton spécial ; on les ajoute avec
 `id_special("<|fin_texte|>")`.
 
+## Encoder les textes en jetons
+
+Une fois les textes téléchargés et le tokenizer appris, `encoder` écrit le corpus en
+fragments de jetons (`uint16`, chaque document suivi de `<|fin_texte|>`), en parallèle sur
+tous les cœurs, avec reprise fragment par fragment :
+
+```powershell
+uv run --extra gpu python -m forge encoder --donnees echantillon `
+    --tokenizer forge/ressources/tokenizer-ton-ia-v1.json
+```
+
+Le résultat est dans `FORGE_DONNEES/jetons/echantillon/` (`train/`, `val/`, `index.json`),
+et `forge.donnees.jetons.lire_jetons(fichier)` ouvre un fichier sans le charger en mémoire.
+Détails dans `docs/donnees.md`.
+
 ## Tester
 
 ```powershell

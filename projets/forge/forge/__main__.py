@@ -3,7 +3,7 @@
 Les commandes `donnees`, `tokenizer`, `encoder`, `mesurer`, `entrainer`,
 `evaluer` et `suivi` s'y branchent une par une, au fil des tâches du plan
 (chacune ajoute son sous-parseur dans `construire_parseur`). Déjà là :
-`donnees` et `tokenizer`.
+`donnees`, `tokenizer` et `encoder`.
 """
 
 import argparse
@@ -169,6 +169,81 @@ def _ajouter_tokenizer(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_tokenizer)
 
 
+def _commande_encoder(choix: argparse.Namespace) -> int:
+    """`forge encoder` : encode les textes téléchargés en fragments de jetons, en parallèle."""
+    # Imports ici : les autres commandes n'ont pas besoin de l'encodage.
+    from forge.chemins import PlaceInsuffisante, racine_donnees
+    from forge.donnees import jetons
+    from forge.donnees.melange import MELANGE_PAR_DEFAUT
+    from forge.donnees.telechargement import dossier_des_textes
+    from forge.tokenizer.apprentissage import DonneesManquantes, verifier_dossier
+    from forge.tokenizer.bpe_octets import TokenizerOctets
+
+    def journal(message: str) -> None:
+        print(message, flush=True)
+
+    racine = dossier_des_textes(Path(choix.donnees))
+    sortie = racine_donnees() / "jetons" / Path(choix.donnees).name
+    try:
+        verifier_dossier(racine)  # chaque source est là, avec son .complet
+        tokenizer = TokenizerOctets.charger(choix.tokenizer)
+        resume = jetons.encoder_corpus(
+            [racine / source for source in MELANGE_PAR_DEFAUT], tokenizer, sortie, choix.processus, journal
+        )
+    except (DonneesManquantes, PlaceInsuffisante, FileNotFoundError, ValueError) as erreur:
+        print(f"Erreur : {erreur}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print(
+            "Interrompu. Relance la même commande : les fragments déjà encodés sont gardés, "
+            "seuls ceux en cours seront refaits.",
+            file=sys.stderr,
+        )
+        return 130
+    except Exception as erreur:  # disque, mémoire, processus tué…
+        print(
+            f"Erreur pendant l'encodage ({type(erreur).__name__}) : {erreur}\n"
+            "Relance la même commande : elle reprendra au dernier fragment encodé.",
+            file=sys.stderr,
+        )
+        return 1
+    octets_par_jeton = f"{resume['octets_par_jeton']:.2f}".replace(".", ",")
+    print(
+        f"Jetons prêts dans {sortie} : {resume['jetons_train']} jetons d'entraînement, "
+        f"{resume['jetons_val']} de validation, {octets_par_jeton} octets par jeton."
+    )
+    return 0
+
+
+def _ajouter_encoder(sous_parseurs) -> None:
+    commande = _nouvelle_commande(
+        sous_parseurs,
+        "encoder",
+        "Encode les textes téléchargés en fragments de jetons (uint16), en parallèle, avec reprise.",
+    )
+    commande.add_argument(
+        "--donnees",
+        required=True,
+        metavar="NOM",
+        help="dossier des textes, sous FORGE_DONNEES/textes (celui de « forge donnees --dossier »)",
+    )
+    commande.add_argument(
+        "--tokenizer",
+        required=True,
+        type=Path,
+        metavar="CHEMIN",
+        help="fichier JSON du tokenizer (celui de « forge tokenizer --sortie »)",
+    )
+    commande.add_argument(
+        "--processus",
+        type=int,
+        default=None,
+        metavar="N",
+        help="nombre de processus qui encodent en même temps (tous les cœurs par défaut)",
+    )
+    commande.set_defaults(fonction=_commande_encoder)
+
+
 def construire_parseur() -> argparse.ArgumentParser:
     """Construit le parseur principal et ses sous-commandes."""
     parseur = argparse.ArgumentParser(
@@ -195,6 +270,7 @@ def construire_parseur() -> argparse.ArgumentParser:
     sous_parseurs = parseur.add_subparsers(dest="commande", metavar="<commande>")
     _ajouter_donnees(sous_parseurs)
     _ajouter_tokenizer(sous_parseurs)
+    _ajouter_encoder(sous_parseurs)
     return parseur
 
 
