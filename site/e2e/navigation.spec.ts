@@ -1,6 +1,7 @@
 // Parcours des pages hors chapitre : l'accueil (pari d'ouverture et plan du
 // parcours), les pages de partie, la recherche (Pagefind) et la page 404.
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import { terminerChapitre13, verifierAxe, verifierSansDebordement } from './outils';
 
 const CLE_PROGRESSION = 'forge-ia:progression:v1';
@@ -156,6 +157,16 @@ test('recherche : les titres du parcours, un numéro, et rien de la page d’ess
   await verifierSansDebordement(page);
 });
 
+test('recherche : « jeux » et « mots » trouvent « jeu » et « mot », comme Pagefind', async ({ page }) => {
+  await page.goto('/forge-ia/recherche/?q=jeux');
+  await expect(page.locator('[data-resultat]').first()).toContainText('tokenizer');
+  await expect(page.locator('[data-resultat] mark').first()).toHaveText(/^jeu/);
+  await page.getByRole('searchbox').fill('mots');
+  await expect(page.locator('[role="status"]')).toContainText('mots');
+  await expect(page.locator('[data-resultat] .passages li')).not.toHaveCount(0);
+  await expect(page.locator('[data-resultat] mark', { hasText: /^mot$/ }).first()).toBeVisible();
+});
+
 test('recherche : la requête de l’adresse est cherchée d’emblée', async ({ page }) => {
   await page.goto('/forge-ia/recherche/?q=jetons');
   await expect(page.getByRole('searchbox')).toHaveValue('jetons');
@@ -174,6 +185,32 @@ test('404 : un chapitre à venir est reconnu, et le pari se joue', async ({ page
   await expect(pari.locator('.verdict')).toContainText('Pas tout à fait.');
   const g = (mot: string) => `«${FINE}${mot}${FINE}»`;
   await expect(pari.locator('.verdict')).toContainText(`${g('ou')}, ${g('ab')} et ${g('le')}`);
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
+});
+
+// GitHub Pages sert 404.html pour toute adresse inconnue, même mal encodée
+// (vieux lien en Latin-1, « % » isolé). astro preview répond 500 à ces
+// adresses : on sert donc 404.html nous-mêmes, comme le ferait GitHub Pages.
+test('404 : une adresse mal encodée ne casse ni l’adresse affichée ni le pari', async ({ page }) => {
+  const page404 = readFileSync('dist/404.html', 'utf8');
+  const erreurs: string[] = [];
+  page.on('pageerror', (erreur) => erreurs.push(erreur.message));
+  for (const abimee of ['/forge-ia/caf%E9/', '/forge-ia/100%zz/']) {
+    await page.route(
+      (url) => url.pathname === abimee,
+      (route) => route.fulfill({ status: 404, contentType: 'text/html; charset=utf-8', body: page404 }),
+    );
+    const r = await page.goto(abimee);
+    expect(r?.status()).toBe(404);
+    await expect(page.locator('[data-adresse]')).toBeVisible();
+    await expect(page.locator('[data-adresse]')).toHaveText(abimee);
+    const pari = page.locator('[data-pari="introuvable"]');
+    await pari.locator('[data-juste]').click();
+    await expect(pari.locator('.verdict')).toBeVisible();
+    await expect(pari.locator('.verdict')).toContainText('Juste.');
+  }
+  expect(erreurs).toEqual([]);
   await verifierAxe(page);
   await verifierSansDebordement(page);
 });

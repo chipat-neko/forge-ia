@@ -134,6 +134,16 @@ describe('extraitPertinent et garderPertinents', () => {
     expect(extraitPertinent('l. es. ␣f. o. r. <mark>g.</mark> er.', 'gabarit')).toBe(false);
     expect(extraitPertinent('on la fusionne <mark>en</mark> un nouveau', 'enclume')).toBe(false);
     expect(extraitPertinent('rien de surligné', 'jetons')).toBe(false);
+    // « GPU » absent du chapitre : Pagefind surligne le « g » d'un exemple de code.
+    expect(extraitPertinent("par exemple {('f', 'o', 'r', <mark>'g',</mark> 'e')", 'GPU')).toBe(false);
+  });
+
+  it('garde le mot que le racinisateur français trouve à juste titre', () => {
+    // Pagefind ramène « mots » à « mot » et « jeux » à « jeu » : ces passages parlent bien du sujet.
+    expect(extraitPertinent('découper <mark>mot</mark> par mot', 'mots')).toBe(true);
+    expect(extraitPertinent('comme ceux d’un <mark>jeu</mark> de société', 'jeux')).toBe(true);
+    expect(extraitPertinent('les <mark>mots</mark> rares', 'mot')).toBe(true);
+    expect(extraitPertinent('les <mark>mots</mark> rares', 'Les mots rares')).toBe(true);
   });
 
   it('retire les passages hors sujet, puis les pages qui n’en ont plus', () => {

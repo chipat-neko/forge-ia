@@ -87,19 +87,25 @@ export async function chercher(requete: string): Promise<Resultat[]> {
 }
 
 /**
- * Vrai si l'extrait surligne au moins un mot qui ressemble à la requête : il
- * contient le début (quatre lettres au plus) d'une de ses racines.
+ * Vrai si l'extrait surligne au moins un mot qui ressemble à la requête : un
+ * mot surligné commence comme un mot de la requête, sur quatre lettres au
+ * plus et une de moins que ce mot. « mots » garde donc « mot » et « jeux »
+ * garde « jeu », que le racinisateur français de Pagefind trouve à juste titre.
  *
  * Quand un mot est absent de l'index, Pagefind le cherche en morceaux : pour
  * « gabarit », il surligne « g » ; pour « enclume », « en ». Ces résultats-là
  * ne parlent pas de ce que le lecteur cherche, on les écarte.
  */
 export function extraitPertinent(extrait: string, requete: string): boolean {
-  const debuts = racines(requete).map((r) => r.slice(0, 4));
+  const debuts = (requete.match(MOT) ?? [])
+    .map(aplatir)
+    .filter((mot) => mot.length > 1)
+    .map((mot) => mot.slice(0, Math.min(4, mot.length - 1)));
   if (debuts.length === 0) return true;
   return morceauxExtrait(extrait)
     .filter((m) => m.marque)
-    .some((m) => debuts.some((debut) => aplatir(m.texte).includes(debut)));
+    .flatMap((m) => (m.texte.match(MOT) ?? []).map(aplatir))
+    .some((mot) => debuts.some((debut) => mot.startsWith(debut)));
 }
 
 /** Les résultats sans les passages hors sujet ; une page sans passage pertinent disparaît. */

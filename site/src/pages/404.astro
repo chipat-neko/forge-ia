@@ -124,7 +124,13 @@ const assemblages = `${enLettres(nbAssemblages)} assemblage${nbAssemblages > 1 ?
   const ligne = document.querySelector<HTMLElement>('[data-ligne-adresse]');
   const adresse = document.querySelector<HTMLElement>('[data-adresse]');
   if (ligne && adresse) {
-    adresse.textContent = decodeURIComponent(location.pathname);
+    // Une adresse mal encodée (vieux lien en Latin-1, « % » isolé) ne se
+    // décode pas : on la montre telle quelle, et la suite du script tourne.
+    try {
+      adresse.textContent = decodeURIComponent(location.pathname);
+    } catch {
+      adresse.textContent = location.pathname;
+    }
     ligne.hidden = false;
   }
   const explication = document.querySelector<HTMLElement>('[data-explication]');
