@@ -3,7 +3,15 @@
 // fini coupe le tracé, une perte trop grande est ramenée au bord.
 
 import { describe, expect, it } from 'vitest';
-import { cheminCourbe, echelleCourbe, graduations, moyennesParPaquets, reduirePoints, taillePaquet } from './courbe';
+import {
+  cheminCourbe,
+  echelleCourbe,
+  graduations,
+  moyennesParPaquets,
+  reduirePoints,
+  sortieDeLEchelle,
+  taillePaquet,
+} from './courbe';
 
 describe('echelleCourbe', () => {
   it('de 0 à 1,25 fois l’erreur du hasard, sur 640 × 280 par défaut', () => {
@@ -176,5 +184,42 @@ describe('graduations', () => {
     expect(() => graduations(0, 3)).toThrow(/maximum/);
     expect(() => graduations(Infinity, 3)).toThrow(/maximum/);
     expect(() => graduations(10, 0)).toThrow(/nbMax/);
+  });
+});
+
+describe('sortieDeLEchelle : le premier pas hors échelle, lu sur les pertes brutes', () => {
+  const e = echelleCourbe(3000, 3.7); // yMax = 4,625
+
+  it('un pas qui explose dans un paquet : la moyenne le noie, pas sortieDeLEchelle', () => {
+    const pertes = Array<number>(30).fill(2);
+    pertes[20] = 50; // le pas 21, dans le premier paquet de 25 pas : (24 × 2 + 50) / 25 = 3,92
+    // Les moyennes par paquets de 25 restent sous le haut du cadre…
+    expect(moyennesParPaquets(pertes, 25).every((p) => p.perte <= e.yMax)).toBe(true);
+    expect(cheminCourbe(moyennesParPaquets(pertes, 25), e).horsEchelle).toBe(false);
+    // … mais la perte brute du pas 21 en sort.
+    expect(sortieDeLEchelle(pertes, [], e)).toBe(21);
+  });
+
+  it('un NaN ou un infini sort de l’échelle, même ignoré par les moyennes', () => {
+    expect(sortieDeLEchelle([2, 2, NaN, 2], [], e)).toBe(3);
+    expect(cheminCourbe(moyennesParPaquets([2, 2, NaN, 2], 25), e).horsEchelle).toBe(false);
+    expect(sortieDeLEchelle([2, Infinity], [], e)).toBe(2);
+    expect(sortieDeLEchelle([2, -Infinity], [], e)).toBe(2);
+  });
+
+  it('les points de validation comptent aussi ; c’est le premier pas qui gagne', () => {
+    const validations = [
+      { pas: 0, perte: 3.6 },
+      { pas: 100, perte: Infinity },
+    ];
+    expect(sortieDeLEchelle(Array<number>(150).fill(2), validations, e)).toBe(100);
+    const pertes = Array<number>(150).fill(2);
+    pertes[49] = 9;
+    expect(sortieDeLEchelle(pertes, validations, e)).toBe(50);
+  });
+
+  it('tout dans le cadre, y compris yMax pile : null', () => {
+    expect(sortieDeLEchelle([3, e.yMax, 0], [{ pas: 0, perte: 3.6 }], e)).toBeNull();
+    expect(sortieDeLEchelle([], [], e)).toBeNull();
   });
 });

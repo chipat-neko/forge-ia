@@ -79,16 +79,19 @@ export async function attendreHydratation(page: Page): Promise<void> {
 /**
  * Vérifie la typographie française du texte affiché d'une zone (innerText) :
  * aucune espace ordinaire ni insécable (U+0020, U+00A0) devant ; : ! ? % »,
- * aucune après «, et aucun nombre dont les milliers sont séparés par une
- * espace ordinaire (« 3 000 » doit s'écrire avec une espace fine, U+202F).
- * Les deux premiers motifs sont ceux du parcours du chapitre 1.3.
+ * aucune après «, aucun nombre dont les milliers sont séparés par une
+ * espace ordinaire ou insécable (« 3 000 » doit s'écrire avec une espace
+ * fine, U+202F), et aucune apostrophe droite entre deux lettres. Les motifs
+ * des espaces et de l'apostrophe sont ceux du parcours du chapitre 1.3.
  */
 export async function verifierTypographie(zone: Locator): Promise<void> {
   const texte = await zone.innerText();
   expect(texte.length, 'la zone à vérifier est vide').toBeGreaterThan(0);
   expect(texte.match(/.{0,30}[ \u00A0][;:!?%].{0,10}/g) ?? []).toEqual([]);
   expect(texte.match(/.{0,10}«[ \u00A0].{0,30}|.{0,30}[ \u00A0]».{0,10}/g) ?? []).toEqual([]);
-  expect(texte.match(/.{0,20}\d \d{3}\b.{0,20}/g) ?? []).toEqual([]);
+  expect(texte.match(/.{0,20}\d[ \u00A0]\d{3}\b.{0,20}/g) ?? []).toEqual([]);
+  // Apostrophe courbe (U+2019) entre deux lettres, jamais droite.
+  expect(texte.match(/.{0,20}\p{L}'\p{L}.{0,20}/gu) ?? []).toEqual([]);
 }
 
 /** Vérifie que la page ne déborde pas en largeur : pas de défilement horizontal. */

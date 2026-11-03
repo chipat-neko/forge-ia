@@ -11,7 +11,15 @@
   //
   // Le SVG a un nom accessible qui donne l'erreur de validation au départ et
   // au dernier point ; la liste des erreurs, sous la courbe, donne le détail.
-  import { cheminCourbe, echelleCourbe, graduations, moyennesParPaquets, taillePaquet, type Point } from '../../lib/courbe';
+  import {
+    cheminCourbe,
+    echelleCourbe,
+    graduations,
+    moyennesParPaquets,
+    sortieDeLEchelle,
+    taillePaquet,
+    type Point,
+  } from '../../lib/courbe';
   import { formaterPerte, nombre } from '../../lib/nombres';
   import type { Courbe } from '../../lib/mini-modele/pilote';
 
@@ -29,12 +37,22 @@
     etiquette: string;
     /** Ce que la légende dit du fantôme : « l'essai d'avant, au taux de 0,01 ». */
     legendeFantome?: string;
+    /** Vrai quand l'erreur a explosé (le Worker l'a dit) : la courbe est hors échelle. */
+    explose?: boolean;
   }
 
-  const { pertes, validations, pasTotal, perteHasard, fantome, etiquette, legendeFantome = 'l’essai d’avant' }: Props =
-    $props();
+  const {
+    pertes,
+    validations,
+    pasTotal,
+    perteHasard,
+    fantome,
+    etiquette,
+    legendeFantome = 'l’essai d’avant',
+    explose = false,
+  }: Props = $props();
 
-  const FINE = ' ';
+  const FINE = '\u202F';
   // 120 points au plus : des paquets de 25 pas pour 3 000 pas, de 5 pour 600.
   // L'erreur d'un seul pas (8 prénoms) varie beaucoup d'un pas à l'autre : la
   // moyenne d'un paquet montre la tendance. La taille dépend du nombre total
@@ -48,9 +66,20 @@
   const traceFantome = $derived(fantome === null ? null : cheminCourbe(moyennesParPaquets(fantome.pertes, taille), e));
   // Chaque point de validation est un trait de longueur nulle à bouts ronds :
   // un rond de 6 px de diamètre (rayon 3) à toute largeur de courbe.
-  const points = $derived(validations.map((v) => cheminCourbe([v], e)));
-  const dPoints = $derived(points.filter((p) => p.d !== '').map((p) => `${p.d}h0`).join(''));
-  const horsEchelle = $derived(trace.horsEchelle || points.some((p) => p.horsEchelle));
+  const dPoints = $derived(
+    validations
+      .map((v) => cheminCourbe([v], e).d)
+      .filter((d) => d !== '')
+      .map((d) => `${d}h0`)
+      .join(''),
+  );
+
+  // Où la courbe sort par le haut : le premier pas dont l'erreur brute (avant
+  // les moyennes, qui noient un pas qui explose et ignorent NaN) est non finie
+  // ou au-dessus du cadre. Une explosion annoncée par le Worker la marque
+  // aussi, au dernier pas. Le fantôme peut sortir du cadre lui aussi.
+  const sortieCourante = $derived(sortieDeLEchelle(pertes, validations, e) ?? (explose ? Math.max(pertes.length, 1) : null));
+  const sortieFantome = $derived(fantome === null ? null : sortieDeLEchelle(fantome.pertes, fantome.validations, e));
 
   // Les positions en pourcentage du cadre, pour les textes posés par-dessus.
   const enX = (pas: number) => (Math.min(Math.max(pas, 0), e.xMax) / e.xMax) * 100;
@@ -61,13 +90,10 @@
   const gradY = $derived(graduations(e.yMax, 5).filter((v) => v < e.yMax));
   const yHasard = $derived((e.hauteur * (1 - (perteHasard - e.yMin) / (e.yMax - e.yMin))).toFixed(1));
 
-  // Où la courbe sort par le haut : le premier point au-dessus de l'échelle.
+  // La position du repère « hors échelle », en pourcentage de la largeur.
   const sortie = $derived.by(() => {
-    if (!horsEchelle) return null;
-    const dehors = (p: Point) => p.perte > e.yMax;
-    const candidats = [...moyennesParPaquets(pertes, taille), ...validations].filter(dehors);
-    const pas = candidats.length > 0 ? Math.min(...candidats.map((p) => p.pas)) : e.xMax;
-    return enX(pas);
+    const pas = [sortieCourante, sortieFantome].filter((p): p is number => p !== null);
+    return pas.length === 0 ? null : enX(Math.min(...pas));
   });
 
   const nomAccessible = $derived.by(() => {
@@ -77,7 +103,8 @@
     if (premier !== undefined) morceaux.push(`${formaterPerte(premier.perte)} au pas ${sur(premier.pas)}`);
     if (dernier !== undefined && dernier !== premier) morceaux.push(`${formaterPerte(dernier.perte)} au pas ${sur(dernier.pas)}`);
     let texte = morceaux.length > 0 ? `${etiquette}${FINE}: ${morceaux.join(', ')}.` : `${etiquette}.`;
-    if (horsEchelle) texte += ' La courbe sort du cadre par le haut.';
+    if (sortieCourante !== null) texte += ' La courbe sort du cadre par le haut.';
+    if (sortieFantome !== null) texte += ' L’essai d’avant, en pointillé, sort du cadre par le haut.';
     const finFantome = fantome?.validations[fantome.validations.length - 1];
     if (finFantome !== undefined) {
       texte += ` En pointillé, ${legendeFantome}${FINE}: ${formaterPerte(finFantome.perte)} au pas ${sur(finFantome.pas)}.`;
@@ -109,13 +136,12 @@
         {#if traceFantome !== null && traceFantome.d !== ''}
           <path class="fantome" d={traceFantome.d} data-test="courbe-fantome" />
         {/if}
+        <!-- Les points de validation d'abord : la ligne d'entraînement passe par-dessus, et reste visible. -->
+        {#if dPoints !== ''}
+          <path class="validation" d={dPoints} />
+        {/if}
         {#if trace.d !== ''}
           <path class="entrainement" d={trace.d} />
-        {/if}
-        {#if dPoints !== ''}
-          <!-- Un anneau couleur papier détache chaque point de la courbe qu'il recouvre. -->
-          <path class="anneau" d={dPoints} />
-          <path class="validation" d={dPoints} />
         {/if}
       </svg>
       <span class="repere-hasard" style:top="{enY(perteHasard)}%" aria-hidden="true">hasard</span>
@@ -262,11 +288,6 @@
     stroke-linecap: round;
   }
 
-  .anneau {
-    stroke: var(--papier);
-    stroke-width: 10;
-    stroke-linecap: round;
-  }
 
   .repere-hasard {
     position: absolute;
@@ -279,7 +300,8 @@
   .hors-echelle {
     position: absolute;
     top: 0;
-    left: clamp(0%, var(--x), calc(100% - 7em));
+    /* Jamais sous le titre « erreur », même quand la courbe sort près du pas 0. */
+    left: clamp(2.2em, var(--x), calc(100% - 7em));
     transform: translateY(-110%);
     font-weight: 700;
     color: var(--corail);

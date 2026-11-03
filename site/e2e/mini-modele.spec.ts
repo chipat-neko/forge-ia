@@ -15,9 +15,12 @@ import { PRESETS_MINI, TAUX_PROPOSES } from '../src/lib/mini-modele/reglages';
 import { attendreHydratation, verifierAxe, verifierSansDebordement, verifierTypographie } from './outils';
 
 const PAGE = '/forge-ia/essais/mini-modele/';
-const FINE = ' ';
+const FINE = '\u202F';
 const COMPLET = PRESETS_MINI.complet;
 const AVANT_GOUT = PRESETS_MINI['avant-gout'];
+// Le premier progrès d'un Worker neuf peut tarder : le PC fait tourner l'entraînement
+// de la carte graphique en même temps, et les parcours vont par quatre.
+const ATTENTE_TRAVAILLEUR = { timeout: 20_000 };
 
 const demo = (p: Page, nom = 'mini') => p.locator(`[data-mini="${nom}"]`);
 const etat = (p: Page, nom = 'mini') => demo(p, nom).locator('[data-test="mini-etat"]');
@@ -79,15 +82,17 @@ test('avant le pari, le taux est désactivé ; après, ça apprend', async ({ pa
   await expect(taux(page)).not.toHaveAttribute('aria-disabled', 'true');
   await expect(taux(page)).toHaveAttribute('aria-valuetext', texteTaux(COMPLET.tauxMax));
   await page.locator('[data-test="mini-action"]').first().click();
-  await expect.poll(() => pas(page)).toBeGreaterThan(0);
+  await expect.poll(() => pas(page), ATTENTE_TRAVAILLEUR).toBeGreaterThan(0);
   await expect(action(page)).toHaveText('Pause');
 });
 
 test('la page ne charge pas les prénoms avant le lancement', async ({ page }) => {
   // La ligne du milieu de la liste versionnée (Playwright tourne dans site/).
   const prenoms = readFileSync('../projets/mini-modele/donnees/prenoms.txt', 'utf8').split('\n').filter((l) => l !== '');
-  const milieu = prenoms[Math.floor(prenoms.length / 2)];
-  expect(milieu.length).toBeGreaterThan(2);
+  // Un prénom distinctif : le premier d'au moins 7 lettres à partir du milieu (un nom
+  // court pourrait se trouver par hasard dans un script sans rapport).
+  const milieu = prenoms.slice(Math.floor(prenoms.length / 2)).find((p) => p.length >= 7)!;
+  expect(milieu.length).toBeGreaterThanOrEqual(6);
 
   const scripts: { url: string; corps: string }[] = [];
   const lectures: Promise<void>[] = [];
@@ -126,7 +131,7 @@ test('pause et reprise au même pas', async ({ page }) => {
   await ouvrir(page);
   await allerVite(page);
   await action(page).click();
-  await expect.poll(() => pas(page)).toBeGreaterThanOrEqual(200);
+  await expect.poll(() => pas(page), ATTENTE_TRAVAILLEUR).toBeGreaterThanOrEqual(200);
   await expect(action(page)).toHaveText('Pause');
   await action(page).click();
   // La pause est confirmée par le Worker : plus aucun progrès n'arrivera ensuite.
@@ -138,19 +143,19 @@ test('pause et reprise au même pas', async ({ page }) => {
   expect(await brut(page)).toBe(`En pause au pas ${nombre(n)} sur ${nombre(COMPLET.pasTotal)}.`);
   await expect(action(page)).toHaveText('Reprendre');
   await action(page).click();
-  await expect.poll(() => pas(page)).toBeGreaterThan(n);
+  await expect.poll(() => pas(page), ATTENTE_TRAVAILLEUR).toBeGreaterThan(n);
 });
 
 test('onglet caché : pause automatique', async ({ page }) => {
   await ouvrir(page);
   await action(page).click();
-  await expect.poll(() => pas(page)).toBeGreaterThan(0);
+  await expect.poll(() => pas(page), ATTENTE_TRAVAILLEUR).toBeGreaterThan(0);
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { value: true, configurable: true });
     Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
     document.dispatchEvent(new Event('visibilitychange'));
   });
-  await expect(etat(page)).toContainText('En pause : l’onglet était caché.');
+  await expect(etat(page)).toContainText('En pause\u202F: l’onglet était caché.');
   expect(await brut(page)).toBe(MESSAGE_ONGLET);
   await expect(demo(page)).toHaveAttribute('data-travailleur', 'en-pause');
   const n = await pas(page);
@@ -169,7 +174,7 @@ test('recommencer : courbe fantôme, et le même réglage redonne les mêmes err
   await expect(demo(page).locator('[data-test="mini-recommencer"]')).toBeDisabled(); // rien à recommencer
   await allerVite(page);
   await action(page).click();
-  await expect.poll(() => validations(page).count()).toBeGreaterThanOrEqual(4);
+  await expect.poll(() => validations(page).count(), ATTENTE_TRAVAILLEUR).toBeGreaterThanOrEqual(4);
   const avant = (await validations(page).allTextContents()).slice(0, 3);
   await expect(demo(page).locator('[data-test="courbe-fantome"]')).toHaveCount(0);
 
@@ -184,14 +189,14 @@ test('recommencer : courbe fantôme, et le même réglage redonne les mêmes err
 
   await expect(action(page)).toHaveText('Lancer l’entraînement');
   await action(page).click();
-  await expect.poll(() => validations(page).count()).toBeGreaterThanOrEqual(4);
+  await expect.poll(() => validations(page).count(), ATTENTE_TRAVAILLEUR).toBeGreaterThanOrEqual(4);
   expect((await validations(page).allTextContents()).slice(0, 3)).toEqual(avant);
 });
 
 test('changer le taux repart de zéro', async ({ page }) => {
   await ouvrir(page);
   await action(page).click();
-  await expect.poll(() => pas(page)).toBeGreaterThan(0);
+  await expect.poll(() => pas(page), ATTENTE_TRAVAILLEUR).toBeGreaterThan(0);
   const suivant = TAUX_PROPOSES[TAUX_PROPOSES.indexOf(COMPLET.tauxMax) + 1];
   await taux(page).focus();
   await page.keyboard.press('ArrowRight');
@@ -207,7 +212,7 @@ test('changer le taux repart de zéro', async ({ page }) => {
   expect(await pas(page)).toBe(0);
   // Le nouveau part au nouveau taux.
   await action(page).click();
-  await expect.poll(() => pas(page)).toBeGreaterThan(0);
+  await expect.poll(() => pas(page), ATTENTE_TRAVAILLEUR).toBeGreaterThan(0);
 });
 
 test('entraînement complet : erreur finale ≤ 2,45 et acquis gagné', async ({ page }) => {
@@ -255,6 +260,68 @@ test('taux trop grand (0,3) : la courbe reste lisible, et l’erreur finale est 
     const finale = erreurDe((await validations(page).allTextContents()).at(-1)!);
     expect(finale).toBeGreaterThan(normale);
   }
+});
+
+// Aucun taux proposé ne fait exploser l'erreur : pour voir le rendu d'une
+// explosion, le parcours remplace le Worker par un faux, servi à la place du
+// vrai fichier (page.route). Il suit le même protocole de messages, et passe
+// donc par le vrai réducteur et le vrai composant ; rien de cela n'entre dans
+// le site. Au lancement, il envoie 38 pas ordinaires ; quand la page lui
+// envoie la vitesse, il envoie le pas 39 (au-dessus du cadre, mais noyé dans
+// la moyenne de son paquet de 25 pas), le pas 40 (NaN, que les moyennes
+// ignorent), puis « diverge », comme la vraie boucle.
+const FAUX_TRAVAILLEUR = `
+let generation = null;
+self.onmessage = (evenement) => {
+  const m = evenement.data;
+  if (m.type === 'lancer') {
+    generation = m.generation;
+    const pertes = [];
+    for (let i = 0; i < 38; i++) pertes.push(3.6 - i * 0.03);
+    self.postMessage({ type: 'progres', generation, pas: 38, pasTotal: 3000, pertes, dureeMs: 300, pasParSeconde: 127 });
+  } else if (m.type === 'vitesse' && m.generation === generation) {
+    self.postMessage({ type: 'progres', generation, pas: 40, pasTotal: 3000, pertes: [12.5, NaN], dureeMs: 320, pasParSeconde: 125 });
+    self.postMessage({ type: 'etat', generation, etat: 'diverge' });
+  }
+};
+`;
+
+test('explosion de l’erreur : message exact, repère « hors échelle », aucun NaN dans la courbe', async ({ page }) => {
+  let servi = false;
+  await page.route(/\/_astro\/travailleur-[^/]*\.js$/, (route) => {
+    servi = true;
+    return route.fulfill({ contentType: 'text/javascript', body: FAUX_TRAVAILLEUR });
+  });
+  await ouvrir(page);
+  const repere = demo(page).locator('[data-test="hors-echelle"]');
+  await action(page).click();
+  // Le lancement s'annonce tout de suite, avant la première validation.
+  await expect.poll(() => brut(page)).toBe('Entraînement lancé.');
+  await expect(etat(page)).toHaveAttribute('data-pas', '38', ATTENTE_TRAVAILLEUR);
+  expect(servi, 'le faux Worker a bien été servi').toBe(true);
+  await expect(repere).toHaveCount(0);
+
+  await demo(page).locator('[data-test="mini-vitesse"]').click();
+  await expect(demo(page)).toHaveAttribute('data-phase', 'diverge');
+  expect(await brut(page)).toBe(MESSAGE_DIVERGENCE);
+  await expect(action(page)).toHaveText('Entraînement arrêté');
+  await expect(action(page)).toBeDisabled();
+  // Le repère, avec son texte exact (la flèche est un décor CSS).
+  await expect(repere).toBeVisible();
+  expect(await repere.textContent()).toBe('hors échelle');
+  const courbe = demo(page).locator('[data-test="courbe"]');
+  await expect(courbe).toHaveAttribute('aria-label', /La courbe sort du cadre par le haut\.$/);
+  const chemins = await courbe.locator('path').evaluateAll((ps) => ps.map((p) => p.getAttribute('d') ?? ''));
+  expect(chemins.some((d) => d.startsWith('M'))).toBe(true);
+  for (const d of chemins) expect(d).not.toMatch(/NaN|Infinity/);
+  // La sortie est près du pas 0 : le repère ne chevauche pas le titre « erreur ».
+  const titre = (await demo(page).locator('.titre-y').boundingBox())!;
+  const boite = (await repere.boundingBox())!;
+  const chevauche =
+    boite.x < titre.x + titre.width && titre.x < boite.x + boite.width && boite.y < titre.y + titre.height && titre.y < boite.y + boite.height;
+  expect(chevauche, 'le repère chevauche le titre de l’axe').toBe(false);
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
 });
 
 test('avant-goût : 600 pas, sans réglage de taux', async ({ page }) => {
@@ -317,7 +384,7 @@ test('accessibilité, largeur, typographie', async ({ page }) => {
   // En cours, puis en pause, avec les prénoms des étapes d'avant ouverts.
   await allerVite(page);
   await action(page).click();
-  await expect.poll(() => validations(page).count()).toBeGreaterThanOrEqual(4);
+  await expect.poll(() => validations(page).count(), ATTENTE_TRAVAILLEUR).toBeGreaterThanOrEqual(4);
   await action(page).click();
   await expect(demo(page)).toHaveAttribute('data-travailleur', 'en-pause');
   await demo(page).locator('details.avant summary').click();

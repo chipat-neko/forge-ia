@@ -116,6 +116,32 @@ export function graduations(max: number, nbMax: number): number[] {
   return valeurs;
 }
 
+/** Vrai si une perte sort du cadre : non finie (NaN, ±∞), ou au-dessus de yMax. */
+const dehors = (perte: number, e: Echelle) => !Number.isFinite(perte) || perte > e.yMax;
+
+/**
+ * Le premier pas où l'erreur sort de l'échelle, ou null : une perte non finie
+ * (NaN, ±∞) ou au-dessus de yMax, parmi les pertes brutes de chaque pas (le
+ * pas p est à l'indice p − 1) et les points de validation.
+ *
+ * Il se lit sur les pertes brutes, avant toute moyenne : une moyenne par
+ * paquets noie un pas qui explose parmi ses voisins, et ignore NaN. Le repère
+ * « hors échelle » de la courbe en dépend.
+ */
+export function sortieDeLEchelle(pertes: readonly number[], validations: readonly Point[], e: Echelle): number | null {
+  let premier: number | null = null;
+  for (let i = 0; i < pertes.length; i++) {
+    if (dehors(pertes[i], e)) {
+      premier = i + 1;
+      break;
+    }
+  }
+  for (const { pas, perte } of validations) {
+    if (Number.isFinite(pas) && dehors(perte, e) && (premier === null || pas < premier)) premier = pas;
+  }
+  return premier;
+}
+
 const borne = (x: number, min: number, max: number) => (x < min ? min : x > max ? max : x);
 const coordonnee = (x: number) => x.toFixed(1);
 

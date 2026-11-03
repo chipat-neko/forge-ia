@@ -60,7 +60,7 @@
 
   const { preset, nom, verrou, acquis, initial, lien15 }: Props = $props();
 
-  const FINE = ' ';
+  const FINE = '\u202F';
   const avantGout = untrack(() => preset) === 'avant-gout';
   const tauxDepart = untrack(() => tauxIndexParDefaut(preset));
   const nbValidation = untrack(() => PRESETS_MINI[preset].nbValidation);
@@ -71,6 +71,10 @@
   // chaque validation (pas à chaque image) : les lecteurs d'écran ne
   // l'entendent qu'à ces moments-là, ou à une pause, ou à la fin.
   let vitesseALaValidation = $state(0);
+  // Au lancement ou à la reprise, la ligne d'état le dit tout de suite (les
+  // lecteurs d'écran entendent quelque chose avant la première validation),
+  // jusqu'au point de validation suivant. `validations` : leur nombre d'alors.
+  let lancement: { texte: string; validations: number } | null = $state(null);
 
   // Le canal du taux est choisi une fois pour toutes, comme dans NombreManipulable.
   const tauxCanal = canal<number>(untrack(() => `${nom}:taux`), tauxDepart);
@@ -139,6 +143,12 @@
     if (apres.validations !== avant.validations) {
       vitesseALaValidation = apres.validations.length > 1 ? apres.pasParSeconde : 0;
     }
+    if (apres.phase === 'en-cours' && avant.phase !== 'en-cours') {
+      lancement = {
+        texte: avant.phase === 'en-pause' ? `Entraînement repris au pas ${entier(apres.pas)}.` : 'Entraînement lancé.',
+        validations: apres.validations.length,
+      };
+    }
     if (envoi !== null) envoyer(envoi);
     if (apres.phase === 'termine' && avant.phase !== 'termine' && acquis !== undefined && !acquisAnnonces.has(acquis)) {
       acquisAnnonces.add(acquis);
@@ -173,6 +183,9 @@
   const ligneEtat = $derived.by(() => {
     if (etat.message !== null) return typographier(etat.message);
     if (etat.phase === 'en-pause') return `En pause au pas ${entier(etat.pas)} sur ${entier(etat.pasTotal)}.`;
+    if (etat.phase === 'en-cours' && lancement !== null && etat.validations.length === lancement.validations) {
+      return lancement.texte;
+    }
     const vitesse = vitesseALaValidation > 0 ? `, ${entier(vitesseALaValidation)} pas par seconde` : '';
     return `Pas ${entier(derniere.pas)} sur ${entier(etat.pasTotal)}${FINE}: erreur ${formaterPerte(derniere.perte)}${vitesse}.`;
   });
@@ -242,6 +255,7 @@
     fantome={etat.fantome}
     etiquette="Courbe de l’erreur"
     {legendeFantome}
+    explose={etat.phase === 'diverge'}
   />
 
   <p class="intro-liste">
@@ -297,9 +311,15 @@
     margin-bottom: 0.8em;
   }
 
-  /* Le nombre jaune ne part pas seul à la ligne : « de 0,01. » reste ensemble. */
+  /* Le nombre jaune ne part pas seul à la ligne : « de 0,01. » reste ensemble.
+     Sa marge droite, réservée au chevron ›, est réduite ici pour que le point
+     final ne flotte pas ; le chevron ne le recouvre qu'au survol ou au focus. */
   .insecable {
     white-space: nowrap;
+  }
+
+  .insecable :global(.nombre) {
+    margin-right: 2px;
   }
 
   /* Les boutons reprennent les choix des paris : bord indigo, ombre décalée,
