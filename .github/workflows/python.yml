@@ -1,0 +1,50 @@
+name: Python
+
+# Les tests des projets Python (et l'exécution des notebooks qui les
+# accompagnent) tournent sous Linux et sous Windows, comme chez les lecteurs.
+on:
+  push:
+    paths:
+      - 'projets/**'
+      - 'notebooks/**'
+      - '.github/workflows/python.yml'
+  pull_request:
+    paths:
+      - 'projets/**'
+      - 'notebooks/**'
+      - '.github/workflows/python.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests Python (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+      - name: Tests de chaque projet
+        shell: bash
+        run: |
+          echec=0
+          nombre=0
+          for dossier in projets/*/; do
+            [ -f "${dossier}pyproject.toml" ] || continue
+            nombre=$((nombre + 1))
+            echo "::group::${dossier}"
+            if ! (cd "$dossier" && uv run pytest -q); then
+              echo "::error::Tests en échec dans ${dossier}"
+              echec=1
+            fi
+            echo "::endgroup::"
+          done
+          if [ "$nombre" -eq 0 ]; then
+            echo "::error::Aucun projet Python trouvé dans projets/"
+            exit 1
+          fi
+          exit "$echec"

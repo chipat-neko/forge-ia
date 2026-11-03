@@ -1,12 +1,15 @@
 # La Forge IA
 
+[![Site](https://github.com/chipat-neko/forge-ia/actions/workflows/site.yml/badge.svg)](https://github.com/chipat-neko/forge-ia/actions/workflows/site.yml)
+[![Python](https://github.com/chipat-neko/forge-ia/actions/workflows/python.yml/badge.svg)](https://github.com/chipat-neko/forge-ia/actions/workflows/python.yml)
+
 La Forge IA est un site en français qui apprend à créer une intelligence
 artificielle de zéro, pas à pas. Chaque étape se manipule : on lit un peu,
 on fait un pari sur ce que va répondre le modèle, puis on essaie dans
 l'atelier. Il n'y a ni compte, ni statistique de visite. La progression est
 gardée dans le `localStorage` du navigateur et peut être effacée à tout moment.
 
-Adresse publique : <https://chipat-neko.github.io/forge-ia/>
+Le site est en ligne : <https://chipat-neko.github.io/forge-ia/>
 
 ## Structure du dépôt
 
@@ -20,23 +23,30 @@ Adresse publique : <https://chipat-neko.github.io/forge-ia/>
 
 ## Lancer le site
 
-Il faut Node.js et npm. Dans PowerShell :
+Il faut Node.js et npm. Dans PowerShell, depuis la racine du dépôt :
 
 ```powershell
 cd site; npm install; npm run dev
 ```
 
-Le site est alors servi en local sur <http://localhost:8530/forge-ia/>.
+Le site est alors servi en local sur <http://127.0.0.1:8530/forge-ia/>.
 Les ports du projet sont listés dans `PORTS.md`.
 
 ## Lancer un projet Python
 
-Il faut [uv](https://docs.astral.sh/uv/). Par exemple pour le projet du
-tokenizer :
+Il faut [uv](https://docs.astral.sh/uv/). Les commandes Python se lancent
+depuis la racine du dépôt. Par exemple pour le projet du tokenizer :
 
 ```powershell
 cd projets/1.3-tokenizer; uv run pytest
 ```
+
+## Tests et publication
+
+À chaque envoi sur GitHub, GitHub Actions lance les tests du site (vitest et
+Playwright) et ceux des projets Python (sous Linux et sous Windows). Quand les
+tests du site passent sur la branche `main`, le site est publié sur
+GitHub Pages.
 
 ## Licences
 
