@@ -257,7 +257,14 @@ def _commande_entrainer(choix: argparse.Namespace) -> int:
     except PlaceInsuffisante as erreur:
         print(f"Erreur : {erreur}\nUne fois la place libérée : {reprise}", file=sys.stderr)
         return 1
-    except (FileExistsError, FileNotFoundError, DonneesManquantes, CompilationImpossible, ValueError) as erreur:
+    except (
+        FileExistsError,
+        FileNotFoundError,
+        PermissionError,
+        DonneesManquantes,
+        CompilationImpossible,
+        ValueError,
+    ) as erreur:
         print(f"Erreur : {erreur}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:

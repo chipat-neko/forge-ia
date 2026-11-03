@@ -9,6 +9,9 @@ chaque époque : les tests de reprise traversent un changement d'époque.
 
 import errno
 import json
+import math
+import os
+import shutil
 import signal
 from collections import Counter
 from dataclasses import replace
@@ -105,7 +108,7 @@ def test_reprise_exacte(tmp_path):
     entrainer(config_test(tmp_path / "b"), arreter_apres=10)
     b = entrainer(config_test(tmp_path / "b"), reprendre=True, arreter_apres=20)["pertes"]
     assert len(a) == 20 and len(b) == 10
-    assert a[10:20] == pytest.approx(b, abs=1e-6)
+    assert a[10:20] == b  # au bit près sur le processeur
 
 
 def test_sauvegarde_coupee(tmp_path):
@@ -315,30 +318,123 @@ def test_aucune_sauvegarde(tmp_path):
     assert charger_derniere(tmp_path / "absent") is None
 
 
-def test_disque_plein_pendant_l_ecriture(tmp_path, monkeypatch):
-    def save_qui_remplit_le_disque(etat, fichier, *a, **k):
-        fichier.write(b"debut")
+def save_comme_torch_sur_disque_plein(etat, fichier, *a, **k):
+    """Ce que fait le vrai `torch.save` quand le disque se remplit : une RuntimeError, l'OSError en contexte."""
+    fichier.write(b"PK\x03\x04 debut")
+    try:
         raise OSError(errno.ENOSPC, "No space left on device")
+    except OSError:
+        raise RuntimeError("[enforce fail at inline_container.cc:671] . unexpected pos 704 vs 598")
 
-    monkeypatch.setattr("forge.entrainement.sauvegarde.torch.save", save_qui_remplit_le_disque)
+
+def test_disque_plein_pendant_l_ecriture(tmp_path, monkeypatch):
+    monkeypatch.setattr("forge.entrainement.sauvegarde.torch.save", save_comme_torch_sur_disque_plein)
     with pytest.raises(PlaceInsuffisante, match="--reprendre"):
         sauvegarder(tmp_path, {"pas": 1}, "etape-0000001.pt")
     assert not list(tmp_path.iterdir())
 
 
-def test_disque_plein_en_ecrivant_le_journal(tmp_path):
-    class FichierPlein:
-        def write(self, texte):
+def test_disque_plein_sans_cause_dans_l_erreur(tmp_path, monkeypatch):
+    """Une erreur qui ne dit rien du disque, mais il ne reste plus de place : c'est le disque."""
+
+    def save_qui_echoue(etat, fichier, *a, **k):
+        fichier.write(b"PK\x03\x04 debut")
+        raise RuntimeError("PytorchStreamWriter failed writing file data/0: file write failed")
+
+    plein = shutil.disk_usage(tmp_path)._replace(free=4096)
+    monkeypatch.setattr("forge.entrainement.sauvegarde.verifier_place", lambda *a, **k: None)
+    monkeypatch.setattr("forge.entrainement.sauvegarde.torch.save", save_qui_echoue)
+    monkeypatch.setattr("forge.entrainement.sauvegarde.shutil.disk_usage", lambda chemin: plein)
+    with pytest.raises(PlaceInsuffisante, match="Il manque"):
+        sauvegarder(tmp_path, {"pas": 1}, "etape-0000001.pt")
+    assert not list(tmp_path.iterdir())
+
+
+def test_autre_erreur_d_ecriture_non_deguisee(tmp_path, monkeypatch):
+    def save_qui_echoue(etat, fichier, *a, **k):
+        raise TypeError("objet impossible à enregistrer")
+
+    monkeypatch.setattr("forge.entrainement.sauvegarde.torch.save", save_qui_echoue)
+    with pytest.raises(TypeError):
+        sauvegarder(tmp_path, {"pas": 1}, "etape-0000001.pt")
+    assert not list(tmp_path.iterdir())
+
+
+class FichierQuiRemplitLeDisque:
+    """Un fichier texte sur un disque qui se remplit après `lignes` lignes ; `close` réécrit son tampon."""
+
+    def __init__(self, lignes: int) -> None:
+        self.restantes = lignes
+        self.en_attente = False
+
+    def write(self, texte):
+        if self.restantes == 0:
+            self.en_attente = True
+            raise OSError(errno.ENOSPC, "No space left on device")
+        self.restantes -= 1
+
+    def flush(self):
+        pass
+
+    def close(self):
+        if self.en_attente:
             raise OSError(errno.ENOSPC, "No space left on device")
 
-        def close(self):
-            pass
 
+def test_disque_plein_en_ecrivant_le_journal(tmp_path):
     journal = boucle._Journal(tmp_path / "journal.jsonl")
     journal._fichier.close()
-    journal._fichier = FichierPlein()
+    journal._fichier = FichierQuiRemplitLeDisque(lignes=0)
     with pytest.raises(PlaceInsuffisante, match="--reprendre"):
         journal.ecrire({"pas": 1})
+    journal.fermer()  # ne relance pas l'erreur du disque plein
+
+
+def test_disque_plein_pendant_l_entrainement(tmp_path, monkeypatch):
+    class JournalSurDisquePlein(boucle._Journal):
+        def __init__(self, chemin):
+            super().__init__(chemin)
+            self._fichier.close()
+            self._fichier = FichierQuiRemplitLeDisque(lignes=4)
+
+    monkeypatch.setattr(boucle, "_Journal", JournalSurDisquePlein)
+    with pytest.raises(PlaceInsuffisante, match="--reprendre"):
+        entrainer(config_test(tmp_path), arreter_apres=10)
+
+
+def test_remplacement_reessaye_si_windows_refuse(tmp_path, monkeypatch):
+    """Antivirus ou Explorateur : os.replace échoue deux fois, puis réussit."""
+    vrai_replace = os.replace
+    refus = []
+
+    def replace_bloque_deux_fois(source, cible):
+        if len(refus) < 2:
+            refus.append(cible)
+            raise PermissionError(13, "Accès refusé")
+        vrai_replace(source, cible)
+
+    monkeypatch.setattr("forge.entrainement.sauvegarde.os.replace", replace_bloque_deux_fois)
+    monkeypatch.setattr("forge.entrainement.sauvegarde.time.sleep", lambda secondes: None)
+    chemin = sauvegarder(tmp_path, {"pas": 1}, "etape-0000001.pt")
+    assert len(refus) == 2 and charger_derniere(tmp_path)["pas"] == 1
+    assert sorted(f.name for f in tmp_path.iterdir()) == [chemin.name]
+
+
+def test_effacer_une_ancienne_etape_n_est_jamais_fatal(tmp_path, monkeypatch):
+    for pas in (1, 2):
+        sauvegarder(tmp_path, {"pas": pas}, f"etape-{pas:07d}.pt")
+    vrai_unlink = Path.unlink
+
+    def unlink_bloque(chemin, *a, **k):
+        if chemin.name == "etape-0000001.pt":
+            raise PermissionError(13, "Accès refusé")
+        vrai_unlink(chemin, *a, **k)
+
+    monkeypatch.setattr(Path, "unlink", unlink_bloque)
+    notes = []
+    sauvegarder(tmp_path, {"pas": 3}, "etape-0000003.pt", noter=notes.append)
+    assert charger_derniere(tmp_path)["pas"] == 3
+    assert len(notes) == 1 and "etape-0000001.pt" in notes[0]
 
 
 # --------------------------------------------------------------------------------------
@@ -391,7 +487,7 @@ def test_pause_par_ctrl_c(tmp_path, monkeypatch, capsys):
 
     monkeypatch.setattr(boucle, "_pas_d_optimisation", vrai_pas)
     suite = entrainer(config, reprendre=True, arreter_apres=8)["pertes"]
-    assert reference[3:8] == pytest.approx(suite, abs=1e-6)
+    assert reference[3:8] == suite  # au bit près sur le processeur
 
 
 def test_reprise_coupe_le_journal(tmp_path):
@@ -436,6 +532,88 @@ def test_reprise_refusee_si_le_modele_change(tmp_path):
     autre = replace(MODELE_TEST, dim=64)
     with pytest.raises(ValueError, match="modèle"):
         entrainer(config_test(tmp_path, preset=autre), reprendre=True, arreter_apres=4)
+
+
+def test_reprise_refusee_si_un_reglage_du_calcul_change(tmp_path):
+    entrainer(config_test(tmp_path), arreter_apres=2)
+    changee = config_test(tmp_path, betas=(0.5, 0.6), poids_decroissance=0.0, taille_lot_jetons=128)
+    with pytest.raises(ValueError, match="La configuration a changé") as erreur:
+        entrainer(changee, reprendre=True, arreter_apres=4)
+    for reglage in ("betas", "poids_decroissance", "taille_lot_jetons"):
+        assert reglage in str(erreur.value)
+    for reglage, valeur in (("ecretage", 0.5), ("graine", 7), ("echauffement", 9), ("jetons_total", 64 * 30)):
+        with pytest.raises(ValueError, match=reglage):
+            entrainer(config_test(tmp_path, **{reglage: valeur}), reprendre=True, arreter_apres=4)
+    with pytest.raises(ValueError, match="taux_max"):  # le taux ne peut que baisser
+        entrainer(config_test(tmp_path, taux_max=2e-2), reprendre=True, arreter_apres=4)
+
+
+def test_reprise_avec_les_reglages_libres(tmp_path, monkeypatch):
+    entrainer(config_test(tmp_path), arreter_apres=2)
+    # compiler = "auto" : on évite le vrai essai de torch.compile, lent sur le processeur.
+    monkeypatch.setattr(torch, "compile", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("pas ici")))
+    libre = config_test(tmp_path, micro_lot=1, compiler="auto", sauvegarde_minutes=5, evaluation_tous_pas=3)
+    assert entrainer(libre, reprendre=True, arreter_apres=4)["pas"] == 4
+
+
+def test_reprise_jetons_total_augmente_et_taux_max_baisse(tmp_path):
+    entrainer(config_test(tmp_path), arreter_apres=2)
+    plus_long = config_test(tmp_path, jetons_total=64 * 80, taux_max=5e-3)
+    r = entrainer(plus_long, reprendre=True, arreter_apres=4)
+    assert r["pas_total"] == 80
+    messages = [l["message"] for l in lire_journal(tmp_path) if l.get("evenement") == "configuration"]
+    assert any("jetons_total" in m for m in messages) and any("taux_max" in m for m in messages)
+    # La sauvegarde suivante enregistre la nouvelle configuration.
+    assert charger_derniere(tmp_path / "sauvegardes")["config"]["jetons_total"] == 64 * 80
+
+
+def test_perte_infinie_arrete_sans_sauvegarder(tmp_path, monkeypatch, capsys):
+    vrai_pas = boucle._pas_d_optimisation
+    appels = []
+
+    def pas_qui_diverge(modele, *a, **k):
+        appels.append(1)
+        if len(appels) == 3:
+            with torch.no_grad():
+                modele.plongement.weight.fill_(math.nan)  # comme une divergence
+        return vrai_pas(modele, *a, **k)
+
+    monkeypatch.setattr(boucle, "_pas_d_optimisation", pas_qui_diverge)
+    with pytest.raises(SystemExit) as sortie:
+        # Sauvegarde à chaque pas : les pas 1 et 2 sont sauvegardés, le pas 3 ne doit pas l'être.
+        entrainer(config_test(tmp_path, sauvegarde_minutes=1e-9), arreter_apres=10)
+    assert sortie.value.code == 3
+    assert (
+        "La perte est devenue infinie au pas 3 : l'entraînement s'arrête sans sauvegarder ; "
+        "reprends depuis la dernière sauvegarde avec un taux_max plus petit."
+    ) in capsys.readouterr().err
+    assert charger_derniere(tmp_path / "sauvegardes")["pas"] == 2
+
+
+def test_validation_ne_depend_pas_du_micro_lot(tmp_path):
+    ecrire_corpus(tmp_path)
+    torch.manual_seed(0)
+    modele = boucle.Transformer(MODELE_TEST)
+    valeurs = []
+    for micro_lot in (2, 3, 4):
+        chargeur = ChargeurJetons(tmp_path / "val", longueur=16, taille_lot=micro_lot, graine=1234)
+        valeurs.append(boucle._perte_validation(modele, chargeur, chargeur.etat(), 12, torch.device("cpu")))
+    assert valeurs[0] == pytest.approx(valeurs[1], rel=1e-6) == pytest.approx(valeurs[2], rel=1e-6)
+
+
+def test_accumulation_moyenne_les_gradients(tmp_path):
+    """Un pas en 2 micro-lots de 2 lignes, ou en 1 micro-lot de 4 : les mêmes gradients."""
+    ecrire_corpus(tmp_path)
+    gradients = []
+    for micro_lot, accumulation in ((2, 2), (4, 1)):
+        torch.manual_seed(0)
+        modele = boucle.Transformer(MODELE_TEST)
+        optimiseur = torch.optim.AdamW(modele.parameters(), lr=0.0)
+        chargeur = ChargeurJetons(tmp_path / "train", longueur=16, taille_lot=micro_lot, graine=8)
+        boucle._pas_d_optimisation(modele, optimiseur, chargeur, accumulation, 0.0, 1e9, torch.device("cpu"))
+        gradients.append([p.grad.clone() for p in modele.parameters()])
+    for deux_fois_deux, une_fois_quatre in zip(*gradients):
+        assert torch.allclose(deux_fois_deux, une_fois_quatre, atol=1e-6, rtol=1e-5)
 
 
 def test_fin_d_entrainement(tmp_path):

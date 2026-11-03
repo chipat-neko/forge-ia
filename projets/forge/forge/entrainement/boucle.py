@@ -50,21 +50,45 @@ from torch import nn
 from forge.chemins import PlaceInsuffisante, racine_donnees
 from forge.entrainement.chargeur import ChargeurJetons
 from forge.entrainement.planning import taux
-from forge.entrainement.sauvegarde import charger_derniere, est_disque_plein, nom_etape, sauvegarder
+from forge.entrainement.sauvegarde import charger_derniere, est_disque_plein, nom_etape, remplacer, sauvegarder
 from forge.modele import PRESETS, ConfigModele, Transformer, nombre_parametres
 from forge.tokenizer.apprentissage import DonneesManquantes
 
 VERSION_DE_LA_SAUVEGARDE = 1
 
-# Nombre de lots lus pour mesurer la perte de validation (moins si `val/` est plus petit).
-LOTS_DE_VALIDATION = 20
+# Nombre de morceaux de validation lus pour mesurer la perte de validation : toujours les
+# mêmes, quel que soit `micro_lot` (moins si `val/` en a moins).
+MORCEAUX_DE_VALIDATION = 64
 
 # Une ligne de suivi à l'écran au plus toutes les 10 secondes (le journal, lui, a chaque pas).
 SECONDES_ENTRE_AFFICHAGES = 10
 
+# Réglages qu'on peut changer en reprenant : ils ne changent pas le calcul. `micro_lot` change
+# le découpage d'un pas, pas ses jetons ; `donnees` peut changer de chemin (le chargeur vérifie
+# que les jetons sont les mêmes) ; `sortie` est le dossier où l'on a trouvé la sauvegarde.
+# Deux autres peuvent changer dans un seul sens : `jetons_total` peut augmenter (le planning
+# s'allonge) et `taux_max` peut baisser (le remède à une perte devenue infinie).
+REGLAGES_LIBRES = (
+    "micro_lot",
+    "compiler",
+    "sauvegarde_minutes",
+    "evaluation_tous_pas",
+    "appareil",
+    "fichier",
+    "donnees",
+    "sortie",
+)
+
+# Code de sortie quand la perte devient infinie (2 : manque de mémoire de la carte graphique).
+CODE_PERTE_INFINIE = 3
+
 
 class CompilationImpossible(RuntimeError):
     """`torch.compile` a échoué alors que la configuration l'exige (`compiler = "oui"`)."""
+
+
+class PerteNonFinie(ArithmeticError):
+    """La perte ou la norme des gradients n'est plus un nombre fini (infini ou « NaN »)."""
 
 
 # --- La configuration -----------------------------------------------------------------
@@ -315,7 +339,12 @@ class _Journal:
             raise
 
     def fermer(self) -> None:
-        self._fichier.close()
+        try:
+            self._fichier.close()
+        except OSError:
+            # Disque plein : `close` réessaie d'écrire la ligne qui a échoué, et échoue encore.
+            # L'erreur utile (PlaceInsuffisante) est déjà en route : on ne la masque pas.
+            pass
 
 
 def _couper_journal(chemin: Path, pas: int) -> None:
@@ -336,7 +365,7 @@ def _couper_journal(chemin: Path, pas: int) -> None:
             gardees.append(ligne + "\n")
     temporaire = chemin.with_name(chemin.name + ".tmp")
     temporaire.write_text("".join(gardees), encoding="utf-8")
-    os.replace(temporaire, chemin)
+    remplacer(temporaire, chemin)  # réessayé si `forge suivi` lit le journal à cet instant
 
 
 class _Pause:
@@ -462,6 +491,9 @@ def _pas_d_optimisation(
     Renvoie la perte moyenne des micro-lots de ce pas. Chaque perte est divisée par
     `accumulation` avant `backward` : la somme des gradients est ainsi la moyenne sur tout le
     lot, comme si la carte avait tout traité d'un coup.
+
+    Si la perte ou la norme des gradients n'est plus un nombre fini (l'entraînement a
+    « divergé »), `PerteNonFinie` est levée AVANT de toucher aux poids.
     """
     for groupe in optimiseur.param_groups:
         groupe["lr"] = taux_du_pas
@@ -474,24 +506,35 @@ def _pas_d_optimisation(
             _, perte = modele(x, y)
         (perte / accumulation).backward()
         somme += perte.detach()
-    torch.nn.utils.clip_grad_norm_(modele.parameters(), ecretage)
+    norme = torch.nn.utils.clip_grad_norm_(modele.parameters(), ecretage)
+    moyenne = somme / accumulation
+    if not torch.isfinite(torch.stack([moyenne, norme.to(moyenne.dtype)])).all():
+        raise PerteNonFinie(f"perte {moyenne.item()}, norme des gradients {norme.item()}")
     optimiseur.step()
-    return (somme / accumulation).item()
+    return moyenne.item()
 
 
 @torch.no_grad()
-def _perte_validation(modele: nn.Module, chargeur: ChargeurJetons, depart: dict, n_lots: int, appareil) -> float:
-    """Perte moyenne sur `n_lots` lots de validation, toujours les mêmes (depuis `depart`)."""
+def _perte_validation(modele: nn.Module, chargeur: ChargeurJetons, depart: dict, n_morceaux: int, appareil) -> float:
+    """Perte moyenne par jeton sur les `n_morceaux` premiers morceaux de validation.
+
+    Le chargeur repart toujours de `depart` : ce sont toujours les mêmes morceaux. On les lit
+    par paquets de la taille du chargeur (`micro_lot`), le dernier paquet coupé au besoin :
+    le résultat ne dépend pas de `micro_lot`.
+    """
     chargeur.restaurer(depart)
     modele.eval()
     somme = torch.zeros((), device=appareil)
-    for _ in range(n_lots):
+    restants = n_morceaux
+    while restants > 0:
         x, y = chargeur.lot()
+        x, y = x[:restants], y[:restants]
         with _autocast(appareil):
             _, perte = modele(x.to(appareil), y.to(appareil))
-        somme += perte.float()
+        somme += perte.float() * x.numel()  # la perte est une moyenne par jeton : on la remet en somme
+        restants -= x.shape[0]
     modele.train()
-    return (somme / n_lots).item()
+    return (somme / (n_morceaux * chargeur.longueur)).item()
 
 
 # --- L'entraînement ---------------------------------------------------------------------
@@ -514,8 +557,21 @@ def _decrire_modele(c: ConfigModele) -> str:
     )
 
 
-def _verifier_sauvegarde(etat: dict, config: ConfigEntrainement) -> None:
-    """Refuse de reprendre avec un autre modèle que celui de la sauvegarde."""
+def _verifier_sauvegarde(etat: dict, config: ConfigEntrainement) -> list[str]:
+    """Refuse de reprendre avec un autre modèle, ou avec des réglages qui changent le calcul.
+
+    Une reprise doit continuer LE MÊME entraînement : mêmes poids de départ, même lot, même
+    planning, même optimiseur. Seuls les `REGLAGES_LIBRES` peuvent changer, plus deux
+    exceptions à sens unique :
+
+    - `jetons_total` peut augmenter, pour entraîner plus longtemps. Le planning du taux est
+      alors recalculé sur le nouveau nombre de pas : la descente en cosinus s'allonge, et le
+      taux remonte un peu au moment de la reprise ;
+    - `taux_max` peut baisser : c'est le remède quand la perte est devenue infinie. Tout le
+      planning est alors abaissé dans la même proportion.
+
+    Renvoie les lignes à écrire dans le journal pour ces deux changements permis.
+    """
     if etat.get("version") != VERSION_DE_LA_SAUVEGARDE:
         raise ValueError(
             f"Sauvegarde de version {etat.get('version')!r} : cette version de la forge lit la "
@@ -528,6 +584,31 @@ def _verifier_sauvegarde(etat: dict, config: ConfigEntrainement) -> None:
             f"que celui de la configuration ({_decrire_modele(config.modele)}). Remets le même "
             "preset pour reprendre, ou change `sortie` pour commencer un nouvel entraînement."
         )
+    avant, maintenant = etat["config"], dataclasses.asdict(config)
+    differences, notes = [], []
+    for reglage, valeur in maintenant.items():
+        # Le preset est déjà comparé, dimension par dimension, juste au-dessus.
+        if reglage in REGLAGES_LIBRES or reglage == "preset" or avant.get(reglage) == valeur:
+            continue
+        ancienne = avant.get(reglage)
+        if reglage == "jetons_total" and valeur > ancienne:
+            notes.append(
+                f"jetons_total passe de {ancienne} à {valeur} : le planning du taux est recalculé "
+                f"sur {config.pas_total} pas."
+            )
+        elif reglage == "taux_max" and valeur < ancienne:
+            notes.append(f"taux_max baisse de {ancienne} à {valeur} : tout le planning du taux baisse d'autant.")
+        else:
+            differences.append(f"{reglage} : {ancienne!r} dans la sauvegarde, {valeur!r} maintenant")
+    if differences:
+        raise ValueError(
+            f"La configuration a changé depuis la sauvegarde du pas {etat['pas']} : "
+            f"{' ; '.join(differences)}. Ces réglages changent le calcul : remets les valeurs de la "
+            "sauvegarde pour reprendre, ou change `sortie` pour commencer un nouvel entraînement. "
+            f"En reprenant, on peut changer {', '.join(REGLAGES_LIBRES[:5])}, augmenter "
+            "jetons_total et baisser taux_max."
+        )
+    return notes
 
 
 def _signaler_manque_de_memoire(config: ConfigEntrainement, appareil: torch.device) -> None:
@@ -569,7 +650,9 @@ def entrainer(config: ConfigEntrainement, reprendre: bool = False, arreter_apres
 
     - `reprendre` : repartir de la dernière sauvegarde de `sortie/sauvegardes` (s'il n'y en a
       pas, l'entraînement part du début). Sans lui, un dossier qui a déjà des sauvegardes est
-      refusé (`FileExistsError`) : on ne repart jamais de zéro par mégarde ;
+      refusé (`FileExistsError`) : on ne repart jamais de zéro par mégarde. En reprenant, les
+      réglages qui changent le calcul doivent être ceux de la sauvegarde (voir
+      `_verifier_sauvegarde` : `jetons_total` peut seulement augmenter, `taux_max` baisser) ;
     - `arreter_apres` : s'arrêter (et sauvegarder) quand le pas atteint ce numéro ; sert aux
       essais et aux tests.
 
@@ -578,7 +661,8 @@ def entrainer(config: ConfigEntrainement, reprendre: bool = False, arreter_apres
     `meilleure_perte_val`.
 
     Ctrl+C met en pause (voir le début du module). Un manque de mémoire sur la carte
-    graphique affiche la marche à suivre, puis quitte avec `SystemExit(2)`.
+    graphique affiche la marche à suivre, puis quitte avec `SystemExit(2)`. Une perte qui
+    devient infinie arrête tout SANS sauvegarder, avec `SystemExit(3)`.
 
     Sur GPU, deux entraînements identiques peuvent différer légèrement (certains calculs de
     la carte additionnent dans un ordre qui varie) ; la reprise, elle, repart exactement du
@@ -613,8 +697,9 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
             f"Pour le continuer : {_commande_de_reprise(config)}. Pour repartir de zéro : "
             f"supprime ce dossier, ou change `sortie` dans {config.fichier or 'la configuration'}."
         )
+    changements_permis = []
     if etat is not None:
-        _verifier_sauvegarde(etat, config)
+        changements_permis = _verifier_sauvegarde(etat, config)
     elif reprendre:
         print(f"Aucune sauvegarde dans {sauvegardes} : l'entraînement part du début.", flush=True)
 
@@ -625,11 +710,11 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
     modele = Transformer(config.modele).to(appareil)
     optimiseur = _creer_optimiseur(modele, config, appareil)
     chargeur = ChargeurJetons(config.dossier_donnees / "train", longueur, config.micro_lot, config.graine)
-    validation, depart_validation, lots_validation, sans_validation = None, None, 0, ""
+    validation, depart_validation, morceaux_validation, sans_validation = None, None, 0, ""
     try:
         validation = ChargeurJetons(config.dossier_donnees / "val", longueur, config.micro_lot, config.graine)
-        depart_validation = validation.etat()  # la validation relit toujours les mêmes lots
-        lots_validation = min(LOTS_DE_VALIDATION, max(1, validation.morceaux // config.micro_lot))
+        depart_validation = validation.etat()  # la validation relit toujours les mêmes morceaux
+        morceaux_validation = min(MORCEAUX_DE_VALIDATION, validation.morceaux)
     except (DonneesManquantes, ValueError) as erreur:
         sans_validation = str(erreur)
 
@@ -651,6 +736,9 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
     try:
         debut = f"Reprise au pas {pas} sur {pas_total}." if pas else f"Début de l'entraînement : {pas_total} pas."
         journal.ecrire({"evenement": "reprise" if pas else "debut", "pas": pas, "message": debut})
+        for message in changements_permis:
+            journal.ecrire({"evenement": "configuration", "pas": pas, "message": message})
+            print(message, flush=True)
         if validation is None:
             journal.ecrire(
                 {"evenement": "validation", "pas": pas, "message": f"Pas de perte de validation : {sans_validation}"}
@@ -668,6 +756,10 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
             modele, config, appareil, lambda ligne: journal.ecrire({**ligne, "pas": pas})
         )
 
+        def avertir(message: str) -> None:
+            """Un souci qui n'arrête pas l'entraînement (une ancienne sauvegarde restée là)."""
+            journal.ecrire({"evenement": "avertissement", "pas": pas, "message": message})
+
         def sauvegarder_tout() -> Path:
             """La sauvegarde complète du pas `pas` : de quoi reprendre exactement."""
             tout = {
@@ -680,7 +772,7 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
                 "chargeur": chargeur.etat(),
                 "hasard": _etat_du_hasard(),
             }
-            chemin = sauvegarder(sauvegardes, tout, nom_etape(pas))
+            chemin = sauvegarder(sauvegardes, tout, nom_etape(pas), noter=avertir)
             journal.ecrire({"evenement": "sauvegarde", "pas": pas, "fichier": chemin.name})
             return chemin
 
@@ -695,9 +787,20 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
                 debut_pas = time.perf_counter()
                 pas += 1
                 taux_du_pas = taux(pas, pas_total, config.taux_max, config.echauffement)
-                perte = _pas_d_optimisation(
-                    modele_entraine, optimiseur, chargeur, config.accumulation, taux_du_pas, config.ecretage, appareil
-                )
+                try:
+                    perte = _pas_d_optimisation(
+                        modele_entraine, optimiseur, chargeur, config.accumulation, taux_du_pas, config.ecretage, appareil
+                    )
+                except PerteNonFinie as erreur:
+                    # Les poids sont peut-être déjà abîmés : surtout ne rien sauvegarder.
+                    journal.ecrire({"evenement": "perte_non_finie", "pas": pas, "message": str(erreur)})
+                    print(
+                        f"La perte est devenue infinie au pas {pas} : l'entraînement s'arrête sans "
+                        "sauvegarder ; reprends depuis la dernière sauvegarde avec un taux_max plus petit.",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    raise SystemExit(CODE_PERTE_INFINIE) from None
                 vitesse = config.taille_lot_jetons / max(time.perf_counter() - debut_pas, 1e-9)
                 pertes.append(perte)
                 ligne = {
@@ -710,12 +813,12 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
                 }
                 if validation is not None and (pas % config.evaluation_tous_pas == 0 or pas == pas_total):
                     ligne["perte_val"] = _perte_validation(
-                        modele, validation, depart_validation, lots_validation, appareil
+                        modele, validation, depart_validation, morceaux_validation, appareil
                     )
                     if meilleure is None or ligne["perte_val"] < meilleure:
                         meilleure = ligne["perte_val"]
                         modele_seul = {**_etat_du_modele(config, modele, pas), "perte_val": meilleure}
-                        sauvegarder(sauvegardes, modele_seul, "meilleur.pt")
+                        sauvegarder(sauvegardes, modele_seul, "meilleur.pt", noter=avertir)
                 journal.ecrire(ligne)
 
                 maintenant = time.perf_counter()
