@@ -7,6 +7,7 @@ réserver de mémoire, ce qui permet de vérifier leur nombre exact sans rien en
 """
 
 import math
+from collections import Counter
 
 import pytest
 
@@ -27,7 +28,7 @@ from forge.modele import (
     largeur_cachee,
     nombre_parametres,
 )
-from forge.modele.transformer import RMSNorm, appliquer_rope, rope_cos_sin
+from forge.modele.transformer import Attention, RMSNorm, appliquer_rope, rope_cos_sin
 
 PETITE = ConfigModele(taille_vocabulaire=512, dim=64, couches=2, tetes=4, longueur_contexte=32)
 
@@ -268,6 +269,71 @@ def test_le_modele_utilise_rope(monkeypatch):
     assert not torch.allclose(avec, sans, atol=1e-6)
 
 
+def _attention_de_reference(att, x, base):
+    """Attention causale écrite à la main, sans `appliquer_rope` ni `rope_cos_sin`.
+
+    RoPE y est fait avec des nombres complexes : la paire (x[2i], x[2i+1]) est le nombre
+    x[2i] + i·x[2i+1], qu'on multiplie par e^(i·angle), angle = position × base^(-2i/dim_tete).
+    """
+    lot, positions, dim = x.shape
+    tetes, dim_tete = att.tetes, att.dim_tete
+    q, k, v = (x @ att.proj_qkv.weight.T).split(dim, dim=-1)
+    q, k, v = (t.reshape(lot, positions, tetes, dim_tete).transpose(1, 2) for t in (q, k, v))
+    pos = torch.arange(positions, dtype=torch.float32)[:, None]
+    freq = base ** (-2.0 * torch.arange(dim_tete // 2, dtype=torch.float32) / dim_tete)
+    rotation = torch.polar(torch.ones(positions, dim_tete // 2), pos * freq)
+
+    def tourner(t):
+        z = torch.view_as_complex(t.reshape(*t.shape[:-1], dim_tete // 2, 2).contiguous())
+        return torch.view_as_real(z * rotation).flatten(-2)
+
+    q, k = tourner(q), tourner(k)
+    scores = q @ k.transpose(-1, -2) / math.sqrt(dim_tete)
+    interdit = torch.triu(torch.ones(positions, positions, dtype=torch.bool), diagonal=1)
+    poids = torch.softmax(scores.masked_fill(interdit, float("-inf")), dim=-1)
+    sortie = (poids @ v).transpose(1, 2).reshape(lot, positions, dim)
+    return sortie @ att.proj_sortie.weight.T
+
+
+def test_attention_applique_rope_a_q_et_a_k():
+    """L'attention du modèle égale une attention de référence qui tourne q ET k.
+
+    Les poids sont agrandis (ceux de l'initialisation donnent des scores presque nuls, donc une
+    attention presque uniforme que RoPE ne changerait guère) : sans cela le test ne verrait
+    pas un RoPE oublié sur q ou sur k.
+    """
+    torch.manual_seed(0)
+    config = ConfigModele(taille_vocabulaire=512, dim=64, couches=1, tetes=4, longueur_contexte=32)
+    att = Attention(config)
+    with torch.no_grad():
+        att.proj_qkv.weight.normal_(0.0, 0.15)
+        att.proj_sortie.weight.normal_(0.0, 0.15)
+    x = torch.randn(2, 12, 64)
+    cos, sin = rope_cos_sin(12, 16, config.base_rope, torch.device("cpu"))
+    attendu = _attention_de_reference(att, x, config.base_rope)
+    assert torch.allclose(att(x, cos, sin), attendu, atol=1e-5)
+    # Le test est sensible : l'attention SANS RoPE s'écarte nettement de la référence.
+    sans_rope = _attention_de_reference(att, x, base=1e30)  # angles ~ 0, aucune rotation
+    assert (sans_rope - attendu).abs().max() > 0.05
+
+
+def test_chaque_bloc_applique_rope_une_fois_a_q_puis_une_fois_a_k(monkeypatch):
+    from forge.modele import transformer as module_transformer
+
+    appels = []
+    reel = module_transformer.appliquer_rope
+
+    def espion(t, cos, sin):
+        appels.append(t.shape)
+        return reel(t, cos, sin)
+
+    monkeypatch.setattr(module_transformer, "appliquer_rope", espion)
+    m = Transformer(PETITE).eval()
+    m(torch.randint(0, 512, (1, 16)))
+    # 2 appels par couche (q puis k), chacun sur [lot, têtes, positions, dim_tete].
+    assert appels == [(1, PETITE.tetes, 16, PETITE.dim // PETITE.tetes)] * (2 * PETITE.couches)
+
+
 def test_rope_fait_tourner_les_paires_comme_prevu():
     """Pour la paire i, l'angle de la position p vaut p × base^(-2i/dim_tete)."""
     cos, sin = rope_cos_sin(4, 8, 10000.0, torch.device("cpu"))
@@ -363,6 +429,50 @@ def test_generation_temperature_zero_est_gloutonne():
             logits, _ = m(torch.tensor([contexte]))
             assert jeton == logits[0, -1].argmax().item()
             contexte.append(jeton)
+
+
+def _modele_aux_logits_piquants():
+    """Un modèle dont les scores sont 5 fois plus écartés (le poids de la dernière norme × 5).
+
+    Avec les poids de départ, les scores sont si proches que la température ne change presque
+    rien aux probabilités : on ne verrait pas une division par la température oubliée.
+    """
+    torch.manual_seed(0)
+    m = Transformer(PETITE).eval()
+    with torch.no_grad():
+        m.norme_finale.poids.mul_(5)
+    return m
+
+
+def test_generation_temperature_tres_basse_redonne_le_glouton():
+    m = _modele_aux_logits_piquants()
+    ids = [4, 5, 6]
+    glouton = generer(m, ids, 12, temperature=0)
+    for graine in range(5):
+        assert generer(m, ids, 12, temperature=1e-3, top_k=0, graine=graine) == glouton
+
+
+def test_generation_la_temperature_divise_les_scores():
+    """Sur 1500 graines, le premier jeton suit softmax(score / temperature) parmi les k premiers."""
+    m = _modele_aux_logits_piquants()
+    ids, k, graines = [4, 5, 6], 4, 1500
+    with torch.no_grad():
+        scores = m(torch.tensor([ids]))[0][0, -1]
+    meilleurs = scores.topk(k)
+    for temperature in (0.5, 3.0):
+        attendu = torch.softmax(meilleurs.values / temperature, dim=0).tolist()
+        comptes = Counter(
+            generer(m, ids, 1, temperature=temperature, top_k=k, graine=graine)[0]
+            for graine in range(graines)
+        )
+        assert sum(comptes[j] for j in meilleurs.indices.tolist()) == graines
+        for jeton, probabilite in zip(meilleurs.indices.tolist(), attendu):
+            assert comptes[jeton] / graines == pytest.approx(probabilite, abs=0.06), temperature
+    # Plus la température monte, plus les jetons se répartissent : exigé en plus, pour que le
+    # sens de la division soit net (multiplier par la température l'inverserait).
+    froid = Counter(generer(m, ids, 1, temperature=0.5, top_k=k, graine=g)[0] for g in range(300))
+    chaud = Counter(generer(m, ids, 1, temperature=3.0, top_k=k, graine=g)[0] for g in range(300))
+    assert max(froid.values()) > max(chaud.values())
 
 
 def test_generation_top_k_un_est_glouton():
