@@ -130,5 +130,187 @@
    "",
    "yà-eûlipgyuiëzq"
   ]
+ },
+ "entrainement": {
+  "preset": "complet",
+  "nb_pas": 20,
+  "pertes": [
+   "400d7bd1a1385162",
+   "400d293c41ecd17b",
+   "400d36d1884301a5",
+   "400d3d25e956e4aa",
+   "400cd6245ea181d8",
+   "400ca2641a6c9556",
+   "400cfdcdc6f642e1",
+   "400c27cef243b0dd",
+   "400c62010d656060",
+   "400bfd5af240e8ce",
+   "400befe780968122",
+   "400bd967a4b0c0ea",
+   "400b8b559320e5d0",
+   "400bdae61e2adcf0",
+   "400b29ff87ed5a7a",
+   "400b0dcfc999651f",
+   "400b19e630e4510e",
+   "400af2f7af08ae04",
+   "400aee31fb4a8f26",
+   "400a1da76af7e19e"
+  ],
+  "taux": [
+   "3f1a36e2eb1c432d",
+   "3f2a36e2eb1c432d",
+   "3f33a92a30553261",
+   "3f3a36e2eb1c432d",
+   "3f40624dd2f1a9fc",
+   "3f43a92a30553261",
+   "3f46f0068db8bac8",
+   "3f4a36e2eb1c432d",
+   "3f4d7dbf487fcb92",
+   "3f50624dd2f1a9fc",
+   "3f5205bc01a36e2f",
+   "3f53a92a30553261",
+   "3f554c985f06f694",
+   "3f56f0068db8bac8",
+   "3f589374bc6a7efa",
+   "3f5a36e2eb1c432d",
+   "3f5bda5119ce0760",
+   "3f5d7dbf487fcb92",
+   "3f5f212d77318fc5",
+   "3f60624dd2f1a9fc"
+  ],
+  "validation_0": "400d39161fba8940",
+  "validation_20": "400a5ec256ef0aa0",
+  "params_empreinte_20": "4927c00d",
+  "params_premiers_20": [
+   "bfbbbd2807828df5",
+   "3f8521210d8c0f06",
+   "bfbc45b645de133d",
+   "bfa778d578241923",
+   "bf9483cf0f3bec8b",
+   "3f98a181444fb7d1",
+   "bfb230b72ee93f29",
+   "bfb67e49f82b980f"
+  ],
+  "echantillons_0": [
+   "xèhàlàhuïfîadâu",
+   "rhqôohnkç",
+   "üdèöààîëaûuüüüm",
+   "üëïkîèço-sïüiüà",
+   "màqèk",
+   "njüryxü-îëkà",
+   "",
+   "yà-eûlipgyuiëzq"
+  ],
+  "echantillons_20": [
+   "crëkâtpmûîzkuèh",
+   "ixèevàe",
+   "ceouçëqwztmoûob",
+   "rôecrxalfjlhqze",
+   "gwërcîlmuuy",
+   "sa",
+   "aoikmëa",
+   "ïathnt"
+  ],
+  "taux_planning": [
+   [
+    0,
+    "0000000000000000"
+   ],
+   [
+    1,
+    "3f1a36e2eb1c432d"
+   ],
+   [
+    50,
+    "3f747ae147ae147b"
+   ],
+   [
+    99,
+    "3f84467381d7dbf4"
+   ],
+   [
+    100,
+    "3f847ae147ae147c"
+   ],
+   [
+    101,
+    "3f847ae0ecf3fe58"
+   ],
+   [
+    550,
+    "3f83680ce9237de4"
+   ],
+   [
+    1000,
+    "3f806f97245c2ffe"
+   ],
+   [
+    1550,
+    "3f76872b020c49bb"
+   ],
+   [
+    2000,
+    "3f6bc9e11d9a7c87"
+   ],
+   [
+    2999,
+    "3f506250a8c25b1a"
+   ],
+   [
+    3000,
+    "3f50624dd2f1a9fc"
+   ],
+   [
+    3001,
+    "3f50624dd2f1a9fc"
+   ]
+  ],
+  "divergence": {
+   "taux_max": "408f400000000000",
+   "pas": 2,
+   "perte": "40526ac43623a9ab"
+  },
+  "presets": {
+   "complet": {
+    "pas_total": 3000,
+    "echauffement": 100,
+    "taux_max": "3f847ae147ae147b",
+    "lot": 8,
+    "ratio_min": "3fb999999999999a",
+    "beta1": "3feccccccccccccd",
+    "beta2": "3fee666666666666",
+    "epsilon": "3e45798ee2308c3a",
+    "poids_decroissance": "3fb999999999999a",
+    "ecretage": "3ff0000000000000",
+    "graine": 1234,
+    "validation_tous": 100,
+    "nb_validation": 256,
+    "nb_echantillons": 8
+   },
+   "avant-gout": {
+    "pas_total": 600,
+    "echauffement": 50,
+    "taux_max": "3f847ae147ae147b",
+    "lot": 8,
+    "ratio_min": "3fb999999999999a",
+    "beta1": "3feccccccccccccd",
+    "beta2": "3fee666666666666",
+    "epsilon": "3e45798ee2308c3a",
+    "poids_decroissance": "3fb999999999999a",
+    "ecretage": "3ff0000000000000",
+    "graine": 1234,
+    "validation_tous": 100,
+    "nb_validation": 256,
+    "nb_echantillons": 8
+   }
+  },
+  "taux_proposes": [
+   "3f50624dd2f1a9fc",
+   "3f689374bc6a7efa",
+   "3f847ae147ae147b",
+   "3f9eb851eb851eb8",
+   "3fb999999999999a",
+   "3fd3333333333333"
+  ]
  }
 }

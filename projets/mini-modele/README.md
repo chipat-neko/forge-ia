@@ -18,10 +18,71 @@ Il faut `uv` et Python 3.12 ou plus. Depuis le dossier `projets/mini-modele` :
 uv run pytest -q
 ```
 
-Côté site, depuis le dossier `site` :
+Le test long, l'entraînement complet de 3 000 pas en Python pur (moins de
+2 minutes sur un Ryzen 7 9800X3D), ne tourne qu'à la demande :
+
+```powershell
+uv run pytest -q -m lent
+```
+
+Côté site, depuis le dossier `site` (le même test long y tourne à chaque fois,
+en 6 secondes environ) :
 
 ```powershell
 npx vitest run src/lib/mini-modele
+```
+
+## Entraîner
+
+Depuis `projets/mini-modele`, sur le processeur, en Python pur :
+
+```powershell
+uv run python -m mini_modele entrainer [--preset complet|avant-gout] [--pas N] [--taux X]
+```
+
+- `--preset` : `complet` (3 000 pas, dont 100 de montée du taux ; par défaut)
+  ou `avant-gout` (600 pas, dont 50 de montée).
+- `--pas N` : entraîner N pas au lieu de ceux du préréglage ; le taux monte et
+  redescend sur ces N pas.
+- `--taux X` : le taux maximal, 0,01 par défaut. Le site propose 0,001, 0,003,
+  0,01, 0,03, 0,1 et 0,3. La virgule et le point sont acceptés.
+
+La commande affiche l'erreur du lot tous les 50 pas et au dernier pas
+(`pas 50 : erreur 2,562`), puis l'erreur de validation et 8 prénoms inventés,
+marqués « existe déjà » quand ils sont dans la liste. Si l'erreur explose (taux
+trop grand), elle s'arrête et le dit. Les nombres sont ceux de la démo du site,
+au bit près.
+
+La recette est celle de ton IA (`projets/forge`) : AdamW (0,9 ; 0,95), une
+décroissance des poids de 0,1 sur tous les paramètres (ce sont tous des
+matrices, comme celles que forge fait décroître), un écrêtage du gradient à 1,
+et un taux qui monte en ligne droite puis redescend en cosinus jusqu'au
+dixième du taux maximal. Le taux est le même code que
+`forge/entrainement/planning.py`, avec notre `cos` ; un test l'y compare, en
+lisant le fichier de forge sans l'importer. Le pas d'AdamW tient ses
+corrections de biais par des produits successifs (`b1t = b1t × beta1`), sans
+puissance.
+
+**Résultat mesuré** (préréglage complet, taux 0,01, graine 1234), le même en
+Python et en TypeScript : l'erreur de validation (256 prénoms) passe de
+3,653 au départ (ln 40 = 3,689 pour le pur hasard) à **2,158 au pas 3 000**.
+Le seuil des tests est 2,45, avec une baisse d'au moins 1,0 : le taux 0,01
+suffit, aucun repli (0,03, 0,003 ou 4 000 pas) n'a servi.
+
+La commande complète prend environ 2 minutes sur un Ryzen 7 9800X3D (un seul
+cœur : le calcul est une suite de pas, qui ne se partage pas). Elle affiche,
+au début et à la fin :
+
+```text
+Mini-modèle : 4 608 paramètres, 40 caractères, 4 752 prénoms d'entraînement.
+Réglages : préréglage complet, 3 000 pas, taux maximal 0,01.
+Erreur de validation au départ : 3,653
+pas 50 : erreur 2,562
+…
+pas 3000 : erreur 2,122
+Erreur de validation au pas 3000 : 2,158
+Prénoms inventés : fated, carissa, ney, rajaste, marfahy, lerbana, alicise, maora
+Durée : 119,6 s
 ```
 
 ## Les attendus partagés
@@ -39,6 +100,18 @@ uv run python -m mini_modele.attendus
 
 Un test vérifie que les fichiers sont à jour : si le code change, il échoue
 tant qu'ils ne sont pas régénérés.
+
+`tests/attendus-modele.json` a deux clés. `modele` : les paramètres de départ,
+la perte et tout le gradient d'un lot, la validation et des prénoms inventés.
+`entrainement` : 20 pas du préréglage complet (la perte et le taux de chaque
+pas, l'empreinte de tous les paramètres au pas 20, la validation et les
+prénoms au départ et au pas 20), le taux à quelques pas de la montée, du
+cosinus et de la fin, un entraînement qui diverge (taux 1 000), et les
+préréglages eux-mêmes. Le résultat des 3 000 pas, trop long à refaire à chaque
+régénération, est écrit dans les deux tests longs
+(`tests/test_entrainement.py` et `site/src/lib/mini-modele/entrainement-long.test.ts`) :
+si le code change, relance `uv run pytest -q -m lent`, puis recopie ses motifs
+dans les deux.
 
 ## Pourquoi on n'utilise ni `math.exp` ni `sum`
 

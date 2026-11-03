@@ -37,6 +37,7 @@ from mini_modele.calcul import (
     vers_hex,
 )
 from mini_modele.donnees import FICHIER_PRENOMS, decoder, donnees_par_defaut, preparer, prenoms_du_texte
+from mini_modele.entrainement import PRESETS_MINI, TAUX_PROPOSES, Entraineur, ReglagesMini, taux
 from mini_modele.modele import (
     ConfigMini,
     avant,
@@ -188,13 +189,66 @@ def calculer_attendus_du_modele() -> dict:
     }
 
 
+# L'entraînement : le préréglage complet, sur PAS_ENTRAINEMENT pas.
+PRESET_ENTRAINEMENT = "complet"
+PAS_ENTRAINEMENT = 20
+# Le taux du préréglage complet à ces pas : la montée, le sommet, le cosinus et la fin.
+PAS_DU_PLANNING = (0, 1, 50, 99, 100, 101, 550, 1000, 1550, 2000, 2999, 3000, 3001)
+# Un taux maximal absurde : l'erreur explose en quelques pas.
+TAUX_QUI_DIVERGE = 1000.0
+
+
+def reglages_en_attendus(r: ReglagesMini) -> dict:
+    """Les champs des réglages, avec leurs noms Python : les entiers tels quels, les flottants en motifs."""
+    return {nom: vers_hex(v) if isinstance(v, float) else v for nom, v in dataclasses.asdict(r).items()}
+
+
+def calculer_attendus_entrainement() -> dict:
+    """La clé « entrainement » : 20 pas du préréglage complet, le planning du taux, et une divergence."""
+    reglages = PRESETS_MINI[PRESET_ENTRAINEMENT]
+    e = Entraineur(reglages)
+    validation_0 = e.perte_validation()
+    echantillons_0 = e.echantillons()
+    pertes = []
+    taux_des_pas = []
+    for _ in range(PAS_ENTRAINEMENT):
+        pertes.append(vers_hex(e.faire_un_pas()))
+        taux_des_pas.append(vers_hex(e.taux_courant()))
+    fou = Entraineur(dataclasses.replace(reglages, taux_max=TAUX_QUI_DIVERGE))
+    perte_folle = 0.0
+    while not fou.diverge and fou.pas < 50:
+        perte_folle = fou.faire_un_pas()
+    if not fou.diverge:
+        raise RuntimeError(f"Un taux maximal de {TAUX_QUI_DIVERGE} n'a pas fait diverger l'entraînement en 50 pas.")
+    r = reglages
+    return {
+        "preset": PRESET_ENTRAINEMENT,
+        "nb_pas": PAS_ENTRAINEMENT,
+        # La perte de chaque lot et le taux de chaque pas, dans l'ordre des pas 1 à 20.
+        "pertes": pertes,
+        "taux": taux_des_pas,
+        "validation_0": vers_hex(validation_0),
+        "validation_20": vers_hex(e.perte_validation()),
+        # Tous les paramètres après 20 pas, bit pour bit : un seul écart d'un ulp change l'empreinte.
+        "params_empreinte_20": empreinte(e.params),
+        "params_premiers_20": [vers_hex(p) for p in e.params[:8]],
+        "echantillons_0": echantillons_0,
+        "echantillons_20": e.echantillons(),
+        "taux_planning": [[p, vers_hex(taux(p, r.pas_total, r.taux_max, r.echauffement, r.ratio_min))]
+                          for p in PAS_DU_PLANNING],
+        "divergence": {"taux_max": vers_hex(TAUX_QUI_DIVERGE), "pas": fou.pas, "perte": vers_hex(perte_folle)},
+        "presets": {nom: reglages_en_attendus(p) for nom, p in PRESETS_MINI.items()},
+        "taux_proposes": [vers_hex(x) for x in TAUX_PROPOSES],
+    }
+
+
 def calculer_attendus_modele() -> dict:
     """Les attendus du mini-modèle (tests/attendus-modele.json), une clé par partie.
 
-    « modele » : la passe avant, la perte et la passe arrière. L'entraînement
-    aura sa propre clé, à côté, dans le même fichier.
+    « modele » : la passe avant, la perte et la passe arrière. « entrainement » :
+    les premiers pas, le taux, et un entraînement qui diverge.
     """
-    return {"modele": calculer_attendus_du_modele()}
+    return {"modele": calculer_attendus_du_modele(), "entrainement": calculer_attendus_entrainement()}
 
 
 # Chaque fichier tests/attendus-<nom>.json et la fonction qui le calcule.

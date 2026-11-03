@@ -25,7 +25,7 @@ const INTERDITS =
 const VERIFIES = ['calcul', 'donnees', 'attention', 'modele', 'entrainement', 'exemple-attention'];
 // Les fichiers vérifiés qui doivent déjà exister : sans cette liste, un fichier
 // mal nommé ne serait jamais lu. Elle grandit à chaque tâche du plan 3.
-const OBLIGATOIRES = ['calcul', 'donnees', 'attention', 'modele'];
+const OBLIGATOIRES = ['calcul', 'donnees', 'attention', 'modele', 'entrainement'];
 // Les seules fonctions de Math permises. Les autres (max, min, fround, cbrt…)
 // arrondissent autrement que le Python, ou traitent −0 autrement.
 const MATH_PERMIS = new Set(['sqrt', 'floor', 'imul']);
@@ -33,6 +33,7 @@ const MATH_PERMIS = new Set(['sqrt', 'floor', 'imul']);
 const CALCUL_PY = new URL('../../../../projets/mini-modele/mini_modele/calcul.py', import.meta.url);
 const ATTENTION_PY = new URL('../../../../projets/mini-modele/mini_modele/attention.py', import.meta.url);
 const MODELE_PY = new URL('../../../../projets/mini-modele/mini_modele/modele.py', import.meta.url);
+const ENTRAINEMENT_PY = new URL('../../../../projets/mini-modele/mini_modele/entrainement.py', import.meta.url);
 
 function chemin(nom: string): URL {
   return new URL(`./${nom}.ts`, import.meta.url);
@@ -174,5 +175,48 @@ describe('régions de modele.py, pour le chapitre 1.5', () => {
     expect(region).toContain('m = maximum(logits)');
     expect(region.trimEnd().endsWith('return log(somme(e)) - (logits[cible] - m)')).toBe(true);
     expect(region).not.toMatch(/region:|fin:/);
+  });
+});
+
+describe('régions de entrainement.py, pour le chapitre 1.5', () => {
+  const source = (): string => readFileSync(ENTRAINEMENT_PY, 'utf8');
+
+  it('extrait la région lot', () => {
+    const region = extraireRegion(source(), 'lot', 'entrainement.py');
+    expect(region.startsWith('def _prochain_lot(')).toBe(true);
+    expect(region).toContain('if self._position + r.lot > len(self.donnees.entrainement):');
+    expect(region).toContain('self._melanger()');
+    expect(region.trimEnd().endsWith('return lot')).toBe(true);
+    expect(region).not.toMatch(/region:|fin:/);
+  });
+
+  it('extrait la région ecretage', () => {
+    const region = extraireRegion(source(), 'ecretage', 'entrainement.py');
+    expect(region.split('\n')).toEqual([
+      'carres = 0.0',
+      'for g in gradient:',
+      '    carres += g * g',
+      'norme = racine(carres)',
+      'if norme > r.ecretage:',
+      '    facteur = r.ecretage / norme',
+      '    for i in range(n):',
+      '        gradient[i] = gradient[i] * facteur',
+    ]);
+  });
+
+  it('extrait la région adamw', () => {
+    const region = extraireRegion(source(), 'adamw', 'entrainement.py');
+    expect(region.split('\n')).toEqual([
+      'self._b1t = self._b1t * r.beta1',
+      'self._b2t = self._b2t * r.beta2',
+      'for i in range(n):',
+      '    g = gradient[i]',
+      '    self._m[i] = r.beta1 * self._m[i] + (1.0 - r.beta1) * g',
+      '    self._v[i] = r.beta2 * self._v[i] + (1.0 - r.beta2) * (g * g)',
+      '    m_chapeau = self._m[i] / (1.0 - self._b1t)',
+      '    v_chapeau = self._v[i] / (1.0 - self._b2t)',
+      '    p = self.params[i] * (1.0 - t * r.poids_decroissance)',
+      '    self.params[i] = p - t * m_chapeau / (racine(v_chapeau) + r.epsilon)',
+    ]);
   });
 });

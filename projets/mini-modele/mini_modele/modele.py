@@ -357,8 +357,14 @@ def perte_et_gradient(
     Une séquence vaut (0, …, 0) : on lit seq[:-1] et on prédit seq[1:]. La
     perte est la moyenne de l'entropie croisée sur toutes les positions
     prédites de toutes les séquences. Le gradient (de même longueur que
-    params) est remis à 0,0, puis rempli séquence par séquence.
+    params) est remis à 0,0, puis rempli séquence par séquence. Toutes les
+    vérifications passent avant : une entrée refusée laisse le gradient intact.
     """
+    if len(params) != nombre_parametres(c):
+        raise ValueError(
+            f"perte_et_gradient : {len(params)} paramètres, mais cette configuration en a {nombre_parametres(c)}. "
+            "Crée-les avec initialiser(c, hasard)."
+        )
     if gradient is not None and len(gradient) != nombre_parametres(c):
         raise ValueError(
             f"perte_et_gradient : le gradient a {len(gradient)} cases, il en faut une par paramètre "

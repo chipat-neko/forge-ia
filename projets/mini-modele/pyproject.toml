@@ -21,3 +21,7 @@ packages = ["mini_modele"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Le test long (l'entraînement complet, quelques minutes en Python pur) ne tourne
+# qu'à la demande : « uv run pytest -q -m lent ».
+addopts = "-m 'not lent'"
+markers = ["lent: l'entraînement complet du mini-modèle, en Python pur (quelques minutes)"]

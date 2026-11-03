@@ -421,7 +421,8 @@ export function arriere(
  * Une séquence vaut [0, …, 0] : on lit seq[:-1] et on prédit seq[1:]. La
  * perte est la moyenne de l'entropie croisée sur toutes les positions
  * prédites de toutes les séquences. Le gradient (de même longueur que
- * params) est remis à 0,0, puis rempli séquence par séquence.
+ * params) est remis à 0,0, puis rempli séquence par séquence. Toutes les
+ * vérifications passent avant : une entrée refusée laisse le gradient intact.
  */
 export function perteEtGradient(
   c: ConfigMini,
@@ -429,6 +430,12 @@ export function perteEtGradient(
   sequences: readonly (readonly number[])[],
   gradient: Float64Array | null = null,
 ): number {
+  if (params.length !== nombreParametres(c)) {
+    throw new RangeError(
+      `perte_et_gradient : ${params.length} paramètres, mais cette configuration en a ${nombreParametres(c)}. ` +
+        'Crée-les avec initialiser(c, hasard).',
+    );
+  }
   if (gradient !== null && gradient.length !== nombreParametres(c)) {
     throw new RangeError(
       `perte_et_gradient : le gradient a ${gradient.length} cases, il en faut une par paramètre ` +

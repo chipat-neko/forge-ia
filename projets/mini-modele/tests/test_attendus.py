@@ -16,7 +16,7 @@ from mini_modele.attendus import (
     calculer_attendus_donnees,
     calculer_attendus_modele,
 )
-from mini_modele.calcul import empreinte_texte
+from mini_modele.calcul import depuis_hex, empreinte_texte
 from mini_modele.donnees import donnees_par_defaut
 from mini_modele.modele import ConfigMini, nombre_parametres
 
@@ -103,8 +103,8 @@ def test_attendus_donnees_au_complet():
 
 def test_attendus_modele_au_complet():
     fichier = lire("modele")
-    # Une clé par partie : « modele » ici ; l'entraînement aura la sienne à côté.
-    assert "modele" in fichier
+    # Une clé par partie : « modele », et « entrainement » à côté.
+    assert set(fichier) == {"modele", "entrainement"}
     a = fichier["modele"]
     assert set(a) == {
         "config", "graine", "nb_parametres", "init_empreinte", "init_premiers", "lot", "perte_lot",
@@ -125,3 +125,36 @@ def test_attendus_modele_au_complet():
     assert re.fullmatch(r"[0-9a-f]{8}", a["pertes_positions_empreinte"])
     assert len(a["generes"]) == 8
     assert all(isinstance(p, str) and len(p) <= 15 and set(p) <= set(d.vocabulaire[1:]) for p in a["generes"])
+
+
+def test_attendus_entrainement_au_complet():
+    fichier = lire("modele")
+    a = fichier["entrainement"]
+    assert set(a) == {
+        "preset", "nb_pas", "pertes", "taux", "validation_0", "validation_20", "params_empreinte_20",
+        "params_premiers_20", "echantillons_0", "echantillons_20", "taux_planning", "divergence", "presets",
+        "taux_proposes",
+    }
+    assert a["preset"] == "complet" and a["nb_pas"] == 20
+    assert len(a["pertes"]) == len(a["taux"]) == 20
+    assert len(a["params_premiers_20"]) == 8
+    motifs = a["pertes"] + a["taux"] + a["params_premiers_20"] + [a["validation_0"], a["validation_20"]]
+    motifs += [m for _, m in a["taux_planning"]] + [a["divergence"]["taux_max"], a["divergence"]["perte"]]
+    motifs += a["taux_proposes"]
+    assert all(re.fullmatch(r"[0-9a-f]{16}", m) for m in motifs)
+    assert re.fullmatch(r"[0-9a-f]{8}", a["params_empreinte_20"])
+    # Le départ de l'entraînement est le modèle de la clé « modele » : mêmes poids (graine 1234),
+    # même validation (256 prénoms), mêmes prénoms inventés (graine 1234 + 2 + 0).
+    assert a["validation_0"] == fichier["modele"]["perte_validation_256"]
+    assert a["echantillons_0"] == fichier["modele"]["generes"]
+    # Les 20 premiers pas sont dans l'échauffement : le taux monte à chaque pas, comme la courbe le montrera.
+    taux = [depuis_hex(m) for m in a["taux"]]
+    assert all(taux[i] > taux[i - 1] > 0.0 for i in range(1, 20))
+    # Le planning couvre la montée, le sommet, le cosinus et la fin.
+    assert [p for p, _ in a["taux_planning"]] == [0, 1, 50, 99, 100, 101, 550, 1000, 1550, 2000, 2999, 3000, 3001]
+    assert a["divergence"]["pas"] >= 2
+    assert set(a["presets"]) == {"complet", "avant-gout"}
+    d = donnees_par_defaut()
+    assert len(a["echantillons_0"]) == len(a["echantillons_20"]) == 8
+    for p in a["echantillons_0"] + a["echantillons_20"]:
+        assert isinstance(p, str) and len(p) <= 15 and set(p) <= set(d.vocabulaire[1:])

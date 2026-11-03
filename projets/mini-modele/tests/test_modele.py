@@ -189,6 +189,23 @@ def test_le_gradient_est_remis_a_zero_et_ne_change_pas_la_perte():
     assert params == petits_params()
 
 
+def test_une_entree_refusee_laisse_le_gradient_intact():
+    # Toutes les vérifications passent avant la remise à zéro : une erreur ne vide pas le gradient de l'appelant.
+    params = petits_params()
+    for mauvais_params, sequences, message in (
+        (params[:-1], PETITES_SEQUENCES, "paramètres"),
+        (params + [0.0], PETITES_SEQUENCES, "paramètres"),
+        (params, [(0, 1, 2, 3, 1, 0)], "contexte"),
+        (params, [(0, 5, 0)], "Numéro hors du vocabulaire"),
+        (params, [(0,)], "au moins deux numéros"),
+        (params, [], "aucune séquence"),
+    ):
+        sale = [123.0] * len(params)
+        with pytest.raises(ValueError, match=message):
+            perte_et_gradient(PETITE, mauvais_params, sequences, sale)
+        assert sale == [123.0] * len(params), message
+
+
 def test_gradient_rempli_sequence_par_sequence():
     # Le gradient du lot est la somme des gradients des séquences, chacun divisé par le nombre de positions du lot.
     params = petits_params()

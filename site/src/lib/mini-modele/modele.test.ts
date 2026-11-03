@@ -234,6 +234,25 @@ describe('la passe arrière', () => {
     expect(params).toEqual(petitsParams());
   });
 
+  it('une entrée refusée laisse le gradient intact : les vérifications passent avant la remise à zéro', () => {
+    const params = petitsParams();
+    const plus = new Float64Array(params.length + 1);
+    plus.set(params);
+    const cas: [Float64Array, number[][], RegExp][] = [
+      [params.slice(0, -1), PETITES_SEQUENCES, /paramètres/],
+      [plus, PETITES_SEQUENCES, /paramètres/],
+      [params, [[0, 1, 2, 3, 1, 0]], /contexte/],
+      [params, [[0, 5, 0]], /Numéro hors du vocabulaire/],
+      [params, [[0]], /au moins deux numéros/],
+      [params, [], /aucune séquence/],
+    ];
+    for (const [mauvais, sequences, message] of cas) {
+      const sale = new Float64Array(params.length).fill(123.0);
+      expect(() => perteEtGradient(PETITE, mauvais, sequences, sale)).toThrow(message);
+      expect(Array.from(sale).every((x) => x === 123.0), String(message)).toBe(true);
+    }
+  });
+
   it('le gradient du lot est la somme de ceux des séquences, pesée par leurs positions', () => {
     const params = petitsParams();
     const [a, b] = PETITES_SEQUENCES;
