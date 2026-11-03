@@ -107,6 +107,7 @@ L'utilisateur a validé ce plan le 02/11/2026. Il pourra s'enrichir plus tard.
 **Une seule IA qui grandit** (décidé le 02/11/2026) : la Partie 1 fabrique **une seule IA**, « ton IA », reprise de chapitre en chapitre, et non un modèle séparé par chapitre. Conséquences pour la construction :
 
 - **Un seul modèle de langage tout au long du parcours** : il naît en 1.5 avec le tokenizer de 1.3, puis il est affiné de 1.7 à 1.10 (conversation, alignement, raisonnement, code). C'est encore lui qui sert d'agent de 1.16 à 1.19, puis qui est accéléré et servi en 1.20.
+- **Langue de ton IA** (décidé le 03/11/2026) : **français uniquement, plus du code**. Le tokenizer de ton IA et les données de pré-entraînement sont donc du français et du code, sans anglais visé.
 - **Le tokenizer de 1.3 prévoit dès le départ toute la suite** : les jetons spéciaux du format de conversation, des appels d'outils et des messages système, et une réserve de jetons libres pour plus tard. Les données de pré-entraînement contiennent du code, pour préparer 1.10.
 - **Images et vidéo** (1.11 à 1.14) : elles ont leurs propres petits modèles, entraînés de zéro. En 1.15 et dans « agir seul », ils sont branchés à ton IA : elle sait les appeler comme des outils, et la vision lui donne des yeux. Mon choix, qui découle de la recommandation acceptée.
 - **Un paquet Python commun** (`forge`) regroupe les briques partagées : tokenizer, modèle, chargement des données, sauvegarde et reprise. Chaque projet de chapitre s'appuie dessus et ajoute sa propre étape.
