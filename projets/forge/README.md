@@ -135,6 +135,22 @@ vont dans `FORGE_DONNEES/entrainements/<sortie>/`. On garde les deux dernières 
 - **Mémoire de la carte graphique insuffisante :** réduire `micro_lot` dans le TOML (les
   jetons de chaque pas restent les mêmes), puis relancer avec `--reprendre`.
 
+## Mesurer la vitesse avant d'entraîner
+
+Avant un entraînement de plusieurs heures, `mesurer` fait un essai chronométré de la vraie
+étape d'entraînement (sur des jetons tirés au hasard) pour chaque taille, sur la carte graphique
+(il cherche le plus grand `micro_lot` qui tient en mémoire, puis mesure celui-là et les puissances
+de 2 en dessous : le plus grand n'est pas toujours le plus rapide) et sur le processeur (avec tous
+ses fils, dont il relève la charge). Il écrit des tableaux : jetons par seconde, durée pour 20 jetons
+par paramètre, place sur le disque. Si la carte est déjà occupée par un autre programme, il le dit
+au lieu de mesurer :
+
+```powershell
+uv run --extra gpu python -m forge mesurer --json mesures.json --tableau tableaux.md
+```
+
+Les chiffres du 3 novembre 2026 sont dans `docs/mesures/entrainement-2026-11.md`.
+
 ## Évaluer ton IA
 
 Après un entraînement, `evaluer` mesure une sauvegarde et écrit un rapport en français

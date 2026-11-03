@@ -3,7 +3,7 @@
 Les commandes `donnees`, `tokenizer`, `compression`, `encoder`, `mesurer`,
 `entrainer`, `evaluer` et `suivi` s'y branchent une par une, au fil des tâches
 du plan (chacune ajoute son sous-parseur dans `construire_parseur`). Déjà là :
-`donnees`, `tokenizer`, `compression`, `encoder`, `entrainer` et `evaluer`.
+`donnees`, `tokenizer`, `compression`, `encoder`, `mesurer`, `entrainer` et `evaluer`.
 """
 
 import argparse
@@ -418,6 +418,137 @@ def _ajouter_entrainer(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_entrainer)
 
 
+PRESETS_MESURES = "petit,moyen,grand,tres_grand"
+
+
+def _noms_de_presets(texte: str) -> list[str]:
+    """Lit « petit,moyen » : des noms de tailles de ton IA, séparés par des virgules."""
+    from forge.modele import PRESETS
+
+    noms = [nom.strip() for nom in texte.split(",") if nom.strip()]
+    inconnus = [nom for nom in noms if nom not in PRESETS]
+    if not noms or inconnus:
+        raise argparse.ArgumentTypeError(
+            f"taille inconnue : {', '.join(inconnus) or repr(texte)}. Les tailles sont {', '.join(PRESETS)} "
+            "(séparées par des virgules)."
+        )
+    return noms
+
+
+def _entier_strictement_positif(texte: str) -> int:
+    try:
+        valeur = int(texte)
+    except ValueError:
+        valeur = 0
+    if valeur < 1:
+        raise argparse.ArgumentTypeError(f"nombre illisible : {texte!r}. Écris un entier d'au moins 1.")
+    return valeur
+
+
+def _nombre_strictement_positif(texte: str) -> float:
+    try:
+        valeur = float(texte)
+    except ValueError:
+        valeur = 0.0
+    if not valeur > 0:
+        raise argparse.ArgumentTypeError(f"nombre illisible : {texte!r}. Écris un nombre plus grand que 0.")
+    return valeur
+
+
+def _commande_mesurer(choix: argparse.Namespace) -> int:
+    """`forge mesurer` : essai chronométré de l'entraînement sur la carte graphique et le processeur."""
+    # Imports ici : PyTorch est long à charger, les autres commandes n'en ont pas besoin.
+    import json
+
+    import torch
+
+    from forge import mesure
+
+    def journal(message: str) -> None:
+        print(message, file=sys.stderr, flush=True)
+
+    try:
+        resultats = mesure.mesurer_presets(
+            choix.presets, choix.pas, choix.cpu_secondes, choix.cpu_micro_lot, choix.gpu_accumulation, journal
+        )
+    except mesure.GpuOccupe as erreur:
+        print(f"Erreur : {erreur}", file=sys.stderr)
+        return 1
+    except torch.cuda.OutOfMemoryError:
+        print(
+            "Erreur : la carte graphique manque de mémoire, même pour un micro-lot de 1. Ferme les jeux ou "
+            "logiciels 3D ouverts, puis relance la même commande.",
+            file=sys.stderr,
+        )
+        return 1
+    except KeyboardInterrupt:
+        print("Mesure interrompue : rien n'est écrit. Relance la même commande.", file=sys.stderr)
+        return 130
+    tableaux = mesure.tableaux_markdown(resultats)
+    print(tableaux)
+    try:
+        if choix.json:
+            Path(choix.json).write_text(json.dumps(resultats, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        if choix.tableau:
+            Path(choix.tableau).write_text(tableaux, encoding="utf-8")
+    except OSError as erreur:
+        print(f"Erreur : impossible d'écrire le résultat ({erreur}).", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _ajouter_mesurer(sous_parseurs) -> None:
+    commande = _nouvelle_commande(
+        sous_parseurs,
+        "mesurer",
+        "Essai chronométré de l'entraînement : jetons par seconde sur la carte graphique et sur le "
+        "processeur (tous les fils), durée pour 20 jetons par paramètre et place sur le disque.",
+    )
+    commande.add_argument(
+        "--presets",
+        type=_noms_de_presets,
+        default=PRESETS_MESURES,
+        metavar="NOM,…",
+        help=f"tailles à mesurer, séparées par des virgules ({PRESETS_MESURES} par défaut)",
+    )
+    commande.add_argument(
+        "--pas",
+        type=_entier_strictement_positif,
+        default=20,
+        metavar="N",
+        help="pas d'entraînement chronométrés, après 2 pas d'échauffement (20 par défaut)",
+    )
+    commande.add_argument(
+        "--cpu-secondes",
+        type=_nombre_strictement_positif,
+        default=120.0,
+        metavar="S",
+        help="durée maximale de la mesure sur le processeur, par taille, après 1 pas d'échauffement (120 par défaut)",
+    )
+    commande.add_argument(
+        "--cpu-micro-lot",
+        type=_entier_strictement_positif,
+        default=2,
+        metavar="N",
+        help="lignes traitées d'un coup sur le processeur (2 par défaut)",
+    )
+    commande.add_argument(
+        "--gpu-accumulation",
+        type=_entier_strictement_positif,
+        default=8,
+        metavar="N",
+        help="micro-lots accumulés par pas sur la carte (8 par défaut) : l'écrêtage et le pas d'AdamW "
+        "pèsent alors comme dans un vrai entraînement, où un pas accumule beaucoup de micro-lots",
+    )
+    commande.add_argument(
+        "--json", type=Path, default=None, metavar="FICHIER", help="écrit aussi tous les chiffres bruts dans ce fichier JSON"
+    )
+    commande.add_argument(
+        "--tableau", type=Path, default=None, metavar="FICHIER", help="écrit aussi les tableaux dans ce fichier Markdown"
+    )
+    commande.set_defaults(fonction=_commande_mesurer)
+
+
 def _entier_positif_ou_nul(texte: str) -> int:
     try:
         valeur = int(texte)
@@ -557,6 +688,7 @@ def construire_parseur() -> argparse.ArgumentParser:
     _ajouter_tokenizer(sous_parseurs)
     _ajouter_compression(sous_parseurs)
     _ajouter_encoder(sous_parseurs)
+    _ajouter_mesurer(sous_parseurs)
     _ajouter_entrainer(sous_parseurs)
     _ajouter_evaluer(sous_parseurs)
     return parseur
