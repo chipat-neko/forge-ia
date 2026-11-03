@@ -111,6 +111,34 @@ vont dans `FORGE_DONNEES/entrainements/<sortie>/`. On garde les deux dernières 
 - **Mémoire de la carte graphique insuffisante :** réduire `micro_lot` dans le TOML (les
   jetons de chaque pas restent les mêmes), puis relancer avec `--reprendre`.
 
+## Évaluer ton IA
+
+Après un entraînement, `evaluer` mesure une sauvegarde et écrit un rapport en français
+(les chemins ci-dessous sont des exemples) :
+
+```powershell
+uv run --extra gpu python -m forge evaluer `
+    --sauvegarde D:\forge-ia-donnees\entrainements\mini\sauvegardes\meilleur.pt --donnees echantillon
+```
+
+Le rapport (`rapport.md` pour la lecture, `rapport.json` pour les programmes) va dans
+`evaluation/<nom de la sauvegarde>/`, à côté de `sauvegardes/` (ou dans `--sortie`). Il contient :
+
+- la perte de validation (en nats par jeton), la perplexité (`exp(perte)`) et les bits par octet
+  (`perte ÷ ln 2 ÷ octets par jeton`) : la perte ramenée à un octet de texte, la seule qui se compare
+  d'un tokenizer à l'autre. Elle est mesurée sur 1 024 morceaux fixes de `val/` au plus ;
+- les QCM français de FrenchBench (HellaSwag et ARC-Challenge, des traductions automatiques),
+  comparés au hasard (1 ÷ nombre de choix) avec la marge d'erreur à 95 % : avec peu de questions, un écart
+  au hasard plus petit que la marge ne prouve rien. `--qcm N` limite chaque test à N questions, `--qcm 0` n'en
+  passe aucune (et n'a pas besoin du réseau) ; sinon FrenchBench se télécharge la première fois, et la commande
+  lève elle-même `HF_HUB_OFFLINE` pour son processus ;
+- dix textes écrits par le modèle à partir de débuts fixes (huit phrases françaises, deux débuts
+  de fonction Python), avec une graine fixe : mêmes réglages, mêmes textes.
+
+Le tokenizer est celui du dépôt (`--tokenizer` pour un autre) : il doit être celui de l'entraînement, et celui qui a
+encodé les données, sinon la commande refuse de mesurer. Les calculs se font sur la carte graphique si PyTorch la
+voit (en bf16), sinon sur le processeur (`--appareil cpu` pour le forcer).
+
 ## Tester
 
 ```powershell

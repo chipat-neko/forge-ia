@@ -51,6 +51,8 @@ from forge.chemins import PlaceInsuffisante, racine_donnees
 from forge.entrainement.chargeur import ChargeurJetons
 from forge.entrainement.planning import taux
 from forge.entrainement.sauvegarde import charger_derniere, est_disque_plein, nom_etape, remplacer, sauvegarder
+from forge.evaluation.perte import autocast as _autocast  # bf16 sur la carte graphique, 32 bits sur le processeur
+from forge.evaluation.perte import perte_sur_morceaux as _perte_validation  # la mesure est celle de `evaluer`
 from forge.modele import PRESETS, ConfigModele, Transformer, nombre_parametres
 from forge.tokenizer.apprentissage import DonneesManquantes
 
@@ -313,11 +315,6 @@ def _restaurer_hasard(etat: dict) -> None:
         torch.cuda.set_rng_state_all(cuda)
 
 
-def _autocast(appareil: torch.device):
-    """bf16 sur la carte graphique ; sur le processeur, on reste en 32 bits."""
-    return torch.autocast(device_type=appareil.type, dtype=torch.bfloat16, enabled=appareil.type == "cuda")
-
-
 class _Journal:
     """`journal.jsonl` : une ligne JSON par pas ou par évènement, écrite tout de suite sur le disque."""
 
@@ -512,29 +509,6 @@ def _pas_d_optimisation(
         raise PerteNonFinie(f"perte {moyenne.item()}, norme des gradients {norme.item()}")
     optimiseur.step()
     return moyenne.item()
-
-
-@torch.no_grad()
-def _perte_validation(modele: nn.Module, chargeur: ChargeurJetons, depart: dict, n_morceaux: int, appareil) -> float:
-    """Perte moyenne par jeton sur les `n_morceaux` premiers morceaux de validation.
-
-    Le chargeur repart toujours de `depart` : ce sont toujours les mêmes morceaux. On les lit
-    par paquets de la taille du chargeur (`micro_lot`), le dernier paquet coupé au besoin :
-    le résultat ne dépend pas de `micro_lot`.
-    """
-    chargeur.restaurer(depart)
-    modele.eval()
-    somme = torch.zeros((), device=appareil)
-    restants = n_morceaux
-    while restants > 0:
-        x, y = chargeur.lot()
-        x, y = x[:restants], y[:restants]
-        with _autocast(appareil):
-            _, perte = modele(x.to(appareil), y.to(appareil))
-        somme += perte.float() * x.numel()  # la perte est une moyenne par jeton : on la remet en somme
-        restants -= x.shape[0]
-    modele.train()
-    return (somme / (n_morceaux * chargeur.longueur)).item()
 
 
 # --- L'entraînement ---------------------------------------------------------------------

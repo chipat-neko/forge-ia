@@ -3,7 +3,7 @@
 Les commandes `donnees`, `tokenizer`, `encoder`, `mesurer`, `entrainer`,
 `evaluer` et `suivi` s'y branchent une par une, au fil des tâches du plan
 (chacune ajoute son sous-parseur dans `construire_parseur`). Déjà là :
-`donnees`, `tokenizer`, `encoder` et `entrainer`.
+`donnees`, `tokenizer`, `encoder`, `entrainer` et `evaluer`.
 """
 
 import argparse
@@ -50,6 +50,19 @@ def _nouvelle_commande(sous_parseurs, nom: str, aide: str) -> argparse.ArgumentP
     return commande
 
 
+def _lever_le_mode_hors_ligne(journal, pour: str) -> None:
+    """Lève, pour ce processus seulement, le mode hors ligne de Hugging Face (`HF_HUB_OFFLINE=1`).
+
+    Cette variable est souvent posée pour les autres projets (c'est le cas sur ce PC). Les
+    commandes qui ont besoin du réseau (`donnees`, `evaluer` pour FrenchBench) la lèvent ici,
+    avant que `datasets` ne la lise à son import. `pour` complète le message : « levé pour … seulement ».
+    """
+    for variable in ("HF_HUB_OFFLINE", "HF_DATASETS_OFFLINE"):
+        if os.environ.get(variable, "").strip().upper() in {"1", "ON", "YES", "TRUE"}:
+            journal(f"{variable} est à 1 : levé pour {pour} seulement, qui a besoin du réseau.")
+            os.environ[variable] = "0"
+
+
 def _commande_donnees(choix: argparse.Namespace) -> int:
     """`forge donnees` : télécharge les trois sources, dans les parts du mélange."""
     # Imports ici : les autres commandes n'ont pas besoin des données.
@@ -61,13 +74,8 @@ def _commande_donnees(choix: argparse.Namespace) -> int:
     def journal(message: str) -> None:
         print(message, flush=True)
 
-    # Cette commande a besoin du réseau. Si la session coupe Hugging Face (variable
-    # `HF_HUB_OFFLINE=1`, souvent posée pour les autres projets), on la lève pour ce
-    # processus seulement, avant que `datasets` ne lise la variable à son import.
-    for variable in ("HF_HUB_OFFLINE", "HF_DATASETS_OFFLINE"):
-        if os.environ.get(variable, "").strip().upper() in {"1", "ON", "YES", "TRUE"}:
-            journal(f"{variable} est à 1 : levé pour ce téléchargement seulement, qui a besoin du réseau.")
-            os.environ[variable] = "0"
+    # Cette commande a besoin du réseau : si la session coupe Hugging Face, on le permet pour ce processus.
+    _lever_le_mode_hors_ligne(journal, "ce téléchargement")
     racine = telechargement.dossier_des_textes(Path(choix.dossier))
     budgets = repartir(choix.octets)
     for nom, octets in budgets.items():
@@ -298,6 +306,117 @@ def _ajouter_entrainer(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_entrainer)
 
 
+def _entier_positif_ou_nul(texte: str) -> int:
+    try:
+        valeur = int(texte)
+    except ValueError:
+        valeur = -1
+    if valeur < 0:
+        raise argparse.ArgumentTypeError(f"nombre de questions illisible : {texte!r}. Écris un entier, 0 ou plus.")
+    return valeur
+
+
+def _appareil(texte: str) -> str:
+    if texte not in ("cuda", "cpu"):
+        raise argparse.ArgumentTypeError(f'appareil inconnu : {texte!r}. Écris "cuda" (carte graphique) ou "cpu".')
+    return texte
+
+
+def _sortie_par_defaut_de_l_evaluation(sauvegarde: Path) -> Path:
+    """`<entraînement>/evaluation/<nom de la sauvegarde>/` : une sauvegarde n'écrase pas le rapport d'une autre."""
+    dossier = sauvegarde if sauvegarde.is_dir() else sauvegarde.parent
+    racine = dossier.parent if dossier.name == "sauvegardes" else dossier
+    return racine / "evaluation" / ("derniere" if sauvegarde.is_dir() else sauvegarde.stem)
+
+
+def _commande_evaluer(choix: argparse.Namespace) -> int:
+    """`forge evaluer` : perte, perplexité, bits par octet, QCM français et échantillons, en rapport."""
+
+    def journal(message: str) -> None:
+        print(message, flush=True)
+
+    # FrenchBench se télécharge : on permet le réseau avant tout import de `datasets`.
+    if choix.qcm != 0:
+        _lever_le_mode_hors_ligne(journal, "le chargement de FrenchBench")
+    # Imports ici : PyTorch est long à charger, les autres commandes n'en ont pas besoin.
+    import torch
+
+    from forge.chemins import PlaceInsuffisante
+    from forge.evaluation.rapport import evaluer, resume_court
+    from forge.tokenizer.apprentissage import DonneesManquantes
+
+    sauvegarde = Path(choix.sauvegarde)
+    sortie = choix.sortie or _sortie_par_defaut_de_l_evaluation(sauvegarde)
+    try:
+        rapport = evaluer(sauvegarde, Path(choix.donnees), choix.tokenizer, sortie, choix.qcm, choix.appareil)
+    except (FileNotFoundError, PermissionError, PlaceInsuffisante, DonneesManquantes, ValueError) as erreur:
+        print(f"Erreur : {erreur}", file=sys.stderr)
+        return 1
+    except torch.cuda.OutOfMemoryError:
+        print(
+            "Erreur : la carte graphique manque de mémoire pour l'évaluation. Ferme les jeux ou logiciels 3D "
+            "ouverts (et l'entraînement, s'il tourne), ou évalue sur le processeur avec --appareil cpu.",
+            file=sys.stderr,
+        )
+        return 1
+    except KeyboardInterrupt:
+        print("Évaluation interrompue : aucun rapport écrit. Relance la même commande.", file=sys.stderr)
+        return 130
+    print(resume_court(rapport))
+    print(f"Rapport : {sortie / 'rapport.md'}")
+    return 0
+
+
+def _ajouter_evaluer(sous_parseurs) -> None:
+    commande = _nouvelle_commande(
+        sous_parseurs,
+        "evaluer",
+        "Évalue une sauvegarde de ton IA : perte, perplexité, bits par octet, QCM français et "
+        "échantillons, dans rapport.json et rapport.md.",
+    )
+    commande.add_argument(
+        "--sauvegarde",
+        required=True,
+        metavar="FICHIER",
+        help="sauvegarde de l'entraînement (etape-*.pt ou meilleur.pt), ou son dossier sauvegardes/ (dernière étape)",
+    )
+    commande.add_argument(
+        "--donnees",
+        required=True,
+        metavar="NOM",
+        help="dossier des jetons, sous FORGE_DONNEES/jetons (celui de « forge encoder --donnees »), ou un chemin absolu",
+    )
+    commande.add_argument(
+        "--tokenizer",
+        type=Path,
+        default=Path(__file__).parent / "ressources" / "tokenizer-ton-ia-v1.json",
+        metavar="CHEMIN",
+        help="fichier JSON du tokenizer de l'entraînement (celui du dépôt par défaut)",
+    )
+    commande.add_argument(
+        "--sortie",
+        type=Path,
+        default=None,
+        metavar="DOSSIER",
+        help="dossier des rapports (par défaut : evaluation/<nom de la sauvegarde>/ à côté de sauvegardes/)",
+    )
+    commande.add_argument(
+        "--qcm",
+        type=_entier_positif_ou_nul,
+        default=None,
+        metavar="N",
+        help="nombre de questions de chaque test FrenchBench (toutes par défaut ; 0 : aucun QCM, sans réseau)",
+    )
+    commande.add_argument(
+        "--appareil",
+        type=_appareil,
+        default=None,
+        metavar="cuda|cpu",
+        help="où calculer (la carte graphique si PyTorch la voit, sinon le processeur)",
+    )
+    commande.set_defaults(fonction=_commande_evaluer)
+
+
 def construire_parseur() -> argparse.ArgumentParser:
     """Construit le parseur principal et ses sous-commandes."""
     parseur = argparse.ArgumentParser(
@@ -326,6 +445,7 @@ def construire_parseur() -> argparse.ArgumentParser:
     _ajouter_tokenizer(sous_parseurs)
     _ajouter_encoder(sous_parseurs)
     _ajouter_entrainer(sous_parseurs)
+    _ajouter_evaluer(sous_parseurs)
     return parseur
 
 
