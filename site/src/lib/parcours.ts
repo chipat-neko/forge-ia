@@ -335,3 +335,11 @@ export function chapitresDuGroupe(partie: Partie, groupe: Groupe): Chapitre[] {
 export function titreCourt(titre: string): string {
   return titre.split(/ : | \(/)[0];
 }
+
+/**
+ * Où en est la parution d'une série de chapitres : « à venir », « 1 paru sur
+ * 6 », « 2 parus sur 6 ».
+ */
+export function etatParution(parus: number, total: number): string {
+  return parus === 0 ? 'à venir' : `${parus} paru${parus > 1 ? 's' : ''} sur ${total}`;
+}

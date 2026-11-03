@@ -25,9 +25,24 @@ export const schemaChapitre = z
     programme: z.string().min(1),
     /**
      * Ce que le lecteur saura à la fin, dans l'ordre du chapitre. `ou` complète
-     * « à gagner … », par exemple « à l'étape 3 ».
+     * « à gagner … », par exemple « à l'étape 3 ». Chaque clé est unique dans
+     * le chapitre : c'est elle que la progression enregistre.
      */
-    acquis: z.array(z.object({ cle: z.string().min(1), texte: z.string().min(1), ou: z.string().min(1) })),
+    acquis: z
+      .array(z.object({ cle: z.string().min(1), texte: z.string().min(1), ou: z.string().min(1) }))
+      .superRefine((acquis, ctx) => {
+        const vues = new Set<string>();
+        acquis.forEach(({ cle }, i) => {
+          if (vues.has(cle)) {
+            ctx.addIssue({
+              code: 'custom',
+              message: `La clé d’acquis « ${cle} » est déjà prise dans ce chapitre : chaque acquis a sa propre clé.`,
+              path: [i, 'cle'],
+            });
+          }
+          vues.add(cle);
+        });
+      }),
   })
   .refine((c) => c.numero.split('.')[0] === String(c.partie), {
     message: 'Le numéro du chapitre ne correspond pas à sa partie.',

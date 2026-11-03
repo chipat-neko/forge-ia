@@ -79,7 +79,7 @@ const ESSAIS = ['jetons', 'BPE', 'zip', 'labo'];
   } from '../lib/recherche';
   import { typographier } from '../lib/typo';
 
-  const FINE = ' ';
+  const FINE = '\u202F';
   const TOUS = PARCOURS.flatMap((p) => p.chapitres);
   const formulaire = document.querySelector<HTMLFormElement>('[data-formulaire]')!;
   const champ = document.querySelector<HTMLInputElement>('#q')!;

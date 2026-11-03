@@ -10,7 +10,15 @@
 // gagnés, et tient à jour la barre des chapitres en haut de la page.
 import LayoutSite from '../../layouts/LayoutSite.astro';
 import { chapitresParus } from '../../lib/chapitres-parus';
-import { PARCOURS, chapitresDuGroupe, hrefChapitre, hrefPartie, type Chapitre, type Partie } from '../../lib/parcours';
+import {
+  PARCOURS,
+  chapitresDuGroupe,
+  etatParution,
+  hrefChapitre,
+  hrefPartie,
+  type Chapitre,
+  type Partie,
+} from '../../lib/parcours';
 import { typographier } from '../../lib/typo';
 
 export function getStaticPaths() {
@@ -50,8 +58,7 @@ const note = partie.depart
 
 const ancre = (c: Chapitre) => `chapitre-${c.numero.replace('.', '-')}`;
 const plage = (chapitres: Chapitre[]) => {
-  const n = chapitres.filter((c) => parus.has(c.numero)).length;
-  const etat = n === 0 ? 'à venir' : `${n} paru sur ${chapitres.length}`;
+  const etat = etatParution(chapitres.filter((c) => parus.has(c.numero)).length, chapitres.length);
   return `Chapitres ${chapitres[0].numero} à ${chapitres[chapitres.length - 1].numero}, ${etat}`;
 };
 const savoirs = partie.savoirs ?? [];
@@ -234,7 +241,7 @@ const savoirs = partie.savoirs ?? [];
   import { typographier } from '../../lib/typo';
   import { avancementDe, pastilles } from '../../scripts/etats';
 
-  const FINE = ' ';
+  const FINE = '\u202F';
   let faits = 0;
   for (const ligne of document.querySelectorAll<HTMLElement>('.chap[data-chapitre-carte]')) {
     const avancement = avancementDe(ligne);

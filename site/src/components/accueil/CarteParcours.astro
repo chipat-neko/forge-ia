@@ -20,6 +20,7 @@ import {
   trouverChapitre,
   type Chapitre,
 } from '../../lib/parcours';
+import { enLettres } from '../../lib/exemples';
 import { typographier } from '../../lib/typo';
 
 interface Props {
@@ -31,6 +32,9 @@ const [p0, p1, ...branches] = PARCOURS;
 const total = PARCOURS.reduce((n, p) => n + p.chapitres.length, 0);
 const departs = new Set(branches.map((b) => b.depart));
 const nbParus = parus.size;
+// « Quatre parties, 34 chapitres. » : les deux nombres viennent du parcours.
+const nbParties = enLettres(PARCOURS.length);
+const enTete = `${nbParties.charAt(0).toUpperCase()}${nbParties.slice(1)} parties, ${total} chapitres.`;
 ---
 
 <section class="parcours" id="parcours" aria-labelledby="t-parcours">
@@ -39,7 +43,7 @@ const nbParus = parus.size;
     <p>
       {
         typographier(
-          'Quatre parties, trente-quatre chapitres. La ligne principale, la Partie 1, fabrique une seule IA, « ton IA », de chapitre en chapitre. Les chapitres paraissent au fur et à mesure.',
+          `${enTete} La ligne principale, la Partie 1, fabrique une seule IA, « ton IA », de chapitre en chapitre. Les chapitres paraissent au fur et à mesure.`,
         )
       }
     </p>
@@ -638,8 +642,18 @@ const nbParus = parus.size;
       grid-template-columns: 0 minmax(0, 1fr);
     }
 
+    /* Masquée à l'écran seulement (même motif que .vh) : le raccord dessine
+       le départ, mais les lecteurs d'écran ont toujours la phrase. */
     .carte.placee .depuis {
-      display: none;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
     }
 
     .carte.placee .station.depart {

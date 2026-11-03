@@ -115,7 +115,7 @@ describe('morceauxExtrait', () => {
 
   it('décode les entités sans jamais interpréter de HTML', () => {
     expect(morceauxExtrait('a &lt;b&gt; &amp; &#8217; &#x202F; <img src=x>')).toEqual([
-      { texte: 'a <b> & ’   <img src=x>', marque: false },
+      { texte: 'a <b> & \u2019 \u202F <img src=x>', marque: false },
     ]);
     expect(morceauxExtrait('&bidule; &#99999999;')).toEqual([{ texte: '&bidule; &#99999999;', marque: false }]);
   });

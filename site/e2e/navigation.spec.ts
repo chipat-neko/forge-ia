@@ -2,10 +2,11 @@
 // parcours), les pages de partie, la recherche (Pagefind) et la page 404.
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { PARCOURS } from '../src/lib/parcours';
 import { terminerChapitre13, verifierAxe, verifierSansDebordement } from './outils';
 
 const CLE_PROGRESSION = 'forge-ia:progression:v1';
-const FINE = ' ';
+const FINE = '\u202F';
 
 // Les cinq tests du brief de la tâche 12, chacun terminé par axe et le
 // contrôle du débordement.
@@ -13,6 +14,9 @@ const FINE = ' ';
 test('accueil : 34 chapitres, 1.3 disponible', async ({ page }) => {
   await page.goto('/forge-ia/');
   await expect(page.locator('[data-chapitre-carte]')).toHaveCount(34);
+  // Le compte annoncé en tête du plan vient du parcours, pas d'un texte écrit à la main.
+  const total = PARCOURS.reduce((n, p) => n + p.chapitres.length, 0);
+  await expect(page.locator('.parcours-tete p').first()).toContainText(`Quatre parties, ${total} chapitres.`);
   await expect(page.locator('[data-chapitre-carte="1.3"]')).toHaveAttribute('data-etat', 'disponible');
   await expect(page.locator('[data-chapitre-carte="1.4"]')).toHaveAttribute('data-etat', 'a-venir');
   await verifierAxe(page);
@@ -213,4 +217,38 @@ test('404 : une adresse mal encodée ne casse ni l’adresse affichée ni le par
   expect(erreurs).toEqual([]);
   await verifierAxe(page);
   await verifierSansDebordement(page);
+});
+
+test('accueil : les phrases d’embranchement restent lues par les lecteurs d’écran', async ({ page }, info) => {
+  await page.goto('/forge-ia/');
+  if (info.project.name === 'ordinateur') {
+    // Sur grand écran, le script place les embranchements à droite du plan :
+    // la phrase « Elle part de… » n'a plus à se voir, mais doit rester lue.
+    await expect(page.locator('[data-carte]')).toHaveClass(/\bplacee\b/);
+  }
+  const depuis = page.locator('.depuis');
+  await expect(depuis).toHaveCount(2);
+  for (const phrase of await depuis.all()) {
+    await expect(phrase).not.toHaveCSS('display', 'none');
+    if (info.project.name === 'ordinateur') expect((await phrase.boundingBox())?.width).toBeLessThanOrEqual(1);
+  }
+  const arbre = await page.locator('[data-carte]').ariaSnapshot();
+  expect(arbre).toContain('Elle part de la Partie 1 après 1.7,');
+  expect(arbre).toContain('Elle part de la Partie 1 après 1.16,');
+  await verifierSansDebordement(page);
+});
+
+test('favicon : une icône SVG sous la base du site, et aucune requête en 404', async ({ page, request }) => {
+  const manquantes: string[] = [];
+  page.on('response', (reponse) => {
+    if (reponse.status() === 404) manquantes.push(reponse.url());
+  });
+  for (const adresse of ['/forge-ia/', '/forge-ia/partie-1/', '/forge-ia/partie-1/1-3/', '/forge-ia/recherche/']) {
+    await page.goto(adresse);
+    await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/forge-ia/favicon.svg');
+  }
+  const icone = await request.get('/forge-ia/favicon.svg');
+  expect(icone.status()).toBe(200);
+  expect(icone.headers()['content-type']).toContain('image/svg+xml');
+  expect(manquantes).toEqual([]);
 });

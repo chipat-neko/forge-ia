@@ -18,6 +18,8 @@ interface Props {
 const NOM_DU_SITE = 'La Forge IA';
 const { titre, description = 'Apprendre à construire une IA de zéro, chapitre après chapitre.' } = Astro.props;
 const titreComplet = titre === NOM_DU_SITE ? titre : `${titre}, ${NOM_DU_SITE}`;
+// L'icône est servie sous la base du site (/forge-ia/), comme tout le reste.
+const icone = `${import.meta.env.BASE_URL.replace(/[/]+$/, '')}/favicon.svg`;
 ---
 
 <!doctype html>
@@ -27,6 +29,7 @@ const titreComplet = titre === NOM_DU_SITE ? titre : `${titre}, ${NOM_DU_SITE}`;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{titreComplet}</title>
     <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href={icone} />
   </head>
   <body>
     <slot />

@@ -3,6 +3,7 @@ import {
   ANNEXES,
   PARCOURS,
   chapitresDuGroupe,
+  etatParution,
   hrefChapitre,
   hrefPartie,
   titreCourt,
@@ -230,5 +231,14 @@ describe('titreCourt', () => {
     expect(titreCourt('Le tokenizer (BPE)')).toBe('Le tokenizer');
     expect(titreCourt('Les données : où les trouver, les nettoyer, les licences')).toBe('Les données');
     expect(titreCourt('Le faire coder')).toBe('Le faire coder');
+  });
+});
+
+describe('etatParution', () => {
+  it('accorde « paru » avec le nombre de chapitres parus', () => {
+    expect(etatParution(0, 6)).toBe('à venir');
+    expect(etatParution(1, 6)).toBe('1 paru sur 6');
+    expect(etatParution(2, 6)).toBe('2 parus sur 6');
+    expect(etatParution(6, 6)).toBe('6 parus sur 6');
   });
 });
