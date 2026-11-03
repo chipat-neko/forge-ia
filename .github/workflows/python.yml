@@ -21,12 +21,15 @@ jobs:
   tests:
     name: Tests Python (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v10.3.3
       - name: Tests de chaque projet
         shell: bash
@@ -37,7 +40,8 @@ jobs:
             [ -f "${dossier}pyproject.toml" ] || continue
             nombre=$((nombre + 1))
             echo "::group::${dossier}"
-            if ! (cd "$dossier" && uv run pytest -q); then
+            # --locked : échoue si uv.lock ne correspond plus à pyproject.toml.
+            if ! (cd "$dossier" && uv run --locked pytest -q); then
               echo "::error::Tests en échec dans ${dossier}"
               echec=1
             fi

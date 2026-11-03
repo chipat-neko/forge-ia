@@ -1,8 +1,10 @@
 name: Site
 
 # Les tests tournent sur chaque push vers main et sur chaque pull request.
-# Le déploiement sur GitHub Pages n'a lieu que pour un push vers main, une
-# fois les tests passés.
+# Pour un push vers main, une fois les tests passés, le site est construit
+# par un job sans aucun droit sur GitHub Pages, puis publié par un job qui ne
+# fait que ça : le seul à détenir pages:write et id-token:write, il n'installe
+# ni n'exécute aucun paquet npm.
 on:
   push:
     branches: [main]
@@ -15,11 +17,14 @@ jobs:
   tests:
     name: Tests du site
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: site
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -42,13 +47,43 @@ jobs:
           path: site/playwright-report/
           retention-days: 14
 
-  deploiement:
-    name: Déploiement sur GitHub Pages
+  construction:
+    name: Construction du site
     needs: tests
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: Installation
+        run: npm ci
+      # Sans FORGE_ESSAIS : les pages d'essai ne sont pas publiées.
+      - name: Construction du site
+        run: npm run build
+      - name: Dépôt du site construit pour la publication
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site/dist
+
+  deploiement:
+    name: Déploiement sur GitHub Pages
+    needs: construction
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
       pages: write
       id-token: write
     environment:
@@ -58,22 +93,6 @@ jobs:
       group: pages
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: site/package-lock.json
-      - name: Installation
-        run: npm ci
-        working-directory: site
-      # Sans FORGE_ESSAIS : les pages d'essai ne sont pas publiées.
-      - name: Construction du site
-        run: npm run build
-        working-directory: site
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: site/dist
       - name: Publication
         id: deploiement
         uses: actions/deploy-pages@v5

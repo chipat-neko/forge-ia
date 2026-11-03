@@ -1,4 +1,4 @@
-﻿"""Tokenizer BPE pédagogique : apprendre des fusions sur un corpus, puis découper un texte."""
+"""Tokenizer BPE pédagogique : apprendre des fusions sur un corpus, puis découper un texte."""
 
 from tokenizer_pedagogique.bpe import (
     Fusion,

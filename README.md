@@ -43,10 +43,15 @@ cd projets/1.3-tokenizer; uv run pytest
 
 ## Tests et publication
 
-À chaque envoi sur GitHub, GitHub Actions lance les tests du site (vitest et
-Playwright) et ceux des projets Python (sous Linux et sous Windows). Quand les
-tests du site passent sur la branche `main`, le site est publié sur
-GitHub Pages.
+GitHub Actions lance deux séries de tests :
+
+- **le site** (`.github/workflows/site.yml`) : vitest et Playwright, à chaque
+  envoi sur la branche `main` et à chaque pull request. Pour un envoi sur
+  `main`, quand ces tests passent, le site est construit puis publié sur
+  GitHub Pages ;
+- **les projets Python** (`.github/workflows/python.yml`) : pytest dans chaque
+  projet, sous Linux et sous Windows, seulement quand un envoi ou une pull
+  request modifie `projets/`, `notebooks/` ou ce workflow lui-même.
 
 ## Licences
 
