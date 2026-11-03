@@ -8,6 +8,9 @@ l'évaluer. Il donne les durées et les chiffres mesurés, et il dit sans fard *
 d'une heure de ton IA sait faire et ce qu'elle ne sait pas faire**. C'est une répétition générale : l'entraînement
 principal (étape suivante du plan) utilisera une bien plus grande taille et bien plus de données.
 
+Unités : dans tout ce document, « Mo » et « Go » valent 1 048 576 et 1 073 741 824 octets (comme l'Explorateur de
+Windows et les autres documents de ce dossier).
+
 ## En bref
 
 - **Le modèle :** « mini », 23 204 736 paramètres (23,2 millions), dimension 384, 6 couches,
@@ -15,10 +18,11 @@ principal (étape suivante du plan) utilisera une bien plus grande taille et bie
 - **Les données :** 1 000 Mo de texte (75 % de français du web, 10 % de Wikipédia, 15 % de code Python),
   soit 239 242 872 jetons d'entraînement et 1 206 420 de validation. Téléchargées en 127 s, encodées en 33 s.
 - **L'entraînement :** 6 370 pas de 131 072 jetons, soit 834 928 640 jetons lus (3,5 fois les données),
-  en **60 min 17 s** sur la RTX 5070 Ti, à 230 815 jetons par seconde en moyenne
+  en **60 min 17 s** de boucle sur la RTX 5070 Ti (60 min 28 s du lancement à la dernière sauvegarde), à 230 815 jetons par seconde en moyenne
   (mesuré avant : 231 934, un écart de −0,5 %).
-- **La courbe :** la perte de validation passe de 10,4 (le hasard) à 3,455 d'après le journal
-  de l'entraînement (3,428 à l'évaluation finale, sur plus de morceaux).
+- **La courbe :** la perte d'entraînement part de 10,477 au pas 1, le niveau du hasard (ln 32 768 = 10,4) ; la perte de
+  validation, mesurée pour la première fois au pas 100, y est à 6,30 et finit à 3,455 d'après le
+  journal de l'entraînement (3,428 à l'évaluation finale, sur plus de morceaux).
 - **L'évaluation :** perplexité **30,8**, **1,133 bit par octet**. Aux QCM
   français : HellaSwag 27,2 % contre 25,0 % au hasard (**au-dessus du hasard**, de peu),
   ARC-Challenge 23,6 % contre 25,0 % (**pas différent du hasard**).
@@ -79,12 +83,12 @@ d'apprendre la langue (on le voit déjà un peu ici, plus bas). Il faut donc au 
 répartis 750 Mo de web français, 100 Mo de Wikipédia, 150 Mo de code Python.
 
 **Téléchargement** (`python -m forge donnees --octets 1000M --dossier court`) : 127 s, soit 7,9 Mo de texte
-par seconde (0,13 s par Mo ; l'estimation de 0,37 s par Mo faite plus tôt était près de trois fois trop prudente).
+par seconde (0,13 s par Mo).
 724 070 documents lus (215 761 de web, 5 322 de Wikipédia, 502 987 de code), 11 fragments, 353 Mo une fois
 compressés (gzip) sur le disque.
 
-**Encodage** (`python -m forge encoder --donnees court`) : 33 s, soit 30,0 Mo de texte par seconde, avec 14 processus
-en parallèle. Résultat : **239 242 872 jetons d'entraînement et 1 206 420 de validation**, 4,37 octets par jeton.
+**Encodage** (`python -m forge encoder --donnees court`) : 33 s, soit 30,0 Mo de texte par seconde, avec 11 processus
+en parallèle (un par fragment ; `psutil` a compté 14 processus descendants en tout, lanceur et processus d'aide compris). Résultat : **239 242 872 jetons d'entraînement et 1 206 420 de validation**, 4,37 octets par jeton.
 Chaque jeton est donc lu 3,49 fois pendant l'entraînement (au plus 4 : respecté).
 Charge relevée avec `psutil` pendant l'encodage (un relevé toutes les 3 s) : **les 16 cœurs logiques étaient
 tous au-dessus de 50 %** de la 6ᵉ à la 15ᵉ seconde (moyenne de 81 % à 87 %), 15 sur 16 jusqu'à la 24ᵉ seconde, puis la
@@ -113,7 +117,7 @@ L'entraînement a tourné détaché de la fenêtre de commande, du début à la 
 
 | | |
 | --- | --- |
-| Début | 14:41:22 |
+| Début (lancement du programme) | 14:41:22 |
 | Dernière sauvegarde (fin) | 15:41:50 |
 | Durée de la boucle (journal) | 3 617,3 s, soit 60 min 17 s |
 | Pas | 6 370 |
@@ -121,22 +125,26 @@ L'entraînement a tourné détaché de la fenêtre de commande, du début à la 
 | Débit moyen sur toute la durée | 230 815 jetons par seconde |
 | Débit affiché pas à pas (pas 101 à 6 370) | de 225 838 à 238 266, moyenne 234 138 |
 | Débit mesuré avant | 231 934 jetons par seconde (écart de −0,5 %) |
-| Carte graphique pendant l'entraînement | 90 à 93 % d'utilisation, 7,2 Go de mémoire, 232 W |
+| Carte graphique pendant l'entraînement | 90 à 93 % d'utilisation, 7,0 Go de mémoire, 232 W |
 | Processeur pendant l'entraînement | environ un cœur de calcul sur 16, qui pilote la carte (le travail est sur la carte) |
 | Validations | 64 (tous les 100 pas, plus la fin) |
-| Sauvegardes | pas 1 589, 3 174, 4 766, 6 352 et 6 370 ; il reste `etape-0006352.pt`, `etape-0006370.pt` (278,5 Mo chacune) et `meilleur.pt` (92,8 Mo, pas 6 300) |
+| Sauvegardes | pas 1 589, 3 174, 4 766, 6 352 et 6 370 ; il reste `etape-0006352.pt`, `etape-0006370.pt` (265,6 Mo chacune) et `meilleur.pt` (88,5 Mo, pas 6 300) |
+
+Du lancement à la dernière sauvegarde, il s'est écoulé 60 min 28 s ; la boucle, elle, a chronométré 60 min 17 s. Les 11 s
+d'écart sont le démarrage (chargement de PyTorch, des données et du modèle) avant le premier pas, et l'écriture de la dernière sauvegarde.
 
 ### La courbe
 
 La perte est en nats par jeton (un modèle qui devine au hasard parmi 32 768 jetons est à ln 32 768 = 10,397).
-La perte de validation du journal est mesurée tous les 100 pas sur 64 morceaux de validation (32 768 jetons) :
-un pas sur dix n'en a donc pas de mesure exacte, et la ligne de chaque dixième prend le pas de validation
-le plus proche. La perte d'entraînement d'un seul pas bouge beaucoup d'un pas à l'autre ; on donne la moyenne
-des 20 derniers pas.
+La perte de validation du journal est mesurée tous les 100 pas sur 64 morceaux de validation (32 768 jetons). Les
+dixièmes de l'entraînement (pas 637, 1 274, 1 911…) ne tombent pas sur un multiple de 100 : chaque ligne du tableau
+prend donc le pas de validation le plus proche (600, 1 300, 1 900…), et la colonne « Pas » le dit. La perte
+d'entraînement d'un seul pas bouge beaucoup d'un pas à l'autre ; on donne la moyenne des 20 derniers pas (sauf
+pour la ligne « début », qui est le pas 1 seul).
 
 | Avancement | Pas | Jetons vus | Taux d'apprentissage | Perte d'entraînement (moyenne des 20 derniers pas) | Perte de validation | Temps écoulé |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| début | 1 | 131 072 | 1,0 × 10⁻⁵ | 10,477 | pas mesurée | 2 s |
+| début (pas 1 seul) | 1 | 131 072 | 1,0 × 10⁻⁵ | 10,477 | pas mesurée | 2 s |
 | 10 % | 600 | 78 643 200 | 9,86 × 10⁻⁴ | 4,065 | 4,210 | 5 min 41 s |
 | 20 % | 1 300 | 170 393 600 | 9,21 × 10⁻⁴ | 3,669 | 3,842 | 12 min 18 s |
 | 30 % | 1 900 | 249 036 800 | 8,29 × 10⁻⁴ | 3,543 | 3,729 | 17 min 58 s |
@@ -148,16 +156,21 @@ des 20 derniers pas.
 | 90 % | 5 700 | 747 110 400 | 1,25 × 10⁻⁴ | 3,215 | 3,466 | 53 min 55 s |
 | 100 % | 6 370 | 834 928 640 | 1,00 × 10⁻⁴ | 3,229 | 3,455 | 60 min 17 s |
 
-- **Les 10 premiers pour cent font l'essentiel du chemin** : de 10,4 (le hasard) à 4,2 en validation. Dès le pas 100
-  (13 millions de jetons), la validation est à 6,299.
+- **Les 10 premiers pour cent font l'essentiel du chemin** : la perte d'entraînement tombe de 10,477 au pas 1 (le hasard) à
+  4,065 à 10 %, et la validation, mesurée pour la première fois au pas 100 (13 millions de jetons) à
+  6,299, est à 4,210 au pas 600.
 - **Puis la progression ralentit** : de 70 % à 100 % de l'entraînement, la validation ne gagne que
-  0,055 nat. Le taux d'apprentissage a presque fini de redescendre, et un modèle de 23 millions de
-  paramètres a une capacité limitée : on gagne peu à relire encore les mêmes textes.
+  0,055 nat, alors que le taux d'apprentissage descend encore de 2,8 × 10⁻⁴ à
+  1,0 × 10⁻⁴. Un modèle de 23 millions de paramètres a une capacité limitée : relire les mêmes textes lui
+  apporte de moins en moins.
 - **La perte de validation baisse jusqu'au dernier pas** (meilleure valeur du journal : 3,454 au pas 6 300,
   3,455 au pas 6 370 : la même, au bruit près), le taux d'apprentissage descendant jusqu'au dernier pas.
 - **L'écart entre l'entraînement et la validation grandit un peu** : de 0,145 à 10 % de l'entraînement
-  à 0,226 à la fin (en nats). Les textes sont lus 3,5 fois : c'est le premier signe, léger, d'un
-  apprentissage par cœur. Avec plus de lectures, il s'aggraverait ; c'est la raison de la règle des 4 lectures.
+  à 0,226 à la fin (en nats). Les textes sont lus 3,5 fois : c'est sans doute le premier signe, léger, d'un
+  apprentissage par cœur. Mais l'écart n'est pas nul avant la fin de la première lecture (pas 1 825), quand aucun texte n'a
+  encore été relu : il est déjà de l'ordre de 0,1 à 0,17 entre les pas 300 et 1 800. Une partie de l'écart ne vient donc pas de
+  la mémorisation (la validation porte sur d'autres documents, et sur 64 morceaux seulement). Avec plus de lectures, la part de
+  mémorisation s'aggraverait ; c'est la raison de la règle des 4 lectures.
 
 ## 5. L'évaluation
 
@@ -173,8 +186,8 @@ des 20 derniers pas.
 
 La perte de l'évaluation (3,428) diffère un peu de la dernière valeur du journal (3,455) : ce ne sont pas
 les mêmes morceaux (1 024 ici, 64 dans la boucle). L'évaluation, sur 16 fois plus de jetons, est la plus
-fiable. Ces chiffres se comparent à ceux de nos autres modèles sur les mêmes données, pas à ceux de modèles
-publics : autres textes, autre tokenizer. Pour se faire une idée des bits par octet : 8 pour un texte
+fiable. Ces chiffres sont un point de repère pour les modèles plus grands qui suivent, mesurés de la même façon ;
+ils ne se comparent pas à ceux de modèles publics : autres textes, autre tokenizer. Pour se faire une idée des bits par octet : 8 pour un texte
 non compressé, environ 2,8 pour ces mêmes textes une fois compressés en gzip (353 Mo pour 1 000 Mo, JSON compris : un ordre
 de grandeur), 1,13 pour ton IA.
 
@@ -197,7 +210,7 @@ longueur des réponses) au hasard, avec la marge d'un résultat qui ne devrait q
 - **ARC-Challenge** : 23,6 % contre 25,0 % : **pas différent du hasard**. L'exactitude brute (17,5 %) est
   même sous le hasard, sans doute parce que la somme des log-vraisemblances favorise les réponses courtes ;
   la version normalisée corrige cela et retombe dans la marge.
-- **Mesure maison** : comparable à nos autres modèles et au hasard, pas aux scores publiés de FrenchBench
+- **Mesure maison** : comparable aux modèles plus grands qui suivent et au hasard, pas aux scores publiés de FrenchBench
   (gabarit des questions, jeton de début et normalisation par octets sont les nôtres).
 
 ## 6. Les échantillons
@@ -284,10 +297,11 @@ def moyenne(valeurs):
 
 Ce qu'on y voit :
 
-- **De la langue, pas du savoir.** Les phrases ont une grammaire française presque toujours correcte, la bonne
-  ponctuation (apostrophes typographiques comprises) et le ton du genre demandé : récit, presse
-  (« samedi 22 janvier », « le gouvernement a annoncé »), message de forum (« Bonjour, je voudrais savoir
-  comment… »), recette (four, poêle, crème fraîche).
+- **De la langue, pas du savoir.** Les phrases sont souvent bien formées (accords, ponctuation, apostrophes) et ont
+  le ton du genre demandé : récit, presse (« samedi 22 janvier », « le gouvernement a annoncé »), message de forum
+  (« Bonjour, je voudrais savoir comment… »), recette (four, poêle, crème fraîche). Elles ne sont pas toujours
+  correctes : « il était tombé en état », « la faire cuire » pour un gâteau, « Je suis désolé que le site… ne sera pas
+  en mesure » (l'indicatif là où il faudrait le subjonctif).
 - **Mais le fond est faux ou vide.** « La capitale de la France est la ville de la capitale » (pas de Paris) ;
   la recette dit « mettre au four au four » et finit par « Il faut le laver » ; la photosynthèse devient une boucle sur « la fonction de
   l'individu » ; les faits de presse sont inventés.
@@ -307,9 +321,9 @@ paramètres et ont lu des centaines ou des milliers de fois plus de texte. Ton I
 
 **Ce que cette version courte sait faire**
 
-- Écrire des phrases françaises plausibles, avec la bonne ponctuation, dans le style du web, de la presse ou d'un
+- Écrire des phrases françaises plausibles et souvent bien formées, avec la ponctuation usuelle, dans le style du web, de la presse ou d'un
   forum, et des morceaux de code Python qui ont l'allure de code.
-- Prédire le mot suivant mieux qu'au hasard, et beaucoup mieux : une perplexité de 30,8 au lieu de 32 768.
+- Prédire le jeton suivant (un morceau de mot) bien mieux qu'au hasard : une perplexité de 30,8 au lieu de 32 768.
 - Prouver que **toute la chaîne fonctionne** : téléchargement, encodage en parallèle, entraînement d'une heure sans
   incident, sauvegardes, évaluation, rapport. C'est le but de cette tâche.
 
@@ -325,8 +339,8 @@ paramètres et ont lu des centaines ou des milliers de fois plus de texte. Ton I
 - **Réussir un QCM de culture ou de sciences.** HellaSwag : tout juste au-dessus du hasard ; ARC : au niveau du hasard.
 
 Deux réserves sur ces mesures : la mesure d'échantillons est un tirage (10 textes, une graine), et les QCM
-sont des traductions automatiques mesurées avec notre propre méthode. Ils servent à comparer nos modèles entre
-eux, pas à classer ton IA face à des modèles publics.
+sont des traductions automatiques mesurées avec notre propre méthode. Ils servent à comparer entre eux les modèles de
+la forge, pas à classer ton IA face à des modèles publics.
 
 **Et après ?** Ces chiffres sont la base de comparaison de la suite : les mêmes mesures, refaites sur le grand
 modèle et le grand corpus, diront ce que valent des heures d'entraînement de plus. Avec plus de paramètres et
@@ -338,7 +352,8 @@ la perte, dans HellaSwag et dans les échantillons.
 - **Dépôt :** `projets/forge/configs/mini.toml` (réglé) et ce document. Aucun poids ni aucune donnée dans git.
 - **Hors dépôt**, sous `D:\forge-ia-donnees` : les jetons (`jetons\court`, 458,6 Mo, gardés), l'entraînement
   (`entrainements\ton-ia-mini` : journal, sauvegardes, rapport d'évaluation `evaluation\etape-0006370\rapport.md` et
-  `rapport.json`, 620,7 Mo en tout) et les journaux d'écran (`journaux\`).
+  `rapport.json` ; 620,7 Mo en tout : 2 × 265,62 Mo de sauvegardes d'étape, 88,54 Mo pour `meilleur.pt`, 0,93 Mo de
+  journal et 0,01 Mo de rapports) et les journaux d'écran (`journaux\`).
 - **Textes bruts effacés** : `textes\court` (353 Mo), après avoir vérifié que `jetons\court\.complet` existait. Les
   jetons suffisent pour entraîner et évaluer ; pour les retrouver, relancer `python -m forge donnees --octets 1000M --dossier court` (même flux
   de textes, tant que les jeux de données de Hugging Face ne changent pas).
