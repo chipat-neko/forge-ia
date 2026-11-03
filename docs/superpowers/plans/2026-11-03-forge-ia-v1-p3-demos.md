@@ -122,14 +122,14 @@ Toutes les sources ont été lues le 03/11/2026. Les chiffres de matériel et de
 
 ## Écarts assumés avec la spécification
 
-- **Données versionnées** (en attente de la réponse de l'utilisateur, voir la question plus bas). La spécification dit que les données ne sont jamais versionnées. Pourtant `projets/mini-modele/donnees/prenoms.txt` (environ 100 Ko) entre dans git, comme le fichier du tokenizer au plan 2.
+- **Données versionnées** (choisi par l'utilisateur le 03/11/2026, voir la question plus bas). La spécification dit que les données ne sont jamais versionnées. Pourtant `projets/mini-modele/donnees/prenoms.txt` (environ 100 Ko) entre dans git, comme le fichier du tokenizer au plan 2.
   - Raison : le site statique doit servir ce fichier, et le télécharger à chaque construction rendrait la page dépendante de l'Insee.
   - Le script qui le produit et sa source restent dans le dépôt.
 - **Pas de page d'annexe publiée pour le calculateur.** Les annexes doivent d'abord être maquettées et validées (spécification, section 6). Le plan 5, qui écrit déjà l'annuaire et le glossaire, maquettera les annexes et y posera le calculateur. Ici, il vit sur sa page d'essai.
 
-## Question en attente
+## Question tranchée
 
-**Versionner la liste des prénoms ?** Ce plan est écrit avec la réponse recommandée (A). Si l'utilisateur choisit autrement, la tâche 2 change, et elle seule.
+**Versionner la liste des prénoms ?** L'utilisateur a choisi la réponse A le 03/11/2026 : `prenoms.txt` entre dans le dépôt. Les autres réponses restent notées pour mémoire.
 
 - **(A, recommandé)** Versionner `prenoms.txt`, environ 100 Ko, avec sa source et sa licence.
 - **(B)** Le télécharger dans l'intégration continue à chaque construction.
