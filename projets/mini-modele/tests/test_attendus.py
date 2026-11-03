@@ -10,8 +10,15 @@ import json
 import pathlib
 import re
 
-from mini_modele.attendus import CALCULS, calculer_attendus_calcul, calculer_attendus_donnees
+from mini_modele.attendus import (
+    CALCULS,
+    calculer_attendus_calcul,
+    calculer_attendus_donnees,
+    calculer_attendus_modele,
+)
 from mini_modele.calcul import empreinte_texte
+from mini_modele.donnees import donnees_par_defaut
+from mini_modele.modele import ConfigMini, nombre_parametres
 
 DOSSIER = pathlib.Path(__file__).resolve().parent
 REGENERER = "Régénère-les avec « uv run python -m mini_modele.attendus » (dans projets/mini-modele)."
@@ -24,6 +31,7 @@ def lire(nom: str):
 def test_attendus_a_jour():
     assert CALCULS["calcul"] is calculer_attendus_calcul
     assert CALCULS["donnees"] is calculer_attendus_donnees
+    assert CALCULS["modele"] is calculer_attendus_modele
     for nom, calculer in CALCULS.items():
         fichier = DOSSIER / f"attendus-{nom}.json"
         assert fichier.exists(), f"tests/attendus-{nom}.json est introuvable. {REGENERER}"
@@ -91,3 +99,29 @@ def test_attendus_donnees_au_complet():
     octets = (DOSSIER.parent / "donnees" / "prenoms.txt").read_bytes()
     assert a["nb_prenoms"] == octets.count(b"\n")
     assert a["empreinte_fichier"] == empreinte_texte(octets.decode("utf-8"))
+
+
+def test_attendus_modele_au_complet():
+    fichier = lire("modele")
+    # Une clé par partie : « modele » ici ; l'entraînement aura la sienne à côté.
+    assert "modele" in fichier
+    a = fichier["modele"]
+    assert set(a) == {
+        "config", "graine", "nb_parametres", "init_empreinte", "init_premiers", "lot", "perte_lot",
+        "pertes_positions_empreinte", "gradient_empreinte", "gradient_premiers", "perte_validation_256", "generes",
+    }
+    d = donnees_par_defaut()
+    v = len(d.vocabulaire)
+    # La configuration est écrite comme en Python (taille_vocabulaire, largeur_mlp) : le TypeScript émet les mêmes clés.
+    assert a["config"] == {"taille_vocabulaire": v, "dim": 16, "tetes": 4, "contexte": 16, "largeur_mlp": 64}
+    assert a["graine"] == 1234
+    assert a["nb_parametres"] == nombre_parametres(ConfigMini(taille_vocabulaire=v)) == 32 * v + 3328
+    assert a["lot"] == [list(s) for s in d.entrainement[:8]]
+    assert len(a["init_premiers"]) == len(a["gradient_premiers"]) == 8
+    motifs = a["init_premiers"] + a["gradient_premiers"] + [a["perte_lot"], a["perte_validation_256"]]
+    assert all(re.fullmatch(r"[0-9a-f]{16}", m) for m in motifs)
+    assert re.fullmatch(r"[0-9a-f]{8}", a["init_empreinte"])
+    assert re.fullmatch(r"[0-9a-f]{8}", a["gradient_empreinte"])
+    assert re.fullmatch(r"[0-9a-f]{8}", a["pertes_positions_empreinte"])
+    assert len(a["generes"]) == 8
+    assert all(isinstance(p, str) and len(p) <= 15 and set(p) <= set(d.vocabulaire[1:]) for p in a["generes"])

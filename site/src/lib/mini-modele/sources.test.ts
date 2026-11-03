@@ -25,12 +25,14 @@ const INTERDITS =
 const VERIFIES = ['calcul', 'donnees', 'attention', 'modele', 'entrainement', 'exemple-attention'];
 // Les fichiers vérifiés qui doivent déjà exister : sans cette liste, un fichier
 // mal nommé ne serait jamais lu. Elle grandit à chaque tâche du plan 3.
-const OBLIGATOIRES = ['calcul', 'donnees'];
+const OBLIGATOIRES = ['calcul', 'donnees', 'attention', 'modele'];
 // Les seules fonctions de Math permises. Les autres (max, min, fround, cbrt…)
 // arrondissent autrement que le Python, ou traitent −0 autrement.
 const MATH_PERMIS = new Set(['sqrt', 'floor', 'imul']);
 
 const CALCUL_PY = new URL('../../../../projets/mini-modele/mini_modele/calcul.py', import.meta.url);
+const ATTENTION_PY = new URL('../../../../projets/mini-modele/mini_modele/attention.py', import.meta.url);
+const MODELE_PY = new URL('../../../../projets/mini-modele/mini_modele/modele.py', import.meta.url);
 
 function chemin(nom: string): URL {
   return new URL(`./${nom}.ts`, import.meta.url);
@@ -121,6 +123,56 @@ describe('régions de calcul.py, pour le chapitre 1.5', () => {
     expect(region.startsWith('def log(')).toBe(true);
     expect(region).toContain('m, e = math.frexp(x)');
     expect(region.trimEnd().endsWith('return e * LN2_HAUT + (2.0 * s * q + e * LN2_BAS)')).toBe(true);
+    expect(region).not.toMatch(/region:|fin:/);
+  });
+});
+
+describe('régions de attention.py, pour les chapitres', () => {
+  const source = (): string => readFileSync(ATTENTION_PY, 'utf8');
+
+  it('extrait la région scores', () => {
+    const region = extraireRegion(source(), 'scores', 'attention.py');
+    expect(region.startsWith('def scores_attention(')).toBe(true);
+    expect(region.trimEnd().endsWith('return [produit_scalaire(requete, cle) * echelle for cle in cles]')).toBe(true);
+    expect(region).not.toMatch(/region:|fin:/);
+  });
+
+  it('extrait la région softmax', () => {
+    const region = extraireRegion(source(), 'softmax', 'attention.py');
+    expect(region.startsWith('def softmax(')).toBe(true);
+    expect(region).toContain('m = maximum(scores)');
+    expect(region).toContain('e = [exp(s - m) for s in scores]');
+    expect(region.trimEnd().endsWith('return [v / total for v in e]')).toBe(true);
+    expect(region).not.toMatch(/region:|fin:/);
+  });
+
+  it('extrait la région melange', () => {
+    const region = extraireRegion(source(), 'melange', 'attention.py');
+    expect(region.startsWith('def melanger_valeurs(')).toBe(true);
+    expect(region).toContain('s += poids[j] * valeurs[j][d]');
+    expect(region.trimEnd().endsWith('return sortie')).toBe(true);
+    expect(region).not.toMatch(/region:|fin:/);
+  });
+});
+
+describe('régions de modele.py, pour le chapitre 1.5', () => {
+  const source = (): string => readFileSync(MODELE_PY, 'utf8');
+
+  it('extrait la région avant', () => {
+    const region = extraireRegion(source(), 'avant', 'modele.py');
+    expect(region.startsWith('def avant(')).toBe(true);
+    expect(region).toContain('a, inv_a = norme(h0)');
+    expect(region).toContain('p = poids_attention(');
+    expect(region).toContain('logits = produit(f, params, places["tete_de_lecture"])');
+    expect(region.trimEnd().endsWith('return passe')).toBe(true);
+    expect(region).not.toMatch(/region:|fin:/);
+  });
+
+  it('extrait la région perte', () => {
+    const region = extraireRegion(source(), 'perte', 'modele.py');
+    expect(region.startsWith('def entropie_croisee(')).toBe(true);
+    expect(region).toContain('m = maximum(logits)');
+    expect(region.trimEnd().endsWith('return log(somme(e)) - (logits[cible] - m)')).toBe(true);
     expect(region).not.toMatch(/region:|fin:/);
   });
 });

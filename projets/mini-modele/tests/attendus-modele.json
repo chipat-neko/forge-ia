@@ -1,0 +1,134 @@
+{
+ "modele": {
+  "config": {
+   "taille_vocabulaire": 40,
+   "dim": 16,
+   "tetes": 4,
+   "contexte": 16,
+   "largeur_mlp": 64
+  },
+  "graine": 1234,
+  "nb_parametres": 4608,
+  "init_empreinte": "cb731b4f",
+  "init_premiers": [
+   "bfbc3f1bc7d70a3e",
+   "3f710d53c147ae15",
+   "bfbb6317a9c28f5c",
+   "bfa6d8efca8f5c29",
+   "bf8ca88d2d70a3d7",
+   "3f989c82ef0a3d71",
+   "bfac8a2fd828f5c3",
+   "bfba088385ae147b"
+  ],
+  "lot": [
+   [
+    0,
+    6,
+    14,
+    14,
+    2,
+    15,
+    22,
+    6,
+    13,
+    0
+   ],
+   [
+    0,
+    4,
+    9,
+    19,
+    10,
+    20,
+    21,
+    0
+   ],
+   [
+    0,
+    7,
+    32,
+    13,
+    10,
+    4,
+    10,
+    2,
+    0
+   ],
+   [
+    0,
+    2,
+    19,
+    10,
+    20,
+    21,
+    10,
+    5,
+    6,
+    0
+   ],
+   [
+    0,
+    11,
+    2,
+    5,
+    6,
+    15,
+    0
+   ],
+   [
+    0,
+    11,
+    2,
+    15,
+    15,
+    2,
+    9,
+    0
+   ],
+   [
+    0,
+    24,
+    2,
+    9,
+    10,
+    3,
+    0
+   ],
+   [
+    0,
+    11,
+    16,
+    7,
+    7,
+    19,
+    6,
+    26,
+    0
+   ]
+  ],
+  "perte_lot": "400d444d09efe73a",
+  "pertes_positions_empreinte": "aadc214e",
+  "gradient_empreinte": "40e589a1",
+  "gradient_premiers": [
+   "bf9254912d529b97",
+   "3f71bfedaba4efb0",
+   "3fa66edef1c51419",
+   "bf9ede64e1c717d5",
+   "bf42d10368d97b88",
+   "bfa2c506f0d9e778",
+   "bf762c1321595e74",
+   "bf91acacd9c81c85"
+  ],
+  "perte_validation_256": "400d39161fba8940",
+  "generes": [
+   "xèhàlàhuïfîadâu",
+   "rhqôohnkç",
+   "üdèöààîëaûuüüüm",
+   "üëïkîèço-sïüiüà",
+   "màqèk",
+   "njüryxü-îëkà",
+   "",
+   "yà-eûlipgyuiëzq"
+  ]
+ }
+}

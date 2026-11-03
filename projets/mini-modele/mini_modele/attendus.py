@@ -14,6 +14,7 @@ Chaque tâche qui ajoute un module ajoute ici son `calculer_attendus_<nom>()`,
 et l'inscrit dans CALCULS.
 """
 
+import dataclasses
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -35,7 +36,17 @@ from mini_modele.calcul import (
     log,
     vers_hex,
 )
-from mini_modele.donnees import FICHIER_PRENOMS, decoder, preparer, prenoms_du_texte
+from mini_modele.donnees import FICHIER_PRENOMS, decoder, donnees_par_defaut, preparer, prenoms_du_texte
+from mini_modele.modele import (
+    ConfigMini,
+    avant,
+    entropie_croisee,
+    generer,
+    initialiser,
+    nombre_parametres,
+    perte,
+    perte_et_gradient,
+)
 
 DOSSIER_TESTS = Path(__file__).resolve().parent.parent / "tests"
 
@@ -137,10 +148,60 @@ def calculer_attendus_donnees() -> dict:
     }
 
 
+# Le mini-modèle : la graine des poids (celle de ton IA), et celle des prénoms
+# inventés au départ (graine + 2 + pas, au pas 0, comme l'entraînement).
+GRAINE_MODELE = 1234
+GRAINE_GENERES = 1236
+
+
+def calculer_attendus_du_modele() -> dict:
+    """La clé « modele » : l'initialisation, la perte et le gradient d'un lot, la validation et la génération."""
+    donnees = donnees_par_defaut()
+    c = ConfigMini(taille_vocabulaire=len(donnees.vocabulaire))
+    params = initialiser(c, Hasard(GRAINE_MODELE))
+    lot = donnees.entrainement[:8]
+    gradient = [0.0] * len(params)
+    perte_lot = perte_et_gradient(c, params, lot, gradient)
+    generes = generer(c, params, Hasard(GRAINE_GENERES), 8)
+    # La perte de chaque position du lot, dans l'ordre : un ulp d'écart sur l'une d'elles
+    # disparaît souvent dans la moyenne, mais pas dans cette empreinte.
+    pertes_positions = []
+    for seq in lot:
+        passe = avant(c, params, seq[:-1])
+        for t in range(len(seq) - 1):
+            pertes_positions.append(entropie_croisee(passe[t].logits, seq[t + 1]))
+    return {
+        # Les noms des champs sont ceux du Python (taille_vocabulaire, largeur_mlp) : le TypeScript émet les mêmes.
+        "config": dataclasses.asdict(c),
+        "graine": GRAINE_MODELE,
+        "nb_parametres": nombre_parametres(c),
+        "init_empreinte": empreinte(params),
+        "init_premiers": [vers_hex(p) for p in params[:8]],
+        "lot": [list(s) for s in lot],
+        "perte_lot": vers_hex(perte_lot),
+        "pertes_positions_empreinte": empreinte(pertes_positions),
+        # Tout le gradient, bit pour bit, dans l'empreinte : un seul écart d'un ulp la change.
+        "gradient_empreinte": empreinte(gradient),
+        "gradient_premiers": [vers_hex(g) for g in gradient[:8]],
+        "perte_validation_256": vers_hex(perte(c, params, donnees.validation[:256])),
+        "generes": [decoder(p, donnees.vocabulaire) for p in generes],
+    }
+
+
+def calculer_attendus_modele() -> dict:
+    """Les attendus du mini-modèle (tests/attendus-modele.json), une clé par partie.
+
+    « modele » : la passe avant, la perte et la passe arrière. L'entraînement
+    aura sa propre clé, à côté, dans le même fichier.
+    """
+    return {"modele": calculer_attendus_du_modele()}
+
+
 # Chaque fichier tests/attendus-<nom>.json et la fonction qui le calcule.
 CALCULS: dict[str, Callable[[], dict]] = {
     "calcul": calculer_attendus_calcul,
     "donnees": calculer_attendus_donnees,
+    "modele": calculer_attendus_modele,
 }
 
 

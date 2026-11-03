@@ -6,7 +6,7 @@
 // partagés ici à la main, avec le résultat écrit en toutes lettres.
 
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import attendus from '../../../../projets/mini-modele/tests/attendus-donnees.json';
 import prenomsBrut from '../../../../projets/mini-modele/donnees/prenoms.txt?raw';
 import { comparerPointsDeCode } from '../points-de-code';
@@ -20,6 +20,7 @@ import {
   GRAINE_PARTAGE,
   preparer,
   prenomsDuTexte,
+  tailleVocabulaire,
   vocabulaireDe,
   type Donnees,
 } from './donnees';
@@ -32,7 +33,7 @@ const VINGT = ['an', 'bo', 'ci', 'du', 'el', 'fa', 'gu', 'hi', 'in', 'jo', 'ka',
 const VINGT_VALIDATION = ['bo', 'ti'];
 const VINGT_ENTRAINEMENT = ['qu', 'an', 'ka', 'ro', 'ma', 'el', 'ci', 'gu', 'ol', 'du', 'ne', 'in', 'fa', 'lu', 'su', 'jo', 'pa', 'hi'];
 
-function decodes(d: Donnees, suites: number[][]): string[] {
+function decodes(d: Donnees, suites: readonly (readonly number[])[]): string[] {
   return suites.map((s) => decoder(s, d.vocabulaire));
 }
 
@@ -137,7 +138,7 @@ describe('vocabulaireDe', () => {
     expect(vocabulaireDe([])).toBe('.');
     expect(vocabulaireDe(['a-b', 'ab'])).toBe('.-ab');
     expect(vocabulaireDe(['œ', 'ÿ', 'z'])).toBe('.zÿœ');
-    expect(vocabulaireDe(['\u{1F642}', '�'])).toBe('.�\u{1F642}');
+    expect(vocabulaireDe(['\u{1F642}', '\uFFFD'])).toBe('.\uFFFD\u{1F642}');
   });
 
   it('refuse le bord dans un prénom', () => {
@@ -231,5 +232,49 @@ describe('donneesParDefaut', () => {
     expect(vus.size).toBe(Array.from(d.vocabulaire).length);
     expect(Math.max(...vus)).toBe(Array.from(d.vocabulaire).length - 1);
     expect(d.validation.length).toBe(Math.floor(chargerPrenoms().length / 10));
+  });
+});
+
+describe('tailleVocabulaire', () => {
+  it('compte les points de code, comme len() en Python', () => {
+    expect(tailleVocabulaire('.ab')).toBe(3);
+    expect(tailleVocabulaire('.a\u{1F642}')).toBe(3);
+    expect('.a\u{1F642}'.length).toBe(4);
+  });
+
+  it('pour les prénoms, V vaut aussi la longueur du texte du vocabulaire', () => {
+    // Tous les caractères des prénoms sont sous U+FFFF : une unité UTF-16 chacun. Le modèle lit V
+    // avec tailleVocabulaire, et ce test dit que les deux façons de compter tombent d'accord ici.
+    const d = donneesParDefaut();
+    expect(d.vocabulaire.length).toBe(Array.from(d.vocabulaire).length);
+    expect(tailleVocabulaire(d.vocabulaire)).toBe(d.vocabulaire.length);
+    expect(tailleVocabulaire(d.vocabulaire)).toBe(Array.from(attendus.vocabulaire).length);
+  });
+});
+
+describe('les données partagées ne changent pas', () => {
+  it('les suites sont figées : un mélange sur place lève une erreur', () => {
+    const d = donneesParDefaut();
+    expect(Object.isFrozen(d.entrainement) && Object.isFrozen(d.validation)).toBe(true);
+    expect(Object.isFrozen(d.entrainement[0]) && Object.isFrozen(d.validation[0])).toBe(true);
+    expect(() => (d.entrainement as number[][]).reverse()).toThrow(TypeError);
+    expect(() => {
+      (d.validation[0] as number[])[0] = 5;
+    }).toThrow(TypeError);
+  });
+
+  it('et leurs types sont en lecture seule : les mélanger sur place ne compile pas', () => {
+    const d = donneesParDefaut();
+    expectTypeOf(d.entrainement).toEqualTypeOf<readonly (readonly number[])[]>();
+    expectTypeOf(d.validation).toEqualTypeOf<readonly (readonly number[])[]>();
+    expectTypeOf(d.connus).toEqualTypeOf<ReadonlySet<string>>();
+    // Jamais appelée : seul le contrôle des types (astro check) la lit.
+    const melangerSurPlace = (): void => {
+      // @ts-expect-error : les suites sont partagées (la valeur par défaut est en cache), on mélange des indices
+      new Hasard(1).melanger(d.entrainement);
+      // @ts-expect-error : idem pour la validation
+      d.validation.reverse();
+    };
+    expect(typeof melangerSurPlace).toBe('function');
   });
 });

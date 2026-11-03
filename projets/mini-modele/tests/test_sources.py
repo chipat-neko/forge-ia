@@ -28,7 +28,7 @@ INTERDITS = re.compile(
 VERIFIES = ["calcul", "donnees", "attention", "modele", "entrainement", "exemple_attention"]
 # Les fichiers vérifiés qui doivent déjà exister : sans cette liste, un fichier
 # mal nommé ne serait jamais lu. Elle grandit à chaque tâche du plan 3.
-OBLIGATOIRES = ["calcul", "donnees"]
+OBLIGATOIRES = ["calcul", "donnees", "attention", "modele"]
 # Les seuls noms du module math permis. Toute autre fonction de math (atan,
 # hypot, prod, sumprod, fma…) peut arrondir autrement que le TypeScript.
 MATH_PERMIS = {"sqrt", "floor", "ldexp", "frexp", "inf", "nan", "isnan", "isinf", "isfinite"}

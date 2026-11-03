@@ -299,7 +299,14 @@ export class Hasard {
     return (s - 6.0) * ecartType;
   }
 
-  /** Mélange la liste (tableau ou tableau typé) sur place : Fisher-Yates, de la fin vers le début. */
+  /**
+   * Mélange la liste (tableau ou tableau typé) sur place : Fisher-Yates, de la fin vers le début.
+   *
+   * Un tableau en lecture seule est refusé dès le typage : les suites des prénoms
+   * sont partagées (donnees.ts), on mélange une copie ou une liste d'indices.
+   */
+  melanger<T>(liste: T[]): void;
+  melanger(liste: ArrayBufferView & { length: number; [i: number]: number }): void;
   melanger<T>(liste: { length: number; [i: number]: T }): void {
     for (let i = liste.length - 1; i > 0; i--) {
       const j = this.entier(i + 1);

@@ -17,13 +17,17 @@ import { Hasard } from './calcul';
 export const BORD = '.'; // le numéro 0 : le début et la fin d'un prénom
 export const GRAINE_PARTAGE = 20261103; // la graine du mélange, la même pour tous les réglages
 
-/** Les prénoms prêts pour le mini-modèle. */
+/**
+ * Les prénoms prêts pour le mini-modèle. Figés, comme les tuples du Python :
+ * donneesParDefaut est en cache et partagée, donc on mélange une copie ou des
+ * indices, jamais les suites elles-mêmes (le typage le refuse, et le gel aussi).
+ */
 export interface Donnees {
-  vocabulaire: string;
-  entrainement: number[][];
-  validation: number[][];
+  readonly vocabulaire: string;
+  readonly entrainement: readonly (readonly number[])[];
+  readonly validation: readonly (readonly number[])[];
   /** Tous les prénoms de la liste : sert à marquer « existe déjà ». */
-  connus: Set<string>;
+  readonly connus: ReadonlySet<string>;
 }
 
 /** Un prénom par ligne, coupée au « \n » ; le saut de ligne final ne compte pas. */
@@ -38,6 +42,11 @@ export function prenomsDuTexte(texte: string): string[] {
 /** Les prénoms du fichier donnees/prenoms.txt, lu tel quel (?raw : sans aucune traduction des fins de ligne). */
 export function chargerPrenoms(): string[] {
   return prenomsDuTexte(prenomsBrut);
+}
+
+/** La taille du vocabulaire, V : ses caractères comptés par point de code, comme len() en Python. */
+export function tailleVocabulaire(vocabulaire: string): number {
+  return Array.from(vocabulaire).length;
 }
 
 /** BORD, puis les caractères distincts des prénoms, triés par point de code. */
@@ -102,13 +111,13 @@ export function preparer(prenoms: readonly string[]): Donnees {
   const melanges = [...prenoms];
   new Hasard(GRAINE_PARTAGE).melanger(melanges);
   const nbValidation = Math.floor(melanges.length / 10);
-  const codes = melanges.map((prenom) => encoder(prenom, vocabulaire));
-  return {
+  const codes = melanges.map((prenom) => Object.freeze(encoder(prenom, vocabulaire)));
+  return Object.freeze({
     vocabulaire,
-    entrainement: codes.slice(nbValidation),
-    validation: codes.slice(0, nbValidation),
+    entrainement: Object.freeze(codes.slice(nbValidation)),
+    validation: Object.freeze(codes.slice(0, nbValidation)),
     connus: new Set(melanges),
-  };
+  });
 }
 
 let parDefaut: Donnees | null = null;

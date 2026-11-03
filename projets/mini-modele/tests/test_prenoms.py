@@ -211,7 +211,7 @@ def noms_fabriques(n: int) -> list[str]:
 
 
 def test_lire_zip_lit_le_csv_de_l_archive(tmp_path):
-    url = fabriquer_zip(tmp_path, "﻿" + csv_insee([("ana", 600)]))  # même avec une marque d'ordre
+    url = fabriquer_zip(tmp_path, "\ufeff" + csv_insee([("ana", 600)]))  # même avec une marque d'ordre
     lignes = list(lire_zip(tmp_path / "prenoms-fabrique.zip"))
     assert url.startswith("file:///")
     assert [(l["PRENOM"], l["VALEUR"]) for l in lignes] == [("ANA", "595"), ("ANA", "5")]

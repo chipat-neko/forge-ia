@@ -79,7 +79,7 @@ def test_vocabulaire_de():
     assert vocabulaire_de(["a-b", "ab"]) == ".-ab"
     # Par point de code : ÿ (U+00FF) avant œ (U+0153), et les lettres de plus de 16 bits aussi.
     assert vocabulaire_de(["œ", "ÿ", "z"]) == ".zÿœ"
-    assert vocabulaire_de(["\U0001F642", "�"]) == ".�\U0001F642"
+    assert vocabulaire_de(["\U0001F642", "\uFFFD"]) == ".\uFFFD\U0001F642"
 
 
 def test_vocabulaire_de_refuse_le_bord_dans_un_prenom():

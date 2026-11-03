@@ -12,7 +12,7 @@ import { comparerPointsDeCode } from './points-de-code';
 
 describe('points-de-code.ts', () => {
   it('compare par point de code, pas par unité UTF-16', () => {
-    expect(['\u{1F642}', '�', 'é', 'e', 'z'].sort(comparerPointsDeCode)).toEqual(['e', 'z', 'é', '�', '\u{1F642}']);
+    expect(['\u{1F642}', '\uFFFD', 'é', 'e', 'z'].sort(comparerPointsDeCode)).toEqual(['e', 'z', 'é', '\uFFFD', '\u{1F642}']);
     expect(comparerPointsDeCode('a', 'ab')).toBeLessThan(0);
     expect(comparerPointsDeCode('ab', 'ab')).toBe(0);
   });
