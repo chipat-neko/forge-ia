@@ -1,0 +1,23 @@
+[project]
+name = "mini-modele"
+version = "0.1.0"
+description = "Le jumeau Python exact des démos du mini-modèle de La Forge IA."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mini_modele"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
