@@ -179,6 +179,9 @@ test('marge et labo : les autres vues du nombre de fusions le suivent', async ({
   await expect(page.locator('[data-test="fusions"]')).toHaveCount(1);
   const labo = page.locator('.labo');
   const nombreLabo = labo.getByRole('slider');
+  // Deux curseurs, deux noms : le lecteur d'écran sait lequel il règle.
+  await expect(nombreLabo).toHaveAccessibleName('Nombre de fusions apprises, échelle du labo');
+  await expect(page.getByRole('slider', { name: 'Nombre de fusions apprises', exact: true })).toHaveCount(1);
   // Avant le pari, le nombre du labo est figé, comme celui de l'atelier.
   await expect(nombreLabo).toHaveAttribute('aria-disabled', 'true');
   await page.locator('[data-pari="prediction"] [data-juste]').click();
@@ -204,6 +207,21 @@ test('marge et labo : les autres vues du nombre de fusions le suivent', async ({
   // Les sources du labo sont datées du jour de la vérification.
   expect(await labo.locator('.sources a').count()).toBeGreaterThanOrEqual(3);
   expect((await labo.locator('.sources').textContent()) ?? '').toContain('vérifiées le 2 novembre 2026');
+});
+
+test('lien d’évitement : Tab puis Entrée mène au contenu, après la barre du haut', async ({ page }) => {
+  await page.goto(PAGE);
+  await attendreHydratation(page);
+  await page.keyboard.press('Tab');
+  const lien = page.getByRole('link', { name: 'Aller au contenu' });
+  await expect(lien).toBeFocused();
+  await expect(lien).toBeInViewport();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/#contenu$/);
+  await expect(page.locator('main#contenu')).toHaveCount(1);
+  // La touche Tab suivante part du contenu : la barre du haut est sautée.
+  await page.keyboard.press('Tab');
+  expect(await page.evaluate(() => document.activeElement?.closest('main')?.id)).toBe('contenu');
 });
 
 test('progression gardée : après rechargement, tout reste acquis et l’atelier ouvert', async ({ page }) => {

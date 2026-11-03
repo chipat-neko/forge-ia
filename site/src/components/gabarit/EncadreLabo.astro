@@ -80,6 +80,13 @@ const memeDate = dates.length === 1;
     color: var(--papier);
   }
 
+  /* Le code en ligne garde son fond clair (gabarit du chapitre) : sans cette
+     règle, il prendrait le texte clair de l'encadré, de la couleur du fond. */
+  .labo :not(pre) > code {
+    color: var(--indigo);
+    background: var(--brume-claire);
+  }
+
   /* Sur le fond indigo, le contour de focus indigo serait invisible. */
   .labo :focus-visible {
     outline-color: var(--papier);

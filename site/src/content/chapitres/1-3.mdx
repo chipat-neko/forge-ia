@@ -179,10 +179,10 @@ Le mot n'apparaît jamais dans le texte d'apprentissage : aucune fusion ne le co
 Le cœur de l'algorithme tient en quelques lignes de Python. Une première fonction compte toutes les paires de symboles voisins :
 
 <CodeExplique fichier="projets/1.3-tokenizer/tokenizer_pedagogique/bpe.py" region="compter">
-  <li data-lignes="1">La fonction reçoit les mots du texte : chaque mot, écrit comme une suite de symboles, est associé à son nombre d'apparitions, par exemple `{('f', 'o', 'r', 'g', 'e'): 12, …}`.</li>
+  <li data-lignes="1">La fonction reçoit les mots du texte : chaque mot, écrit comme une suite de symboles, est associé à son nombre d'apparitions. Par exemple `{(' ', 'l', 'e', 's'): 8, …}` dit que le mot « les », avec l'espace qui le précède, revient 8 fois.</li>
   <li data-lignes="3">`Counter` compte les paires pour nous : une paire encore jamais vue part de zéro.</li>
-  <li data-lignes="6">`zip(symboles, symboles[1:])` donne chaque paire de voisins : (f, o), (o, r), (r, g)…</li>
-  <li data-lignes="4, 7">On ajoute la fréquence du mot : un mot vu 12 fois compte 12 fois.</li>
+  <li data-lignes="6">`zip(symboles, symboles[1:])` donne chaque paire de voisins : `(' ', 'l')`, `('l', 'e')` puis `('e', 's')`.</li>
+  <li data-lignes="4, 7">On ajoute la fréquence du mot : un mot vu 8 fois compte 8 fois.</li>
 </CodeExplique>
 
 <Pari

@@ -42,7 +42,7 @@
       min={0}
       max={NB_FUSIONS}
       initiale={FUSIONS_AU_DEPART}
-      etiquette="Nombre de fusions apprises"
+      etiquette="Nombre de fusions apprises, échelle du labo"
       {verrou}
     />
     {pluriel(k, 'fusion', 'fusions')}, soit <span class="calcule">{nombre.format(vocabulaire)}</span> morceaux.

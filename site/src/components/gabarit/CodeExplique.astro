@@ -22,6 +22,7 @@ import type { ComponentProps } from 'astro/types';
 import { root } from 'astro:config/server';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { DEPOT } from '../../lib/depot';
 import { lignesVisees } from '../../lib/lignes';
 import { extraireRegion } from '../../lib/regions';
 
@@ -104,7 +105,7 @@ const transformers = [
 
 <figure class="code-explique">
   <figcaption>
-    Extrait de <a href={`https://github.com/chipat-neko/forge-ia/blob/main/${fichier}`}>{fichier}</a>
+    Extrait de <a href={`${DEPOT}/blob/main/${fichier}`}>{fichier}</a>
   </figcaption>
   <Code code={code} lang={langue as ComponentProps<typeof Code>['lang']} theme={theme} transformers={transformers} />
   {explications.trim() !== '' && <ul class="explications" set:html={explications} />}

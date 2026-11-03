@@ -15,6 +15,22 @@ export async function verifierAxe(page: Page): Promise<void> {
 }
 
 /**
+ * Rapport de contraste WCAG entre deux couleurs calculées par le navigateur
+ * (« rgb(35, 32, 87) »), de 1 (aucun contraste) à 21.
+ */
+export function contraste(couleurA: string, couleurB: string): number {
+  const luminance = (couleur: string) => {
+    const [r, g, b] = (couleur.match(/[\d.]+/g) ?? []).slice(0, 3).map((v) => {
+      const c = Number(v) / 255;
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const [claire, foncee] = [luminance(couleurA), luminance(couleurB)].sort((x, y) => y - x);
+  return (claire + 0.05) / (foncee + 0.05);
+}
+
+/**
  * Longueur, en caractères, de la plus longue ligne affichée dans les
  * paragraphes de la colonne de lecture. Le plancher de qualité demande des
  * lignes de moins de 80 caractères environ.

@@ -1,6 +1,6 @@
 ---
-// Gabarit d'un chapitre (direction « fusion énergie », maquette 10) :
-// barre du haut, ouverture, étapes, récapitulatif des acquis et pied.
+// Gabarit d'un chapitre (direction « fusion énergie », maquette 10) : lien
+// d'évitement, barre du haut, ouverture, étapes, récapitulatif des acquis et pied.
 //
 // Mise en page : une seule grille pour tout l'article, avec une marge de
 // gauche pour les grands numéros, une colonne de lecture d'environ 75 signes (80 au plus)
@@ -26,8 +26,9 @@ const { numero, titre, chapeau, programme, acquis, indexer = true } = Astro.prop
 ---
 
 <Base titre={typographier(`${numero} ${titre}`)} description={typographier(chapeau)}>
+  <a class="evitement" href="#contenu">Aller au contenu</a>
   <BarreHaut numero={numero} acquis={acquis} />
-  <main>
+  <main id="contenu">
     {/* Seul le contenu de l'article est indexé : ni la barre du haut ni le pied. */}
     <article
       class="chapitre"

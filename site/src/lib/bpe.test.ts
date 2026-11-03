@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import attendus from '../../../projets/1.3-tokenizer/tests/attendus.json';
 import corpus from '../../../projets/1.3-tokenizer/donnees/corpus.txt?raw';
@@ -56,6 +57,17 @@ describe('preDecouper', () => {
 
   it('découpe un emoji en un seul pré-mot, sans couper la paire de substitution', () => {
     expect(preDecouper('a 🙂🙂 b')).toEqual(['a', ' 🙂🙂', ' b']);
+  });
+
+  // compter_mots (Python) compte les pré-mots du corpus : l'exemple que le
+  // chapitre 1.3 en donne doit être une vraie entrée, espace de tête comprise.
+  it('donne le compte cité en exemple de compter_mots dans le chapitre 1.3', () => {
+    const chapitre = readFileSync(new URL('../content/chapitres/1-3.mdx', import.meta.url), 'utf8');
+    const exemple = /`\{\(((?:'[^']*'(?:, )?)+)\): (\d+), …\}`/.exec(chapitre);
+    expect(exemple, 'exemple « {(…): n, …} » introuvable dans 1-3.mdx').not.toBeNull();
+    const mot = [...exemple![1].matchAll(/'([^']*)'/g)].map((m) => m[1]).join('');
+    expect(mot).toBe(' les');
+    expect(preDecouper(corpus).filter((m) => m === mot)).toHaveLength(Number(exemple![2]));
   });
 });
 

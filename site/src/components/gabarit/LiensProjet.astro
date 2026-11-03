@@ -1,7 +1,7 @@
 ---
 // Les deux liens qui mènent du chapitre au projet : le code complet sur
 // GitHub, et le notebook à ouvrir dans Colab. Des liens de texte simples.
-import { DEPOT } from '../../lib/depot';
+import { DEPOT, NOM_DU_DEPOT } from '../../lib/depot';
 
 interface Props {
   /** Nom du dossier du projet, par exemple « 1.3-tokenizer ». */
@@ -14,7 +14,7 @@ const { projet } = Astro.props;
 <ul class="liens-projet">
   <li><a href={`${DEPOT}/tree/main/projets/${projet}`}>Le projet complet</a></li>
   <li>
-    <a href={`https://colab.research.google.com/github/chipat-neko/forge-ia/blob/main/notebooks/${projet}.ipynb`}>
+    <a href={`https://colab.research.google.com/github/${NOM_DU_DEPOT}/blob/main/notebooks/${projet}.ipynb`}>
       Ouvrir dans Colab
     </a>
   </li>

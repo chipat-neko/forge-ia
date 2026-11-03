@@ -1,7 +1,7 @@
 // Parcours du gabarit de chapitre, sur la page d'essai /forge-ia/essais/gabarit/
 // (construite seulement avec FORGE_ESSAIS=1, voir src/essais/gabarit.mdx).
 import { test, expect, type Page } from '@playwright/test';
-import { plusLongueLigne, verifierAxe, verifierSansDebordement } from './outils';
+import { contraste, plusLongueLigne, verifierAxe, verifierSansDebordement } from './outils';
 
 const PAGE = '/forge-ia/essais/gabarit/';
 const CLE_PROGRESSION = 'forge-ia:progression:v1';
@@ -134,6 +134,20 @@ test('accessibilité et largeur', async ({ page }) => {
 });
 
 // Compléments.
+
+// axe ne compte pas un contraste de 1 pour 1 comme une faute (il le laisse
+// « à revoir ») : le rapport se vérifie donc aussi à part.
+test('encadré labo : le code en ligne se lit sur le fond indigo', async ({ page }) => {
+  await page.goto(PAGE);
+  const code = page.locator('.labo p code');
+  await expect(code).toHaveText('paire_la_plus_frequente');
+  const { texte, fond } = await code.evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { texte: style.color, fond: style.backgroundColor };
+  });
+  expect(contraste(texte, fond)).toBeGreaterThanOrEqual(4.5);
+  await verifierAxe(page);
+});
 
 test('typographie : espace fine avant « ? » dans la prose MDX et dans les props', async ({ page }) => {
   await page.goto('/forge-ia/essais/gabarit/');
