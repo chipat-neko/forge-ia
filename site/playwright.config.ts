@@ -13,6 +13,15 @@ import { defineConfig } from '@playwright/test';
 // passent la baseURL de cette configuration : ils suivent la même adresse.
 const adressePublique = process.env.PLAYWRIGHT_BASE_URL;
 
+// Réglages des projets Chrome. La carte graphique reste éteinte (`--disable-gpu`) :
+// l'entraînement de ton IA l'occupe sur le PC. Le canal est posé projet par projet,
+// pas dans le `use` commun : un projet Firefox ou WebKit ne peut pas annuler un
+// `channel: 'chrome'` hérité (Playwright ignore les valeurs `undefined`).
+const chrome = {
+  channel: process.env.CI ? undefined : 'chrome',
+  launchOptions: { args: ['--disable-gpu'] },
+};
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -21,14 +30,13 @@ export default defineConfig({
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: adressePublique || 'http://127.0.0.1:8531',
-    channel: process.env.CI ? undefined : 'chrome',
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'ordinateur', use: { viewport: { width: 1440, height: 900 } } },
+    { name: 'ordinateur', use: { ...chrome, viewport: { width: 1440, height: 900 } } },
     {
       name: 'mobile',
-      use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
+      use: { ...chrome, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
     },
   ],
   webServer: adressePublique
