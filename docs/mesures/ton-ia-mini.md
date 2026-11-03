@@ -88,7 +88,7 @@ par seconde (0,13 s par Mo).
 compressés (gzip) sur le disque.
 
 **Encodage** (`python -m forge encoder --donnees court`) : 33 s, soit 30,0 Mo de texte par seconde, avec 11 processus
-en parallèle (un par fragment ; `psutil` a compté 14 processus descendants en tout, lanceur et processus d'aide compris). Résultat : **239 242 872 jetons d'entraînement et 1 206 420 de validation**, 4,37 octets par jeton.
+en parallèle (un par fragment ; `psutil` a compté 14 processus descendants en tout, dont sans doute le lanceur et des processus d'aide). Résultat : **239 242 872 jetons d'entraînement et 1 206 420 de validation**, 4,37 octets par jeton.
 Chaque jeton est donc lu 3,49 fois pendant l'entraînement (au plus 4 : respecté).
 Charge relevée avec `psutil` pendant l'encodage (un relevé toutes les 3 s) : **les 16 cœurs logiques étaient
 tous au-dessus de 50 %** de la 6ᵉ à la 15ᵉ seconde (moyenne de 81 % à 87 %), 15 sur 16 jusqu'à la 24ᵉ seconde, puis la
