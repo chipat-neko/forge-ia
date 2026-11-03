@@ -70,6 +70,16 @@ uv run --extra gpu python -m forge tokenizer --donnees echantillon-tokenizer `
     --taille 32768 --nom ton-ia-v1 --sortie forge/ressources/tokenizer-ton-ia-v1.json --octets-max 300M
 ```
 
+Les documents de validation (ceux que `encoder` rangera dans `val/`, 0,5 % des documents) ne
+servent pas à apprendre, pour que la compression mesurée dessus soit honnête. Si les textes ne
+suffisent pas pour toutes les fusions, la commande échoue sans rien écrire.
+
+Le tokenizer définitif de ton IA, `ton-ia-v1`, est déjà appris sur 300 Mo de français et de
+code, et rangé dans le dépôt : `forge/ressources/tokenizer-ton-ia-v1.json`. **Il est figé** pour
+tout le reste du parcours (les tests de `tests/test_tokenizer_ton_ia.py` le vérifient octet pour
+octet) ; ses mesures sont dans `docs/mesures/tokenizer-ton-ia-v1.md`. Il n'y a donc pas à le
+réapprendre : la commande ci-dessus sert à refaire l'expérience.
+
 Dans le code : `TokenizerOctets.charger(chemin)`, puis `encoder(texte)` et
 `decoder(ids)`. L'encodeur n'émet jamais de jeton spécial ; on les ajoute avec
 `id_special("<|fin_texte|>")`.

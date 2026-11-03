@@ -10,6 +10,8 @@ from pathlib import Path
 import pytest
 
 from forge.__main__ import main, taille_en_octets
+from forge.donnees.melange import est_validation
+from forge.donnees.nettoyage import empreinte_du_texte_nettoye
 from forge.tokenizer import (
     MOTIF_TON_IA,
     PREMIER_SPECIAL,
@@ -352,6 +354,10 @@ def test_apprendre_depuis_dossier(tmp_path, monkeypatch):
     assert tok.nom == "essai-v0" and len(tok.fusions) == 10
     relu = TokenizerOctets.charger(sortie)
     assert relu.fusions == tok.fusions and relu.nom == "essai-v0"
+    # Le tokenizer n'apprend que sur les documents d'apprentissage : ici, « code_python 000 »
+    # est un document de validation, il est sauté et le suivant prend sa place dans le volume.
+    textes = list(lire_textes_du_melange(dossier, 1000, ecarter_validation=True))
+    assert ("code_python", "000") not in [tuple(t.split()[:2]) for t in textes] and len(textes) == 20
     assert tok.fusions == entrainer_tokenizer(textes, 256 + 64 + 10).fusions
 
 
@@ -362,6 +368,90 @@ def test_dossier_incomplet(tmp_path, monkeypatch):
         apprendre_depuis_dossier(Path("essai"), 330, "x", tmp_path / "t.json", None)
     with pytest.raises(DonneesManquantes, match="python -m forge donnees"):
         apprendre_depuis_dossier(Path("absent"), 330, "x", tmp_path / "t.json", None)
+
+
+def _documents_a_motif(valides: bool, nombre: int, motif: str = "QJQJQJ") -> list[str]:
+    """`nombre` documents (de 200 caractères ou plus) pleins de `motif`, tous de validation ou aucun.
+
+    Le choix de la validation ne dépend que de l'empreinte du texte : on cherche, parmi des
+    documents qui ne diffèrent que par un numéro, ceux qui tombent du côté voulu.
+    """
+    trouves: list[str] = []
+    numero = 0
+    while len(trouves) < nombre:
+        texte = f"{motif} document {numero:05d} {motif} " * 8
+        if est_validation(empreinte_du_texte_nettoye(texte)) == valides:
+            trouves.append(texte)
+        numero += 1
+    return trouves
+
+
+def _dossier_avec_validation(racine: Path) -> tuple[Path, list[str], list[str]]:
+    """Un faux téléchargement dont chaque source mêle des documents de validation et d'apprentissage.
+
+    Les documents de validation sont pleins de « QJQJQJ » : s'ils servaient à l'apprentissage,
+    la paire (Q, J) serait fusionnée. Renvoie le dossier, les textes d'apprentissage et ceux de validation.
+    """
+    dossier = racine / "textes" / "mixte"
+    apprentissage = [t for t in _documents_a_motif(False, 60, motif="forgeron")]
+    validation = _documents_a_motif(True, 6)
+    for source in ("web_fr", "wikipedia_fr", "code_python"):
+        (dossier / source).mkdir(parents=True)
+        # Un document de validation sur dix, en tête, au milieu et en queue de source.
+        textes = validation[:2] + apprentissage[:20] + validation[2:4] + apprentissage[20:40] + validation[4:] + apprentissage[40:]
+        _ecrire_fragment(dossier / source / "fragment-00000.jsonl.gz", textes)
+        (dossier / source / ".complet").write_text("", encoding="utf-8")
+    assert all(est_validation(empreinte_du_texte_nettoye(t)) for t in validation)
+    assert not any(est_validation(empreinte_du_texte_nettoye(t)) for t in apprentissage)
+    return dossier, apprentissage, validation
+
+
+def test_les_documents_de_validation_ne_servent_pas_a_apprendre(tmp_path, monkeypatch):
+    monkeypatch.setenv("FORGE_DONNEES", str(tmp_path))
+    dossier, apprentissage, validation = _dossier_avec_validation(tmp_path)
+
+    # Le lecteur, quand on le lui demande, saute ces documents sans les compter dans le volume.
+    lignes: list[str] = []
+    lus = list(lire_textes_du_melange(dossier, None, lignes.append, ecarter_validation=True))
+    assert lus == apprentissage * 3
+    assert sum("6 documents de validation écartés" in ligne for ligne in lignes) == 3
+    # Sans cette demande, il lit tout, comme avant.
+    assert len(list(lire_textes_du_melange(dossier, None))) == 3 * (len(apprentissage) + len(validation))
+    octets_par_texte = len(apprentissage[0].encode("utf-8"))
+    budget_web = 10 * octets_par_texte  # 10 documents de web (75 %) : 10 d'apprentissage, validation sautée
+    total = round(budget_web / 0.75)
+    lus = list(lire_textes_du_melange(dossier, total, ecarter_validation=True))
+    # Web : 10 documents ; Wikipédia (352 octets) : 2 ; code (528 octets) : 2 ; aucun n'est de validation.
+    # Si les documents de validation comptaient dans le volume, le web en donnerait moins de 10.
+    assert lus == apprentissage[:10] + apprentissage[:2] + apprentissage[:2]
+
+    # L'apprentissage du tokenizer lit ainsi : la paire (Q, J) n'est jamais fusionnée.
+    sortie = tmp_path / "sortie" / "tok.json"
+    tok = apprendre_depuis_dossier(Path("mixte"), 256 + 64 + 50, "mixte-v0", sortie, None)
+    assert tok.fusions == entrainer_tokenizer(apprentissage * 3, 256 + 64 + 50).fusions
+    assert not any(b"QJ" in tok.octets_du_jeton(256 + rang) for rang in range(len(tok.fusions)))
+    # Preuve que le test mord : appris sur tout, le tokenizer fusionne bien « QJ ».
+    sur_tout = entrainer_tokenizer(list(lire_textes_du_melange(dossier, None)), 256 + 64 + 50)
+    assert any(b"QJ" in sur_tout.octets_du_jeton(256 + rang) for rang in range(len(sur_tout.fusions)))
+
+
+def test_apprentissage_trop_court_echoue_sans_rien_ecrire(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("FORGE_DONNEES", str(tmp_path))
+    _faux_dossier(tmp_path)
+    sortie = tmp_path / "sortie" / "tok.json"
+    # Ces 30 documents de 50 octets n'ont pas 10 000 fusions à donner.
+    with pytest.raises(ValueError, match=r"fusions sur les 10000 voulues") as erreur:
+        apprendre_depuis_dossier(Path("essai"), 256 + 64 + 10_000, "court", sortie, None)
+    assert "plus de textes" in str(erreur.value) and "--taille" in str(erreur.value)
+    assert not sortie.exists() and not list(sortie.parent.glob("*"))
+    # Un fichier déjà là n'est pas écrasé par un tokenizer trop court.
+    sortie.parent.mkdir(parents=True)
+    sortie.write_text("ancien", encoding="utf-8")
+    code = main(["tokenizer", "--donnees", "essai", "--taille", str(256 + 64 + 10_000), "--sortie", str(sortie)])
+    assert code == 1
+    erreur_affichee = capsys.readouterr().err
+    assert erreur_affichee.startswith("Erreur : ") and "fusions" in erreur_affichee
+    assert sortie.read_text(encoding="utf-8") == "ancien"
 
 
 def test_sous_commande_tokenizer(tmp_path, monkeypatch, capsys):
