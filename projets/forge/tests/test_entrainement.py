@@ -40,7 +40,7 @@ from forge.entrainement import (
     taux,
 )
 from forge.entrainement import boucle
-from forge.modele import ConfigModele
+from forge.modele import ConfigModele, nombre_parametres
 from forge.tokenizer.apprentissage import DonneesManquantes
 
 RACINE_DU_PROJET = Path(__file__).resolve().parents[1]
@@ -656,6 +656,16 @@ def test_config_mini_toml():
     assert config.preset == "mini" and config.appareil == "cuda"
     assert config.taille_lot_jetons % (config.micro_lot * 512) == 0
     assert config.fichier.endswith("mini.toml")
+
+
+def test_config_principal_toml():
+    # Le choix de l'utilisateur après la mesure de la tâche 10 : la carte, la taille « tres_grand »,
+    # 20 jetons par paramètre.
+    config = lire_config(RACINE_DU_PROJET / "configs" / "principal.toml")
+    assert config.preset == "tres_grand" and config.appareil == "cuda"
+    assert config.micro_lot == 1 and config.accumulation == 256
+    assert config.jetons_total >= 20 * nombre_parametres(config.modele)
+    assert config.pas_total == 16_540
 
 
 def test_config_cle_inconnue(tmp_path):

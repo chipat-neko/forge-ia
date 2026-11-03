@@ -11,15 +11,17 @@ taille demande sur le disque. Il ne recommande aucune taille ni aucun appareil�
 
 - **Carte graphique (RTX 5070 Ti)** : de 138 433 jetons par seconde (taille « petit ») à 17 855
   (« tres_grand »). Pour 20 jetons par paramètre, cela fait 1,7 h pour « petit », 9,8 h pour « moyen »,
-  40,1 h pour « grand » et 135 h (6 jours) pour « tres_grand ».
+  40,1 h pour « grand » et 135 h (5,6 jours) pour « tres_grand ».
 - **Processeur (Ryzen 7 9800X3D, ses 16 fils)** : de 1 749 à 235 jetons par seconde, soit 76 à 81 fois
-  moins vite que la carte. Les mêmes entraînements dureraient de 132 h (6 jours) pour « petit » à
+  moins vite que la carte. Les mêmes entraînements dureraient de 132 h (5,5 jours) pour « petit » à
   10 235 h (426 jours) pour « tres_grand ».
 - **Les 16 cœurs logiques du processeur travaillaient bien** : chacun à 100,0 % pendant toute la mesure,
   et PyTorch n'en aurait utilisé que 8 sans réglage explicite (voir « Le processeur travaille-t-il
   vraiment à fond ? »).
 - **Disque** (44,4 Go libres sur D:) : « petit », « moyen » et « grand » tiennent, « tres_grand » ne tient
-  pas (il manque 7,0 Go au moins, 26,3 Go dans le cas le plus prudent).
+  pas avec ce calcul (il manque 7,0 Go au moins, 26,3 Go dans le cas le plus prudent), qui compte le
+  texte brut sans compression. Sur le disque, ce texte est compressé environ 3 fois : compté ainsi,
+  « tres_grand » tient, avec 8,9 Go de marge (voir « Le choix du 3 novembre 2026 »).
 - **Une nuit de 10 h sur la carte** fait lire 4,98 milliards de jetons à « petit », 2,25 à « moyen », 1,18 à
   « grand » et 0,64 à « tres_grand ». Rapporté à la taille du modèle, cela fait 120, 20, 5 et 1,5 jetons
   par paramètre.
@@ -39,7 +41,7 @@ taille demande sur le disque. Il ne recommande aucune taille ni aucun appareil�
 | Logiciel | PyTorch 2.15.0 (CUDA 13.2), Python 3.12, Windows 11 |
 | Compilation | aucune (`torch.compile` n'a pas `triton` sous Windows) : tout se mesure en mode immédiat |
 
-La carte était libre pendant toute la mesure (`python -m forge mesurer` refuse de mesurer si elle travaille
+La carte était libre au début de la mesure (`python -m forge mesurer` refuse de mesurer si elle travaille
 déjà à 30 % ou plus, pour ne pas donner de chiffres faussés). Aucun programme lourd n'a été arrêté ni
 lancé pour l'occasion.
 
@@ -54,8 +56,8 @@ de jetons, pas de leur valeur. Le code est dans `projets/forge/forge/mesure.py`.
 
 - **Sur la carte** : 2 pas d'échauffement non comptés, puis 20 pas chronométrés, chacun de 8 micro-lots
   accumulés. L'accumulation compte : l'écrêtage et le pas d'AdamW coûtent le même temps quelle que soit la
-  taille du lot, et ils pèsent environ 15 % sur « tres_grand » s'ils ne servent qu'un seul micro-lot (15 589
-  jetons par seconde avec 1 micro-lot par pas, 17 878 avec 8), alors qu'un vrai entraînement en accumule des
+  taille du lot, et ils font perdre environ 13 % de vitesse à « tres_grand » s'ils ne servent qu'un seul micro-lot
+  (15 589 jetons par seconde avec 1 micro-lot par pas, 17 855 avec 8), alors qu'un vrai entraînement en accumule des
   dizaines.
 - **Le plus grand micro-lot qui tient** est cherché par essais de 3 pas (à 2 micro-lots accumulés, car les
   gradients du premier occupent déjà la mémoire pendant le calcul du second) : 1, 2, 4, 8… tant que ça
@@ -99,10 +101,10 @@ colonne « pic de mémoire » est le maximum de mémoire occupée par les te
 
 | Taille | Jetons visés (20 par paramètre) | Durée sur la carte (micro-lot le plus rapide) | Durée sur la carte (plus grand micro-lot) | Durée sur le processeur | Jetons vus en 10 h sur la carte | Soit, par paramètre |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| petit | 0,83 milliards | 1,7 h | 1,9 h | 132 h (6 j) | 4,98 milliards | 119,5 jetons |
+| petit | 0,83 milliards | 1,7 h | 1,9 h | 132 h (5,5 j) | 4,98 milliards | 119,5 jetons |
 | moyen | 2,20 milliards | 9,8 h | 11,2 h | 789 h (33 j) | 2,25 milliards | 20,4 jetons |
 | grand | 4,72 milliards | 40,1 h | 41,6 h | 3 243 h (135 j) | 1,18 milliards | 5,0 jetons |
-| tres_grand | 8,67 milliards | 135 h (6 j) | 135 h (6 j) | 10 235 h (426 j) | 0,64 milliards | 1,5 jetons |
+| tres_grand | 8,67 milliards | 135 h (5,6 j) | 135 h (5,6 j) | 10 235 h (426 j) | 0,64 milliards | 1,5 jetons |
 
 Les durées de la carte partent du micro-lot le plus rapide. Celles du processeur sont extrapolées de 7 à 20
 pas mesurés (cf. la section sur la fiabilité).
@@ -164,7 +166,8 @@ Oui. Pour chaque taille, pendant toute la mesure :
 - **les 16 cœurs logiques étaient chacun à 100,0 %** (moyenne de chaque cœur sur la durée de la mesure, relevée
   avec `psutil`) : les seize valeurs de `charge_par_coeur` valent toutes 100,0, pour les quatre tailles ;
 - PyTorch utilisait 16 fils (`fils_utilises = 16`). **Sans réglage, il en prend 8** (le nombre de vrais
-  cœurs) : c'est ce qu'il annonce au démarrage sur ce PC. La forge impose `os.cpu_count()`, soit 16 ;
+  cœurs) : c'est la valeur de `torch.get_num_threads()` sur ce PC quand on ne règle rien, relevée
+  pendant les mesures sur la carte. La forge impose `os.cpu_count()`, soit 16 ;
 - le processus occupait en moyenne **12,9 à 13,1 cœurs** de calcul sur 16. Les 3 cœurs restants sont
   très probablement pris par les programmes ouverts en arrière-plan (16 % de charge au repos, soit environ
   2,5 cœurs) : le calcul de ce PC est alors complet, et les chiffres du processeur seraient un peu meilleurs
@@ -190,7 +193,7 @@ le travail.
   Un balayage du micro-lot refait deux fois a donné des écarts sous 0,5 %.
 - **Régime soutenu** : 100 pas de « moyen » (3 minutes) sur la carte donnent 54 490 jetons par seconde,
   comme les 20 pas (54 504). La carte est restée entre 52 et 60 °C, à 2 925 à 2 932 MHz (maximum 3 090) et
-  entre 220 et 235 W : pas d'étranglement thermique.
+  entre 218 et 235 W : pas d'étranglement thermique.
 - **Ce que les durées ne comptent pas** : la perte de validation (tous les `evaluation_tous_pas` pas), les
   sauvegardes, la lecture des jetons sur le disque (ici, des jetons tirés au hasard en mémoire) et les
   interruptions. Compter quelques pour cent de plus.
@@ -231,11 +234,34 @@ dernière sauvegarde). Une durée de 40 h peut donc se faire en plusieurs sessio
 **Fait pour le choix** (sans recommandation) :
 
 - les durées sont du calcul pur, à augmenter de quelques pour cent (validation, sauvegardes) ;
-- « tres_grand » ne tient pas sur le disque tel qu'il est, et ne verrait que 1,5 jeton par paramètre
-  en une nuit ;
+- « tres_grand » ne tient pas sur le disque avec le calcul prudent (texte brut non compressé), et ne
+  verrait que 1,5 jeton par paramètre en une nuit ;
 - « grand » tient sur le disque, avec 16,4 Go de marge si le texte brut est effacé avant
   l'entraînement et 5,9 Go dans le cas le plus prudent ;
-- sur le processeur, même « petit » demande 6 jours.
+- sur le processeur, même « petit » demande 5,5 jours.
+
+## Le choix du 3 novembre 2026
+
+Après avoir lu ces chiffres, l'utilisateur a choisi **la carte graphique** et la taille **« tres_grand »**
+(433,6 millions de paramètres). Sa configuration est `projets/forge/configs/principal.toml` :
+
+- 16 540 pas de 524 288 jetons (256 lignes de 2 048), soit 8,67 milliards de jetons, 20 par paramètre ;
+- un micro-lot de 1 ligne, le seul qui tient, donc 256 micro-lots accumulés par pas ;
+- environ 135 h de carte, en plusieurs sessions grâce à la pause et à la reprise.
+
+**La place sur le disque, recomptée.** Le tableau plus haut compte le texte brut sans compression
+(35,2 Go). Or le téléchargement range le texte compressé en gzip : 343 Mo pour 1 Go de texte, mesuré sur
+les échantillons du tokenizer. Le texte de « tres_grand » occupera donc environ 12,1 Go. Dans l'ordre
+prévu (télécharger, encoder, effacer le texte, entraîner), les deux moments les plus chargés sont :
+
+| Moment | Ce qui est sur le disque | Place |
+| --- | --- | ---: |
+| fin de l'encodage | texte compressé (12,1 Go) et jetons (16,2 Go) | 28,2 Go |
+| entraînement | jetons (16,2 Go) et sauvegardes (19,4 Go au plus) | 35,5 Go |
+
+Le pic est donc de 35,5 Go, pour 44,4 Go libres : il reste 8,9 Go de marge, sans rien libérer de plus.
+Cette marge suppose qu'aucun autre programme ne remplit D: pendant l'entraînement. S'il manque de la
+place, l'entraînement s'arrête proprement et dit combien il en manque.
 
 ## Refaire la mesure
 
