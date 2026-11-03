@@ -242,8 +242,8 @@ dernière sauvegarde). Une durée de 40 h peut donc se faire en plusieurs sessio
 
 ## Le choix du 3 novembre 2026
 
-Après avoir lu ces chiffres, l'utilisateur a choisi **la carte graphique** et la taille **« tres_grand »**
-(433,6 millions de paramètres). Sa configuration est `projets/forge/configs/principal.toml` :
+Après avoir lu ces chiffres, tu as choisi **la carte graphique** et la taille **« tres_grand »**
+(433,6 millions de paramètres). La configuration est `projets/forge/configs/principal.toml` :
 
 - 16 540 pas de 524 288 jetons (256 lignes de 2 048), soit 8,67 milliards de jetons, 20 par paramètre ;
 - un micro-lot de 1 ligne, le seul qui tient, donc 256 micro-lots accumulés par pas ;
@@ -251,15 +251,19 @@ Après avoir lu ces chiffres, l'utilisateur a choisi **la carte graphique** et l
 
 **La place sur le disque, recomptée.** Le tableau plus haut compte le texte brut sans compression
 (35,2 Go). Or le téléchargement range le texte compressé en gzip : 343 Mo pour 1 Go de texte, mesuré sur
-les échantillons du tokenizer. Le texte de « tres_grand » occupera donc environ 12,1 Go. Dans l'ordre
-prévu (télécharger, encoder, effacer le texte, entraîner), les deux moments les plus chargés sont :
+les échantillons du tokenizer. Ces échantillons ne mélangent pas les sources comme l'entraînement (plus
+de Wikipédia et de code), donc le vrai chiffre peut être un peu différent. Le texte de « tres_grand »
+occupera environ 12,1 Go. Dans l'ordre prévu (télécharger, encoder, effacer le texte, entraîner), les
+deux moments les plus chargés sont :
 
 | Moment | Ce qui est sur le disque | Place |
 | --- | --- | ---: |
 | fin de l'encodage | texte compressé (12,1 Go) et jetons (16,2 Go) | 28,2 Go |
 | entraînement | jetons (16,2 Go) et sauvegardes (19,4 Go au plus) | 35,5 Go |
 
-Le pic est donc de 35,5 Go, pour 44,4 Go libres : il reste 8,9 Go de marge, sans rien libérer de plus.
+Les totaux sont calculés avant arrondi. Le pic est donc de 35,5 Go, pendant l'entraînement, quand le
+texte est déjà effacé : il ne dépend pas de la compression. Pour 44,4 Go libres, il reste 8,9 Go de
+marge, sans rien libérer de plus.
 Cette marge suppose qu'aucun autre programme ne remplit D: pendant l'entraînement. S'il manque de la
 place, l'entraînement s'arrête proprement et dit combien il en manque.
 

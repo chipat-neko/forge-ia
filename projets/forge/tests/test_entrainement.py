@@ -664,8 +664,12 @@ def test_config_principal_toml():
     config = lire_config(RACINE_DU_PROJET / "configs" / "principal.toml")
     assert config.preset == "tres_grand" and config.appareil == "cuda"
     assert config.micro_lot == 1 and config.accumulation == 256
-    assert config.jetons_total >= 20 * nombre_parametres(config.modele)
-    assert config.pas_total == 16_540
+    assert config.taille_lot_jetons == 524_288 and config.pas_total == 16_540
+    assert config.taux_max == 4e-4 and config.echauffement == 500
+    # 20 jetons par paramètre, arrondis au pas entier au-dessus.
+    parametres = nombre_parametres(config.modele)
+    assert parametres == 433_573_120
+    assert 20 * parametres <= config.jetons_total < 20 * parametres + config.taille_lot_jetons
 
 
 def test_config_cle_inconnue(tmp_path):

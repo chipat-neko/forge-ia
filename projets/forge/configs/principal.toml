@@ -1,6 +1,6 @@
 # Entraînement principal de ton IA (preset « tres_grand », environ 135 heures sur la carte graphique).
 #
-# Choix de l'utilisateur le 3 novembre 2026, d'après la mesure de docs/mesures/entrainement-2026-11.md :
+# Choisi le 3 novembre 2026, d'après la mesure de docs/mesures/entrainement-2026-11.md :
 # la carte graphique (RTX 5070 Ti, 17 855 jetons par seconde pour cette taille, 76 fois le processeur
 # sur ses 16 fils) et la taille « tres_grand ».
 #
@@ -20,8 +20,8 @@ donnees = "principal"
 # entier au-dessus : 16 540 pas de 524 288 jetons = 8 671 723 520 jetons.
 jetons_total = 8_671_723_520
 
-# Jetons vus par pas d'optimisation : 256 lignes de 2 048 jetons, le lot habituel des modèles de
-# cette taille (GPT-3 350M, Pythia 410M). Doit être un multiple de micro_lot × 2 048.
+# Jetons vus par pas d'optimisation : 256 lignes de 2 048 jetons, soit 0,5 million, le lot de
+# GPT-3 350M (Pythia 410M en prenait 2 millions). Doit être un multiple de micro_lot × 2 048.
 taille_lot_jetons = 524_288
 
 # Lignes de 2 048 jetons que la carte traite d'un coup : 1, le seul micro-lot qui tient pour cette
@@ -29,9 +29,10 @@ taille_lot_jetons = 524_288
 micro_lot = 1
 
 # Taux d'apprentissage : montée de 0 à 0,0004 pendant les 500 premiers pas (3 % de
-# l'entraînement), puis descente en cosinus jusqu'à 0,00004 au dernier pas. 0,0004 se place entre
-# Pythia 410M (0,0003) et les petits modèles récents (0,0006) : un peu prudent, car une divergence
-# coûterait des heures de carte.
+# l'entraînement), puis descente en cosinus jusqu'à 0,00004 au dernier pas. GPT-3 350M prenait
+# 0,0003 avec le même lot, Pythia 410M 0,0003 avec un lot 4 fois plus grand, OLMo et TinyLlama
+# 0,0004 : un peu au-dessus de GPT-3, sans aller plus loin, car une divergence coûterait des heures
+# de carte.
 taux_max = 4e-4
 echauffement = 500
 
@@ -46,7 +47,7 @@ graine = 1234
 # Perte de validation tous les 200 pas (environ 1 h 40) : 83 points sur la courbe.
 evaluation_tous_pas = 200
 
-# Sauvegarde au moins toutes les 30 minutes. Une sauvegarde d'étape pèse 5,2 Go (12 octets par
+# Sauvegarde au moins toutes les 30 minutes. Une sauvegarde d'étape pèse 4,8 Go (12 octets par
 # paramètre) : plus souvent userait le SSD pour rien, plus rarement ferait perdre plus de calcul
 # après une coupure de courant. Ctrl+C sauvegarde tout de suite, quelle que soit cette valeur.
 sauvegarde_minutes = 30
