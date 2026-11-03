@@ -41,6 +41,22 @@ sous-dossiers au besoin (`dossier`) et vérifie la place libre avant un travail
 long (`verifier_place`) : s'il en manque, il s'arrête avec un message qui dit
 combien de Go libérer.
 
+## Le tokenizer de ton IA
+
+Le paquet `forge.tokenizer` contient le tokenizer de ton IA : un BPE sur les
+octets (256 octets, 32 448 fusions, puis 64 jetons spéciaux, soit 32 768 jetons),
+écrit à la main en Python. Il s'apprend sur les textes téléchargés, dans les
+parts du mélange (75 % de web, 10 % de Wikipédia, 15 % de code) :
+
+```powershell
+uv run --extra gpu python -m forge tokenizer --donnees echantillon-tokenizer `
+    --taille 32768 --nom ton-ia-v1 --sortie forge/ressources/tokenizer-ton-ia-v1.json --octets-max 300M
+```
+
+Dans le code : `TokenizerOctets.charger(chemin)`, puis `encoder(texte)` et
+`decoder(ids)`. L'encodeur n'émet jamais de jeton spécial ; on les ajoute avec
+`id_special("<|fin_texte|>")`.
+
 ## Tester
 
 ```powershell

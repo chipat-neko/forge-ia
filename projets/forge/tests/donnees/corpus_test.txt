@@ -1,0 +1,210 @@
+L'atelier du forgeron
+
+Au bout du village, là où la route quitte les maisons pour descendre vers la rivière, se tient l'atelier de Mathilde Roche. On l'entend avant de le voir : le souffle du soufflet, le tintement clair du marteau sur l'enclume, puis le sifflement de l'eau quand une pièce rouge plonge dans le baquet. Les enfants qui passent pour aller à l'école ralentissent toujours un peu devant la porte ouverte. Ils regardent les étincelles comme on regarde un feu d'artifice, avec un mélange de crainte et d'envie.
+
+Mathilde a repris la forge de son oncle il y a douze ans. À l'époque, elle ne savait presque rien du métier : elle sortait d'une école d'ingénieurs, elle connaissait les diagrammes de phase de l'acier et les courbes de refroidissement, mais elle n'avait jamais tenu une paire de tenailles. « La théorie, disait son oncle, c'est la carte. Le marteau, c'est le chemin. » Il lui a fallu deux hivers entiers pour apprendre à lire la couleur du métal : le rouge sombre qui ne sert à rien, le cerise où l'on peut commencer à frapper, l'orange vif qui pardonne les erreurs, et le jaune presque blanc où l'acier commence à brûler.
+
+Aujourd’hui, elle fabrique surtout des outils pour les jardiniers et les menuisiers de la vallée : des serpes, des binettes, des ciseaux à bois, quelques couteaux de cuisine. Elle refuse les commandes trop pressées. « Un bon outil, ça se forge lentement, et ça se garde toute une vie », répète-t-elle aux clients qui voudraient leur commande pour le lendemain.
+
+Le matin, elle allume le feu vers sept heures. Le charbon doit monter doucement en température ; si l'on souffle trop fort au début, il se forme une croûte de mâchefer qui étouffe le foyer. Pendant que le feu prend, elle balaie l'atelier, range les outils de la veille, relit le carnet où elle note chaque commande. Le carnet est couvert de taches de graisse et de petits croquis : une lame vue de profil, la forme d'une douille, des cotes en millimètres griffonnées à la hâte.
+
+Son apprenti s'appelle Yanis. Il a dix-sept ans, des mains immenses et une patience qu'on ne soupçonnerait pas chez un garçon de son âge. Il est arrivé un jour de septembre, avec une lettre de son professeur de technologie et un vieux couteau ébréché qu'il voulait réparer. Mathilde lui a montré comment reprendre le fil sur la meule, puis comment redresser la lame à froid, sans la casser. Il est revenu le lendemain, puis le jour suivant, et il n'est plus jamais reparti.
+
+— Pourquoi tu frappes toujours trois coups légers avant de commencer ? lui a-t-il demandé un matin.
+— Pour écouter l'enclume, a répondu Mathilde. Si elle sonne clair, la pièce est bien posée. Si elle sonne sourd, quelque chose cloche : la pièce bouge, ou elle est trop froide.
+— Et si elle ne sonne pas du tout ?
+— Alors c'est que tu as oublié de poser la pièce.
+
+Yanis a ri, mais il a retenu la leçon. Depuis, lui aussi frappe trois petits coups avant chaque série, et il écoute.
+
+Les saisons de la forge
+
+L'hiver est la meilleure saison pour forger. Il fait froid dehors, la forge chauffe l'atelier, et la lumière basse permet de mieux voir la couleur du métal. En été, au contraire, la chaleur devient vite insupportable : l'air au-dessus du foyer dépasse les 50 °C, et il faut boire sans arrêt. Mathilde travaille alors très tôt le matin, entre cinq heures et onze heures, puis elle passe l'après-midi à affûter, à emmancher, à faire les comptes.
+
+Au printemps, les commandes arrivent par vagues. Les jardiniers veulent leurs outils avant les premières plantations ; les vignerons demandent des sécateurs et des serpettes pour la taille. En automne, ce sont les bûcherons et les menuisiers : haches, coins à fendre, gouges, planes. Chaque saison a son odeur, aussi. L'hiver sent le charbon et la laine mouillée, le printemps la terre retournée, l'été la sueur et le fer chaud, l'automne la sciure et les feuilles mortes. Ça ne trompe pas : on sait l'heure et le mois rien qu'en respirant.
+
+Une recette de la vallée
+
+Pour la soupe du vendredi, il faut quatre poireaux, trois pommes de terre, deux carottes, un oignon, une gousse d'ail et un bon morceau de beurre. On émince les poireaux en rondelles fines, on coupe les pommes de terre en dés, on fait revenir le tout dans le beurre pendant dix minutes, à feu doux, sans laisser colorer. On ajoute ensuite un litre et demi d'eau, une pincée de sel, un peu de poivre, et l'on laisse mijoter trois quarts d'heure. Certains mixent la soupe ; d'autres préfèrent la garder telle quelle, avec ses morceaux. Chez Mathilde, on la mange avec du pain grillé et un peu de fromage râpé, assis sur le banc devant l'atelier quand il fait beau.
+
+Lettre à une amie
+
+Chère Léonie,
+
+Merci pour ta carte postale, elle est arrivée mardi, un peu froissée mais lisible. Tu me demandes si je regrette d'avoir quitté la ville. Honnêtement ? Pas une seconde. Bien sûr, il y a des jours où le cinéma me manque, et les librairies ouvertes tard le soir, et le bruit des cafés. Mais ici, je dors comme une pierre, je mange les légumes du voisin, et je fabrique des choses qui servent. Quand un client revient me voir trois ans plus tard avec sa binette et me dit qu'elle n'a pas bougé, je suis plus fière que le jour où j'ai eu mon diplôme.
+
+Viens nous voir cet été. On fera une grande table dehors, on invitera tout le village, et je te montrerai comment on forge un clou. C'est la première chose qu'on apprend, et c'est plus difficile qu'on ne croit : il faut tirer la pointe en quatre faces égales, couper à la bonne longueur, puis refouler la tête d'un seul coup sec. Le mien, le premier, ressemblait à un tire-bouchon. Je l'ai gardé, il est cloué au-dessus de la porte.
+
+Je t'embrasse de tout cœur,
+Mathilde
+
+Comment une machine lit un texte
+
+Un ordinateur ne lit pas les mots comme nous. Avant de traiter une phrase, un modèle de langage la découpe en petits morceaux appelés jetons. Un jeton peut être un mot entier, une partie de mot, un signe de ponctuation ou même un seul octet. Le découpage le plus répandu aujourd'hui s'appelle BPE, pour « Byte Pair Encoding ». L'idée est simple : on part des octets du texte, on cherche la paire de symboles voisins la plus fréquente, et on la remplace par un nouveau symbole. On recommence des milliers de fois. À la fin, les mots courants comme « le », « de » ou « est » deviennent un seul jeton, tandis que les mots rares restent découpés en plusieurs morceaux.
+
+Pourquoi partir des octets plutôt que des lettres ? Parce qu'ainsi, aucun texte n'est jamais inconnu. Un emoji, un caractère chinois ou une lettre accentuée s'écrivent tous avec un à quatre octets en UTF-8. Le tokenizer peut donc tout représenter, même ce qu'il n'a jamais vu pendant son apprentissage. Il suffit de 256 jetons de base pour couvrir toutes les valeurs possibles d'un octet.
+
+Avant de compter les paires, on découpe le texte en pré-mots, à l'aide d'une expression régulière. Ce premier découpage empêche, par exemple, de coller la fin d'un mot au début du suivant, ou de mélanger des chiffres et des lettres. En français, il faut faire attention aux apostrophes : « l'atelier » se découpe en « l' » puis « atelier », ce qui permet au modèle de reconnaître le même mot « atelier » partout, qu'il soit précédé de « l' », de « d' » ou d'une espace.
+
+Les nombres posent un autre problème. Si l'on laisse le tokenizer apprendre librement, il crée des jetons pour « 2026 », « 1999 » ou « 404 », mais pas pour « 2027 », et le modèle a beaucoup de mal à calculer. On découpe donc les nombres par groupes de trois chiffres au plus : « 1234567 » devient « 123 », « 456 » et « 7 ».
+
+Le marché du samedi
+
+Le samedi, la place de l'église se remplit dès six heures du matin. Les maraîchers installent leurs étals sous les platanes : tomates anciennes, courgettes rondes, haricots verts, melons, abricots, cerises noires. Le fromager arrive le dernier, avec sa camionnette blanche et son klaxon reconnaissable entre mille. Il y a aussi le marchand de miel, qui fait goûter ses pots sur de petites cuillères en bois, et la dame aux plantes, qui vend des boutures de géranium et des pieds de basilic pour deux euros cinquante.
+
+Mathilde y tient un petit stand une fois par mois. Elle expose ses couteaux sur une planche de chêne, à côté d'une pierre à aiguiser, et elle propose aux passants d'affûter leurs vieilles lames pendant qu'ils font leurs courses. C'est comme ça qu'elle trouve la plupart de ses clients : on vient pour un couteau émoussé, on repart avec une commande de serpe ou de hachoir. Les enfants, eux, restent plantés devant la planche et posent mille questions. Est-ce que ça coupe vraiment ? Est-ce que c'est toi qui l'as fait ? Combien de temps il faut pour en faire un ? Est-ce que tu t'es déjà brûlée ?
+
+— Oui, souvent, répond-elle en montrant les petites cicatrices blanches sur ses avant-bras. Le métal chaud ne prévient pas. Il a l'air noir, tout à fait inoffensif, et il est encore à trois cents degrés.
+
+Le train de nuit
+
+Pour aller voir sa sœur à Marseille, Mathilde prend le train de nuit qui part de la gare voisine à 21 h 47. Le voyage dure neuf heures, avec un changement à Lyon, et elle aime cette lenteur. Elle lit, elle regarde défiler les lumières des villages, elle somnole contre la vitre. Au petit matin, le train longe l'étang de Berre, et la lumière change d'un seul coup : plus blanche, plus dure, avec cette odeur de pins et de sel qui annonce la mer.
+
+Dans le compartiment, il y a souvent des inconnus avec qui l'on finit par parler. Une nuit, c'était un vieux monsieur qui réparait des horloges ; une autre fois, une étudiante en biologie qui comptait les oiseaux migrateurs sur les côtes de Camargue. L’horloger lui a expliqué que les ressorts des montres anciennes étaient forgés à la main, puis trempés dans l'huile, exactement comme ses lames. « Nous faisons le même métier, a-t-il dit en souriant, seulement moi, je travaille au dixième de millimètre. »
+
+Notes de l'atelier
+
+Température de trempe pour l'acier XC75 : environ 800 °C, refroidissement à l'huile tiède. Revenu à 200 °C pendant une heure pour les couteaux, à 300 °C pour les outils qui doivent encaisser des chocs. Pour l'acier 90MCV8, monter un peu plus haut, vers 820 °C. Ne jamais tremper une lame à l'eau froide si elle a une section irrégulière : elle risque de se fendre. Dureté visée pour un couteau de cuisine : 58 à 60 HRC. Pour une hache : 52 à 55 HRC, plus tendre au talon.
+
+Commande no 214 : une plane de charron, lame de 30 cm, deux poignées en frêne. Commande no 215 : six crochets de boucherie. Commande no 216 : réparer la pelle à feu de la boulangerie (soudure à la forge, ne pas oublier le borax). Facture de charbon : 340 kg à 0,62 € le kilo, soit 210,80 €.
+
+outil	acier	prix
+serpe	XC75	89,00
+binette	C45	42,50
+plane	90MCV8	120,00
+
+Le programme de Yanis
+
+Yanis aime aussi l'informatique. Le soir, il a écrit un petit programme pour tenir le carnet des commandes à la place de Mathilde, qui continue malgré tout à tout noter à la main.
+
+"""Carnet des commandes de l'atelier : ajouter, chercher et facturer."""
+
+from dataclasses import dataclass, field
+from datetime import date
+
+
+@dataclass
+class Commande:
+    """Une commande d'un client, avec son prix en centimes."""
+
+    numero: int
+    client: str
+    description: str
+    prix_centimes: int
+    date_limite: date | None = None
+    terminee: bool = False
+    notes: list[str] = field(default_factory=list)
+
+    def prix_en_euros(self) -> str:
+        """Écrit le prix à la française : 1234 centimes donnent « 12,34 € »."""
+        euros, centimes = divmod(self.prix_centimes, 100)
+        return f"{euros},{centimes:02d} €"
+
+
+class Carnet:
+    """Toutes les commandes, rangées par numéro."""
+
+    def __init__(self) -> None:
+        self._commandes: dict[int, Commande] = {}
+        self._prochain_numero = 1
+
+    def ajouter(self, client: str, description: str, prix_centimes: int) -> Commande:
+        if prix_centimes < 0:
+            raise ValueError("Le prix ne peut pas être négatif : vérifie la commande.")
+        commande = Commande(self._prochain_numero, client, description, prix_centimes)
+        self._commandes[commande.numero] = commande
+        self._prochain_numero += 1
+        return commande
+
+    def en_retard(self, aujourd_hui: date) -> list[Commande]:
+        """Les commandes non terminées dont la date limite est dépassée."""
+        return [
+            c
+            for c in self._commandes.values()
+            if not c.terminee and c.date_limite is not None and c.date_limite < aujourd_hui
+        ]
+
+    def chiffre_d_affaires(self) -> int:
+        return sum(c.prix_centimes for c in self._commandes.values() if c.terminee)
+
+    def chercher(self, mot: str) -> list[Commande]:
+        mot = mot.lower()
+        trouvees = []
+        for commande in self._commandes.values():
+            texte = f"{commande.client} {commande.description}".lower()
+            if mot in texte:
+                trouvees.append(commande)
+        return trouvees
+
+
+if __name__ == "__main__":
+    carnet = Carnet()
+    carnet.ajouter("Boulangerie Martin", "Pelle à feu, soudure", 4500)
+    carnet.ajouter("M. Durand", "Serpe à long manche", 8900)
+    serpe = carnet.chercher("serpe")[0]
+    serpe.terminee = True
+    print(f"Chiffre d'affaires : {carnet.chiffre_d_affaires() / 100:.2f} €")
+    for commande in carnet.en_retard(date(2026, 11, 3)):
+        print(f"En retard : no {commande.numero}, {commande.client}")
+
+Quand il a montré son programme à Mathilde, elle l'a regardé longtemps, puis elle a dit : « C'est joli, mais est-ce que ça marche quand il y a de la graisse sur l'écran ? » Yanis a imprimé la liste et l'a punaisée à côté du carnet. Depuis, les deux cohabitent.
+
+Un second programme : compter les mots
+
+Pour son exposé de fin d'année, Yanis a voulu savoir quels mots revenaient le plus souvent dans les lettres de Mathilde. Son éditeur était réglé pour indenter avec des tabulations.
+
+import re
+from collections import Counter
+
+
+def compter_mots(texte: str, minimum: int = 2) -> list[tuple[str, int]]:
+	"""Compte les mots d'un texte et garde ceux qui reviennent au moins `minimum` fois."""
+	mots = re.findall(r"\w+", texte.lower())
+	compteur = Counter(mots)
+	return [(mot, n) for mot, n in compteur.most_common() if n >= minimum]
+
+
+def afficher(resultats: list[tuple[str, int]]) -> None:
+	for mot, n in resultats:
+		barre = "#" * min(n, 40)
+		print(f"{mot:>15} {n:5d} {barre}")
+
+
+def moyenne(valeurs: list[float]) -> float:
+	if not valeurs:
+		raise ValueError("Liste vide : il faut au moins une valeur pour faire une moyenne.")
+	return sum(valeurs) / len(valeurs)
+
+Le résultat l'a surpris : après « de », « la » et « le », le mot le plus fréquent était « feu ».
+
+La rivière
+
+La rivière qui passe sous l'atelier s'appelle la Sorgue, comme beaucoup de rivières du coin. Autrefois, elle faisait tourner une roue à aubes qui actionnait un martinet : un énorme marteau de deux cents kilos qui frappait le fer au rythme de l'eau. La roue a disparu dans une crue, en 1958, mais on voit encore les pierres du bief et l'axe rouillé, à moitié enfoui dans la vase. Mathilde rêve de la reconstruire. Elle a fait des plans, calculé le débit, demandé un devis au charpentier. Il faudrait au moins trois ans et une bonne dose de chance avec les autorisations de l'État.
+
+En attendant, la rivière sert à autre chose. L'été, Yanis s'y baigne après le travail ; l'hiver, Mathilde y rince les pièces décapées. Les truites remontent le courant en mai, les hérons guettent sur les galets, et un martin-pêcheur file parfois au ras de l'eau, comme une étincelle bleue échappée de la forge.
+
+Questions des visiteurs
+
+Combien de temps faut-il pour forger un couteau ? Entre une journée et une semaine, selon l'acier, la forme et le manche. Un couteau simple en acier au carbone, avec un manche en bois vissé, demande environ huit heures de travail. Un couteau en damas, avec des dizaines de couches soudées, peut en demander quarante.
+
+Est-ce qu'un couteau en acier au carbone rouille ? Oui, s'il reste mouillé. Il suffit de l'essuyer après usage et de passer une goutte d'huile de temps en temps. Avec les années, la lame se couvre d'une patine grise qui la protège.
+
+Peut-on visiter l'atelier ? Oui, le premier samedi de chaque mois, de 14 h à 18 h. Il est demandé de porter des chaussures fermées et de ne rien toucher sans demander : ce qui a l'air froid peut être brûlant !
+
+Faut-il un diplôme pour devenir forgeron ? Il existe des formations, des CAP et des stages, mais la plupart des forgerons ont appris auprès d'un maître, en travaillant. L'essentiel, c'est la patience, des épaules solides et l'envie de recommencer ; le reste vient avec le temps.
+
+Le soir à la forge
+
+Quand le soleil descend derrière les collines, l'atelier devient orange, puis rouge, puis presque noir. Il ne reste que la lueur du foyer, qui s'éteint doucement sous sa couche de cendres. Mathilde et Yanis s'assoient sur le banc, une tasse de tisane à la main, et ils regardent la rivière. Ils ne parlent pas beaucoup. Parfois, Yanis demande comment on fait un damas, ou pourquoi les anciens forgerons enterraient leurs lames dans le fumier. Mathilde répond quand elle sait, et quand elle ne sait pas, elle dit simplement : « On essaiera demain. »
+
+Le lendemain, ils essaient. Parfois ça marche, souvent ça rate, et ils recommencent. C'est ainsi qu'on apprend un métier, disait l'oncle : en ratant beaucoup, mais jamais deux fois de la même manière.
+
+La fête de la Saint-Éloi
+
+Le 1er décembre, on fête saint Éloi, le patron des forgerons, des orfèvres et de tous ceux qui travaillent le métal. Au village, la tradition s'était perdue depuis longtemps ; c'est Mathilde qui l'a relancée, la troisième année, presque par hasard. Elle avait invité quelques clients à boire un vin chaud devant l'atelier, et ils sont venus à soixante. L'année suivante, le comité des fêtes s'en est mêlé, puis la mairie, puis l'école.
+
+Aujourd'hui, la fête dure toute la journée. Le matin, les enfants fabriquent des crochets et des porte-clés sous la surveillance de Yanis, qui leur prête des tabliers de cuir beaucoup trop grands pour eux. L'après-midi, deux forgerons d'une vallée voisine viennent faire une démonstration à quatre mains : l'un tient la pièce et frappe avec un petit marteau, l'autre suit avec la masse, et le rythme de leurs coups ressemble à une chanson. Le soir, on mange des châtaignes grillées et une soupe au lard, et le vieux Fernand raconte toujours la même histoire, celle du cheval qui refusait d'être ferré tant que le maréchal ne lui avait pas chanté une berceuse.
+
+Personne ne croit à l'histoire de Fernand, mais personne ne veut qu'il arrête de la raconter. Elle fait partie de la fête, comme le vin chaud, comme les étincelles, comme le froid qui pique les joues quand on rentre chez soi, tard, en suivant la rivière. Cette année, l'école a même préparé une exposition : des dessins de forges, de chevaux, de marteaux, et un grand panneau où chaque élève a écrit ce qu'il voudrait fabriquer s'il était forgeron. On y lit « une épée », bien sûr, plusieurs fois, mais aussi « une clé qui ouvre toutes les portes », « un vélo en fer », « une cuillère pour ma grand-mère » et, tout en bas, d'une écriture appliquée : « un robot qui fait mes devoirs ».
+
+Mathilde a pris le panneau en photo. Elle l'a accroché dans l'atelier, à côté du premier clou tordu et de la liste imprimée par Yanis. « Ce sont nos archives », dit-elle aux visiteurs, et elle ne plaisante qu'à moitié.
