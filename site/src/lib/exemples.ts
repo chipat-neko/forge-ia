@@ -9,6 +9,7 @@
 // phrase devient fausse, la construction s'arrête avec un message clair.
 import corpus from '../../../projets/1.3-tokenizer/donnees/corpus.txt?raw';
 import { choixNombreDeJetons, preDecouper, tokenizer13, type Jeton } from './bpe';
+import { exigeur } from './exiger';
 
 /** Toutes les fusions apprises : le découpeur « fini » du chapitre 1.3. */
 export const NB_FUSIONS = tokenizer13.fusions.length;
@@ -20,9 +21,7 @@ export function estAssemblage(jeton: Jeton): boolean {
   return jeton.id !== null && jeton.id >= TAILLE_BASE;
 }
 
-function exiger(condition: boolean, message: string): void {
-  if (!condition) throw new Error(`Exemple devenu faux : ${message}. Revoir src/lib/exemples.ts.`);
-}
+const exiger = exigeur('src/lib/exemples.ts');
 
 const NOMBRES = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix'];
 

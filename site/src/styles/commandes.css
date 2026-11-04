@@ -1,0 +1,113 @@
+/* Les commandes partagées des démos et des ateliers : le bouton en relief, la
+   bascule soulignée de soleil, la zone qui défile et son indice. Les couleurs
+   viennent de jetons.css ; le jaune soleil est réservé à ce qui se manipule.
+
+   Chaque composant règle lui-même la police, les marges intérieures et la
+   hauteur minimale de ses boutons. Les noms sont nouveaux : les .bouton et
+   .bascule des pages Astro (accueil, 404, recherche) ne changent pas. */
+
+/* ---------- Le bouton en relief ---------- */
+
+/* Les choix des paris : bord indigo, ombre décalée, soleil au survol. */
+.bouton-relief {
+  cursor: pointer;
+  background: var(--papier);
+  color: var(--indigo);
+  border: 2px solid var(--indigo);
+  border-radius: 12px;
+  margin-bottom: 4px; /* la place de l'ombre */
+  box-shadow: 0 4px 0 var(--indigo);
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease,
+    background-color 0.15s ease;
+}
+
+.bouton-relief:hover:not([aria-disabled='true']) {
+  background: var(--soleil);
+}
+
+.bouton-relief:active:not([aria-disabled='true']) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--indigo);
+}
+
+/* Un bouton qui ne fait rien pour l'instant (au bout des étapes, rien à
+   recommencer) reste focalisable : aria-disabled plutôt que disabled, et le
+   focus du clavier ne tombe pas sur la page. Il le montre. */
+.bouton-relief[aria-disabled='true'] {
+  cursor: default;
+  color: var(--indigo-doux);
+  border-color: color-mix(in srgb, var(--lavande) 50%, var(--papier));
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--lavande) 50%, var(--papier));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bouton-relief {
+    transition: none;
+  }
+}
+
+/* ---------- La bascule soulignée de soleil ---------- */
+
+/* Un bouton souligné de jaune, comme dans la maquette 10 ; choisi
+   (aria-pressed), il passe en soleil. */
+.bascule-soleil {
+  color: var(--indigo);
+  background: none;
+  text-decoration: underline;
+  text-decoration-color: var(--soleil);
+  text-decoration-thickness: 5px;
+  text-underline-offset: 4px;
+  text-decoration-skip-ink: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.bascule-soleil:hover:not(:disabled) {
+  background: var(--soleil-pale);
+  text-decoration-color: var(--soleil-vif);
+}
+
+.bascule-soleil:disabled {
+  cursor: default;
+}
+
+.bascule-soleil[aria-pressed='true'] {
+  background: var(--soleil);
+  text-decoration-color: transparent;
+}
+
+/* ---------- La zone qui défile (ZoneDefilable.svelte) ---------- */
+
+/* Un tableau plus large que la colonne défile dans sa zone : la page, elle,
+   ne déborde jamais. */
+.zone-defilable {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* La phrase qui invite à faire défiler, au-dessus de la zone. Elle ne
+   s'affiche que sous la largeur de fenêtre où le tableau ne tient plus dans
+   la colonne (data-seuil, en pixels). CSS seul : vaut aussi sans JavaScript. */
+.indice-defilement {
+  display: none;
+  font-family: var(--titres);
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--indigo-doux);
+  margin: 0 0 8px;
+}
+
+@media (max-width: 480px) {
+  .indice-defilement[data-seuil='480'] {
+    display: block;
+  }
+}
+
+@media (max-width: 600px) {
+  .indice-defilement[data-seuil='600'] {
+    display: block;
+  }
+}

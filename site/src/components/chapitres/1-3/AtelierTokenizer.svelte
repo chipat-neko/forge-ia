@@ -207,7 +207,7 @@
       {morceauxCaches
         ? `Voici la phrase telle que le modèle la reçoit, rien que des nombres${FINE}:`
         : `Sous chaque morceau, son numéro${FINE}:`}
-      <button type="button" class="bascule" onclick={() => (morceauxCaches = !morceauxCaches)}
+      <button type="button" class="bascule-soleil" onclick={() => (morceauxCaches = !morceauxCaches)}
         >{morceauxCaches ? 'voir les morceaux' : 'cacher les morceaux'}</button
       >
       {morceauxCaches ? 'pour retrouver le texte.' : 'pour voir la phrase comme le modèle la reçoit.'}
@@ -356,25 +356,11 @@
     color: var(--indigo-doux);
   }
 
-  /* La bascule : un bouton dans la phrase, souligné de jaune. */
-  .bascule {
+  /* La bascule : un bouton dans la phrase, souligné de jaune (.bascule-soleil,
+     src/styles/commandes.css), dans la police du texte. */
+  .bascule-soleil {
     font: inherit;
-    color: var(--indigo);
-    background: none;
-    text-decoration: underline;
-    text-decoration-color: var(--soleil);
-    text-decoration-thickness: 5px;
-    text-underline-offset: 4px;
-    text-decoration-skip-ink: none;
-    border: 0;
-    border-radius: 4px;
     padding: 0 2px;
-    cursor: pointer;
-  }
-
-  .bascule:hover {
-    background: var(--soleil-pale);
-    text-decoration-color: var(--soleil-vif);
   }
 
   /* Le défi, sous un filet, un peu plus petit que le texte, comme dans la

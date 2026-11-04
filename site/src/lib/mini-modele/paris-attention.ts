@@ -13,6 +13,7 @@
 //    5 « puis », 6 « il », 7 « le », 8 « tord ».
 
 import type { Choix } from '../choix';
+import { exigeur } from '../exiger';
 import { detaillerExemple, exempleAttention, type DetailTete, type ExempleAttention } from './exemple-attention';
 
 /** La tête « qui agit » (la « Tête 1 » de la page). */
@@ -26,14 +27,7 @@ export const MOT_PUIS = 5;
 /** « il », le pronom qui pose la question du pari. */
 export const MOT_IL = 6;
 
-function exiger(condition: boolean, message: string): void {
-  if (!condition) {
-    throw new Error(
-      `Exemple devenu faux : ${message}. Revoir projets/mini-modele/donnees/exemple-attention.json ` +
-        'et src/lib/mini-modele/paris-attention.ts.',
-    );
-  }
-}
+const exiger = exigeur('projets/mini-modele/donnees/exemple-attention.json et src/lib/mini-modele/paris-attention.ts');
 
 // Le détail de chaque exemple, calculé une fois et rangé sous l'objet exemple
 // lui-même. Ne modifie donc jamais un exemple après l'avoir passé à l'une de

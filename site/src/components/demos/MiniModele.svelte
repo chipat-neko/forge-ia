@@ -242,14 +242,14 @@
          que disabled) : le focus du clavier ne tombe pas sur la page. -->
     <button
       type="button"
-      class="bouton"
+      class="bouton-relief"
       data-test="mini-action"
       aria-disabled={action.evenement === null}
       onclick={cliquerAction}>{action.texte}</button
     >
     <button
       type="button"
-      class="bouton"
+      class="bouton-relief"
       data-test="mini-recommencer"
       aria-disabled={!peutRecommencer}
       onclick={() => {
@@ -259,7 +259,7 @@
     {#if !avantGout}
       <button
         type="button"
-        class="bascule"
+        class="bascule-soleil"
         data-test="mini-vitesse"
         onclick={() => appliquer({ type: 'vitesse', vitesse: etat.vitesse === 'rapide' ? 'normale' : 'rapide' })}
         >{etat.vitesse === 'rapide' ? 'Revenir au rythme normal' : 'Aller plus vite'}</button
@@ -349,7 +349,8 @@
   }
 
   /* Les boutons reprennent les choix des paris : bord indigo, ombre décalée,
-     soleil au survol (le jaune est réservé à ce qui se manipule). */
+     soleil au survol (.bouton-relief, src/styles/commandes.css). Ici, leur
+     police et leurs marges intérieures. */
   .commandes {
     display: flex;
     flex-wrap: wrap;
@@ -358,63 +359,18 @@
     margin: 0 0 14px;
   }
 
-  .bouton {
-    cursor: pointer;
+  .bouton-relief {
     font-family: var(--titres);
     font-weight: 700;
     font-size: 18px;
     line-height: 1.15;
-    background: var(--papier);
-    color: var(--indigo);
-    border: 2px solid var(--indigo);
-    border-radius: 12px;
     padding: 10px 16px;
-    margin-bottom: 4px; /* la place de l'ombre */
-    box-shadow: 0 4px 0 var(--indigo);
-    transition:
-      transform 0.08s ease,
-      box-shadow 0.08s ease,
-      background-color 0.15s ease;
   }
 
-  .bouton:hover:not([aria-disabled='true']) {
-    background: var(--soleil);
-  }
-
-  .bouton:active:not([aria-disabled='true']) {
-    transform: translateY(3px);
-    box-shadow: 0 1px 0 var(--indigo);
-  }
-
-  /* « Recommencer » quand il n'y a rien à recommencer, et le bouton principal à la fin : ils restent
-     focalisables (aria-disabled), mais ils ne font plus rien et le montrent. */
-  .bouton[aria-disabled='true'] {
-    cursor: default;
-    color: var(--indigo-doux);
-    border-color: color-mix(in srgb, var(--lavande) 50%, var(--papier));
-    box-shadow: 0 4px 0 color-mix(in srgb, var(--lavande) 50%, var(--papier));
-  }
-
-  /* La bascule de vitesse : un bouton souligné de jaune, comme dans la maquette 10
-     (règles reprises de AtelierTokenizer.svelte). */
-  .bascule {
+  /* La bascule de vitesse : un bouton souligné de jaune (.bascule-soleil), dans la police du texte. */
+  .bascule-soleil {
     font: inherit;
-    color: var(--indigo);
-    background: none;
-    text-decoration: underline;
-    text-decoration-color: var(--soleil);
-    text-decoration-thickness: 5px;
-    text-underline-offset: 4px;
-    text-decoration-skip-ink: none;
-    border: 0;
-    border-radius: 4px;
     padding: 0 2px;
-    cursor: pointer;
-  }
-
-  .bascule:hover {
-    background: var(--soleil-pale);
-    text-decoration-color: var(--soleil-vif);
   }
 
   /* Sans JavaScript, les boutons ne feraient rien : ils laissent la place à une phrase. */
@@ -539,14 +495,8 @@
     margin: 1em 0 0;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .bouton {
-      transition: none;
-    }
-  }
-
   @media (max-width: 720px) {
-    .bouton {
+    .bouton-relief {
       font-size: 17px;
       padding: 9px 14px;
     }

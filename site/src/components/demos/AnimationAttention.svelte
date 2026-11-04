@@ -61,6 +61,7 @@
   } from '../../lib/mini-modele/animation-attention';
   import { detaillerExemple, exempleAttention, type ExempleAttention } from '../../lib/mini-modele/exemple-attention';
   import type { DetailAcquis } from '../../scripts/chapitre';
+  import ZoneDefilable from '../interactif/ZoneDefilable.svelte';
 
   interface Props {
     /** L'exemple à montrer ; celui de « Le forgeron chauffe le fer puis il le tord » par défaut. */
@@ -204,7 +205,7 @@
         {#each ex.tetes as _, t (t)}
           <button
             type="button"
-            class="bascule"
+            class="bascule-soleil"
             aria-pressed={t === tete}
             data-test="att-tete"
             data-tete={t}
@@ -218,7 +219,7 @@
     <div class="pas-a-pas">
       <button
         type="button"
-        class="bouton"
+        class="bouton-relief"
         data-test="att-precedente"
         aria-disabled={!actif || etape === 1}
         onclick={() => allerA(etape - 1)}>Étape précédente</button
@@ -226,7 +227,7 @@
       <span class="compteur" data-test="att-compteur">Étape {etape} sur {NB_ETAPES}</span>
       <button
         type="button"
-        class="bouton"
+        class="bouton-relief"
         data-test="att-suivante"
         aria-disabled={!actif || etape === NB_ETAPES}
         onclick={() => allerA(etape + 1)}>Étape suivante</button
@@ -240,8 +241,7 @@
 
   {#if etape === 1}
     <!-- Les tableaux sont dans des zones qui défilent : un exemple plus large ne fait jamais déborder la page. -->
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex (une zone qui défile doit prendre le focus pour se parcourir au clavier : WCAG 2.1.1) -->
-    <div class="defile" role="region" aria-label="Traits de chaque mot, défilable" tabindex="0">
+    <ZoneDefilable etiquette="Traits de chaque mot, défilable">
       <table class="traits" data-test="att-traits">
         <caption class="vh">Les traits de chaque mot</caption>
         <thead>
@@ -263,7 +263,7 @@
           {/each}
         </tbody>
       </table>
-    </div>
+    </ZoneDefilable>
   {:else if etape === 2}
     <dl class="vecteurs">
       <div>
@@ -280,8 +280,7 @@
       </div>
     </dl>
     <p class="titre-tableau" id="{id}-cles">La clé k de chaque mot</p>
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex (une zone qui défile doit prendre le focus pour se parcourir au clavier : WCAG 2.1.1) -->
-    <div class="defile" role="region" aria-label="Clés de chaque mot, défilable" tabindex="0">
+    <ZoneDefilable etiquette="Clés de chaque mot, défilable">
       <table class="cles" data-test="att-cles" aria-labelledby="{id}-cles">
         <thead>
           <tr>
@@ -300,7 +299,7 @@
           {/each}
         </tbody>
       </table>
-    </div>
+    </ZoneDefilable>
   {:else}
     <ol class="lignes" class:axe={etape <= 5} data-test="att-lignes">
       {#each lignes as l (l.mot)}
@@ -349,11 +348,13 @@
   <div class="carte" class:seulement-sans-js={etape < 6}>
     <!-- Le titre du tableau est hors de la zone qui défile : sur un téléphone, il reste lisible en entier. -->
     <p class="titre-tableau" id="{id}-carte" data-test="att-carte-titre">{legendeCarte(ex, tete)}</p>
-    <!-- Sur un téléphone, la carte est plus large que l'écran : la phrase le dit à l'œil (« défilable » n'est
-         que dans le nom de la zone), et une colonne coupée au bord le montre. CSS seul : vaut aussi sans JavaScript. -->
-    <p class="indice-defile" data-test="att-indice-defile">Fais défiler la carte vers la droite pour voir les autres colonnes.</p>
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex (une zone qui défile doit prendre le focus pour se parcourir au clavier : WCAG 2.1.1) -->
-    <div class="defile" role="region" aria-label="Carte complète de la tête, défilable" tabindex="0">
+    <!-- Sur un téléphone (fenêtre de moins de 480 px, le seuil par défaut), la carte est plus large que la colonne :
+         l'indice invite à la faire défiler, et une colonne coupée au bord le montre. -->
+    <ZoneDefilable
+      etiquette="Carte complète de la tête, défilable"
+      indice="Fais défiler la carte vers la droite pour voir les autres colonnes."
+      testIndice="att-indice-defile"
+    >
       <table data-test="att-carte" aria-labelledby="{id}-carte">
         <thead>
           <tr>
@@ -379,7 +380,7 @@
           {/each}
         </tbody>
       </table>
-    </div>
+    </ZoneDefilable>
     {#if noteCarte !== null}
       <p class="note-carte">{noteCarte}</p>
     {/if}
@@ -464,48 +465,25 @@
     cursor: default;
   }
 
-  /* Les têtes : deux bascules soulignées de jaune, comme dans la maquette 10
-     (règles reprises de AtelierTokenizer.svelte) ; celle qui est choisie est en soleil. */
+  /* Les têtes : deux bascules soulignées de jaune (.bascule-soleil, src/styles/commandes.css) ;
+     celle qui est choisie est en soleil. Ici, leur police et leurs marges intérieures. */
   .tetes {
     display: flex;
     flex-wrap: wrap;
     gap: 6px 12px;
   }
 
-  .bascule {
+  .bascule-soleil {
     font-family: var(--titres);
     font-weight: 600;
     font-size: 17px;
     line-height: 1.3;
-    color: var(--indigo);
-    background: none;
-    text-decoration: underline;
-    text-decoration-color: var(--soleil);
-    text-decoration-thickness: 5px;
-    text-underline-offset: 4px;
-    text-decoration-skip-ink: none;
-    border: 0;
-    border-radius: 4px;
     padding: 4px 6px;
-    cursor: pointer;
   }
 
-  .bascule:hover:not(:disabled) {
-    background: var(--soleil-pale);
-    text-decoration-color: var(--soleil-vif);
-  }
-
-  .bascule[aria-pressed='true'] {
-    background: var(--soleil);
-    text-decoration-color: transparent;
-  }
-
-  .bascule:disabled {
-    cursor: default;
-  }
-
-  /* Les étapes : les boutons reprennent ceux du mini-modèle (bord indigo,
-     ombre décalée, soleil au survol). */
+  /* Les étapes : les boutons reprennent ceux du mini-modèle (.bouton-relief :
+     bord indigo, ombre décalée, soleil au survol). Ici, leur police et leurs
+     marges intérieures. */
   .pas-a-pas {
     display: flex;
     flex-wrap: wrap;
@@ -520,41 +498,12 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .bouton {
-    cursor: pointer;
+  .bouton-relief {
     font-family: var(--titres);
     font-weight: 700;
     font-size: 18px;
     line-height: 1.15;
-    background: var(--papier);
-    color: var(--indigo);
-    border: 2px solid var(--indigo);
-    border-radius: 12px;
     padding: 10px 16px;
-    margin-bottom: 4px; /* la place de l'ombre */
-    box-shadow: 0 4px 0 var(--indigo);
-    transition:
-      transform 0.08s ease,
-      box-shadow 0.08s ease,
-      background-color 0.15s ease;
-  }
-
-  .bouton:hover:not([aria-disabled='true']) {
-    background: var(--soleil);
-  }
-
-  .bouton:active:not([aria-disabled='true']) {
-    transform: translateY(3px);
-    box-shadow: 0 1px 0 var(--indigo);
-  }
-
-  /* Aux bouts, le bouton reste focalisable (le focus du clavier ne saute pas
-     ailleurs), mais il ne fait plus rien et le montre. */
-  .bouton[aria-disabled='true'] {
-    cursor: default;
-    color: var(--indigo-doux);
-    border-color: color-mix(in srgb, var(--lavande) 50%, var(--papier));
-    box-shadow: 0 4px 0 color-mix(in srgb, var(--lavande) 50%, var(--papier));
   }
 
   /* Sans JavaScript, les commandes ne feraient rien : une phrase les remplace,
@@ -617,15 +566,6 @@
 
   .titre-tableau {
     margin: 0;
-  }
-
-  .indice-defile {
-    display: none;
-    font-family: var(--titres);
-    font-size: 14px;
-    line-height: 1.35;
-    color: var(--indigo-doux);
-    margin: 0 0 8px;
   }
 
   th[scope='row'] {
@@ -825,11 +765,6 @@
     margin: 22px 0 0;
   }
 
-  .defile {
-    overflow-x: auto;
-    max-width: 100%;
-  }
-
   /* Bordures séparées : avec des bordures fusionnées, celles des cases qui
      défilent passeraient par-dessus la colonne des mots, restée en place. */
   .carte table {
@@ -903,12 +838,6 @@
     margin: 14px 0 0;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .bouton {
-      transition: none;
-    }
-  }
-
   @media (max-width: 720px) {
     .phrase {
       font-size: 22px;
@@ -925,7 +854,7 @@
       grid-row: 1;
     }
 
-    .bouton {
+    .bouton-relief {
       font-size: 16px;
       padding: 9px 8px;
     }
@@ -944,14 +873,6 @@
     .carte td {
       min-width: 2.9em;
       padding: 5px 3px;
-    }
-  }
-
-  /* En dessous de 480 px, la carte est plus large que la colonne : la phrase
-     qui invite à la faire défiler s'affiche. */
-  @media (max-width: 480px) {
-    .indice-defile {
-      display: block;
     }
   }
 </style>

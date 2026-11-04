@@ -67,6 +67,7 @@
   import { JETONS_PAR_PARAMETRE, MATERIEL_DES_MESURES, MESURES_TON_IA } from '../../lib/calculateur/ton-ia';
   import type { DetailAcquis } from '../../scripts/chapitre';
   import NombreManipulable from '../interactif/NombreManipulable.svelte';
+  import ZoneDefilable from '../interactif/ZoneDefilable.svelte';
 
   interface Props {
     /** Le nom de l'instance : data-calculateur, et le préfixe des canaux ; « calc » par défaut. */
@@ -307,7 +308,7 @@
   <p class="voir">
     <button
       type="button"
-      class="bascule"
+      class="bascule-soleil"
       aria-expanded={voirCalcul}
       aria-controls="{id}-formules"
       data-test="calc-voir"
@@ -333,9 +334,14 @@
     Les débits de ton IA, mesurés pendant son entraînement sur la carte (une {materielDesMesures}, celle de ce PC) et sur
     le processeur, et la durée qu’on en tire pour {nombre(JETONS_PAR_PARAMETRE)} jetons par paramètre.
   </p>
-  <p class="indice-defile">Fais défiler le tableau vers la droite pour voir les autres colonnes.</p>
-  <!-- svelte-ignore a11y_no_noninteractive_tabindex (une zone qui défile doit prendre le focus pour se parcourir au clavier : WCAG 2.1.1) -->
-  <div class="defile" role="region" aria-label="Débits mesurés, défilable" tabindex="0" data-test="calc-reperes">
+  <!-- Sous 600 px de fenêtre, le tableau des repères est plus large que la colonne : l'indice invite à le faire défiler. -->
+  <ZoneDefilable
+    etiquette="Débits mesurés, défilable"
+    indice="Fais défiler le tableau vers la droite pour voir les autres colonnes."
+    seuil={600}
+    testId="calc-reperes"
+    classe="zone-reperes"
+  >
     <table class="reperes">
       <thead>
         <tr>
@@ -364,7 +370,7 @@
         {/each}
       </tbody>
     </table>
-  </div>
+  </ZoneDefilable>
   <p class="comme-les-grands" data-test="calc-comme-les-grands">{phraseCommeLesGrands(rel)}</p>
   <ul class="sources-reperes" data-test="calc-sources-reperes">
     {#each sourcesReperes as r (r.modele)}
@@ -572,32 +578,14 @@
     margin: 0 0 0.6em;
   }
 
-  /* La bascule : un bouton souligné de jaune (règles reprises de AtelierTokenizer.svelte). */
-  .bascule {
+  /* La bascule : un bouton souligné de jaune (.bascule-soleil, src/styles/commandes.css). Ici, sa
+     police, ses marges intérieures et sa hauteur minimale. */
+  .bascule-soleil {
     font: inherit;
     font-family: var(--titres);
     font-weight: 600;
-    color: var(--indigo);
-    background: none;
-    text-decoration: underline;
-    text-decoration-color: var(--soleil);
-    text-decoration-thickness: 5px;
-    text-underline-offset: 4px;
-    text-decoration-skip-ink: none;
-    border: 0;
-    border-radius: 4px;
     padding: 0 2px;
     min-height: 28px;
-    cursor: pointer;
-  }
-
-  .bascule:hover:not(:disabled) {
-    background: var(--soleil-pale);
-    text-decoration-color: var(--soleil-vif);
-  }
-
-  .bascule:disabled {
-    cursor: default;
   }
 
   .formules {
@@ -675,18 +663,8 @@
     margin: 0 0 8px;
   }
 
-  .indice-defile {
-    display: none;
-    font-family: var(--titres);
-    font-size: 14px;
-    line-height: 1.35;
-    color: var(--indigo-doux);
-    margin: 0 0 8px;
-  }
-
-  .defile {
-    overflow-x: auto;
-    max-width: 100%;
+  /* La zone qui défile est un div de ZoneDefilable : une règle locale ne l'atteindrait pas. */
+  :global(.zone-defilable.zone-reperes) {
     margin: 0 0 0.8em;
   }
 
@@ -826,14 +804,6 @@
     .sens,
     .comme-les-grands {
       font-size: 16px;
-    }
-  }
-
-  /* En dessous de 600 px, le tableau des repères est plus large que la colonne :
-     la phrase qui invite à le faire défiler s'affiche. */
-  @media (max-width: 600px) {
-    .indice-defile {
-      display: block;
     }
   }
 </style>

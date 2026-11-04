@@ -9,6 +9,7 @@
 // l'îlot peut importer sans rien embarquer d'autre ; elle est réexportée ici.
 
 import type { Choix } from '../choix';
+import { exigeur } from '../exiger';
 import { decimalesUtiles, formaterPerte, nombre } from '../nombres';
 import { etatInitial, type EtatInitialMini } from './apercu';
 import { Entraineur, PRESETS_MINI, TAUX_PROPOSES } from './entrainement';
@@ -44,14 +45,9 @@ export interface ResultatTauxTropGrand {
   verdict: Verdict;
 }
 
-function exiger(condition: boolean, message: string): void {
-  if (!condition) {
-    throw new Error(
-      `Exemple devenu faux : ${message}. Revoir src/lib/mini-modele/paris.ts, ` +
-        'et le texte des paris et de leurs explications sur la page du mini-modèle.',
-    );
-  }
-}
+const exiger = exigeur(
+  'src/lib/mini-modele/paris.ts, et le texte des paris et de leurs explications sur la page du mini-modèle',
+);
 
 /** Un taux écrit tel qu'il est réglé : « 0,01 », « 0,3 ». */
 function texteTaux(taux: number): string {

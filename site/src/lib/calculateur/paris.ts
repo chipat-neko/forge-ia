@@ -9,6 +9,7 @@
 // s'en servira.
 
 import type { Choix } from '../choix';
+import { exigeur } from '../exiger';
 import { nombre } from '../nombres';
 import { materiel, PRIX_LOCATION, TAUX_DE_CHANGE, type PrixLocation } from './donnees';
 import { dixPuissance, formaterEuros, formaterQuantite } from './formats';
@@ -32,14 +33,7 @@ export const MATERIEL_PARI_H100 = 'h100-sxm';
 /** Ce que la question du pari « opérations » dit de ton IA. */
 export const PARAMETRES_DE_LA_QUESTION = '433,6 millions';
 
-function exiger(condition: boolean, message: string): void {
-  if (!condition) {
-    throw new Error(
-      `Exemple devenu faux : ${message}. Revoir src/lib/calculateur/paris.ts, ses données, ` +
-        'et le texte des paris du calculateur.',
-    );
-  }
-}
+const exiger = exigeur('src/lib/calculateur/paris.ts, ses données, et le texte des paris du calculateur');
 
 /**
  * Le pari « Combien d'opérations faut-il pour entraîner ton IA (433,6 millions
