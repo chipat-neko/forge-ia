@@ -1,0 +1,18 @@
+---
+partie: 0
+numero: "0.1"
+titre: "Page d'essai de la parité de la Partie 0"
+chapeau: "Cette page sert aux parcours de test de la parité : ton navigateur refait les calculs des jumeaux Python de la Partie 0, à l'identique. Elle n'est jamais publiée."
+programme: "1 étape, aucun pari, moins d'une minute."
+acquis: []
+---
+
+import ControleParite from '../components/demos/ControleParite.svelte';
+
+<Etape numero={1} titre="Les mêmes résultats que le Python">
+
+Ton navigateur refait ici les attendus des projets de la Partie 0 dont le jumeau tourne dans la page, pour que les parcours de test les comparent à ceux du Python, à l'identique.
+
+<ControleParite client:load jeu="partie-0" />
+
+</Etape>

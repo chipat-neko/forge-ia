@@ -1,0 +1,14 @@
+Avant de lire une phrase, une intelligence artificielle la découpe en morceaux.
+Ces morceaux sont appelés des jetons. Chaque jeton est ensuite remplacé par un nombre,
+parce qu'un réseau de neurones ne sait manipuler que des nombres.
+Le forgeron chauffe le métal, puis il le frappe sur l'enclume. Les forgerons forgent des outils,
+des lames et des fers. Le métal forgé refroidit dans l'eau. On reforge les pièces abîmées.
+Les données sont la matière première de l'apprentissage. On les collecte, on les nettoie,
+on les trie, puis on les découpe en jetons. Plus les données sont propres, plus le modèle apprend vite.
+Un modèle de langage prédit le jeton suivant. Il regarde les jetons précédents et calcule
+la probabilité de chaque jeton possible. Puis il choisit, écrit, et recommence.
+Les mots qui reviennent souvent deviennent des jetons entiers. Les mots rares restent découpés
+en plusieurs morceaux. Ainsi, le vocabulaire reste petit, et aucun mot n'est impossible à écrire.
+Les enfants apprennent à lire en reconnaissant des syllabes, puis des mots entiers.
+Le tokenizer fait un peu la même chose : il part des lettres et apprend les assemblages fréquents.
+Nous allons construire ce découpeur nous-mêmes, ligne par ligne, et le tester sur nos propres phrases.
