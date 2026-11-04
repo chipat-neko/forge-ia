@@ -509,11 +509,15 @@ const ESSAIS = ['jetons', 'BPE', 'zip', 'labo'];
     margin: 0 0 12px;
   }
 
+  /* Un extrait peut contenir un mot sans espace de cent signes (les morceaux
+     numérotés de l'atelier de 1.3) : il se coupe plutôt que de faire déborder
+     la page sur un téléphone. */
   .resultats :global(.chapitre-trouve > .extrait) {
     max-width: 31em;
     font-size: 18px;
     line-height: 1.55;
     color: var(--indigo-doux);
+    overflow-wrap: anywhere;
   }
 
   .resultats :global(.passages) {
@@ -561,7 +565,7 @@ const ESSAIS = ['jetons', 'BPE', 'zip', 'labo'];
     text-underline-offset: 4px;
   }
 
-  /* 31 em : moins de 80 signes par ligne. */
+  /* 31 em : moins de 80 signes par ligne. Un mot trop long se coupe (voir plus haut). */
   .resultats :global(.passages .extrait) {
     display: block;
     max-width: 31em;
@@ -569,6 +573,7 @@ const ESSAIS = ['jetons', 'BPE', 'zip', 'labo'];
     line-height: 1.55;
     color: var(--indigo-doux);
     margin-top: 4px;
+    overflow-wrap: anywhere;
   }
 
   /* Le mot trouvé, surligné comme un jeton. */
