@@ -30,6 +30,7 @@
   import { PRESETS_MINI, TAUX_PROPOSES, type NomPreset } from '../../lib/mini-modele/reglages';
   import {
     actionPrincipale,
+    annonceApres,
     etatDeDepart,
     prenomAffiche,
     reduire,
@@ -63,18 +64,25 @@
   const FINE = '\u202F';
   const avantGout = untrack(() => preset) === 'avant-gout';
   const tauxDepart = untrack(() => tauxIndexParDefaut(preset));
+  // Le taux n'a que 6 crans : sur un téléphone, un cran tous les 24 px au doigt (6 px par défaut).
+  const PIXELS_PAR_TAUX = 24;
   const nbValidation = untrack(() => PRESETS_MINI[preset].nbValidation);
 
   let etat: EtatDemo = $state.raw(untrack(() => etatDeDepart(initial, tauxDepart)));
   // Ce que dit la ligne d'état en cours d'entraînement : le dernier point de
   // validation, avec la vitesse mesurée à ce moment-là. Elle ne change qu'à
-  // chaque validation (pas à chaque image) : les lecteurs d'écran ne
-  // l'entendent qu'à ces moments-là, ou à une pause, ou à la fin.
+  // chaque validation (pas à chaque image), mais c'est encore tous les 100 pas :
+  // elle n'est pas lue d'office (voir `annonce`).
   let vitesseALaValidation = $state(0);
   // Au lancement ou à la reprise, la ligne d'état le dit tout de suite (les
   // lecteurs d'écran entendent quelque chose avant la première validation),
   // jusqu'au point de validation suivant. `validations` : leur nombre d'alors.
   let lancement: { texte: string; validations: number } | null = $state(null);
+  // Ce qu'entendent les lecteurs d'écran (une zone role="status" cachée à l'œil) :
+  // la ligne d'état, reprise seulement au lancement, à la pause, à la reprise,
+  // tous les 1 000 pas, à la fin et à une explosion ou une erreur (annonceApres,
+  // dans pilote.ts). Vide au départ : rien n'est dit au chargement.
+  let annonce = $state('');
 
   // Le canal du taux est choisi une fois pour toutes, comme dans NombreManipulable.
   const tauxCanal = canal<number>(untrack(() => `${nom}:taux`), tauxDepart);
@@ -152,6 +160,8 @@
         validations: apres.validations.length,
       };
     }
+    // La ligne d'état du nouvel état (ligneEtat se recalcule à la lecture).
+    annonce = annonceApres(avant, apres, ligneEtat, annonce);
     if (envoi !== null) envoyer(envoi);
     if (apres.phase === 'termine' && avant.phase !== 'termine' && acquis !== undefined && !acquisAnnonces.has(acquis)) {
       acquisAnnonces.add(acquis);
@@ -220,14 +230,21 @@
           texte={texteTaux}
           {verrou}
           testId="taux"
+          pixelsParUnite={PIXELS_PAR_TAUX}
         />.</span
       >
     </p>
   {/if}
 
   <div class="commandes">
-    <button type="button" class="bouton" data-test="mini-action" disabled={action.evenement === null} onclick={cliquerAction}
-      >{action.texte}</button
+    <!-- À la fin (« Terminé », « Entraînement arrêté »), le bouton ne fait plus rien, mais il reste focalisable
+         (aria-disabled plutôt que disabled) : le focus du clavier ne tombe pas sur la page. -->
+    <button
+      type="button"
+      class="bouton"
+      data-test="mini-action"
+      aria-disabled={action.evenement === null}
+      onclick={cliquerAction}>{action.texte}</button
     >
     <button
       type="button"
@@ -248,7 +265,10 @@
   </div>
   <p class="sans-js">Cette démo calcule dans ton navigateur{FINE}: elle a besoin de JavaScript.</p>
 
-  <p class="etat" role="status" data-test="mini-etat" data-pas={etat.pas}>{ligneEtat}</p>
+  <!-- La ligne d'état change à chaque validation : elle n'est pas une zone lue d'office. Les lecteurs d'écran
+       entendent la zone cachée qui la suit, aux seuls moments qui comptent. -->
+  <p class="etat" data-test="mini-etat" data-pas={etat.pas}>{ligneEtat}</p>
+  <p class="vh" role="status" data-test="mini-annonce">{annonce}</p>
 
   <CourbePerte
     pertes={etat.pertes}
@@ -354,16 +374,19 @@
       background-color 0.15s ease;
   }
 
-  .bouton:hover:not(:disabled) {
+  .bouton:hover:not(:disabled, [aria-disabled='true']) {
     background: var(--soleil);
   }
 
-  .bouton:active:not(:disabled) {
+  .bouton:active:not(:disabled, [aria-disabled='true']) {
     transform: translateY(3px);
     box-shadow: 0 1px 0 var(--indigo);
   }
 
-  .bouton:disabled {
+  /* « Recommencer » au départ (disabled), et le bouton principal à la fin (aria-disabled : il reste
+     focalisable, mais il ne fait plus rien et le montre). */
+  .bouton:disabled,
+  .bouton[aria-disabled='true'] {
     cursor: default;
     color: var(--indigo-doux);
     border-color: color-mix(in srgb, var(--lavande) 50%, var(--papier));

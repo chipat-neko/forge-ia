@@ -141,7 +141,7 @@
           <path class="validation" d={dPoints} />
         {/if}
         {#if trace.d !== ''}
-          <path class="entrainement" d={trace.d} />
+          <path class="entrainement" d={trace.d} data-test="courbe-entrainement" />
         {/if}
       </svg>
       <span class="repere-hasard" style:top="{enY(perteHasard)}%" aria-hidden="true">hasard</span>

@@ -8,6 +8,8 @@ import type { EtatInitialMini } from './apercu';
 import type { MessageDuTravailleur } from './boucle-travailleur';
 import {
   actionPrincipale,
+  ANNONCE_TOUS_LES,
+  annonceApres,
   estEnFrancais,
   etatDeDepart,
   MESSAGE_DIVERGENCE,
@@ -415,6 +417,104 @@ describe('reduire est pur', () => {
     expect(a).toEqual(b);
     expect(a.etat.phase).toBe('termine');
     expect(a.etat.generation).toBe(3);
+  });
+});
+
+describe('annonceApres : ce que disent les lecteurs d’écran', () => {
+  // Une ligne visible qui change à chaque événement, comme la vraie à chaque validation.
+  const ligne = (e: EtatDemo) => `${e.phase} ${e.pas} ${e.validations.length} ${e.message ?? ''}`;
+  /** Joue les événements un à un, comme le composant : la ligne visible et l'annonce après chacun. */
+  function annoncer(etat: EtatDemo, evenements: Evenement[], annonce = '') {
+    const suite: { pas: number; ligne: string; annonce: string }[] = [];
+    for (const ev of evenements) {
+      const apres = reduire(geler(etat), ev, 'complet').etat;
+      annonce = annonceApres(etat, apres, ligne(apres), annonce);
+      etat = apres;
+      suite.push({ pas: etat.pas, ligne: ligne(etat), annonce });
+    }
+    return { etat, annonce, suite };
+  }
+  const validation = (pas: number) => progres(1, pas, { validation: { pas, perte: 3.2 - pas / 3000 } });
+
+  it('au lancement, puis seulement tous les 1 000 pas : rien entre deux validations sous un palier', () => {
+    expect(ANNONCE_TOUS_LES).toBe(1000);
+    const pas = Array.from({ length: 29 }, (_, i) => (i + 1) * 100); // 100, 200, …, 2 900
+    const { suite } = annoncer(etatDeDepart(INITIAL, INDEX_001), [{ type: 'lancer' }, ...pas.map(validation)]);
+    const lancement = suite[0].annonce;
+    expect(lancement).toBe(ligne(jouer(etatDeDepart(INITIAL, INDEX_001), [{ type: 'lancer' }]).etat));
+    const a = (p: number) => suite.find((s) => s.pas === p)!;
+    // De 100 à 900 : l'annonce du lancement, alors que la ligne visible change à chaque validation.
+    for (const p of [100, 200, 900]) expect(a(p).annonce).toBe(lancement);
+    expect(a(100).ligne).not.toBe(a(200).ligne);
+    // 1 000 : annoncé ; 1 100 et 1 200, deux validations de suite sous 2 000 : l'annonce ne bouge pas.
+    expect(a(1000).annonce).toBe(a(1000).ligne);
+    expect(a(1100).ligne).not.toBe(a(1200).ligne);
+    expect(a(1100).annonce).toBe(a(1000).annonce);
+    expect(a(1200).annonce).toBe(a(1000).annonce);
+    expect(a(1900).annonce).toBe(a(1000).annonce);
+    expect(a(2000).annonce).toBe(a(2000).ligne);
+    expect(a(2900).annonce).toBe(a(2000).annonce);
+    // En tout : le lancement, 1 000 et 2 000.
+    expect(new Set(suite.map((s) => s.annonce)).size).toBe(3);
+  });
+
+  it('la fin a son message ; le pas 3 000 ne s’annonce pas avant elle', () => {
+    const { suite } = annoncer(etatDeDepart(INITIAL, INDEX_001), [{ type: 'lancer' }, validation(2900), validation(3000), etatW(1, 'termine')]);
+    expect(suite[2].annonce).toBe(suite[1].annonce);
+    expect(suite[3].annonce).toBe(suite[3].ligne);
+    expect(suite[3].annonce).toContain(messageTermine(3000, 1000));
+  });
+
+  it('la pause du lecteur, une fois confirmée (le pas ne bouge plus), puis la reprise', () => {
+    const { suite } = annoncer(etatDeDepart(INITIAL, INDEX_001), [
+      { type: 'lancer' },
+      { type: 'pause', raison: 'lecteur' },
+      progres(1, 120),
+      etatW(1, 'en-pause'),
+      { type: 'lancer' },
+    ]);
+    const lancement = suite[0].annonce;
+    expect(suite[1].annonce).toBe(lancement); // pas encore confirmée
+    expect(suite[2].annonce).toBe(lancement); // un dernier progrès arrive
+    expect(suite[3].annonce).toBe(suite[3].ligne); // confirmée, au pas 120
+    expect(suite[3].pas).toBe(120);
+    expect(suite[4].annonce).toBe(suite[4].ligne); // la reprise
+    expect(suite[4].annonce).not.toBe(suite[3].annonce);
+  });
+
+  it('l’onglet caché, avec son message exact, dès la pause ; la confirmation ne le redit pas', () => {
+    const { suite } = annoncer(etatDeDepart(INITIAL, INDEX_001), [
+      { type: 'lancer' },
+      validation(100),
+      { type: 'pause', raison: 'onglet' },
+      etatW(1, 'en-pause'),
+    ]);
+    expect(suite[2].annonce).toBe(suite[2].ligne);
+    expect(suite[2].annonce).toContain(MESSAGE_ONGLET);
+    expect(suite[3].annonce).toBe(suite[2].annonce);
+  });
+
+  it('l’explosion, l’erreur et le nouveau taux sont annoncés ; recommencer vide la zone', () => {
+    const lance = (): Evenement[] => [{ type: 'lancer' }, validation(100)];
+    const diverge = annoncer(etatDeDepart(INITIAL, INDEX_001), [...lance(), etatW(1, 'diverge')]);
+    expect(diverge.annonce).toContain(MESSAGE_DIVERGENCE);
+    const erreur = annoncer(etatDeDepart(INITIAL, INDEX_001), [
+      ...lance(),
+      { type: 'message', message: { type: 'erreur', generation: 1, message: 'la liste est vide' } },
+    ]);
+    expect(erreur.annonce).toContain(messageErreur('la liste est vide'));
+    const taux = annoncer(etatDeDepart(INITIAL, INDEX_001), [...lance(), { type: 'changer-taux', tauxIndex: INDEX_001 + 1 }]);
+    expect(taux.annonce).toContain(MESSAGE_NOUVEAU_TAUX);
+    const recommence = annoncer(diverge.etat, [{ type: 'recommencer' }], diverge.annonce);
+    expect(recommence.annonce).toBe('');
+    // Et le lancement suivant se fait entendre de nouveau.
+    expect(annoncer(recommence.etat, [{ type: 'lancer' }]).annonce).not.toBe('');
+  });
+
+  it('la vitesse et les messages d’un ancien essai ne disent rien', () => {
+    const { etat, annonce } = annoncer(etatDeDepart(INITIAL, INDEX_001), [{ type: 'lancer' }, validation(100)]);
+    expect(annoncer(etat, [{ type: 'vitesse', vitesse: 'rapide' }], annonce).annonce).toBe(annonce);
+    expect(annoncer(etat, [progres(7, 1000, { validation: { pas: 1000, perte: 2 } })], annonce).annonce).toBe(annonce);
   });
 });
 

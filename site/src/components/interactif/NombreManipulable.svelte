@@ -1,7 +1,8 @@
 <script lang="ts">
   // Un nombre réglable posé dans une phrase : une pastille jaune soleil (le
   // jaune est réservé à ce qui se manipule). On la fait glisser à la souris ou
-  // au doigt, une unité tous les 6 px horizontaux, ou on la règle au clavier :
+  // au doigt, une unité tous les 6 px horizontaux (prop `pixelsParUnite`), ou on
+  // la règle au clavier :
   //   - flèches droite et haut : + pas ; flèches gauche et bas : - pas ;
   //   - Page précédente / Page suivante : + 10 / - 10 ;
   //   - Début : minimum ; Fin : maximum.
@@ -38,11 +39,25 @@
     testId?: string;
     /** Le texte affiché pour une valeur (et lu par aria-valuetext) ; la valeur elle-même par défaut. */
     texte?: (v: number) => string;
+    /**
+     * Les pixels de glissé horizontal pour une unité ; 6 par défaut. Plus grand pour un réglage à
+     * peu de crans, que le doigt ne doit pas faire sauter d'un bout à l'autre (le taux du mini-modèle).
+     */
+    pixelsParUnite?: number;
   }
 
-  const { canal: nomDuCanal, min, max, initiale, etiquette, pas = 1, verrou, testId, texte }: Props = $props();
-
-  const PIXELS_PAR_UNITE = 6;
+  const {
+    canal: nomDuCanal,
+    min,
+    max,
+    initiale,
+    etiquette,
+    pas = 1,
+    verrou,
+    testId,
+    texte,
+    pixelsParUnite = 6,
+  }: Props = $props();
   const SAUT_PAGE = 10;
 
   // Le canal et le verrou sont choisis une fois pour toutes (untrack le dit) :
@@ -112,7 +127,7 @@
 
   function bouge(evenement: PointerEvent): void {
     if (!geste || evenement.pointerId !== geste.pointeur) return;
-    const unites = Math.trunc((evenement.clientX - geste.x) / PIXELS_PAR_UNITE);
+    const unites = Math.trunc((evenement.clientX - geste.x) / pixelsParUnite);
     regler(geste.depart + unites * pas);
   }
 

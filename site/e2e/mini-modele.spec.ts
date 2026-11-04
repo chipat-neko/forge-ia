@@ -23,7 +23,10 @@ const AVANT_GOUT = PRESETS_MINI['avant-gout'];
 const ATTENTE_TRAVAILLEUR = { timeout: 20_000 };
 
 const demo = (p: Page, nom = 'mini') => p.locator(`[data-mini="${nom}"]`);
+// La ligne d'état visible (elle change à chaque validation), et la zone lue par les lecteurs
+// d'écran (role="status", cachée à l'œil), qui ne la reprend qu'aux moments qui comptent.
 const etat = (p: Page, nom = 'mini') => demo(p, nom).locator('[data-test="mini-etat"]');
+const annonce = (p: Page, nom = 'mini') => demo(p, nom).locator('[data-test="mini-annonce"]');
 const pas = async (p: Page, nom = 'mini') => Number(await etat(p, nom).getAttribute('data-pas'));
 const action = (p: Page, nom = 'mini') => demo(p, nom).locator('[data-test="mini-action"]');
 const validations = (p: Page, nom = 'mini') => demo(p, nom).locator('[data-test="mini-validations"] li');
@@ -41,6 +44,8 @@ function erreurDe(ligne: string): number {
 
 /** Le texte brut (textContent : Playwright ramène U+202F à une espace dans toHaveText). */
 const brut = async (p: Page, nom = 'mini') => ((await etat(p, nom).textContent()) ?? '').trim();
+/** Le texte brut de la zone lue par les lecteurs d'écran. */
+const brutAnnonce = async (p: Page, nom = 'mini') => ((await annonce(p, nom).textContent()) ?? '').trim();
 
 async function ouvrir(p: Page): Promise<void> {
   await p.goto(PAGE);
@@ -141,8 +146,11 @@ test('pause et reprise au même pas', async ({ page }) => {
   await page.waitForTimeout(1000);
   expect(await pas(page)).toBe(n);
   expect(await brut(page)).toBe(`En pause au pas ${nombre(n)} sur ${nombre(COMPLET.pasTotal)}.`);
+  // Les lecteurs d'écran l'entendent, une fois la pause confirmée : la même phrase.
+  expect(await brutAnnonce(page)).toBe(`En pause au pas ${nombre(n)} sur ${nombre(COMPLET.pasTotal)}.`);
   await expect(action(page)).toHaveText('Reprendre');
   await action(page).click();
+  await expect.poll(() => brutAnnonce(page)).toBe(`Entraînement repris au pas ${nombre(n)}.`);
   await expect.poll(() => pas(page), ATTENTE_TRAVAILLEUR).toBeGreaterThan(n);
 });
 
@@ -157,6 +165,7 @@ test('onglet caché : pause automatique', async ({ page }) => {
   });
   await expect(etat(page)).toContainText('En pause\u202F: l’onglet était caché.');
   expect(await brut(page)).toBe(MESSAGE_ONGLET);
+  expect(await brutAnnonce(page)).toBe(MESSAGE_ONGLET);
   await expect(demo(page)).toHaveAttribute('data-travailleur', 'en-pause');
   const n = await pas(page);
   await page.waitForTimeout(1000);
@@ -180,6 +189,8 @@ test('recommencer : courbe fantôme, et le même réglage redonne les mêmes err
 
   await demo(page).locator('[data-test="mini-recommencer"]').click();
   await expect(etat(page)).toHaveAttribute('data-pas', '0');
+  // Rien n'est dit, et l'annonce de l'essai d'avant ne reste pas.
+  expect(await brutAnnonce(page)).toBe('');
   await expect(validations(page)).toHaveCount(1);
   await expect(demo(page).locator('[data-test="courbe-fantome"]')).toHaveAttribute('d', /^M[\d.]+,[\d.]+L/);
   await expect(demo(page).locator('figcaption')).toContainText(`l’essai d’avant, au taux de ${texteTaux(COMPLET.tauxMax)}`);
@@ -204,6 +215,7 @@ test('changer le taux repart de zéro', async ({ page }) => {
   await expect(taux(page)).toHaveText(texteTaux(suivant));
   await expect(etat(page)).toHaveAttribute('data-pas', '0');
   expect(await brut(page)).toBe(MESSAGE_NOUVEAU_TAUX);
+  expect(await brutAnnonce(page)).toBe(MESSAGE_NOUVEAU_TAUX);
   await expect(demo(page)).toHaveAttribute('data-phase', 'pret');
   await expect(action(page)).toHaveText('Lancer l’entraînement');
   await expect(demo(page).locator('[data-test="courbe-fantome"]')).toHaveCount(1);
@@ -220,15 +232,27 @@ test('entraînement complet : erreur finale ≤ 2,45 et acquis gagné', async ({
   await ouvrir(page);
   await expect(page.locator('#recap [data-acquis="entraine"]')).toHaveAttribute('data-gagne', 'non');
   await allerVite(page);
-  const finale = await entrainerJusquauBout(page);
-  await expect(demo(page)).toHaveAttribute('data-phase', 'termine');
+  // Le focus du clavier sur le bouton principal pendant l'entraînement : il y reste à la fin.
+  await expect(action(page)).toHaveText('Lancer l’entraînement');
+  await action(page).focus();
+  await page.keyboard.press('Enter');
+  await expect(action(page)).toHaveText('Pause');
+  await expect(demo(page)).toHaveAttribute('data-phase', 'termine', { timeout: 120_000 });
+  const finale = erreurDe((await validations(page).allTextContents()).at(-1)!);
   expect(finale).toBeLessThanOrEqual(2.45);
   await expect(validations(page)).toHaveCount(COMPLET.pasTotal / COMPLET.validationTous + 1);
   await expect(validations(page).last()).toContainText(`au pas ${nombre(COMPLET.pasTotal)}`);
   await expect(etat(page)).toHaveAttribute('data-pas', String(COMPLET.pasTotal));
   expect(await brut(page)).toMatch(new RegExp(`^Terminé${FINE}: ${nombre(COMPLET.pasTotal)} pas en \\d+ s\\.$`));
+  expect(await brutAnnonce(page)).toBe(await brut(page));
   await expect(action(page)).toHaveText('Terminé');
+  // Désactivé (aria-disabled), mais toujours focalisé, et il ne fait plus rien.
   await expect(action(page)).toBeDisabled();
+  await expect(action(page)).toHaveAttribute('aria-disabled', 'true');
+  await expect(action(page)).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(demo(page)).toHaveAttribute('data-phase', 'termine');
+  await expect(action(page)).toHaveText('Terminé');
   await expect(page.locator('#recap [data-acquis="entraine"]')).toHaveAttribute('data-gagne', 'oui');
   await expect(echantillons(page)).toHaveCount(COMPLET.nbEchantillons);
   await expect(demo(page)).toContainText(`Les prénoms qu’il invente au pas ${nombre(COMPLET.pasTotal)}`);
@@ -297,23 +321,31 @@ test('explosion de l’erreur : message exact, repère « hors échelle », aucu
   await action(page).click();
   // Le lancement s'annonce tout de suite, avant la première validation.
   await expect.poll(() => brut(page)).toBe('Entraînement lancé.');
+  expect(await brutAnnonce(page)).toBe('Entraînement lancé.');
   await expect(etat(page)).toHaveAttribute('data-pas', '38', ATTENTE_TRAVAILLEUR);
   expect(servi, 'le faux Worker a bien été servi').toBe(true);
   await expect(repere).toHaveCount(0);
 
-  await demo(page).locator('[data-test="mini-vitesse"]').click();
+  // La vitesse change par un clic qui ne déplace pas le focus : il reste sur le bouton principal.
+  await action(page).focus();
+  await demo(page).locator('[data-test="mini-vitesse"]').dispatchEvent('click');
   await expect(demo(page)).toHaveAttribute('data-phase', 'diverge');
   expect(await brut(page)).toBe(MESSAGE_DIVERGENCE);
+  expect(await brutAnnonce(page)).toBe(MESSAGE_DIVERGENCE);
   await expect(action(page)).toHaveText('Entraînement arrêté');
   await expect(action(page)).toBeDisabled();
+  await expect(action(page)).toBeFocused();
   // Le repère, avec son texte exact (la flèche est un décor CSS).
   await expect(repere).toBeVisible();
   expect(await repere.textContent()).toBe('hors échelle');
   const courbe = demo(page).locator('[data-test="courbe"]');
   await expect(courbe).toHaveAttribute('aria-label', /La courbe sort du cadre par le haut\.$/);
   const chemins = await courbe.locator('path').evaluateAll((ps) => ps.map((p) => p.getAttribute('d') ?? ''));
-  expect(chemins.some((d) => d.startsWith('M'))).toBe(true);
   for (const d of chemins) expect(d).not.toMatch(/NaN|Infinity/);
+  // Le chemin de l'entraînement lui-même : tracé (au moins un point), sans NaN ni Infinity.
+  const entrainement = (await courbe.locator('[data-test="courbe-entrainement"]').getAttribute('d')) ?? '';
+  expect(entrainement).toMatch(/^M[\d.]+,[\d.]+/);
+  expect(entrainement).not.toMatch(/NaN|Infinity/);
   // La sortie est près du pas 0 : le repère ne chevauche pas le titre « erreur ».
   const titre = (await demo(page).locator('.titre-y').boundingBox())!;
   const boite = (await repere.boundingBox())!;
@@ -322,6 +354,125 @@ test('explosion de l’erreur : message exact, repère « hors échelle », aucu
   expect(chevauche, 'le repère chevauche le titre de l’axe').toBe(false);
   await verifierAxe(page);
   await verifierSansDebordement(page);
+});
+
+// Un faux Worker pas à pas, pour la zone lue par les lecteurs d'écran : au lancement, il fait
+// les pas 1 à 900, avec une validation tous les 100 pas (neuf messages) ; puis, chaque fois que
+// la page lui envoie la vitesse, les 100 pas suivants (1 000, 1 100, 1 200), et enfin d'un coup
+// jusqu'à 2 000. Le parcours avance donc d'une validation à la fois, sans course contre l'horloge.
+const TRAVAILLEUR_PAS_A_PAS = `
+let generation = null;
+let pas = 0;
+function avancer(jusqua) {
+  while (pas < jusqua) {
+    const debut = pas;
+    pas += 100;
+    const pertes = [];
+    for (let i = debut; i < pas; i++) pertes.push(3.5 - i * 0.0004);
+    self.postMessage({
+      type: 'progres', generation, pas, pasTotal: 3000, pertes, dureeMs: pas * 7, pasParSeconde: 140,
+      validation: { pas, perte: 3.4 - pas * 0.0004 },
+    });
+  }
+}
+self.onmessage = (evenement) => {
+  const m = evenement.data;
+  if (m.type === 'lancer') {
+    generation = m.generation;
+    avancer(900);
+  } else if (m.type === 'vitesse' && m.generation === generation) {
+    avancer(pas < 1200 ? pas + 100 : 2000);
+  }
+};
+`;
+
+test('la zone lue ne change pas entre deux validations sous un palier de 1 000 pas', async ({ page }) => {
+  await page.route(/\/_astro\/travailleur-[^/]*\.js$/, (route) =>
+    route.fulfill({ contentType: 'text/javascript', body: TRAVAILLEUR_PAS_A_PAS }),
+  );
+  await ouvrir(page);
+  const vitesse = demo(page).locator('[data-test="mini-vitesse"]');
+  await action(page).click();
+  // Neuf validations, de 100 à 900 : la ligne visible les suit, la zone lue garde l'annonce du lancement.
+  await expect(etat(page)).toHaveAttribute('data-pas', '900', ATTENTE_TRAVAILLEUR);
+  await expect(validations(page)).toHaveCount(10);
+  expect(await brut(page)).toMatch(/^Pas 900 sur /);
+  expect(await brutAnnonce(page)).toBe('Entraînement lancé.');
+  // 1 000 : annoncé, avec la ligne visible de ce moment.
+  await vitesse.click();
+  await expect(etat(page)).toHaveAttribute('data-pas', '1000');
+  const palier = await brut(page);
+  expect(palier).toMatch(new RegExp(`^Pas ${nombre(1000)} sur ${nombre(3000)}${FINE}: erreur `));
+  expect(await brutAnnonce(page)).toBe(palier);
+  // À partir d'ici, on compte chaque changement de la zone lue.
+  await annonce(page).evaluate((el) => {
+    const w = window as unknown as { changementsAnnonce: number };
+    w.changementsAnnonce = 0;
+    new MutationObserver((ms) => (w.changementsAnnonce += ms.length)).observe(el, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
+  });
+  const changements = () => page.evaluate(() => (window as unknown as { changementsAnnonce: number }).changementsAnnonce);
+  // 1 100 puis 1 200 : deux validations de suite sous 2 000. La ligne visible change, la zone lue non.
+  await vitesse.click();
+  await expect(etat(page)).toHaveAttribute('data-pas', '1100');
+  const ligne1100 = await brut(page);
+  expect(ligne1100).not.toBe(palier);
+  await vitesse.click();
+  await expect(etat(page)).toHaveAttribute('data-pas', '1200');
+  expect(await brut(page)).not.toBe(ligne1100);
+  expect(await brutAnnonce(page)).toBe(palier);
+  expect(await changements()).toBe(0);
+  // 2 000 : annoncé de nouveau.
+  await vitesse.click();
+  await expect(etat(page)).toHaveAttribute('data-pas', '2000');
+  expect(await brutAnnonce(page)).toBe(await brut(page));
+  expect(await brutAnnonce(page)).toMatch(new RegExp(`^Pas ${nombre(2000)} sur `));
+  expect(await changements()).toBeGreaterThan(0);
+});
+
+test('le taux se règle au glissé, un cran tous les 24 px', async ({ page }) => {
+  await ouvrir(page);
+  const t = taux(page);
+  await t.scrollIntoViewIfNeeded();
+  const depart = TAUX_PROPOSES.indexOf(COMPLET.tauxMax);
+  expect(depart).toBeGreaterThanOrEqual(2);
+  expect(depart).toBeLessThanOrEqual(TAUX_PROPOSES.length - 3);
+  const boite = (await t.boundingBox())!;
+  const x = boite.x + boite.width / 2;
+  const y = boite.y + boite.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  // 30 px : un seul cran (à 6 px par cran, comme le nombre de l'atelier, ce serait cinq).
+  await page.mouse.move(x + 30, y, { steps: 5 });
+  await expect(t).toHaveAttribute('aria-valuenow', String(depart + 1));
+  await page.mouse.move(x + 50, y, { steps: 3 });
+  await expect(t).toHaveAttribute('aria-valuenow', String(depart + 2));
+  await page.mouse.move(x - 30, y, { steps: 6 });
+  await expect(t).toHaveAttribute('aria-valuenow', String(depart - 1));
+  await page.mouse.up();
+  await expect(t).toHaveAttribute('aria-valuetext', texteTaux(TAUX_PROPOSES[depart - 1]));
+});
+
+test('au doigt, le taux avance d’un cran pour 30 px', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'le toucher se teste sur le projet mobile');
+  await ouvrir(page);
+  const t = taux(page);
+  await t.scrollIntoViewIfNeeded();
+  const depart = TAUX_PROPOSES.indexOf(COMPLET.tauxMax);
+  const boite = (await t.boundingBox())!;
+  const x = Math.round(boite.x + boite.width / 2);
+  const y = Math.round(boite.y + boite.height / 2);
+  // Playwright n'a pas de geste de glissé au doigt : on passe par Chrome directement.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (let i = 1; i <= 10; i++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + i * 3, y }] });
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(t).toHaveAttribute('aria-valuenow', String(depart + 1));
 });
 
 test('avant-goût : 600 pas, sans réglage de taux', async ({ page }) => {
@@ -402,4 +553,11 @@ test('accessibilité, largeur, typographie', async ({ page }) => {
   }
   // La ligne d'état n'a jamais pris le focus.
   await expect(etat(page)).not.toBeFocused();
+  // Une seule zone lue d'office par démo : la zone cachée, pas la ligne visible.
+  for (const nom of ['mini', 'avant-gout']) {
+    await expect(demo(page, nom).getByRole('status')).toHaveCount(1);
+    await expect(demo(page, nom).getByRole('status')).toHaveAttribute('data-test', 'mini-annonce');
+    await expect(demo(page, nom).getByRole('status')).toHaveClass(/\bvh\b/);
+    await expect(etat(page, nom)).not.toHaveAttribute('role', /.*/);
+  }
 });

@@ -267,6 +267,38 @@ export function reduire(etat: EtatDemo, ev: Evenement, preset: NomPreset): Reduc
   }
 }
 
+/** Pendant l'entraînement, les lecteurs d'écran entendent où il en est tous les 1 000 pas, pas à chaque validation. */
+export const ANNONCE_TOUS_LES = 1000;
+
+/**
+ * Ce que dit la zone lue par les lecteurs d'écran (role="status", cachée à l'œil) après un
+ * événement. La ligne d'état visible change à chaque validation : tous les 100 pas, plusieurs
+ * fois par seconde en vitesse rapide. Lue d'office, elle couvrirait tout. La zone reprend donc
+ * `ligne`, la ligne visible du nouvel état, aux seuls moments qui comptent, et garde sinon
+ * `annonce`, la précédente, à l'identique : un texte qui ne change pas n'est pas relu.
+ *
+ * Les moments :
+ * - le lancement et la reprise ;
+ * - la pause du lecteur, une fois confirmée par le Worker (le pas ne bouge plus) ;
+ * - un message nouveau : pause de l'onglet caché, nouveau taux, fin, explosion, erreur ;
+ * - une validation tous les 1 000 pas (ANNONCE_TOUS_LES), sauf la dernière : la fin a son message.
+ *
+ * Recommencer vide la zone : rien n'est dit, et l'annonce de l'essai d'avant ne reste pas.
+ */
+export function annonceApres(avant: EtatDemo, apres: EtatDemo, ligne: string, annonce: string): string {
+  if (apres === avant) return annonce;
+  if (apres.message !== null && apres.message !== avant.message) return ligne;
+  if (apres.phase === 'en-cours' && avant.phase !== 'en-cours') return ligne;
+  const pauseConfirmee = apres.travailleur === 'en-pause' && avant.travailleur !== 'en-pause';
+  if (apres.phase === 'en-pause' && apres.message === null && pauseConfirmee) return ligne;
+  if (apres.phase === 'en-cours' && apres.validations.length > avant.validations.length) {
+    const v = apres.validations[apres.validations.length - 1];
+    if (v.pas > 0 && v.pas % ANNONCE_TOUS_LES === 0 && v.pas < apres.pasTotal) return ligne;
+  }
+  if (apres.phase === 'pret' && apres.message === null && apres.generation !== avant.generation) return '';
+  return annonce;
+}
+
 /**
  * Le bouton principal de la démo : son texte, et l'événement d'un clic
  * (null : le bouton est désactivé). Après un changement de taux, la démo est
