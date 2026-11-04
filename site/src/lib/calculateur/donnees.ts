@@ -11,7 +11,14 @@
 // Relevés : le 3 novembre 2026 pour le matériel, les prix, le taux, le tarif et
 // les formules (recherche du plan 3, prix et pages de NVIDIA revus le 4
 // novembre, inchangés) ; le 4 novembre 2026 pour les formes des modèles
-// publics, lues dans leurs articles.
+// publics, lues dans leurs articles, et pour la bande passante de la B200
+// (page du DGX B200).
+//
+// La grille d'EDF a été relue le 4 novembre 2026 (texte extrait du PDF) :
+// « Applicable au 1er aout 2026 », option Base TTC, 20,01 centimes le kWh à
+// 3 kVA (abonnement 12,13 € par mois) et à 6 kVA (15,86 €), 19,85 centimes de
+// 9 à 36 kVA (puissances « mises en extinction »). Le prix retenu n'a pas
+// changé.
 //
 // Ce module est en TypeScript pur, sans import propre à Vite : les parcours
 // Playwright l'importent directement.
@@ -38,14 +45,14 @@ export interface Materiel {
   creteTflops: number;
   /** La mémoire d'une carte, en Go. */
   memoireGo: number;
-  /** La bande passante de la mémoire, en Go/s décimaux ; null si la source ne la donne pas. */
+  /** La bande passante de la mémoire, en Go/s décimaux (par carte) ; null si la source ne la donne pas. */
   bandePassanteGoS: number | null;
   /** La puissance maximale d'une carte, en W ; null si la source ne la donne pas. */
   puissanceW: number | null;
   /** Comment le chiffre de crête se lit dans la source, quand ce n'est pas direct. */
   note?: string;
   source: Source;
-  /** Les sources d'autres chiffres de la même carte (la mémoire de la B200). */
+  /** Les sources d'autres chiffres de la même carte (la mémoire et la bande passante de la B200). */
   autresSources?: readonly Source[];
 }
 
@@ -65,6 +72,15 @@ export interface RepereEfficacite {
   materiel: string;
   min: number;
   max: number;
+  /**
+   * Vrai si la source compte l'attention dans les opérations (6N + 12·L·h·s
+   * par jeton, PaLM annexe B), faux si elle ne compte que 6N. Le calculateur,
+   * lui, compte 6N : pour comparer à ces chiffres, il faut l'efficacité « en
+   * comptant l'attention » de ton IA.
+   */
+  compteAttention: boolean;
+  /** Où et comment la source dit compter les opérations. */
+  definition: string;
   source: Source;
 }
 
@@ -216,14 +232,21 @@ export const MATERIELS: readonly Materiel[] = Object.freeze([
     categorie: 'centre-de-donnees',
     creteTflops: 2250,
     memoireGo: 180,
-    bandePassanteGoS: null,
+    // Chiffre dérivé : la page du DGX B200 donne « 64 TB/s » pour ses 8 cartes (décision du 4 novembre 2026).
+    bandePassanteGoS: 64_000 / 8,
     puissanceW: null,
     note:
       `36 PFLOPS en FP16 et bf16 pour les 8 cartes d’un HGX B200, chiffre «${FINE}en sparse${FINE}» (le dense en vaut la moitié)${FINE}: ` +
-      `36${FINE}000 ÷ 8 ÷ 2 = 2${FINE}250 TFLOPS par carte. Mémoire${FINE}: 1${FINE}440 Go pour les 8 cartes d’un DGX B200, soit 180 Go.`,
+      `36${FINE}000 ÷ 8 ÷ 2 = 2${FINE}250 TFLOPS par carte. Mémoire${FINE}: 1${FINE}440 Go pour les 8 cartes d’un DGX B200, soit 180 Go. ` +
+      `Bande passante${FINE}: «${FINE}64 TB/s${FINE}» de HBM3e pour les mêmes 8 cartes, soit 8${FINE}000 Go/s par carte, ` +
+      `un chiffre dérivé (divisé par 8), pas lu tel quel. Pas de puissance par carte${FINE}: NVIDIA ne donne que celle du système entier.`,
     source: primaire('NVIDIA, page des HGX (spécifications du HGX B200)', 'https://www.nvidia.com/en-us/data-center/hgx/'),
     autresSources: Object.freeze([
-      primaire('NVIDIA, page du DGX B200 (spécifications, mémoire totale)', 'https://www.nvidia.com/en-us/data-center/dgx-b200/'),
+      primaire(
+        `NVIDIA, page du DGX B200 (spécifications${FINE}: mémoire totale et bande passante HBM3e)`,
+        'https://www.nvidia.com/en-us/data-center/dgx-b200/',
+        '2026-11-04',
+      ),
     ]),
   },
 ] satisfies Materiel[]);
@@ -281,17 +304,16 @@ export const PRIX_LOCATION: readonly PrixLocation[] = Object.freeze(
   ].map((p) => Object.freeze(p)),
 );
 
-/** Les prix d'une carte, du plus bas au plus haut ; null si aucun prix n'a été relevé pour elle. */
+/**
+ * Les prix d'une carte, rangés du plus bas au plus haut (à égalité, dans
+ * l'ordre du relevé), avec le plus bas et le plus haut ; null si aucun prix
+ * n'a été relevé pour elle.
+ */
 export function fourchettePrix(materielId: string): { min: number; max: number; prix: readonly PrixLocation[] } | null {
-  const prix = PRIX_LOCATION.filter((p) => p.materiel === materielId);
+  // sort est stable : deux prix égaux gardent l'ordre de PRIX_LOCATION.
+  const prix = PRIX_LOCATION.filter((p) => p.materiel === materielId).sort((a, b) => a.usdParHeure - b.usdParHeure);
   if (prix.length === 0) return null;
-  let min = prix[0].usdParHeure;
-  let max = prix[0].usdParHeure;
-  for (const p of prix) {
-    if (p.usdParHeure < min) min = p.usdParHeure;
-    if (p.usdParHeure > max) max = p.usdParHeure;
-  }
-  return { min, max, prix };
+  return { min: prix[0].usdParHeure, max: prix[prix.length - 1].usdParHeure, prix: Object.freeze(prix) };
 }
 
 // --- Le taux de change et l'électricité -------------------------------------
@@ -331,6 +353,10 @@ export const REPERES_EFFICACITE: readonly RepereEfficacite[] = Object.freeze([
     materiel: `6${FINE}144 puces TPU v4`,
     min: 0.462,
     max: 0.462,
+    compteAttention: true,
+    definition:
+      `Annexe B${FINE}: 6N + 12·L·H·Q·T opérations par jeton, l’attention comprise (sans remise pour le masque causal), ` +
+      'rapportées à la crête des puces.',
     source: primaire(
       `Chowdhery et al., «${FINE}PaLM: Scaling Language Modeling with Pathways${FINE}» (arXiv 2204.02311), section 4.1 et tableau 3`,
       'https://arxiv.org/abs/2204.02311',
@@ -341,6 +367,10 @@ export const REPERES_EFFICACITE: readonly RepereEfficacite[] = Object.freeze([
     materiel: `de 8${FINE}192 à 16${FINE}384 H100`,
     min: 0.38,
     max: 0.43,
+    compteAttention: true,
+    definition:
+      `Section 3.3.2${FINE}: l’article définit son efficacité («${FINE}BF16 Model FLOPs Utilization${FINE}») par renvoi à ` +
+      `PaLM (Chowdhery et al., 2023), sans donner sa propre formule${FINE}: il compte donc l’attention, comme PaLM.`,
     source: primaire(
       `Llama Team (Meta), «${FINE}The Llama 3 Herd of Models${FINE}» (arXiv 2407.21783), section 3.3.2 et tableau 4`,
       'https://arxiv.org/abs/2407.21783',
@@ -367,7 +397,7 @@ const LLAMA3 = primaire(
 );
 
 const NOTE_PETITS_LLAMA =
-  `Environ 15 billions de jetons${FINE}: l’article ne donne pas le compte exact pour cette taille. Il dit «${FINE}a corpus ` +
+  `Environ 15${FINE}000 milliards de jetons${FINE}: l’article ne donne pas le compte exact pour cette taille. Il dit «${FINE}a corpus ` +
   `of about 15T multilingual tokens${FINE}» (section 1) et «${FINE}similar recipes${FINE}» pour 8B et 70B (section 3.4).`;
 
 /** Les modèles publics, formes lues dans leurs articles le 4 novembre 2026. */

@@ -49,7 +49,7 @@ function textesVisibles(): [string, string][] {
     textes.push([m.id, m.nom]);
     if (m.note) textes.push([m.id, m.note]);
   }
-  for (const r of REPERES_EFFICACITE) textes.push([r.modele, r.modele], [r.modele, r.materiel]);
+  for (const r of REPERES_EFFICACITE) textes.push([r.modele, r.modele], [r.modele, r.materiel], [r.modele, r.definition]);
   textes.push(['électricité', ELECTRICITE.libelle]);
   for (const [lieu, s] of toutesLesSources()) textes.push([lieu, s.titre]);
   return textes;
@@ -119,7 +119,7 @@ describe('le matériel', () => {
       ['a100-80', 'centre-de-donnees', 312, 80, 2039, 400],
       ['h100-sxm', 'centre-de-donnees', 989, 80, 3350, 700],
       ['h200', 'centre-de-donnees', 989, 141, 4800, 700],
-      ['b200', 'centre-de-donnees', 2250, 180, null, null],
+      ['b200', 'centre-de-donnees', 2250, 180, 8000, null],
     ]);
   });
 
@@ -144,6 +144,17 @@ describe('le matériel', () => {
     expect(materiel('l4').note).toMatch(/242/);
     expect(materiel('b200').note).toMatch(/36 PFLOPS/);
     expect(materiel('b200').autresSources?.[0].url).toBe('https://www.nvidia.com/en-us/data-center/dgx-b200/');
+  });
+
+  it('la bande passante de la B200 : « 64 TB/s » pour les 8 cartes du DGX B200, soit 8 000 Go/s par carte, chiffre dérivé', () => {
+    const b200 = materiel('b200');
+    expect(b200.bandePassanteGoS).toBe(64_000 / 8);
+    expect(b200.note).toMatch(/64 TB\/s/);
+    expect(b200.note).toMatch(/8\u202F000 Go\/s par carte/);
+    expect(b200.note).toMatch(/dérivé/);
+    const dgx = b200.autresSources?.[0];
+    expect(dgx?.titre).toMatch(/bande passante/);
+    expect(dgx?.releveLe).toBe('2026-11-04');
   });
 
   it('materiel() trouve une carte, ou dit quoi faire', () => {
@@ -193,6 +204,17 @@ describe('les prix de location', () => {
     expect(h100?.min).toBe(2.69);
     expect(h100?.max).toBe(12.29);
     expect(h100?.prix).toHaveLength(5);
+    // Les prix eux-mêmes sont rangés du plus bas au plus haut (à égalité, dans l'ordre du relevé).
+    expect(h100?.prix.map((p) => [p.fournisseur, p.usdParHeure])).toEqual([
+      ['RunPod', 2.69],
+      ['RunPod', 3.99],
+      ['Lambda', 3.99],
+      ['Lambda', 4.29],
+      ['Azure', 98.32 / 8],
+    ]);
+    const b200 = fourchettePrix('b200');
+    expect(b200?.prix.map((p) => p.usdParHeure)).toEqual([5.98, 6.69, 6.99, 7.99]);
+    expect([b200?.min, b200?.max]).toEqual([5.98, 7.99]);
     expect(fourchettePrix('rtx-5070-ti')).toBeNull();
     expect(fourchettePrix('t4')).toBeNull();
   });
@@ -215,6 +237,17 @@ describe('le taux de change, l’électricité et les efficacités', () => {
     ]);
     expect(REPERES_EFFICACITE[0].source.url).toBe('https://arxiv.org/abs/2204.02311');
     expect(REPERES_EFFICACITE[1].source.url).toBe('https://arxiv.org/abs/2407.21783');
+  });
+
+  it('chaque repère dit s’il compte l’attention : PaLM oui (annexe B), Llama 3 par renvoi à la définition de PaLM', () => {
+    expect(REPERES_EFFICACITE.map((r) => [r.modele, r.compteAttention])).toEqual([
+      ['PaLM 540B', true],
+      ['Llama 3 405B', true],
+    ]);
+    expect(REPERES_EFFICACITE[0].definition).toMatch(/^Annexe B/);
+    expect(REPERES_EFFICACITE[0].definition).toMatch(/12·L·H·Q·T/);
+    expect(REPERES_EFFICACITE[1].definition).toMatch(/^Section 3\.3\.2/);
+    expect(REPERES_EFFICACITE[1].definition).toMatch(/Chowdhery/);
   });
 
   it('chaque formule a ses sources (article et section ou équation)', () => {
@@ -271,13 +304,16 @@ describe('les modèles publics', () => {
     expect(Math.abs(calcul('llama-3-405b') / 3.8e25 - 1)).toBeLessThan(0.01);
   });
 
-  it('les écarts avec le plan sont dits : le vocabulaire de GPT-3 vient de GPT-2, les jetons des petits Llama 3 sont « environ 15 billions »', () => {
+  it('les écarts avec le plan sont dits : le vocabulaire de GPT-3 vient de GPT-2, les jetons des petits Llama 3 sont « environ 15 000 milliards »', () => {
     expect(modelePublic('gpt-3-175b').note).toMatch(/GPT-2/);
     expect(modelePublic('gpt-3-175b').autresSources?.[0].url).toBe(
       'https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf',
     );
-    expect(modelePublic('llama-3-8b').note).toMatch(/environ 15/i);
-    expect(modelePublic('llama-3-70b').note).toMatch(/environ 15/i);
+    for (const id of ['llama-3-8b', 'llama-3-70b']) {
+      // « billion » est un faux ami (10¹² en français) : on écrit les milliards.
+      expect(modelePublic(id).note).toMatch(/^Environ 15\u202F000 milliards de jetons/);
+      expect(modelePublic(id).note).not.toMatch(/billion/);
+    }
   });
 });
 

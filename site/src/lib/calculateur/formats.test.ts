@@ -5,8 +5,12 @@ import { describe, expect, it } from 'vitest';
 import { MATERIELS, MODELES_PUBLICS, PRIX_LOCATION, TAUX_DE_CHANGE } from './donnees';
 import {
   dixPuissance,
+  formaterDate,
+  formaterDollars,
   formaterDuree,
+  formaterEnergie,
   formaterEuros,
+  formaterHeures,
   formaterOctets,
   formaterPrix,
   formaterPuissanceDeDix,
@@ -171,6 +175,88 @@ describe('formaterEuros et formaterPrix', () => {
     for (const x of [NaN, Infinity, -0.01]) {
       expect(() => formaterEuros(x), String(x)).toThrow(RangeError);
       expect(() => formaterPrix(x), String(x)).toThrow(RangeError);
+    }
+  });
+});
+
+describe('formaterDollars', () => {
+  it('comme les euros : moins d’un dollar, deux décimales sous 10, un entier sous 1 000, trois chiffres sous un million', () => {
+    expect(formaterDollars(0.4)).toBe('moins d’un dollar');
+    expect(formaterDollars(1)).toBe('1,00 $');
+    expect(formaterDollars(9.996)).toBe('10 $');
+    expect(formaterDollars(383.4)).toBe('383 $');
+    expect(formaterDollars(1234)).toBe(`1${FINE}230 $`);
+    expect(formaterDollars(194_669)).toBe(`195${FINE}000 $`);
+  });
+
+  it('les millions puis les milliards de dollars', () => {
+    expect(formaterDollars(999_600)).toBe('1,0 million de dollars');
+    expect(formaterDollars(2.5e6)).toBe('2,5 millions de dollars');
+    expect(formaterDollars(37.3e6)).toBe('37 millions de dollars');
+    expect(formaterDollars(1.5e9)).toBe('1,5 milliard de dollars');
+    expect(formaterDollars(1.2e12)).toBe(`1${FINE}200 milliards de dollars`);
+  });
+
+  it('refuse une valeur non finie ou négative', () => {
+    for (const x of [NaN, Infinity, -1]) expect(() => formaterDollars(x), String(x)).toThrow(RangeError);
+  });
+});
+
+describe('formaterEnergie', () => {
+  it('l’exemple du plan : ton IA sur la RTX 5070 Ti, 42,8 kWh', () => {
+    expect(formaterEnergie(42.77)).toBe('42,8 kWh');
+  });
+
+  it('une décimale sous 100 kWh, un entier sous 10 000, puis MWh, GWh et TWh', () => {
+    expect(formaterEnergie(0)).toBe('moins de 0,1 kWh');
+    expect(formaterEnergie(0.04)).toBe('moins de 0,1 kWh');
+    expect(formaterEnergie(0.05)).toBe('0,1 kWh');
+    expect(formaterEnergie(99.94)).toBe('99,9 kWh');
+    expect(formaterEnergie(99.96)).toBe('100 kWh');
+    expect(formaterEnergie(8640)).toBe(`8${FINE}640 kWh`);
+    expect(formaterEnergie(9999.6)).toBe('10,0 MWh');
+    expect(formaterEnergie(1_234_000)).toBe(`1${FINE}234 MWh`);
+    expect(formaterEnergie(37.3e6)).toBe('37,3 GWh');
+    expect(formaterEnergie(5e9)).toBe(`5${FINE}000 GWh`);
+    expect(formaterEnergie(37.3e9)).toBe('37,3 TWh');
+    expect(formaterEnergie(1.5e14)).toBe(`150${FINE}000 TWh`);
+  });
+
+  it('refuse une valeur non finie ou négative', () => {
+    for (const x of [NaN, Infinity, -1]) expect(() => formaterEnergie(x), String(x)).toThrow(RangeError);
+  });
+});
+
+describe('formaterHeures', () => {
+  it('une décimale sous 10 h, un entier sous un million, puis en millions ou milliards d’heures', () => {
+    expect(formaterHeures(0.01)).toBe('moins de 0,1 h');
+    expect(formaterHeures(5.27)).toBe('5,3 h');
+    expect(formaterHeures(9.96)).toBe('10 h');
+    expect(formaterHeures(142.6)).toBe('143 h');
+    expect(formaterHeures(840.2)).toBe('840 h');
+    expect(formaterHeures(999_999.4)).toBe(`999${FINE}999 h`);
+    expect(formaterHeures(999_999.6)).toBe('1,0 million d’heures');
+    expect(formaterHeures(1.381e9)).toBe('1,38 milliard d’heures');
+    expect(formaterHeures(2.5e9)).toBe('2,50 milliards d’heures');
+  });
+
+  it('refuse une valeur non finie ou négative', () => {
+    for (const x of [NaN, Infinity, -1]) expect(() => formaterHeures(x), String(x)).toThrow(RangeError);
+  });
+});
+
+describe('formaterDate', () => {
+  it('une date de relevé en toutes lettres, « 1er » le premier du mois', () => {
+    expect(formaterDate('2026-11-03')).toBe('3 novembre 2026');
+    expect(formaterDate('2026-11-04')).toBe('4 novembre 2026');
+    expect(formaterDate('2026-08-01')).toBe('1er août 2026');
+    expect(formaterDate('2026-02-28')).toBe('28 février 2026');
+    expect(formaterDate('2025-12-31')).toBe('31 décembre 2025');
+  });
+
+  it('refuse ce qui n’est pas une vraie date AAAA-MM-JJ', () => {
+    for (const x of ['3 novembre 2026', '2026-13-01', '2026-02-30', '2026-1-3', '']) {
+      expect(() => formaterDate(x), x).toThrow(RangeError);
     }
   });
 });

@@ -1,0 +1,73 @@
+---
+partie: 1
+numero: "1.6"
+titre: "Page d'essai du calculateur de coût"
+chapeau: "Cette page sert aux parcours de test du calculateur : combien de calcul, de temps, de mémoire et d'argent demande l'entraînement de ton IA, ou celui d'un grand modèle public. Elle n'est jamais publiée."
+programme: "2 étapes, 2 paris, environ 5 minutes."
+acquis:
+  - cle: operations
+    texte: "Entraîner un modèle demande environ 6 opérations par paramètre et par jeton lu."
+    ou: "à l'étape 1, au pari"
+  - cle: cout
+    texte: "Louer plus de cartes ne change pas le prix d'un entraînement : deux fois plus de cartes, c'est deux fois moins longtemps."
+    ou: "à l'étape 2, au pari sur le coût"
+  - cle: calcul
+    texte: "La durée, la mémoire et le prix d'un entraînement se calculent à partir de quelques nombres : paramètres, jetons, cartes et efficacité."
+    ou: "à l'étape 2, en changeant de modèle ou de carte dans le calculateur"
+---
+
+import Calculateur from '../components/demos/Calculateur.svelte';
+import { pourcent } from '../lib/nombres';
+import { materiel } from '../lib/calculateur/donnees';
+import { formaterDate, formaterDuree, formaterEuros, formaterPrix } from '../lib/calculateur/formats';
+import { calculerReleve, formulesDuCalcul, fourchette, reglageDeDepart } from '../lib/calculateur/releve';
+import {
+  choixCoutH100,
+  choixOperationsTonIA,
+  EFFICACITE_PARI_H100,
+  fourchetteCoutH100,
+  MATERIEL_PARI_H100,
+} from '../lib/calculateur/paris';
+
+export const calculDeDepart = formulesDuCalcul(calculerReleve(reglageDeDepart())).find((f) => f.cle === 'calcul');
+export const cout = fourchetteCoutH100();
+export const h100 = materiel(MATERIEL_PARI_H100);
+export const releveH100 = formaterDate(h100.source.releveLe);
+
+<Etape numero={1} titre="Le calcul d'un entraînement">
+
+Pour apprendre, ton IA lit des jetons, et chaque jeton lu lui coûte des opérations : des multiplications et des additions, pour deviner le jeton suivant, puis pour corriger ses poids. Le total dit combien de temps, de mémoire et d'argent il faudra.
+
+<Pari
+  id="operations"
+  question="Combien d'opérations faut-il pour entraîner ton IA (433,6 millions de paramètres, 20 jetons par paramètre) ?"
+  choix={choixOperationsTonIA()}
+  acquis="operations"
+  ouvre="calculateur"
+>
+
+<p>{calculDeDepart.formule}.</p>
+
+Six opérations par paramètre et par jeton lu : deux pour la passe avant, quatre pour la passe arrière. Le calculateur, juste en dessous, refait ce calcul pour n'importe quel modèle et n'importe quelle carte, et en tire la durée.
+
+</Pari>
+
+</Etape>
+
+<Etape numero={2} titre="Le calculateur">
+
+Règle la phrase : le modèle, le nombre de jetons qu'il lit pour chacun de ses paramètres, les cartes et leur efficacité. Le relevé suit, avec ses sources, et le repère mesuré de ton IA dit si le calcul tombe juste.
+
+<Verrou nom="calculateur" message="Fais le pari sur les opérations : le calculateur s'ouvre juste après.">
+  <Calculateur client:load verrou="calculateur" acquis="calcul" />
+</Verrou>
+
+<Pari id="cout" question="Louer des H100 pour entraîner ton IA coûterait plutôt…" choix={choixCoutH100()} acquis="cout">
+
+<p>{`Sur une seule ${h100.nom} à ${pourcent(EFFICACITE_PARI_H100)} d’efficacité, ton IA demande ${formaterDuree(cout.secondes)}. Aux prix relevés le ${releveH100}, ${fourchette(formaterPrix(cout.usdParHeureMin), formaterPrix(cout.usdParHeureMax))} par carte et par heure, cela fait ${fourchette(formaterEuros(cout.eurMin), formaterEuros(cout.eurMax))}.`}</p>
+
+Avec 8 cartes, c'est 8 fois plus court, pour le même prix. Essaie-le dans le calculateur : choisis la H100 SXM, puis double le nombre de cartes.
+
+</Pari>
+
+</Etape>

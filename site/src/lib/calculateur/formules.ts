@@ -111,8 +111,12 @@ export function operationsParJetonAvecAttention(f: Forme): number {
 /**
  * La durée d'un calcul, en secondes : opérations ÷ (crête × 10¹² × efficacité × cartes).
  *
- * [efficacite] C'est la définition de l'efficacité (MFU) de PaLM, section 4.1
- * et annexe B : le débit obtenu rapporté au débit crête des cartes.
+ * [efficacite] L'efficacité est le débit d'opérations obtenu rapporté à la
+ * crête des cartes, comme le MFU de PaLM (section 4.1 et annexe B). Mais le
+ * calculateur compte 6N opérations par jeton, sans l'attention, quand PaLM
+ * compte 6N + 12·L·h·s : son efficacité n'est qu'une approximation du MFU de
+ * PaLM, un peu plus basse pour un même débit (ton IA : 52,8 % avec 6N,
+ * 65,6 % en comptant l'attention). Voir REPERES_EFFICACITE.compteAttention.
  */
 export function dureeSecondes(operations: number, creteTflops: number, efficacite: number, cartes: number): number {
   const f = 'dureeSecondes';
@@ -126,11 +130,12 @@ export function dureeSecondes(operations: number, creteTflops: number, efficacit
 }
 
 /**
- * L'efficacité (MFU) d'un débit mesuré : 6·N·débit ÷ (crête × 10¹²).
+ * L'efficacité d'un débit mesuré, avec 6N opérations par jeton : 6·N·débit ÷ (crête × 10¹²).
  *
- * [efficacite] PaLM, section 4.1 et annexe B, avec 6N opérations par jeton
- * (sans l'attention). Ton IA : 6 × 433,6 millions × 17 855 jetons par seconde
- * sur 87,9 TFLOPS, soit 52,8 %.
+ * [efficacite] Le MFU de PaLM (section 4.1 et annexe B), mais sans
+ * l'attention : une approximation, celle que le calculateur utilise. Ton IA :
+ * 6 × 433,6 millions × 17 855 jetons par seconde sur 87,9 TFLOPS, soit
+ * 52,8 % (65,6 % en comptant l'attention, voir efficaciteMesureeAvecAttention).
  */
 export function efficaciteMesuree(parametres: number, jetonsParSeconde: number, creteTflops: number): number {
   const f = 'efficaciteMesuree';
@@ -143,7 +148,8 @@ export function efficaciteMesuree(parametres: number, jetonsParSeconde: number, 
 /**
  * La même efficacité en comptant l'attention : débit × (6N + 12·L·h·s) ÷ (crête × 10¹²).
  *
- * [attention] [efficacite] PaLM, annexe B. Ton IA : 65,6 %.
+ * [attention] [efficacite] PaLM, annexe B : c'est le MFU de PaLM, celui qui se
+ * compare aux efficacités publiées de PaLM et de Llama 3. Ton IA : 65,6 %.
  */
 export function efficaciteMesureeAvecAttention(f: Forme, jetonsParSeconde: number, creteTflops: number): number {
   const nom = 'efficaciteMesureeAvecAttention';

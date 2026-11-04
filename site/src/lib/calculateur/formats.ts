@@ -1,5 +1,5 @@
-// Les formats du calculateur : durées, quantités, puissances de dix, octets,
-// euros et dollars, en français.
+// Les formats du calculateur : durées, heures, quantités, puissances de dix,
+// octets, énergie, euros et dollars, dates de relevé, en français.
 //
 // Les milliers sont séparés par une espace fine insécable (U+202F) et les
 // décimales par une virgule (nombre(), de ../nombres). Rien n'est jamais écrit
@@ -122,10 +122,32 @@ export function formaterOctets(octets: number): string {
   return `${nombre(to, arrondi(to, 1) < 100 ? 1 : 0)} To`;
 }
 
+/** Comment s'écrit une monnaie : sous un, son symbole, et « d’euros » après les millions. */
+interface Monnaie {
+  moinsDeUn: string;
+  symbole: string;
+  deGrands: string;
+}
+
+const EURO: Monnaie = { moinsDeUn: 'moins d’un euro', symbole: '€', deGrands: 'd’euros' };
+const DOLLAR: Monnaie = { moinsDeUn: 'moins d’un dollar', symbole: '$', deGrands: 'de dollars' };
+
 /** De grands montants : une décimale sous 10 (« 1,2 million »), un entier au-delà (« 33 millions »). */
-function grandMontant(valeur: number, singulier: string, pluriel: string): string {
+function grandMontant(valeur: number, singulier: string, pluriel: string, m: Monnaie): string {
   const decimales = arrondi(valeur, 1) < 10 ? 1 : 0;
-  return `${nombre(valeur, decimales)} ${accord(arrondi(valeur, decimales), singulier, pluriel)} d’euros`;
+  return `${nombre(valeur, decimales)} ${accord(arrondi(valeur, decimales), singulier, pluriel)} ${m.deGrands}`;
+}
+
+function montant(x: number, m: Monnaie, fonction: string): string {
+  verifier(x, fonction);
+  if (x < 1) return m.moinsDeUn;
+  if (arrondi(x, 2) < 10) return `${nombre(x, 2)} ${m.symbole}`;
+  if (arrondi(x, 0) < 1000) return `${nombre(x)} ${m.symbole}`;
+  const significatifs = Number(x.toPrecision(3));
+  if (significatifs < 1e6) return `${nombre(significatifs)} ${m.symbole}`;
+  const millions = x / 1e6;
+  if (arrondi(millions, 0) < 1000) return grandMontant(millions, 'million', 'millions', m);
+  return grandMontant(x / 1e9, 'milliard', 'milliards', m);
 }
 
 /**
@@ -137,19 +159,74 @@ function grandMontant(valeur: number, singulier: string, pluriel: string): strin
  * - « 1,2 million d’euros », « 33 millions d’euros », puis les milliards de la même façon.
  */
 export function formaterEuros(euros: number): string {
-  verifier(euros, 'formaterEuros');
-  if (euros < 1) return 'moins d’un euro';
-  if (arrondi(euros, 2) < 10) return `${nombre(euros, 2)} €`;
-  if (arrondi(euros, 0) < 1000) return `${nombre(euros)} €`;
-  const significatifs = Number(euros.toPrecision(3));
-  if (significatifs < 1e6) return `${nombre(significatifs)} €`;
-  const millions = euros / 1e6;
-  if (arrondi(millions, 0) < 1000) return grandMontant(millions, 'million', 'millions');
-  return grandMontant(euros / 1e9, 'milliard', 'milliards');
+  return montant(euros, EURO, 'formaterEuros');
+}
+
+/** Des dollars, comme les euros : « moins d’un dollar », « 8,56 $ », « 383 $ », « 195 000 $ », « 37 millions de dollars ». */
+export function formaterDollars(dollars: number): string {
+  return montant(dollars, DOLLAR, 'formaterDollars');
 }
 
 /** Un prix horaire en dollars : « 2,69 $ ». */
 export function formaterPrix(usd: number): string {
   verifier(usd, 'formaterPrix');
   return `${nombre(usd, 2)} $`;
+}
+
+/**
+ * Une énergie : « moins de 0,1 kWh », une décimale sous 100 kWh (« 42,8 kWh »),
+ * un entier sous 10 000 (« 8 640 kWh »), puis de même en MWh, en GWh et en TWh
+ * (« 37,3 GWh »).
+ */
+export function formaterEnergie(kwh: number): string {
+  verifier(kwh, 'formaterEnergie');
+  if (arrondi(kwh, 1) < 0.1) return 'moins de 0,1 kWh';
+  const unites = ['kWh', 'MWh', 'GWh', 'TWh'];
+  let valeur = kwh;
+  for (let i = 0; i < unites.length; i++) {
+    const derniere = i === unites.length - 1;
+    if (arrondi(valeur, 1) < 100) return `${nombre(valeur, 1)} ${unites[i]}`;
+    if (arrondi(valeur, 0) < 10_000 || derniere) return `${nombre(valeur)} ${unites[i]}`;
+    valeur /= 1000;
+  }
+  throw new Error('formaterEnergie : inatteignable');
+}
+
+/**
+ * Des heures (la durée d'une location, facturée à l'heure) : « moins de 0,1 h »,
+ * une décimale sous 10 h (« 5,3 h »), un entier sous un million (« 843 h »),
+ * puis « 1,0 million d’heures », « 1,38 milliard d’heures ».
+ */
+export function formaterHeures(heures: number): string {
+  verifier(heures, 'formaterHeures');
+  if (arrondi(heures, 1) < 0.1) return 'moins de 0,1 h';
+  if (arrondi(heures, 1) < 10) return `${nombre(heures, 1)} h`;
+  if (arrondi(heures, 0) < 1e6) return `${nombre(heures)} h`;
+  return `${formaterQuantite(heures)} d’heures`;
+}
+
+const MOIS = [
+  'janvier',
+  'février',
+  'mars',
+  'avril',
+  'mai',
+  'juin',
+  'juillet',
+  'août',
+  'septembre',
+  'octobre',
+  'novembre',
+  'décembre',
+] as const;
+
+/** Une date de relevé (AAAA-MM-JJ) en toutes lettres : « 3 novembre 2026 », « 1er août 2026 ». */
+export function formaterDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  const date = m ? new Date(`${iso}T00:00:00Z`) : null;
+  if (m === null || date === null || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== iso) {
+    throw new RangeError(`formaterDate : «${FINE}${iso}${FINE}» n’est pas une date AAAA-MM-JJ du calendrier. Corrige la date de relevé.`);
+  }
+  const jour = Number(m[3]);
+  return `${jour === 1 ? '1er' : String(jour)} ${MOIS[Number(m[2]) - 1]} ${m[1]}`;
 }
