@@ -10,6 +10,28 @@ nombres, au bit près.
 Il n'a pas de numéro de chapitre, comme `projets/forge` : il sert plusieurs
 chapitres (l'avant-goût de 0.5, puis 1.5).
 
+## Ce qu'il calcule
+
+- **Le mini-modèle.** Un mini-transformer d'une couche, qui lit des prénoms
+  caractère par caractère : un plongement par caractère et un par position
+  (des positions apprises), une attention causale à 4 têtes de 4 (dimension
+  16, contexte 16), un MLP de 64 avec ReLU, une norme RMS sans poids, des
+  connexions résiduelles, et une tête de lecture séparée du plongement
+  d'entrée. Avec les 39 caractères des prénoms et le bord `.`, le vocabulaire
+  réel a **V = 40** numéros, et le modèle **4 608 paramètres** (32·V + 3 328).
+  Il apprend à inventer des prénoms français, par 3 000 pas d'AdamW, avec la
+  recette de ton IA (voir « Entraîner »).
+- **L'exemple d'attention.** Les scores, le masque, les poids et les sorties
+  de deux têtes sur une phrase de 9 mots, pour l'animation du site.
+- **Pourquoi les mêmes bits.** La page du site fait ces calculs en TypeScript,
+  sur des `Float64Array`, dans le navigateur de chaque lecteur : pas de GPU,
+  pas de bibliothèque. Ce paquet les refait en Python pur, avec les mêmes
+  opérations dans le même ordre, en n'employant que des opérations dont la
+  norme IEEE 754 fixe le résultat (voir « Pourquoi on n'utilise ni
+  `math.exp` ni `sum` »). Les nombres de la page sont donc exactement ceux que
+  le Python écrit dans `tests/attendus-*.json`, et un test le vérifie dans
+  Chrome, Firefox et WebKit.
+
 ## Tester
 
 Il faut `uv` et Python 3.12 ou plus. Depuis le dossier `projets/mini-modele` :
@@ -62,8 +84,10 @@ dixième du taux maximal. Le taux est le même code que
 lisant le fichier de forge sans l'importer. Le pas d'AdamW tient ses
 corrections de biais par des produits successifs (`b1t = b1t × beta1`), sans
 puissance. L'écrêtage, lui, diffère d'un rien : quand la norme du gradient
-dépasse 1, on le multiplie par `1 / norme`, alors que `clip_grad_norm_` de
-PyTorch, qu'utilise forge, le multiplie par `1 / (norme + 1e-6)`.
+dépasse 1, on le divise par `norme` (le facteur est `écrêtage / norme`, donc
+`1 / norme`), alors que `clip_grad_norm_` de PyTorch, qu'utilise forge, le
+divise par `norme + 1e-6`. L'écart vaut au plus 10⁻⁶ en valeur relative, et
+seulement aux pas où le gradient est écrêté.
 
 **Résultat mesuré** (préréglage complet, taux 0,01, graine 1234), le même en
 Python et en TypeScript : l'erreur de validation (256 prénoms) passe de
@@ -113,18 +137,27 @@ préréglages eux-mêmes. Sa clé `court` ajoute 10 pas sur vingt prénoms de de
 lettres, par lots de 4 et avec un écrêtage à 100 : l'ordre des prénoms y est
 remélangé (aux pas 5 et 9) et le gradient n'y est jamais écrêté, deux chemins
 que les 20 pas du préréglage complet ne prennent pas. Le résultat des 3 000
-pas, trop long à refaire à chaque régénération, est écrit dans les deux tests
-longs
-(`tests/test_entrainement.py` et `site/src/lib/mini-modele/entrainement-long.test.ts`) :
-si le code change, relance `uv run pytest -q -m lent`, puis recopie ses motifs
-dans les deux.
+pas, trop long à refaire à chaque régénération, n'est pas dans ces fichiers :
+ses motifs sont écrits en dur dans les deux tests longs, `LONG_VALIDATION_DEPART`,
+`LONG_VALIDATION_FIN` et `LONG_PARAMS_EMPREINTE` (l'empreinte de tous les
+paramètres au pas 3 000) en tête de `tests/test_entrainement.py`, et
+`VALIDATION_DEPART`, `VALIDATION_FIN` et `PARAMS_EMPREINTE` en tête de
+`site/src/lib/mini-modele/entrainement-long.test.ts`. Si le code change,
+relance `uv run pytest -q -m lent` : il affiche les nouveaux motifs (l'option
+`-s` montre les lignes « motifs : … »). Recopie-les dans les deux fichiers, puis
+relance `npx vitest run src/lib/mini-modele/entrainement-long.test.ts` pour voir
+que le TypeScript trouve les mêmes.
 
 `tests/attendus-attention.json` : tout le détail de l'exemple d'attention (voir
 plus bas), tête par tête. Les scores des cases masquées y sont `null`, et leurs
 poids valent `+0,0`. Sa clé `flottant` ajoute un petit exemple à virgule (des
-entrées comme 0,1 ou 0,3, une tête de 3) : dans la phrase, tout est entier et
-chaque somme est exacte dans n'importe quel ordre, alors qu'ici, additionner
-dans un autre ordre change des bits.
+entrées comme 0,1 ou 0,3, une tête de 3), qui fixe l'ordre des sommes. Dans la
+phrase, les entrées sont des entiers : les projections et les scores sont des
+sommes d'entiers, exactes dans n'importe quel ordre, et ne disent rien de
+l'ordre des opérations. Le mélange, lui, additionne des valeurs fois les poids
+du softmax, qui ne sont pas exacts : il dépend de l'ordre en général. Dans
+l'exemple à virgule, additionner la projection, le score ou le mélange dans un
+autre ordre change des bits (`test_l_exemple_flottant_voit_l_ordre_des_sommes`).
 
 Ces quatre fichiers sont aussi refaits dans le navigateur, par la page d'essai
 de parité du site (`site/src/lib/mini-modele/parite.ts`, parcours
@@ -190,10 +223,42 @@ Les fichiers vérifiés sont `calcul.py`, `donnees.py`, `attention.py`,
 `modele.py`, `entrainement.py` et `exemple_attention.py`. On n'y permet que
 les + − × ÷, `math.sqrt` (arrondi correct, partout), `math.floor` et les
 opérations entières. S'y ajoutent `math.ldexp` et `math.frexp`, permis parce
-qu'ils sont exacts : ils ne changent que l'exposant, sans arrondi. Le test
-`tests/test_sources.py` cherche les fonctions interdites dans ces fichiers,
-commentaires compris ; `site/src/lib/mini-modele/sources.test.ts` fait de même
+qu'ils sont exacts : ils ne changent que l'exposant, sans arrondi (ils servent
+`exp` et `log`). Les autres noms de `math` permis ne calculent rien : `inf`,
+`nan`, `isnan`, `isinf` et `isfinite`. En TypeScript, les seuls `Math.` permis
+sont `Math.sqrt`, `Math.floor` et `Math.imul` (le produit entier sur 32 bits,
+exact, pour SplitMix32 et l'empreinte). Le test `tests/test_sources.py` cherche
+les fonctions interdites dans ces fichiers, commentaires compris, et refuse tout
+autre nom de `math` ; `site/src/lib/mini-modele/sources.test.ts` fait de même
 pour le TypeScript.
+
+## Les régions balisées (pour les plans 4 et 5)
+
+Les chapitres montrent du vrai code de ce paquet, jamais recopié : des
+commentaires `# region: nom` et `# fin: nom`, chacun seul sur sa ligne,
+encadrent les extraits. La fonction `extraireRegion(source, nom, fichier)`
+(`site/src/lib/regions.ts`) rend les lignes entre les deux marqueurs, sans les
+marqueurs et sans l'indentation commune ; elle arrête la construction si la
+région manque. Dix régions sont posées :
+
+| Région | Fichier | Ce qu'elle contient |
+| --- | --- | --- |
+| `exp` | `calcul.py` | `exp(x)` avec seulement des + − × ÷ (hors de la région : les constantes `LN2_HAUT`, `LN2_BAS`, `INV_LN2` et `deux_puissance`) |
+| `log` | `calcul.py` | `log(x)`, de la même façon |
+| `scores` | `attention.py` | `scores_attention` : requête · clé, fois l'échelle |
+| `softmax` | `attention.py` | `softmax` : des scores aux poids |
+| `melange` | `attention.py` | `melanger_valeurs` : les valeurs, mélangées selon les poids |
+| `avant` | `modele.py` | `avant` : la passe avant, position par position |
+| `perte` | `modele.py` | `entropie_croisee` : l'erreur à une position |
+| `lot` | `entrainement.py` | `_prochain_lot` : les prénoms du prochain lot, dans l'ordre mélangé |
+| `ecretage` | `entrainement.py` | l'écrêtage du gradient, dans `faire_un_pas` |
+| `adamw` | `entrainement.py` | le pas d'AdamW, dans `faire_un_pas` |
+
+`tests/test_sources.py` vérifie que chaque marqueur est seul sur sa ligne et
+que chaque région est fermée ; `site/src/lib/mini-modele/sources.test.ts`
+extrait les dix et vérifie leur début et leur fin. Si tu déplaces un marqueur,
+ce test te dit quelle région a changé. Le TypeScript n'a pas de marqueurs : il
+cite la région du Python qu'il traduit dans son commentaire de documentation.
 
 ## Les données
 
@@ -268,3 +333,20 @@ sont jamais versionnées », choisie par l'utilisateur le 03/11/2026.
   points de code. Le Python lit le fichier en octets (et non avec `read_text`, qui
   range `\r\n` en `\n`), pour voir exactement la liste que le site lit avec
   `?raw`.
+
+## Le calculateur de coût, à côté
+
+Le calculateur de la page d'essai (`site/src/lib/calculateur/`) n'est pas un
+jumeau Python : ses nombres viennent de formules écrites une fois, en
+TypeScript, et chaque étape de « Voir le calcul » se refait à la main à partir
+des nombres affichés (un test le vérifie). Il refait trois choses de
+`projets/forge`, sans l'importer : `largeur_cachee`, `nombre_parametres` et
+`estimer`, et un test de Vitest lit leurs constantes dans le code de forge.
+Deux précisions utiles quand on lit son relevé :
+
+- le cache KV de la génération couvre **min(contexte, 4 096) jetons** : tout le
+  contexte du modèle s'il est plus court que 4 096, 4 096 sinon
+  (`JETONS_DU_CACHE`, dans `site/src/lib/calculateur/releve.ts`) ;
+- dans les étapes « au moins N cartes », le total est écrit en Go (« 6 570 Go ÷
+  16 Go = au moins 411 cartes »), jamais en To : « 6,4 To ÷ 16 Go » ferait
+  trouver 410 cartes à qui refait la division.
