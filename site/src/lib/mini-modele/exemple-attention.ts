@@ -12,6 +12,10 @@
 // fonctions du mini-modèle (attention.ts) : les requêtes, les clés et les
 // valeurs, les scores, le masque, les poids et les sorties.
 //
+// Le fichier porte aussi sa légende (« legende », facultative) : ce que
+// l'animation dit de ces vecteurs, sous la figure. Elle appartient à
+// l'exemple : un autre exemple dit d'où viennent ses propres nombres.
+//
 // Les conventions sont celles du mini-modèle :
 //  - un vecteur est une ligne, et sa projection vaut x · W :
 //    y[j] = x[0] × W[0][j] + x[1] × W[1][j] + …, par i croissant ;
@@ -41,6 +45,12 @@ export interface TeteExemple {
 /** Un exemple d'attention : la phrase, ses jetons, les traits, un vecteur x par jeton, et les têtes. */
 export interface ExempleAttention {
   readonly phrase: string;
+  /**
+   * Ce que la légende de l'animation dit de ces vecteurs, d'où ils viennent (« écrits à la main… »
+   * pour la phrase du forgeron). Propre à chaque exemple, facultative : sans elle, la légende ne
+   * parle que de la carte.
+   */
+  readonly legende?: string;
   readonly jetons: readonly string[];
   readonly traits: readonly string[];
   readonly x: Matrice;
@@ -132,6 +142,9 @@ export function verifierExemple(exemple: unknown): void {
     throw new RangeError(
       "Exemple d'attention : la phrase, les jetons et les traits sont des textes (au moins un jeton et un trait).",
     );
+  }
+  if ('legende' in e && typeof e.legende !== 'string') {
+    throw new RangeError("Exemple d'attention : la légende, si elle est donnée, est un texte.");
   }
   const largeur = verifierMatrice(x, 'x', null);
   const nbJetons = jetons.length;

@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { nombre, pourcent } from '../nombres';
 import { scoresAttention } from './attention';
-import { detaillerExemple, exempleAttention, type DetailTete } from './exemple-attention';
+import { detaillerExemple, exempleAttention, type DetailTete, type ExempleAttention, type Matrice } from './exemple-attention';
 import {
   arrondi2,
   caseClaire,
@@ -15,9 +15,11 @@ import {
   explication,
   fondCarte,
   legendeCarte,
-  LEGENDE,
   LEGENDE_CARTE,
-  LEGENDE_VECTEURS,
+  LEGENDE_CARTE_APRES,
+  LEGENDE_CARTE_AVANT,
+  legendeFigure,
+  legendeVecteurs,
   ligneEtat,
   lignesEtape,
   messageSansJs,
@@ -28,6 +30,7 @@ import {
   phraseRequeteNulle,
   pourcentPoids,
   repete,
+  SOURCE_POIDS_NON_EXPLICATION,
   valeur,
   vecteur,
 } from './animation-attention';
@@ -331,7 +334,32 @@ describe('l’explication de chaque étape', () => {
     expect(explication(1, exempleAttention, D[DE_QUI], IL)).toContain('1 s’il a ce trait, 0 sinon');
     expect(explication(6, exempleAttention, D[DE_QUI], LE)).toContain(`La requête de ${g('Le')} ne vaut que des 0${F}: tous ses scores valent 0.`);
   });
+
+  it('la requête, la clé et la valeur : leurs tailles viennent de la tête, pas de l’exemple du forgeron', () => {
+    expect(explication(2, exempleAttention, D[DE_QUI], IL)).toBe(
+      'La tête multiplie les 8 nombres de chaque mot par trois matrices. Elle en tire trois vecteurs de 4 nombres' +
+        `${F}: la requête q, ce que le mot cherche${F}; la clé k, ce qu’il offre aux autres${F}; la valeur v, ce qu’il transmettra.`,
+    );
+    expect(explication(7, exempleAttention, D[DE_QUI], IL).endsWith(`nouvelle valeur de ${g('il')}, 4 nombres.`)).toBe(true);
+    // Une valeur de 2 nombres (wv a 2 colonnes) dans des têtes de 4 : les phrases le disent.
+    const autre = exempleAvecValeursDe2();
+    const d = detaillerExemple(autre)[DE_QUI];
+    expect(d.valeurs[IL]).toHaveLength(2);
+    expect(explication(2, autre, d, IL)).toBe(
+      'La tête multiplie les 8 nombres de chaque mot par trois matrices. Elle en tire trois vecteurs' +
+        `${F}: la requête q, ce que le mot cherche, et la clé k, ce qu’il offre aux autres, de 4 nombres chacune${F}; ` +
+        'la valeur v, ce qu’il transmettra, de 2 nombres.',
+    );
+    expect(explication(7, autre, d, IL).endsWith(`nouvelle valeur de ${g('il')}, 2 nombres.`)).toBe(true);
+  });
 });
+
+/** L'exemple du forgeron, avec des valeurs de 2 nombres (les deux premières colonnes de chaque wv) et sans légende. */
+function exempleAvecValeursDe2(): ExempleAttention {
+  const deux = (m: Matrice): number[][] => m.map((ligne) => [ligne[0], ligne[1]]);
+  const { phrase, jetons, traits, x, tetes } = exempleAttention;
+  return { phrase, jetons, traits, x, tetes: tetes.map((t) => ({ ...t, wv: deux(t.wv) })) };
+}
 
 describe('la carte', () => {
   it('nom de la tête, légende du tableau, message sans JavaScript', () => {
@@ -420,18 +448,49 @@ describe('les mots qui reviennent, et le classement', () => {
     expect(classement(D[QUI_AGIT], TORD).slice(0, 2)).toEqual([FORGERON, IL]);
   });
 
-  it('la légende en deux parties : les vecteurs (toujours), puis la carte (quand elle est là)', () => {
-    expect(LEGENDE).toBe(`${LEGENDE_VECTEURS} ${LEGENDE_CARTE}`);
-    expect(LEGENDE_VECTEURS).not.toMatch(/carte/i);
+  it('la légende en deux parties : les vecteurs de l’exemple (toujours), puis la carte (quand elle est là)', () => {
+    const vecteurs = legendeVecteurs(exempleAttention);
+    expect(vecteurs).not.toBeNull();
+    expect(legendeFigure(exempleAttention)).toBe(`${vecteurs} ${LEGENDE_CARTE}`);
+    expect(vecteurs).not.toMatch(/carte/i);
     expect(LEGENDE_CARTE).toMatch(/^La carte montre où le calcul lit/);
+    expect(LEGENDE_CARTE).toBe(`${LEGENDE_CARTE_AVANT}${SOURCE_POIDS_NON_EXPLICATION.titre}${LEGENDE_CARTE_APRES}`);
   });
 
-  it('la légende de la figure', () => {
-    expect(LEGENDE).toBe(
+  it('la légende de la figure, avec la mise en garde sourcée (Jain et Wallace)', () => {
+    expect(legendeFigure(exempleAttention)).toBe(
       'Ces vecteurs sont écrits à la main, comme si les couches précédentes avaient déjà reconnu le rôle de chaque mot. ' +
         'Dans un vrai modèle, ils sont appris, et les têtes sont rarement aussi nettes. ' +
-        'La carte montre où le calcul lit, pas pourquoi le modèle répond. ' +
+        'La carte montre où le calcul lit, pas pourquoi le modèle répond ' +
+        `(voir Jain et Wallace, «${F}Attention is not Explanation${F}», arXiv 1902.10186, 2019). ` +
         `Une ligne par mot qui demande, une colonne par mot regardé${F}; score = requête · clé.`,
     );
+    expect(SOURCE_POIDS_NON_EXPLICATION.url).toBe('https://arxiv.org/abs/1902.10186');
+    expect(SOURCE_POIDS_NON_EXPLICATION.url).toContain(SOURCE_POIDS_NON_EXPLICATION.reference.replace('arXiv ', ''));
+  });
+
+  it('la phrase sur les vecteurs vient de l’exemple : un autre exemple ne dit pas « écrits à la main »', () => {
+    // La légende de l'exemple, passée par la typographie.
+    expect(legendeVecteurs({ ...exempleAttention, legende: "Ces poids sont ceux d'un vrai modèle." })).toBe(
+      'Ces poids sont ceux d’un vrai modèle.',
+    );
+    // Sans légende (ou vide), la figure ne parle que de la carte.
+    const autre = exempleAvecValeursDe2();
+    expect(legendeVecteurs(autre)).toBeNull();
+    expect(legendeVecteurs({ ...autre, legende: '  ' })).toBeNull();
+    expect(legendeFigure(autre)).toBe(LEGENDE_CARTE);
+    // Aucun texte de l'animation ne parle alors de vecteurs écrits à la main.
+    const details = detaillerExemple(autre);
+    const textes = [legendeFigure(autre), messageSansJs(autre, 1)];
+    for (const [t, d] of details.entries()) {
+      textes.push(nomTete(autre, t), legendeCarte(autre, t));
+      for (let requete = 0; requete < autre.jetons.length; requete++) {
+        textes.push(phraseMelange(autre, d, requete));
+        for (let etape = 1; etape <= NB_ETAPES; etape++) {
+          textes.push(explication(etape, autre, d, requete), ligneEtat(etape, autre, d, requete));
+        }
+      }
+    }
+    for (const texte of textes) expect(texte).not.toMatch(/à la main/);
   });
 });

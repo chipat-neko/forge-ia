@@ -67,6 +67,7 @@ function plusRegarde(poids: readonly number[], requete: number): number {
 /** Un exemple qu'on peut abîmer, pour vérifier les messages d'erreur. */
 interface ExempleModifiable {
   phrase: string;
+  legende?: unknown;
   jetons: string[];
   traits: string[];
   x: number[][];
@@ -144,8 +145,10 @@ describe('l’exemple écrit à la main', () => {
   it('la phrase, les traits de chaque mot et les deux têtes', () => {
     const ex = chargerExemple();
     expect(ex).toBe(exempleAttention);
-    expect(Object.keys(ex).sort()).toEqual(['jetons', 'phrase', 'tetes', 'traits', 'x']);
+    expect(Object.keys(ex).sort()).toEqual(['jetons', 'legende', 'phrase', 'tetes', 'traits', 'x']);
     expect(ex.phrase).toBe(PHRASE);
+    // La légende dit d'où viennent ces vecteurs : écrits à la main, pour cet exemple-ci.
+    expect(ex.legende).toMatch(/^Ces vecteurs sont écrits à la main/);
     expect(ex.jetons).toEqual(PHRASE.split(' '));
     expect(ex.traits).toEqual(TRAITS);
     expect(ex.x.map((ligne) => TRAITS.filter((_, t) => ligne[t] === 1))).toEqual(TRAITS_DES_MOTS);
@@ -328,6 +331,13 @@ describe('verifierExemple', () => {
     const sansNom = copie();
     if (sansNom.tetes) sansNom.tetes[0].nom = 3;
     expect(() => verifierExemple(sansNom)).toThrow(/le nom et la description de chaque tête sont des textes/);
+    // La légende est facultative ; si elle est là, c'est un texte.
+    const sansLegende = copie();
+    delete sansLegende.legende;
+    verifierExemple(sansLegende);
+    const legendeNombre = copie();
+    legendeNombre.legende = 3;
+    expect(() => verifierExemple(legendeNombre)).toThrow(/la légende, si elle est donnée, est un texte/);
   });
 
   it('un autre exemple se détaille aussi (le composant en accepte un autre)', () => {

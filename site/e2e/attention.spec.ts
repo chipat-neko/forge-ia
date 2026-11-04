@@ -49,13 +49,17 @@ const ETAPES = [
   `Softmax${F}: des poids qui font 1`,
   'Le mélange des valeurs',
 ];
-// La légende du brief, en deux parties : la seconde ne s'affiche qu'avec la carte.
+// La légende, en deux parties : la seconde ne s'affiche qu'avec la carte. La première vient de
+// l'exemple (sa clé « legende », dans donnees/exemple-attention.json) : elle dit que ces vecteurs
+// sont écrits à la main. La seconde cite Jain et Wallace, avec un lien vers l'article.
 const LEGENDE_VECTEURS =
   'Ces vecteurs sont écrits à la main, comme si les couches précédentes avaient déjà reconnu le rôle de chaque mot. ' +
   'Dans un vrai modèle, ils sont appris, et les têtes sont rarement aussi nettes.';
 const LEGENDE_CARTE =
-  'La carte montre où le calcul lit, pas pourquoi le modèle répond. ' +
+  'La carte montre où le calcul lit, pas pourquoi le modèle répond ' +
+  `(voir Jain et Wallace, «${F}Attention is not Explanation${F}», arXiv 1902.10186, 2019). ` +
   `Une ligne par mot qui demande, une colonne par mot regardé${F}; score = requête · clé.`;
+const EXEMPLE = JSON.parse(readFileSync('../projets/mini-modele/donnees/exemple-attention.json', 'utf8')) as { legende: string };
 /** En dessous de cette largeur de fenêtre, la carte est plus large que la colonne de texte. */
 const LARGEUR_CARTE_DEFILE = 480;
 const COURTS = ['les traits', 'requête, clé, valeur', 'les scores', 'divisés par 2', 'le masque', 'softmax', 'le mélange'];
@@ -213,6 +217,14 @@ test('les sept étapes, dans l’ordre, avec leur compteur et leur ligne d’ét
   expect((await legende(page).innerText()).trim()).toBe(LEGENDE_VECTEURS);
   await allerA(page, 6);
   expect((await legende(page).innerText()).trim()).toBe(`${LEGENDE_VECTEURS} ${LEGENDE_CARTE}`);
+  // La première partie est celle de l'exemple ; la mise en garde de la carte mène à l'article cité.
+  expect(EXEMPLE.legende).toBe(LEGENDE_VECTEURS);
+  const source = legende(page).getByRole('link', { name: 'Attention is not Explanation' });
+  await expect(source).toBeVisible();
+  await expect(source).toHaveAttribute('href', 'https://arxiv.org/abs/1902.10186');
+  await expect(source).toHaveAttribute('lang', 'en');
+  await allerA(page, 5);
+  await expect(source).toBeHidden();
 });
 
 test('« il » regarde « forgeron » dans la tête 2', async ({ page }) => {

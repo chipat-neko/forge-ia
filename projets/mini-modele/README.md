@@ -189,6 +189,45 @@ relance `uv run python -m mini_modele.attendus`, puis les tests des deux
 langages : les paris du site (`site/src/lib/mini-modele/paris-attention.ts`)
 arrêtent la construction si leur réponse n'est plus vraie.
 
+Le fichier porte aussi la légende de l'exemple (`legende`, facultative) : ce
+que l'animation dit de ces vecteurs, sous la figure (« Ces vecteurs sont
+écrits à la main… »). Elle appartient à l'exemple et non au composant : un
+autre exemple dit d'où viennent ses propres nombres, et sans légende la figure
+ne parle que de la carte. Les autres phrases de l'animation sont calculées sur
+l'exemple reçu (nombre de traits, taille des têtes et des valeurs).
+
+### Note pour le plan 5 : les cartes de ton IA
+
+Le plan 3 promet que le composant `AnimationAttention` pourra montrer « les
+vraies cartes de ton IA une fois entraînée, calculées sur le processeur »
+(choix 8 du plan). Un exemple, tel que le composant le reçoit, ce sont des
+traits `x` et, pour chaque tête, trois matrices `wq`, `wk` et `wv` que
+`detaillerTete` multiplie telles quelles. Ton IA ne se laisse pas décrire
+ainsi (relevé de la revue finale du plan 3) :
+
+- elle fait tourner les requêtes et les clés selon leur position (RoPE) avant
+  le produit requête · clé (`appliquer_rope`, dans
+  `projets/forge/forge/modele/transformer.py`) : `detaillerTete` ne le fait
+  pas, et ses poids seraient faux ;
+- chaque mot y est un vecteur de 1 280 nombres appris, pas des traits nommés,
+  et chacune de ses 20 têtes a 64 dimensions (preset `tres_grand` : `dim`
+  1 280, 20 têtes ; dans `site/src/lib/calculateur/ton-ia.ts`, voir
+  `PRESETS_FORGE` et, dans `nombreParametres`, le contrôle « RoPE tourne les
+  valeurs par paire », vers les lignes 85-86) ;
+- l'entrée d'une tête de la couche 10 dépend des 9 couches d'avant : la
+  calculer demanderait tout le modèle (433,6 millions de paramètres) dans le
+  navigateur.
+
+Le plan 5 a donc deux voies. Soit un mode « carte seule » du composant,
+nourri de poids d'attention que forge calcule sur le processeur (une phrase,
+une couche et une tête choisies, écrits dans un fichier lu à la construction),
+sans les étapes 1 à 5, qui demandent des traits nommés et de petites matrices
+multipliées telles quelles. Soit renoncer à la promesse des « vraies cartes de
+ton IA ».
+Dans les deux cas, la légende doit dire d'où viennent les nombres, et
+`requeteInitiale` et `teteInitiale` (6 et 1 par défaut : « il » et la tête
+« de qui on parle » de la phrase du forgeron) doivent être donnés.
+
 ## Pourquoi on n'utilise ni `math.exp` ni `sum`
 
 Pour trouver les mêmes bits partout, il faut des opérations dont le résultat

@@ -1,5 +1,6 @@
 {
   "phrase": "Le forgeron chauffe le fer puis il le tord",
+  "legende": "Ces vecteurs sont écrits à la main, comme si les couches précédentes avaient déjà reconnu le rôle de chaque mot. Dans un vrai modèle, ils sont appris, et les têtes sont rarement aussi nettes.",
   "jetons": ["Le", "forgeron", "chauffe", "le", "fer", "puis", "il", "le", "tord"],
   "traits": ["déterminant", "nom", "verbe", "pronom", "sujet", "objet", "personne", "chose"],
   "x": [

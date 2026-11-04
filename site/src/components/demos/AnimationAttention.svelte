@@ -41,9 +41,10 @@
     etapesAttention,
     explication,
     fondCarte,
-    LEGENDE_CARTE,
-    LEGENDE_VECTEURS,
+    LEGENDE_CARTE_APRES,
+    LEGENDE_CARTE_AVANT,
     legendeCarte,
+    legendeVecteurs,
     lignesEtape,
     messageSansJs,
     NB_ETAPES,
@@ -53,6 +54,7 @@
     phraseRequeteNulle,
     pourcentPoids,
     repete,
+    SOURCE_POIDS_NON_EXPLICATION,
     valeur,
     vecteur,
     type LigneMot,
@@ -82,6 +84,8 @@
   // ne change pas d'exemple en cours de route.
   const ex = untrack(() => exemple);
   const details = detaillerExemple(ex);
+  // Ce que la légende dit des vecteurs vient de l'exemple : null s'il n'en dit rien.
+  const vecteursLegende = legendeVecteurs(ex);
   const depart = untrack(() => ({ requete: requeteInitiale, tete: teteInitiale }));
   if (!Number.isInteger(depart.requete) || depart.requete < 0 || depart.requete >= ex.jetons.length) {
     throw new RangeError(
@@ -381,9 +385,16 @@
     {/if}
   </div>
 
-  <!-- La seconde partie de la légende parle de la carte : elle ne s'affiche qu'avec elle. -->
+  <!-- La première partie de la légende vient de l'exemple (d'où viennent ses vecteurs). La seconde parle de
+       la carte, avec sa source : elle ne s'affiche qu'avec elle. -->
   <figcaption class="legende" data-test="att-legende">
-    {LEGENDE_VECTEURS}<span class="legende-carte" class:seulement-sans-js={etape < 6}>{` ${LEGENDE_CARTE}`}</span>
+    {#if vecteursLegende !== null}{vecteursLegende}{/if}<span class="legende-carte" class:seulement-sans-js={etape < 6}
+      >{`${vecteursLegende !== null ? ' ' : ''}${LEGENDE_CARTE_AVANT}`}<a
+        href={SOURCE_POIDS_NON_EXPLICATION.url}
+        lang="en"
+        data-test="att-source">{SOURCE_POIDS_NON_EXPLICATION.titre}</a
+      >{LEGENDE_CARTE_APRES}</span
+    >
   </figcaption>
 </figure>
 

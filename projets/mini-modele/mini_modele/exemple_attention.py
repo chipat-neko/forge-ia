@@ -7,6 +7,10 @@ de −5 à 5. Tout le reste est calculé ici, par les fonctions du mini-modèle
 (attention.py) : les requêtes, les clés et les valeurs, les scores, le
 masque, les poids et les sorties.
 
+Le fichier porte aussi sa légende (« legende », facultative) : ce que
+l'animation du site dit de ces vecteurs, sous la figure. Elle appartient à
+l'exemple : un autre exemple dit d'où viennent ses propres nombres.
+
 Les conventions sont celles du mini-modèle :
 
 - un vecteur est une ligne, et sa projection vaut x · W :
@@ -107,6 +111,8 @@ def verifier_exemple(exemple: object) -> None:
         raise ValueError(
             "Exemple d'attention : la phrase, les jetons et les traits sont des textes (au moins un jeton et un trait)."
         )
+    if "legende" in exemple and not isinstance(exemple["legende"], str):
+        raise ValueError("Exemple d'attention : la légende, si elle est donnée, est un texte.")
     largeur = verifier_matrice(x, "x", None)
     if len(x) != len(jetons):
         raise ValueError(f"Exemple d'attention : il faut une ligne de x par jeton ({len(jetons)} jetons, {len(x)} lignes).")

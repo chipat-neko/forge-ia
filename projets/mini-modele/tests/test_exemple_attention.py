@@ -76,8 +76,10 @@ def test_criteres_de_l_exemple():
 
 def test_l_exemple_ecrit_a_la_main():
     ex = charger_exemple()
-    assert set(ex) == {"phrase", "jetons", "traits", "x", "tetes"}
+    assert set(ex) == {"phrase", "legende", "jetons", "traits", "x", "tetes"}
     assert ex["phrase"] == PHRASE
+    # La légende dit d'où viennent ces vecteurs : écrits à la main, pour cet exemple-ci.
+    assert ex["legende"].startswith("Ces vecteurs sont écrits à la main")
     assert ex["jetons"] == PHRASE.split(" ")
     assert ex["traits"] == TRAITS
     assert [{TRAITS[t] for t, v in enumerate(ligne) if v == 1} for ligne in ex["x"]] == TRAITS_DES_MOTS
@@ -208,6 +210,14 @@ def test_verifier_exemple_refuse_un_exemple_mal_forme():
     sans_nom["tetes"][0]["nom"] = 3
     with pytest.raises(ValueError, match="le nom et la description de chaque tête sont des textes"):
         verifier_exemple(sans_nom)
+    # La légende est facultative ; si elle est là, c'est un texte.
+    sans_legende = copy.deepcopy(ex)
+    del sans_legende["legende"]
+    verifier_exemple(sans_legende)
+    legende_nombre = copy.deepcopy(ex)
+    legende_nombre["legende"] = 3
+    with pytest.raises(ValueError, match="la légende, si elle est donnée, est un texte"):
+        verifier_exemple(legende_nombre)
     with pytest.raises(ValueError, match="il manque « tetes »"):
         detailler_exemple(sans_tetes)
 

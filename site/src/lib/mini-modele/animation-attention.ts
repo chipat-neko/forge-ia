@@ -311,13 +311,20 @@ export function explication(etape: number, exemple: ExempleAttention, d: DetailT
   verifier(etape, d, requete);
   const mot = g(exemple.jetons[requete]);
   const nb = exemple.traits.length;
+  // La taille de la requête et de la clé (celle de la tête), et celle de la valeur : wv peut avoir
+  // un autre nombre de colonnes que wq et wk, et la nouvelle valeur a la taille de la valeur.
   const taille = d.requetes[requete].length;
+  const tailleValeur = d.valeurs[requete].length;
   const textes = [
     traitsBinaires(exemple)
       ? `Chaque mot entre dans la tête sous forme de ${nb} nombres, un par trait : 1 s'il a ce trait, 0 sinon.`
       : `Chaque mot entre dans la tête sous forme de ${nb} nombres, un par trait.`,
-    `La tête multiplie les ${nb} nombres de chaque mot par trois matrices. Elle en tire trois vecteurs de ${taille} nombres : ` +
-      "la requête q, ce que le mot cherche ; la clé k, ce qu'il offre aux autres ; la valeur v, ce qu'il transmettra.",
+    `La tête multiplie les ${nb} nombres de chaque mot par trois matrices. ` +
+      (tailleValeur === taille
+        ? `Elle en tire trois vecteurs de ${taille} nombres : ` +
+          "la requête q, ce que le mot cherche ; la clé k, ce qu'il offre aux autres ; la valeur v, ce qu'il transmettra."
+        : "Elle en tire trois vecteurs : la requête q, ce que le mot cherche, et la clé k, ce qu'il offre aux autres, " +
+          `de ${taille} nombres chacune ; la valeur v, ce qu'il transmettra, de ${tailleValeur} nombres.`),
     `Le score d'un mot, c'est la requête de ${mot} multipliée par la clé de ce mot, case par case, puis additionnée : ` +
       'requête · clé. Plus il est grand, mieux ce mot répond à la question.',
     `Chaque score est divisé par √${nombre(taille)} = ${valeur(Math.sqrt(taille))}, la racine de la taille de la tête. ` +
@@ -326,7 +333,7 @@ export function explication(etape: number, exemple: ExempleAttention, d: DetailT
       'Les scores des mots suivants sont masqués.',
     `Le softmax change les scores visibles en poids, tous positifs, qui font ${pourcent(1)} à eux tous. ` +
       "Un score plus grand d'une unité donne un poids environ 2,7 fois plus grand.",
-    `Chaque mot visible transmet sa valeur v, multipliée par son poids ; leur somme est la nouvelle valeur de ${mot}, ${taille} nombres.`,
+    `Chaque mot visible transmet sa valeur v, multipliée par son poids ; leur somme est la nouvelle valeur de ${mot}, ${tailleValeur} nombres.`,
   ];
   let texte = textes[etape - 1];
   if (etape >= 3 && requeteNulle(d, requete)) {
@@ -415,17 +422,45 @@ export function classement(d: DetailTete, requete: number): number[] {
   return Array.from({ length: requete + 1 }, (_, j) => j).sort((a, b) => poids[b] - poids[a] || a - b);
 }
 
-/** La première partie de la légende : elle vaut à toutes les étapes. */
-export const LEGENDE_VECTEURS = typographier(
-  'Ces vecteurs sont écrits à la main, comme si les couches précédentes avaient déjà reconnu le rôle de chaque mot. ' +
-    'Dans un vrai modèle, ils sont appris, et les têtes sont rarement aussi nettes.',
+/**
+ * La première partie de la légende : ce que l'exemple dit de ses vecteurs, d'où ils viennent (sa
+ * clé « legende »). Elle vaut à toutes les étapes. Elle appartient à l'exemple : la phrase du
+ * forgeron dit qu'ils sont écrits à la main, un autre exemple dira d'où viennent les siens. Sans
+ * légende, null : la figure ne parle alors que de la carte, et ne dit rien de faux sur les vecteurs.
+ */
+export function legendeVecteurs(exemple: ExempleAttention): string | null {
+  const texte = exemple.legende?.trim() ?? '';
+  return texte === '' ? null : typographier(texte);
+}
+
+/**
+ * La source de la mise en garde de la carte : des poids d'attention ne disent pas pourquoi le
+ * modèle répond. Le titre de l'article est en anglais (lang="en" sur son lien).
+ */
+export const SOURCE_POIDS_NON_EXPLICATION = Object.freeze({
+  auteurs: 'Jain et Wallace',
+  titre: 'Attention is not Explanation',
+  reference: 'arXiv 1902.10186',
+  annee: 2019,
+  url: 'https://arxiv.org/abs/1902.10186',
+});
+
+/** La seconde partie de la légende, jusqu'au titre de l'article cité (le lien) : elle parle de la carte. */
+export const LEGENDE_CARTE_AVANT = typographier(
+  `La carte montre où le calcul lit, pas pourquoi le modèle répond (voir ${SOURCE_POIDS_NON_EXPLICATION.auteurs}, « `,
 );
 
-/** La seconde partie de la légende : elle parle de la carte, et ne s'affiche qu'avec elle. */
-export const LEGENDE_CARTE = typographier(
-  'La carte montre où le calcul lit, pas pourquoi le modèle répond. ' +
+/** La fin de la seconde partie de la légende, après le titre de l'article cité. */
+export const LEGENDE_CARTE_APRES = typographier(
+  ` », ${SOURCE_POIDS_NON_EXPLICATION.reference}, ${SOURCE_POIDS_NON_EXPLICATION.annee}). ` +
     'Une ligne par mot qui demande, une colonne par mot regardé ; score = requête · clé.',
 );
 
-/** La légende complète de la figure, celle des étapes 6 et 7. */
-export const LEGENDE = `${LEGENDE_VECTEURS} ${LEGENDE_CARTE}`;
+/** La seconde partie de la légende, en texte : elle parle de la carte, et ne s'affiche qu'avec elle. */
+export const LEGENDE_CARTE = `${LEGENDE_CARTE_AVANT}${SOURCE_POIDS_NON_EXPLICATION.titre}${LEGENDE_CARTE_APRES}`;
+
+/** La légende complète de la figure, celle des étapes 6 et 7 : les vecteurs de l'exemple (s'il en parle), puis la carte. */
+export function legendeFigure(exemple: ExempleAttention): string {
+  const vecteurs = legendeVecteurs(exemple);
+  return vecteurs === null ? LEGENDE_CARTE : `${vecteurs} ${LEGENDE_CARTE}`;
+}
