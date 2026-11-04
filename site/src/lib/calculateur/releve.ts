@@ -97,7 +97,7 @@ export function explicationArrondiDesCartes(total: string): string {
   return (
     'Dans la division par la mémoire de la carte, le total est arrondi vers le haut quand l’arrondi ordinaire ' +
     `ferait trouver une carte de moins en refaisant le calcul à la main${FINE}: il peut alors dépasser ${total} ` +
-    'd’une unité sur son dernier chiffre (0,1 Go sous 100 Go, 1 Go au-delà).'
+    `d’une unité sur son dernier chiffre (0,1${INSECABLE}Go sous 100${INSECABLE}Go, 1${INSECABLE}Go au-delà).`
   );
 }
 

@@ -86,10 +86,14 @@ jobs:
       - name: Construction du site
         run: npm run build
       # Garde-fou : rien des pages d'essai dans le site publié. Ni leur dossier, ni la liste des
-      # prénoms, que seul le Worker du mini-modèle embarque, et qu'aucune page publiée ne montre
-      # encore. On cherche un prénom distinctif, choisi comme dans e2e/mini-modele.spec.ts : le
-      # premier d'au moins 7 lettres à partir du milieu de la liste. Quand une page publiée
-      # montrera le mini-modèle (plan 5), ce contrôle devra écarter le fichier de son Worker.
+      # prénoms, qu'aucune page publiée ne montre encore. On cherche un prénom distinctif, choisi
+      # comme dans e2e/mini-modele.spec.ts : le premier d'au moins 7 lettres à partir du milieu de
+      # la liste. Ce contrôle ne vaut que pour le site publié (construit sans FORGE_ESSAIS) : une
+      # construction avec les pages d'essai contient aussi ce prénom, dans le Worker du mini-modèle
+      # (travailleur-*.js) et dans la page de parité (ControleParite.*.js).
+      # Quand le plan 5 publiera une page avec le mini-modèle, son Worker entrera dans le site :
+      # il faudra alors écarter dist/_astro/travailleur-*.js de la recherche du prénom (par exemple
+      # grep --exclude='travailleur-*.js'), en gardant la vérification de dist/essais.
       - name: Aucune page d'essai dans le site construit
         run: |
           if [ -e dist/essais ]; then

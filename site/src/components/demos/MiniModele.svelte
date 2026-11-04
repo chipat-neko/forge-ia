@@ -237,8 +237,9 @@
   {/if}
 
   <div class="commandes">
-    <!-- À la fin (« Terminé », « Entraînement arrêté »), le bouton ne fait plus rien, mais il reste focalisable
-         (aria-disabled plutôt que disabled) : le focus du clavier ne tombe pas sur la page. -->
+    <!-- À la fin (« Terminé », « Entraînement arrêté »), le bouton principal ne fait plus rien, et « Recommencer »
+         non plus juste après un clic (rien à recommencer au pas 0). Ils restent focalisables (aria-disabled plutôt
+         que disabled) : le focus du clavier ne tombe pas sur la page. -->
     <button
       type="button"
       class="bouton"
@@ -250,8 +251,10 @@
       type="button"
       class="bouton"
       data-test="mini-recommencer"
-      disabled={!peutRecommencer}
-      onclick={() => appliquer({ type: 'recommencer' })}>Recommencer</button
+      aria-disabled={!peutRecommencer}
+      onclick={() => {
+        if (peutRecommencer) appliquer({ type: 'recommencer' });
+      }}>Recommencer</button
     >
     {#if !avantGout}
       <button
@@ -374,18 +377,17 @@
       background-color 0.15s ease;
   }
 
-  .bouton:hover:not(:disabled, [aria-disabled='true']) {
+  .bouton:hover:not([aria-disabled='true']) {
     background: var(--soleil);
   }
 
-  .bouton:active:not(:disabled, [aria-disabled='true']) {
+  .bouton:active:not([aria-disabled='true']) {
     transform: translateY(3px);
     box-shadow: 0 1px 0 var(--indigo);
   }
 
-  /* « Recommencer » au départ (disabled), et le bouton principal à la fin (aria-disabled : il reste
-     focalisable, mais il ne fait plus rien et le montre). */
-  .bouton:disabled,
+  /* « Recommencer » quand il n'y a rien à recommencer, et le bouton principal à la fin : ils restent
+     focalisables (aria-disabled), mais ils ne font plus rien et le montrent. */
   .bouton[aria-disabled='true'] {
     cursor: default;
     color: var(--indigo-doux);

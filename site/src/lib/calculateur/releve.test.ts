@@ -226,6 +226,9 @@ describe('les valeurs extrêmes (point à surveiller 4 du plan)', () => {
     expect(explication(enorme, 'memoire')).toContain(`dépasser le total «${FINE}en tout${FINE}» ${unite}`);
     expect(explication(enorme, 'generation')).toContain(`dépasser la mémoire des poids en bf16 ${unite}`);
     expect(explication(enorme, 'memoire')).not.toContain('d’un chiffre');
+    // Le nombre et son unité ne se séparent pas en fin de ligne (espace insécable, comme OCTETS_BINAIRES).
+    const brute = formulesDuCalcul(enorme).find((f) => f.cle === 'memoire')?.explication ?? '';
+    expect(brute).toContain(`(0,1${INSECABLE}Go sous 100${INSECABLE}Go, 1${INSECABLE}Go au-delà)`);
     // Une seule carte suffit : pas d'étape « cartes », donc pas de phrase.
     expect(releve().memoire.cartesMinimum).toBe(1);
     expect(explication(releve(), 'memoire')).not.toContain(phrase);

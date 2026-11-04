@@ -187,10 +187,18 @@ test('recommencer : courbe fantôme, et le même réglage redonne les mêmes err
   const avant = (await validations(page).allTextContents()).slice(0, 3);
   await expect(demo(page).locator('[data-test="courbe-fantome"]')).toHaveCount(0);
 
-  await demo(page).locator('[data-test="mini-recommencer"]').click();
+  const recommencer = demo(page).locator('[data-test="mini-recommencer"]');
+  await recommencer.click();
   await expect(etat(page)).toHaveAttribute('data-pas', '0');
   // Rien n'est dit, et l'annonce de l'essai d'avant ne reste pas.
   expect(await brutAnnonce(page)).toBe('');
+  // Au pas 0, il n'y a plus rien à recommencer : le bouton le montre (aria-disabled), mais garde le focus,
+  // et Entrée ne fait rien (le fantôme et le pas 0 restent).
+  await expect(recommencer).toBeDisabled();
+  await expect(recommencer).toHaveAttribute('aria-disabled', 'true');
+  await expect(recommencer).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(recommencer).toBeFocused();
   await expect(validations(page)).toHaveCount(1);
   await expect(demo(page).locator('[data-test="courbe-fantome"]')).toHaveAttribute('d', /^M[\d.]+,[\d.]+L/);
   await expect(demo(page).locator('figcaption')).toContainText(`l’essai d’avant, au taux de ${texteTaux(COMPLET.tauxMax)}`);
@@ -200,6 +208,9 @@ test('recommencer : courbe fantôme, et le même réglage redonne les mêmes err
 
   await expect(action(page)).toHaveText('Lancer l’entraînement');
   await action(page).click();
+  // La zone vidée parle de nouveau au lancement suivant.
+  await expect.poll(() => brutAnnonce(page)).toBe('Entraînement lancé.');
+  await expect(recommencer).not.toHaveAttribute('aria-disabled', 'true');
   await expect.poll(() => validations(page).count(), ATTENTE_TRAVAILLEUR).toBeGreaterThanOrEqual(4);
   expect((await validations(page).allTextContents()).slice(0, 3)).toEqual(avant);
 });

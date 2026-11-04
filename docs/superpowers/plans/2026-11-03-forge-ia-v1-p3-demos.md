@@ -104,6 +104,7 @@ Toutes les sources ont été lues le 03/11/2026. Les chiffres de matériel et de
    - Seuls les vecteurs des mots et les matrices sont écrits. Les scores, le masque, les poids et les sorties sont calculés par la même fonction que le mini-modèle, et vérifiés contre le Python.
    - On le dit au lecteur, avec la mise en garde de Jain et Wallace.
    - Le composant accepte un autre exemple : le plan 5 pourra y montrer les vraies cartes de ton IA une fois entraînée, calculées sur le processeur.
+   - Ajout de la revue finale : ton IA (RoPE, 1 280 dimensions, têtes de 64) ne s'écrit pas comme un exemple `x` + `wq`/`wk`/`wv`. Ce que le plan 5 devra faire (un mode « carte seule » nourri par forge, ou renoncer à cette promesse) est dans la note « Note pour le plan 5 : les cartes de ton IA » de `projets/mini-modele/README.md` (lignes 199 à 229).
 9. **Animation pilotée par le lecteur.** Sept étapes : traits, requête/clé/valeur, scores, division par √4 = 2, masque, softmax, mélange.
    - Le lecteur choisit le mot qui pose la question et la tête.
    - La carte complète s'affiche dans un vrai `<table>`.
