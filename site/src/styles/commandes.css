@@ -1,6 +1,7 @@
 /* Les commandes partagées des démos et des ateliers : le bouton en relief, la
-   bascule soulignée de soleil, la zone qui défile et son indice. Les couleurs
-   viennent de jetons.css ; le jaune soleil est réservé à ce qui se manipule.
+   bascule soulignée de soleil, la zone qui défile et son indice, et les blocs
+   de terminal (commandes à taper, sorties). Les couleurs viennent de
+   jetons.css ; le jaune soleil est réservé à ce qui se manipule.
 
    Chaque composant règle lui-même la police, les marges intérieures et la
    hauteur minimale de ses boutons. Les noms sont nouveaux : les .bouton et
@@ -118,5 +119,48 @@
 @media (max-width: 600px) {
   .indice-defilement[data-seuil='600'] {
     display: block;
+  }
+}
+
+/* ---------- Les blocs de terminal (BlocCommande.astro, SortieCommande.astro) ---------- */
+
+/* Des commandes à taper, ou ce qu'une commande a affiché : une légende en
+   encre douce, puis le texte dans une zone qui défile, sur le fond brume
+   claire du code. Chaque composant ajoute sa propre classe pour le reste. */
+.bloc-terminal {
+  margin: 1.2em 0;
+}
+
+.bloc-terminal figcaption {
+  font-family: var(--titres);
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--indigo-doux);
+  margin-bottom: 8px;
+}
+
+.bloc-terminal .zone-defilable {
+  background: var(--brume-claire);
+  border-radius: 10px;
+}
+
+/* Aussi large que la plus longue ligne : la marge de droite suit le défilement. */
+.bloc-terminal pre {
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 16px 22px;
+  font-family: var(--mono);
+  font-size: 15px;
+  line-height: 1.6;
+  font-variant-ligatures: none; /* « -> » reste « -> » : on montre les caractères tels quels */
+  color: var(--indigo);
+}
+
+@media (max-width: 720px) {
+  .bloc-terminal pre {
+    font-size: 14px;
+    padding: 14px 16px;
   }
 }

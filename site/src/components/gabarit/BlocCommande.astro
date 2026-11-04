@@ -3,6 +3,8 @@
 // copie est exactement ce qu'il faut taper. La légende dit où les taper
 // (« PowerShell » par défaut). Les commandes viennent d'un fichier vérifié
 // (src/lib/partie-0/commandes.ts), jamais d'un texte tapé dans le chapitre.
+// Son allure (légende, fond, zone qui défile) est celle de .bloc-terminal,
+// dans src/styles/commandes.css, partagée avec SortieCommande.
 //
 //   <BlocCommande commandes={[INSTALLER_UV_WINDOWS, VERIFIER_UV]} />
 //   <BlocCommande commandes={[INSTALLER_UV_LINUX_MAC]} ou="un terminal, sous Linux ou macOS" />
@@ -21,7 +23,7 @@ if (commandes.length === 0) {
 }
 ---
 
-<figure class="bloc-commande">
+<figure class="bloc-terminal bloc-commande">
   <figcaption>À taper dans {typographier(ou)}</figcaption>
   {/* Une zone qui défile doit prendre le focus pour se parcourir au clavier (WCAG 2.1.1). */}
   <div class="zone-defilable" role="region" aria-label={`Commandes à taper dans ${ou}, défilable`} tabindex="0">
@@ -29,42 +31,3 @@ if (commandes.length === 0) {
   </div>
 </figure>
 
-<style>
-  .bloc-commande {
-    margin: 1.2em 0;
-  }
-
-  .bloc-commande figcaption {
-    font-family: var(--titres);
-    font-size: 16px;
-    line-height: 1.4;
-    color: var(--indigo-doux);
-    margin-bottom: 8px;
-  }
-
-  .bloc-commande .zone-defilable {
-    background: var(--brume-claire);
-    border-radius: 10px;
-  }
-
-  /* Aussi large que la plus longue commande : la marge de droite suit le défilement. */
-  .bloc-commande pre {
-    width: max-content;
-    min-width: 100%;
-    box-sizing: border-box;
-    margin: 0;
-    padding: 16px 22px;
-    font-family: var(--mono);
-    font-size: 15px;
-    line-height: 1.6;
-    font-variant-ligatures: none;
-    color: var(--indigo);
-  }
-
-  @media (max-width: 720px) {
-    .bloc-commande pre {
-      font-size: 14px;
-      padding: 14px 16px;
-    }
-  }
-</style>

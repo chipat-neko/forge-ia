@@ -110,7 +110,7 @@ Pour faire paraître un chapitre :
    « à mesurer » (`[data-a-mesurer]`) ; le notebook passe
    `outils/executer_notebooks.py` dans l'environnement `.colab` (voir la
    section « Notebooks »), et, s'il utilise la carte graphique, il a tourné
-   sur la RTX 5070 Ti ; l'utilisateur a dit oui à la publication.
+   sur la RTX 5070 Ti ; l'auteur du site a dit oui à la publication.
 2. Déplacer le brouillon :
    `git mv site/src/brouillons/chapitres/<p>-<n>.mdx site/src/content/chapitres/<p>-<n>.mdx`.
 3. Mettre à jour les parcours qui disent ce chapitre « à venir »

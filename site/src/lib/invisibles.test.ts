@@ -26,13 +26,17 @@ const NOMS: Record<string, string> = {
 };
 const INTERDITS = /[\u00A0\u202F\u2009\u200B\u200C\u200D\u2060\uFEFF]/g;
 
-/** Ce qu'il faut écrire à la place du caractère, selon le langage du fichier. */
-function echappement(caractere: string, fichier: string): string {
+/** Quoi faire à la place du caractère, selon le langage du fichier. */
+function conseil(caractere: string, fichier: string): string {
   const point = caractere.codePointAt(0) ?? 0;
   const hex = point.toString(16).toUpperCase().padStart(4, '0');
-  if (fichier.endsWith('.mdx')) return `&#${point}; (ou \\u${hex} dans une expression JavaScript)`;
-  if (fichier.endsWith('.css')) return `\\${hex}`;
-  return `\\u${hex}`;
+  // Dans le balisage d'un composant, un échappement s'afficherait tel quel.
+  if (/\.(astro|svelte)$/.test(fichier)) {
+    return `passe le texte par typographier(), ou écris \\u${hex} dans une chaîne du script, à la place.`;
+  }
+  if (fichier.endsWith('.mdx')) return `écris &#${point}; (ou \\u${hex} dans une expression JavaScript) à la place.`;
+  if (fichier.endsWith('.css')) return `écris \\${hex} à la place.`;
+  return `écris \\u${hex} à la place.`;
 }
 
 /**
@@ -45,17 +49,15 @@ function chercherInvisibles(texte: string, lieu: string, fichier: string): strin
     for (const [caractere] of ligne.matchAll(INTERDITS)) {
       const hex = (caractere.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0');
       fautes.push(
-        `${lieu}, ligne ${i + 1} : caractère U+${hex} (${NOMS[caractere]}) ; ` +
-          `écris ${echappement(caractere, fichier)} à la place.`,
+        `${lieu}, ligne ${i + 1} : caractère U+${hex} (${NOMS[caractere]}) ; ${conseil(caractere, fichier)}`,
       );
     }
   });
   return fautes;
 }
 
-/** Les fautes d'un fichier du dépôt ; d'un notebook, seulement celles de ses cellules de code. */
-function fautesDuFichier(fichier: string): string[] {
-  const texte = readFileSync(join(RACINE, fichier), 'utf8');
+/** Les fautes du texte d'un fichier ; d'un notebook, seulement celles de ses cellules de code. */
+function fautesDuTexte(texte: string, fichier: string): string[] {
   if (!fichier.endsWith('.ipynb')) return chercherInvisibles(texte, fichier, fichier);
   const cellules = (JSON.parse(texte) as { cells: { cell_type: string; source: string | string[] }[] }).cells;
   // Une cellule est désignée par son rang dans le notebook, à partir de 1, cellules Markdown comprises.
@@ -64,6 +66,11 @@ function fautesDuFichier(fichier: string): string[] {
     const source = Array.isArray(cellule.source) ? cellule.source.join('') : cellule.source;
     return chercherInvisibles(source, `${fichier}, cellule ${i + 1}`, fichier);
   });
+}
+
+/** Les fautes d'un fichier du dépôt (chemin depuis la racine du dépôt). */
+function fautesDuFichier(fichier: string): string[] {
+  return fautesDuTexte(readFileSync(join(RACINE, fichier), 'utf8'), fichier);
 }
 
 // Le parcours des dossiers ne descend ni dans les dossiers cachés (.venv,
@@ -134,6 +141,30 @@ describe('caractères invisibles', () => {
     expect(chercherInvisibles('a\u2009b\u200Bc', 'f.mdx', 'f.mdx')).toHaveLength(2);
     expect(chercherInvisibles('a\u2060b', 'f.mdx', 'f.mdx')[0]).toContain('écris &#8288;');
     expect(chercherInvisibles('Tout est visible : « oui ».', 'f.ts', 'f.ts')).toEqual([]);
+  });
+
+  it('dans un composant Astro ou Svelte, le conseil renvoie à typographier()', () => {
+    // Dans le balisage, \u202F s'afficherait tel quel : c'est typographier() qui pose l'espace fine.
+    for (const fichier of ['site/x.astro', 'site/x.svelte']) {
+      expect(chercherInvisibles('<p>Vrai\u202F?</p>', fichier, fichier)).toEqual([
+        `${fichier}, ligne 1 : caractère U+202F (espace fine insécable) ; ` +
+          'passe le texte par typographier(), ou écris \\u202F dans une chaîne du script, à la place.',
+      ]);
+    }
+  });
+
+  it('dans un notebook, seules les cellules de code sont lues, et la faute nomme la cellule', () => {
+    // Un petit notebook construit ici : cellule 1 en Markdown (U+202F permise), cellule 2 de code.
+    const notebook = JSON.stringify({
+      cells: [
+        { cell_type: 'markdown', source: ['Texte\u202F: permis ici.\n'] },
+        { cell_type: 'code', source: ['x = 1\n', 'print("a\u202F: b")\n'] },
+        { cell_type: 'code', source: 'print("rien")' },
+      ],
+    });
+    expect(fautesDuTexte(notebook, 'notebooks/x.ipynb')).toEqual([
+      'notebooks/x.ipynb, cellule 2, ligne 2 : caractère U+202F (espace fine insécable) ; écris \\u202F à la place.',
+    ]);
   });
 
   it('la liste des fichiers à lire contient bien les fichiers de la tâche 2', () => {
