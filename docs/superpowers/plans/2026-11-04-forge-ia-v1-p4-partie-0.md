@@ -1321,7 +1321,13 @@ Cette tâche n'attend plus la fin de l'entraînement de ton IA. L'essai du 04/11
 D'où deux temps :
 
 - **les vérifications** (tests `gpu` et notebooks sur la carte) tournent en même temps que l'entraînement : quelques minutes à 11 % de vitesse en moins, moins cher qu'une pause ;
-- **les mesures** se relèvent pendant une courte pause de l'entraînement, d'environ 15 minutes, faite par le contrôleur ; ou sans pause si l'entraînement est déjà fini.
+- **les mesures** se relèvent pendant une courte pause de l'entraînement, faite par le contrôleur ; ou sans pause si l'entraînement est déjà fini.
+
+L'utilisateur a demandé le 04/11/2026 de tout faire au processeur quand c'est possible, et sinon de faire la pause. Les trois sorties de la carte contiennent un temps (l'essai de calcul de 0.3 en millisecondes, les chronos de 0.4, la durée de l'entraînement de 0.5) : elles ne peuvent pas venir du processeur. La pause est donc réduite au minimum :
+
+- tout ce qui ne mesure pas de temps sur la carte se fait avant, pendant l'entraînement (étapes 1 et 2) ;
+- pendant la pause, seulement les quatre commandes de l'étape 4, enchaînées sans attente ; durée visée : 10 minutes ;
+- l'entraînement repart aussitôt la dernière commande finie, avant toute écriture de chapitre.
 
 Conditions : les tâches 1 à 15 sont complètes au ledger, et l'utilisateur a dit « go » (il ne joue pas). Aucune autre question avant de commencer : l'utilisateur a demandé de ne pas perdre de temps.
 
