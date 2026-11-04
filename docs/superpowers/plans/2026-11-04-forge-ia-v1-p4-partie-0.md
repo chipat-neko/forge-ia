@@ -2,7 +2,7 @@
 
 > **Pour les agents qui exécutent ce plan :** SOUS-SKILL REQUIS : utiliser superpowers:subagent-driven-development (recommandé) ou superpowers:executing-plans pour réaliser ce plan tâche par tâche. Les étapes utilisent des cases à cocher (`- [ ]`).
 
-**But :** écrire les cinq chapitres de la Partie 0 (0.1 à 0.5), chacun avec sa prose complète dans le gabarit du plan 1, son projet Python testé et son notebook Colab, sans jamais utiliser la carte graphique tant que ton IA s'entraîne ; puis relever les mesures de la carte dans une tâche porte, une fois l'entraînement fini.
+**But :** écrire les cinq chapitres de la Partie 0 (0.1 à 0.5), chacun avec sa prose complète dans le gabarit du plan 1, son projet Python testé et son notebook Colab, sans jamais utiliser la carte graphique tant que ton IA s'entraîne ; puis relever les mesures de la carte dans une tâche porte, pendant une courte pause de l'entraînement de ton IA (essai du 04/11/2026).
 
 **Architecture :**
 
@@ -28,9 +28,9 @@ C'est le plan 4 du découpage fixé par le plan 1 : « Partie 0 : chapitres 0.1 
 Hors de ce plan, et donc pour le plan 5 :
 
 - les chapitres 1.1, 1.2, 1.4, 1.5 et 1.6 ;
-- l'annuaire des données et le glossaire ;
-- la liste Colab de la vague et sa validation par l'utilisateur ;
-- la parution des chapitres de la Partie 0 (voir la question en fin de plan).
+- l'annuaire des données et le glossaire.
+
+La parution de la Partie 0 se fait dans ce plan (choix 2).
 
 ## Recherche faite avant ce plan (le 04/11/2026)
 
@@ -76,7 +76,14 @@ Toutes les sources ont été lues le 04/11/2026.
 ## Choix de ce plan
 
 1. **Brouillons, puis parution par `git mv`.** Un chapitre s'écrit dans `site/src/brouillons/chapitres/<p>-<n>.mdx`, au même niveau de dossiers que `site/src/content/chapitres/` : ses imports relatifs ne changent pas quand il paraît. Il n'est construit qu'avec `FORGE_ESSAIS=1`, à son adresse définitive et hors de la recherche. Rien d'inachevé ne peut donc paraître, et les parcours testent la vraie page.
-2. **La parution de la Partie 0 se fait avec la liste Colab du plan 5** (question en attente, réponse A recommandée). La spécification fait attendre la publication d'une vague le retour de l'utilisateur sur Colab ; ce plan livre des brouillons complets et la marche à suivre.
+2. **Parution chapitre par chapitre, sans validation Colab par l'utilisateur** (décision de l'utilisateur du 04/11/2026, reportée dans la spécification, section 8).
+   - L'utilisateur ne lance aucun notebook. Chaque notebook est exécuté automatiquement :
+     - par le `test_notebook.py` de son projet (Python 3.12, PyTorch 2.15, sous Linux et Windows) ;
+     - par le job `notebooks-colab` de `python.yml` (tâche 2), qui reproduit l'image de Colab sans carte : Python 3.13, `torch==2.11.0+cpu`, `numpy==2.4.6` ;
+     - et, pour 0.3 à 0.5, sur la RTX 5070 Ti à la porte (tâche 16).
+   - 0.1 et 0.2 paraissent dès qu'ils sont finis et relus, et que leur notebook passe : c'est l'étape « parution » ajoutée à la fin de la tâche 7. 0.3 à 0.5 paraissent après la porte (tâche 16, étape « parution »).
+   - Avant chaque poussée, le contrôleur pose une seule question à l'utilisateur (AskUserQuestion) : « 0.x et 0.y sont prêts. Je pousse et je les publie ? ». Sans oui, rien n'est poussé.
+   - L'utilisateur signale les problèmes qu'il rencontre à l'usage ; ils sont corrigés comme des retours de relecture.
 3. **Un projet autonome par chapitre**, avec ses propres tests et son verrou `uv.lock`. Un lecteur peut n'en télécharger qu'un. Les rares fichiers partagés sont copiés, et un test garde chaque copie identique à l'original :
    - le texte de 0.1 est celui du corpus de 1.3 ;
    - `appareil.py` de 0.4 et 0.5 vient de 0.3 ;
@@ -123,6 +130,7 @@ Toutes les sources ont été lues le 04/11/2026.
 
 - **« Lancé en entier sur la RTX 5070 Ti » :** les projets 0.1 et 0.2 n'utilisent pas la carte. Ils sont lancés en entier sur ce PC, et c'est tout ce que la règle peut vouloir dire pour eux. 0.3, 0.4 et 0.5 passent sur la carte à la porte (tâche 16).
 - **Copies de fichiers entre projets** (choix 3) : la spécification veut une seule source pour les extraits du site, pas pour les projets. Chaque copie est gardée identique par un test.
+- **« Exécuté de bout en bout sur l'offre gratuite de Colab » :** la spécification a été modifiée le 04/11/2026 (choix 2). Le job `notebooks-colab` reproduit le logiciel de Colab, pas sa machine : la carte de Colab (souvent une T4) n'est pas testée, et le chapitre 0.3 le dit.
 
 ## Contraintes globales
 
@@ -191,7 +199,7 @@ Les tests ordinaires ne couvrent pas ces cinq situations, les plus susceptibles 
    Tests en tâches 8, 10 et 12.
 3. **Réglages et saisies extrêmes dans les ateliers** : texte vide, un seul mot, 10 000 caractères, emoji ; vecteur nul ; taux qui fait exploser la descente ; formes pleines de 1 ou à 3 dimensions ; 100 000 tirages ; poids nuls du neurone. Attendu : rien ne plante, jamais `NaN`, `Infinity` ni `e+`, aucun débordement à 390 px, et chaque recalcul en moins de 200 ms. Tests en tâches 4, 6, 11 et 14.
 4. **Un nombre de la prose tapé à la main, ou une mesure de carte inventée.** Attendu : chaque nombre vient d'un import. Une mesure absente s'affiche « à mesurer », et aucun chapitre paru n'en contient. Tests en tâche 2 (`e2e/parution.spec.ts`), en tâches 9, 11 et 14 (« à mesurer » présent avant la porte) et en tâche 16 (plus aucun).
-5. **Le notebook sur Colab** (Python 3.13, PyTorch 2.11 déjà installé, parfois sans carte) diffère du poste local (3.12, PyTorch 2.15). Attendu : il n'installe pas PyTorch, n'appelle que des fonctions anciennes, tourne sans carte et dit sur quoi il a tourné. Tests en tâches 8, 10 et 12 : exécution sans carte, et lecture du notebook qui refuse `pip install torch`, `torch.accelerator` et `torch.compile`.
+5. **Le notebook sur Colab** (Python 3.13, PyTorch 2.11 déjà installé, parfois sans carte) diffère du poste local (3.12, PyTorch 2.15). Attendu : il n'installe pas PyTorch, n'appelle que des fonctions anciennes, tourne sans carte et dit sur quoi il a tourné. Tests en tâches 8, 10 et 12 : exécution sans carte, et lecture du notebook qui refuse `pip install torch`, `torch.accelerator` et `torch.compile`. En plus, le job `notebooks-colab` (tâche 2) exécute chaque notebook avec Python 3.13 et `torch==2.11.0+cpu`, et chaque tâche de notebook le rejoue en local avant son commit.
 
 ---
 
@@ -291,7 +299,9 @@ expect(() => exiger(false, '« z » apparaît dans le corpus')).toThrow(
 - Créer : `site/src/components/gabarit/SortieCommande.astro`, `site/src/components/gabarit/BlocCommande.astro`
 - Créer : `site/src/brouillons/chapitres/0-1.mdx` (squelette : frontmatter final de 0.1, avec `acquis: []` et une étape 1 de deux phrases ; la tâche 4 l'écrit en entier)
 - Modifier : `site/src/pages/[partie]/[chapitre].astro`, `site/src/essais/gabarit.mdx`
-- Modifier : `.github/workflows/site.yml`, `README.md` (section « Parution d'un chapitre »)
+- Modifier : `.github/workflows/site.yml`, `README.md` (sections « Parution d'un chapitre » et « Notebooks »)
+- Créer : `outils/executer_notebooks.py`, `outils/colab-sans-carte.txt`
+- Modifier : `.github/workflows/python.yml` (job `notebooks-colab`), `.gitignore` (`.colab/`)
 - Test : `site/e2e/brouillons.spec.ts`, `site/e2e/parution.spec.ts`, `site/e2e/gabarit.spec.ts` (deux tests de plus)
 
 **Interfaces :**
@@ -365,7 +375,7 @@ done
 ```
 
   - **Section « Parution d'un chapitre » du README** :
-    1. Conditions : tous les tests sont verts ; la page n'a aucun `[data-a-mesurer]` ; le notebook a été validé sur Colab par l'utilisateur, avec sa ligne dans `docs/verifications/colab.md`.
+    1. Conditions : tous les tests sont verts ; la page n'a aucun `[data-a-mesurer]` ; le notebook passe `outils/executer_notebooks.py` dans l'environnement `.colab` (voir la section « Notebooks » du README), et, s'il utilise la carte, il a tourné sur la RTX 5070 Ti ; l'utilisateur a dit oui à la publication.
     2. `git mv site/src/brouillons/chapitres/<p>-<n>.mdx site/src/content/chapitres/<p>-<n>.mdx`.
     3. Mettre à jour les parcours qui disent ce chapitre « à venir » (`navigation.spec.ts`, et le pied des chapitres voisins).
     4. Si le chapitre contient le mini-modèle (0.5), écarter `dist/_astro/travailleur-*.js` de la recherche du prénom dans `site.yml`, comme le dit son commentaire.
@@ -376,6 +386,29 @@ done
   - `npm run build` (sans essais), puis dans Git Bash `test ! -e dist/partie-0/0-1 && test -e dist/partie-1/1-3` ;
   - le garde-fou des prénoms de `site.yml`, rejoué à la main.
 - [ ] **Étape 5 : commit**, message « Brouillons de chapitres, sorties de commande et garde-fous de parution ».
+- [ ] **Étape 6 : les notebooks exécutés comme sur Colab, sans carte** (choix 2).
+  - **`outils/colab-sans-carte.txt`** : en tête, un commentaire avec la source (https://github.com/googlecolab/backend-info, relevé du 03/11/2026, image sans carte). Puis `numpy==2.4.6`, `ipykernel==6.17.1`, `nbclient`, `nbformat`, et `regex` (le notebook 1.3 l'installe lui-même sur Colab). PyTorch n'y est pas : il vient d'un autre index (ci-dessous).
+  - **`outils/executer_notebooks.py [notebooks…]`** : sans argument, tous les `notebooks/*.ipynb`. Pour chacun :
+    - exécution d'une copie en mémoire par `NotebookClient(nb, timeout=600, kernel_name="python3")`, avec `FORGE_IA_LOCAL` à la racine du dépôt (le notebook n'installe et ne télécharge rien) ;
+    - échec si une cellule lève une erreur : le message nomme le notebook, le numéro de la cellule et la dernière ligne de l'erreur ;
+    - échec si une sortie contient une ligne `Même … que la page du site : X` avec X différent de `oui` (espaces ordinaires ou U+202F) ;
+    - une ligne par notebook : nom, durée, `ok` ou `ÉCHEC`. En tête : versions de Python, de PyTorch (s'il s'importe) et de numpy.
+
+    Code de sortie 1 si un notebook échoue.
+  - **Job `notebooks-colab` de `python.yml`**, sous `ubuntu-latest`, `timeout-minutes: 20` :
+
+```bash
+uv venv --python 3.13 .colab
+uv pip install --python .colab --index-url https://download.pytorch.org/whl/cpu torch==2.11.0
+uv pip install --python .colab -r outils/colab-sans-carte.txt
+.colab/bin/python outils/executer_notebooks.py
+```
+
+  - **En local** (PowerShell, `. .\outils\env-forge.ps1` d'abord pour le cache d'uv sur D:) : les mêmes commandes, avec `.colab\Scripts\python`. Si `ipykernel==6.17.1` ne s'installe pas ou ne démarre pas sous Python 3.13, prendre la dernière 6.x, et le noter dans le commentaire du fichier et dans le rapport.
+  - **Vérifier qu'il attrape les fautes** : `notebooks/1.3-tokenizer.ipynb` passe (`ok`). Deux copies temporaires hors du dépôt échouent avec le bon message : l'une a une cellule `raise ValueError("essai")`, l'autre affiche « Même résultat que la page du site : non ».
+  - **Section « Notebooks » du README** : l'utilisateur ne lance pas les notebooks ; ce que fait le job ; les commandes locales.
+  - **Toute tâche qui crée ou modifie un notebook le rejoue ainsi avant son commit** : `.colab\Scripts\python outils\executer_notebooks.py notebooks\0.N-<nom>.ipynb`. Attendu : `ok`.
+  - Commit : message « Notebooks exécutés comme sur Colab, sans carte (Python 3.13, PyTorch 2.11) », avec les fichiers de cette étape.
 
 ### Tâche 3 : le projet 0.1 « le mot suivant », son notebook et son jumeau
 
@@ -742,6 +775,14 @@ Le pari `taux-moitie` n'a pas d'acquis : il prépare `taux-grand`.
 - [ ] **Étape 2 : vérifier l'échec**, écrire le chapitre, puis vérifier que tout passe, `figures-0-2.spec.ts` compris.
 - [ ] **Étape 3 : captures et relecture** du chapitre entier, sur ordinateur et sur mobile.
 - [ ] **Étape 4 : commit**, message « Chapitre 0.2 : les maths utiles (brouillon) ».
+- [ ] **Étape 5 : parution de 0.1 et 0.2** (par le contrôleur, après la relecture de cette tâche ; choix 2).
+  1. **Conditions** : les tâches 1 à 7 sont complètes au ledger ; `executer_notebooks.py` donne `ok` pour `0.1-python` et `0.2-maths` dans `.colab` ; les pages 0-1 et 0-2 n'ont aucun `[data-a-mesurer]`.
+  2. **Question (AskUserQuestion)** : « 0.1 et 0.2 sont prêts. Je pousse et je les publie ? », avec les captures (ordinateur et mobile) et ce que la poussée contient (les commits depuis le dernier push). Sans oui, rien n'est poussé : la question revient à la tâche 15.
+  3. **Sur un oui** :
+     - pousser tel quel (les brouillons ne sont pas construits), puis attendre le vert des workflows Python (dont `notebooks-colab`) et Site ;
+     - `git mv` de `0-1.mdx` et `0-2.mdx` vers `site/src/content/chapitres/`, mettre à jour les parcours qui les disaient « à venir » (`brouillons.spec.ts`, `navigation.spec.ts`, pied de 0.1 vers 0.2, page de la Partie 0) ;
+     - tout vérifier comme en tâche 15, étape 1, puis `npm run build` sans essais : `dist/partie-0/0-1/` et `0-2/` existent, `0-3/` non ;
+     - commit « Parution des chapitres 0.1 et 0.2 », pousser, attendre le déploiement, puis vérifier que les deux adresses publiques répondent 200 et que `0-3` répond 404.
 
 ### Tâche 8 : le projet 0.3 « vérifier son poste » et son notebook
 
@@ -880,7 +921,7 @@ def test_notebook_sans_installation_de_torch_ni_api_recente():
 | 2 | Le pilote, et rien d'autre | `nvidia-smi` (`BlocCommande`) ; pilote, CUDA dans les roues, inutilité du Toolkit ; pilote 580 ou plus pour CUDA 13 ; capacité 12.0 de la RTX 5070 Ti. Note : ce qui rend faux les anciens tutoriels (liste de la recherche). |
 | 3 | Installer uv | Les trois commandes d'installation, `uv --version`, et uv qui installe Python lui-même. |
 | 4 | Le projet et sa version de PyTorch | Cloner, `cd`, puis `CodeExplique langue="toml"` sur la région `pytorch`. Pourquoi deux extras : PyPI ne sert sous Windows que la version pour processeur (126,7 Mo contre plusieurs Go). Pari `pypi`. |
-| 5 | Vérifier | `VERIFIER_POSTE_GPU`. `SortieCommande` sur `sorties/processeur.txt` (« sur ce PC, avec la version pour processeur »), puis sur `sorties/rtx-5070-ti.txt` (absent jusqu'à la porte : « La sortie sur la RTX 5070 Ti s'affichera ici : on la relève quand la carte aura fini d'entraîner ton IA. »). `CodeExplique` sur `diagnostiquer` et sur `appareil`. |
+| 5 | Vérifier | `VERIFIER_POSTE_GPU`. `SortieCommande` sur `sorties/processeur.txt` (« sur ce PC, avec la version pour processeur »), puis sur `sorties/rtx-5070-ti.txt` (absent jusqu'à la porte : « La sortie sur la RTX 5070 Ti s'affichera ici : on la relève quand la carte sera libre. »). `CodeExplique` sur `diagnostiquer` et sur `appareil`. |
 | 6 | Quand ça ne marche pas | Tableau des situations, depuis les attendus : situation, ce que dit le script, ce qu'il faut faire. Pari `trop-recente`. |
 | 7 | Le processeur, Colab, Linux et Mac | 16 fils et 8 par défaut (mesure du plan 2) ; Colab : la carte de l'offre gratuite n'est pas garantie (souvent une T4, capacité 7.5), 12 h au plus, Python 3.13 et PyTorch 2.11 déjà installés (relevé du 03/11/2026, sources) ; Linux : PyPI sert déjà des roues CUDA ; Mac : pas de CUDA, MPS non testé par le site, donc le processeur. WSL2 n'est pas nécessaire. |
 | 8 | À grande échelle | `EncadreLabo` : jusqu'à 16 384 H100 pour Llama 3 405B. Ce nombre n'est pas dans les données du calculateur : le citer depuis l'article de Llama 3 (arXiv 2407.21783, section 3.3), avec la date de vérification ; la T4 de Colab et la RTX 5070 Ti dans le même tableau typographié (mémoire, calcul, depuis `MATERIELS`). `LiensProjet projet="0.3-poste"`, puis « À suivre » vers 0.4. |
@@ -1210,7 +1251,7 @@ expect(gauche).toEqual(attendu);
 | 5 | Remonter l'erreur | La règle de la chaîne de 0.2, appliquée ; `p − y` à la sortie. Pari `gradient`. `CodeExplique` sur `retropropager`. |
 | 6 | Entraîner à la main | `CodeExplique` sur `pas` et `entrainer`. `CourbeXor` avec les pertes des attendus ; un tableau des 4 prédictions. Paris `exact` et `coince`. |
 | 7 | Le même, avec PyTorch | `CodeExplique` sur `modele`, `autograd` et `entrainer-pytorch`. L'écart des gradients, depuis `sorties/processeur.txt` (`SortieCommande`). |
-| 8 | Sur la carte | `choisir_appareil`. `SortieCommande` sur `sorties/rtx-5070-ti.txt` (absent jusqu'à la porte : « La sortie sur la RTX 5070 Ti s'affichera ici : on la relève quand la carte aura fini d'entraîner ton IA. »). Aucune phrase sur qui va le plus vite avant la porte. |
+| 8 | Sur la carte | `choisir_appareil`. `SortieCommande` sur `sorties/rtx-5070-ti.txt` (absent jusqu'à la porte : « La sortie sur la RTX 5070 Ti s'affichera ici : on la relève quand la carte sera libre. »). Aucune phrase sur qui va le plus vite avant la porte. |
 | 9 | La même boucle, en plus grand | L'avant-goût : `<DemoMiniModele preset="avant-gout" nom="avant-gout" acquis="avant-gout" />`. La phrase cite le nombre de poids (`etatInitial('avant-gout').nbParametres`) et les deux premiers prénoms du départ, calculés. Lien vers 1.5 par le composant. |
 | 10 | À grande échelle | `EncadreLabo` : 9 poids ici, `PRESETS_FORGE.tres_grand.parametres` pour ton IA, 175 milliards pour GPT-3 et 405 milliards pour Llama 3 405B (`MODELES_PUBLICS`, avec leurs sources). `LiensProjet projet="0.5-reseau"`, puis « À suivre » vers 1.1. |
 
@@ -1264,19 +1305,25 @@ expect(gauche).toEqual(attendu);
   - Aucune affirmation n'est datée sans source.
   - Corriger dans la tâche concernée, par un commit séparé.
 - [ ] **Étape 4 : montrer les brouillons.** Lancer `npm run build:essais`, puis `npm run preview` (port 8530). Donner les cinq adresses `/forge-ia/partie-0/0-1/` à `0-5/`, avec des captures ordinateur et mobile. Puis :
-  - demander avec AskUserQuestion si les chapitres conviennent, et rappeler la question de parution de la fin de ce plan ;
+  - demander avec AskUserQuestion si les chapitres conviennent ; si 0.1 et 0.2 n'ont pas encore paru, reposer leur question de parution (tâche 7, étape 5) ;
   - arrêter le serveur ;
   - si l'utilisateur demande des changements, les faire dans la tâche concernée, puis redemander.
 - [ ] **Étape 5 : commit**, message « Partie 0 : README des projets et bilan avant la carte ».
 
 ### Tâche 16 : vérification sur la carte graphique (porte)
 
-Cette tâche attend deux conditions, sans exception :
+Cette tâche n'attend plus la fin de l'entraînement de ton IA. L'essai du 04/11/2026 (charge qui imite les notebooks 0.3 à 0.5, trois minutes par phase, pendant l'entraînement) a donné :
 
-1. l'entraînement principal de ton IA est fini : le ledger du plan 2 le dit, et `nvidia-smi` ne montre plus de processus `python -m forge` ni d'utilisation au-dessus de 10 % ;
-2. l'utilisateur dit « go », après une question posée avec AskUserQuestion : « La carte est libre. Je lance les vérifications de la Partie 0 sur la RTX 5070 Ti (environ 15 minutes, carte et processeur à fond par moments) ? »
+- **sur le processeur (16 fils), en même temps** : l'entraînement garde sa vitesse (17 198 jetons par seconde, contre 17 212 sans charge), et la charge va vite ;
+- **sur la carte, en même temps** : 86 Mio de mémoire seulement, sans débordement (14,9 Go sur 16,3), mais l'entraînement perd environ 11 % (15 368 jetons par seconde) tant que la charge tourne, et la charge est dix fois plus lente qu'au processeur ;
+- donc **une mesure de durée prise sur la carte pendant l'entraînement serait fausse** : les chronos et les sorties publiés se relèvent carte au repos.
 
-Sinon, elle attend.
+D'où deux temps :
+
+- **les vérifications** (tests `gpu` et notebooks sur la carte) tournent en même temps que l'entraînement : quelques minutes à 11 % de vitesse en moins, moins cher qu'une pause ;
+- **les mesures** se relèvent pendant une courte pause de l'entraînement, d'environ 15 minutes, faite par le contrôleur ; ou sans pause si l'entraînement est déjà fini.
+
+Conditions : les tâches 1 à 15 sont complètes au ledger, et l'utilisateur a dit « go » (il ne joue pas). Aucune autre question avant de commencer : l'utilisateur a demandé de ne pas perdre de temps.
 
 **Fichiers :**
 
@@ -1286,32 +1333,41 @@ Sinon, elle attend.
 - Modifier : `site/e2e/chapitre-0-3.spec.ts`, `chapitre-0-4.spec.ts`, `chapitre-0-5.spec.ts` (zéro `[data-a-mesurer]`, nouveau pari)
 - Modifier : `projets/0.4-tenseurs/README.md` (les chronos ne sont plus provisoires)
 
-- [ ] **Étape 1 : préparer, sans rien télécharger.**
+- [ ] **Étape 1 : préparer, sans rien télécharger**, pendant l'entraînement.
   - `. .\outils\env-forge.ps1`, puis vérifier qu'il reste au moins 25 Go sur D:.
   - Dans 0.3, 0.4 et 0.5 : `uv sync --extra gpu --offline`. Si uv réclame une roue absente du cache, s'arrêter et demander à l'utilisateur avant tout téléchargement de plusieurs Go.
-- [ ] **Étape 2 : lancer les tests sur la carte.** Dans chaque projet : `uv run --extra gpu pytest -q -rs`. Attendu : tout passe, et aucun test `gpu` n'est sauté.
-- [ ] **Étape 3 : relever les sorties et les mesures**, machine au repos (aucun jeu, `nvidia-smi` sous 10 %) :
+- [ ] **Étape 2 : lancer les tests sur la carte**, pendant l'entraînement. Dans chaque projet : `uv run --extra gpu pytest -q -rs`. Attendu : tout passe, aucun test `gpu` n'est sauté, et le `test_notebook.py` de chaque projet a tourné sur la carte (le notebook le dit). Le contrôleur lit la vitesse de l'entraînement dans son journal avant et après : la baisse doit s'arrêter avec les tests.
+- [ ] **Étape 3 : mettre l'entraînement en pause** (contrôleur ; sauter cette étape si l'entraînement est fini).
+  - Arrêter le chien de garde (et tout Python qui exécute `chien-de-garde.py`), puis lancer `D:\forge-ia-donnees\journaux\pause-entrainement.ps1`.
+  - Attendre l'évènement `pause` dans le journal, puis vérifier avec `nvidia-smi` : utilisation sous 10 %, plus aucun processus `python -m forge`.
+  - Noter l'heure et le pas de la pause dans le ledger du plan 2.
+- [ ] **Étape 4 : relever les sorties et les mesures**, carte au repos (aucun jeu, `nvidia-smi` sous 10 %) :
   - `cd projets/0.3-poste; uv run --extra gpu python -m poste --enregistrer sorties/rtx-5070-ti.txt` : code de sortie 0, constat `carte_prete` ;
   - `cd projets/0.4-tenseurs` :
     - `uv run --extra gpu python -m tenseurs mesurer --appareil cpu --sortie mesures/processeur.json`, en vérifiant que les 16 fils travaillent au réglage « tous » ;
     - `uv run --extra gpu python -m tenseurs mesurer --appareil cuda --sortie mesures/rtx-5070-ti.json` ;
   - `cd projets/0.5-reseau; uv run --extra gpu python -m premier_reseau entrainer --appareil cuda --enregistrer sorties/rtx-5070-ti.txt`.
-- [ ] **Étape 4 : compléter les chapitres, tests d'abord.**
+- [ ] **Étape 5 : reprendre l'entraînement** (contrôleur ; sauter si l'entraînement est fini), aussitôt les mesures relevées.
+  - `entrainement-principal.ps1 -Reprendre`, puis relancer le chien de garde une fois l'évènement `reprise` écrit dans le journal (sinon il voit la pause et s'arrête).
+  - Vérifier les premiers pas, puis noter la reprise et la durée de la pause dans le ledger du plan 2.
+- [ ] **Étape 6 : compléter les chapitres, tests d'abord.**
   - Les trois parcours attendent zéro `[data-a-mesurer]`.
   - Celui de 0.4 attend le pari `petite`, avec `choixPetiteMatrice(lireMesures('processeur'), lireMesures('rtx-5070-ti'))` et l'acquis `petite`, recap « 5 sur 5 ».
   - Puis écrire, dans 0.4 et 0.5, une phrase qualitative qui dit ce que montrent les mesures. Elle ne contient aucun nombre tapé à la main ; les nombres sont dans le tableau et dans les sorties.
   - Le relecteur vérifie chaque phrase contre les fichiers.
-- [ ] **Étape 5 : tout vérifier** comme en tâche 15, étape 1. Pytest repasse avec `--extra cpu` : l'intégration continue le fait ainsi.
-- [ ] **Étape 6 : commit**, message « Partie 0 : sorties et chronos de la RTX 5070 Ti, relevés après l'entraînement de ton IA ».
-- [ ] **Étape 7 : écrire le jalon dans la mémoire partagée**, si elle répond (sinon, le dire dans le compte rendu) : « Projet forge-ia (La Forge IA) : Partie 0 (chapitres 0.1 à 0.5) écrite, avec ses cinq projets (projets/0.1-python à 0.5-reseau) et ses notebooks, vérifiée sur la RTX 5070 Ti ; en brouillon jusqu'à la validation Colab du plan 5 ».
-- [ ] **Étape 8 : compte rendu à l'utilisateur.** Les chiffres relevés (carte, processeur et nombre de fils utilisés), le chemin des fichiers, et la proposition d'écrire le plan 5.
+- [ ] **Étape 7 : tout vérifier** comme en tâche 15, étape 1. Pytest repasse avec `--extra cpu` : l'intégration continue le fait ainsi. `executer_notebooks.py` repasse dans `.colab` pour 0.3 à 0.5.
+- [ ] **Étape 8 : commit**, message « Partie 0 : sorties et chronos de la RTX 5070 Ti, relevés carte au repos ».
+- [ ] **Étape 9 : parution de 0.3 à 0.5** (contrôleur), comme la tâche 7, étape 5, avec ces différences :
+  - la question : « 0.3, 0.4 et 0.5 sont prêts. Je pousse et je les publie ? » (avec 0.1 et 0.2 s'ils n'ont pas encore paru) ;
+  - 0.5 contient le mini-modèle : appliquer le point 4 de la section « Parution d'un chapitre » du README (écarter `dist/_astro/travailleur-*.js` de la recherche du prénom dans `site.yml`) ;
+  - après le déploiement, les cinq adresses `/forge-ia/partie-0/0-1/` à `0-5/` répondent 200.
+- [ ] **Étape 10 : écrire le jalon dans la mémoire partagée**, si elle répond (sinon, le dire dans le compte rendu) : « Projet forge-ia (La Forge IA) : Partie 0 (chapitres 0.1 à 0.5) écrite, avec ses cinq projets (projets/0.1-python à 0.5-reseau) et ses notebooks (exécutés automatiquement, comme sur Colab sans carte, et sur la RTX 5070 Ti) ; publiée le JJ/MM/AAAA ». Sans parution, écrire « en brouillon » à la place.
+- [ ] **Étape 11 : compte rendu à l'utilisateur.** Les chiffres relevés (carte, processeur et nombre de fils utilisés), la durée de la pause de l'entraînement, le chemin des fichiers, et la proposition d'écrire le plan 5.
 
 ---
 
-## Question pour l'utilisateur (en attente)
+## Décisions de l'utilisateur (04/11/2026)
 
-**Quand faire paraître la Partie 0 ?** Le plan est écrit avec la réponse A.
-
-- **(A, recommandé)** Avec la liste Colab de la vague, au plan 5. C'est la règle de la spécification : la publication d'une vague attend ton retour sur Colab.
-- **(B)** Juste après la porte de ce plan, une fois que tu as lancé les cinq notebooks sur Colab. La Partie 0 serait en ligne avant 1.1 à 1.6.
-- **(C)** 0.1 et 0.2 dès que leur notebook est validé sur Colab, car ils n'ont pas besoin de la carte ; 0.3 à 0.5 après la porte et leur propre validation.
+- **Notebooks** : « je ne lancerai pas les notebooks un par un, trouve une solution pour le faire de ton côté ; si je trouve un problème en utilisant, je te le dis ». D'où le job `notebooks-colab` (tâche 2) et le choix 2.
+- **Parution** : « je te laisse me dire quand il peut être publié sur le site ». D'où la parution de 0.1 et 0.2 en tâche 7, et celle de 0.3 à 0.5 en tâche 16, chacune après un oui.
+- **La carte pendant l'entraînement** : « essaie et vois comment ça passerait si tu les lances en même temps, sur la carte ou le processeur, pour ne pas perdre de temps ». D'où la tâche 16 telle qu'elle est écrite, d'après l'essai du 04/11/2026.

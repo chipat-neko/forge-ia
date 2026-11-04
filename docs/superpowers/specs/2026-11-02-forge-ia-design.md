@@ -222,12 +222,12 @@ Le code se présente sous trois formes, toutes demandées par l'utilisateur :
 - **Rien n'est publié sans avoir tourné** :
   - chaque projet a des tests rapides (pytest, quelques minutes au plus sur CPU) ;
   - il a été lancé en entier sur la RTX 5070 Ti ;
-  - son notebook a été exécuté de bout en bout sur l'offre gratuite de Colab.
-- **Les notebooks Colab** (décidé) :
-  - **l'utilisateur les lance lui-même**, tous, sur Colab avec son compte Google, à chaque vague et avant la publication ;
-  - le constructeur les prépare et les teste d'abord en local ;
-  - il remet à l'utilisateur une liste : quel notebook, durée attendue, résultat attendu ;
-  - la publication d'une vague attend ce retour.
+  - son notebook a été exécuté de bout en bout, automatiquement, dans un environnement qui reproduit Colab sans carte (même version de Python et de PyTorch) ; s'il utilise la carte, il a aussi tourné sur la RTX 5070 Ti.
+- **Les notebooks Colab** (décidé par l'utilisateur le 04/11/2026, à la place de la règle d'origine où il les lançait lui-même sur Colab avant chaque publication) :
+  - **l'utilisateur ne les lance pas** : leur exécution est automatique, dans l'intégration continue (environnement proche de Colab) et sur ce PC (RTX 5070 Ti pour ceux qui utilisent la carte) ;
+  - il signale les problèmes qu'il rencontre en les utilisant, et ils sont corrigés ;
+  - le constructeur décide quand un chapitre est prêt à paraître, puis demande un simple oui à l'utilisateur avant de pousser ;
+  - un chapitre peut paraître seul, sans attendre le reste de sa vague.
 - **Pause et reprise des entraînements** (décidé) : tout entraînement long peut être arrêté à tout moment, puis repris plus tard au même point.
   - On sauvegarde régulièrement le modèle, l'optimiseur, le planning du taux d'apprentissage, la position dans les données et l'état du hasard.
   - Une commande de reprise est montrée aux lecteurs.
@@ -300,7 +300,7 @@ Chaque vague commence par sa recherche web. Elle se termine sur des tests verts,
 
 Aucun point bloquant. La relecture par un constructeur a soulevé six questions, toutes tranchées :
 
-- **Par l'utilisateur** : une seule IA qui grandit, le stockage sur D: après libération de place, les notebooks Colab lancés par l'utilisateur, la durée d'entraînement sans limite avec pause et reprise.
+- **Par l'utilisateur** : une seule IA qui grandit, le stockage sur D: après libération de place, les notebooks Colab exécutés automatiquement (décision du 04/11/2026, qui remplace « lancés par l'utilisateur »), la durée d'entraînement sans limite avec pause et reprise.
 - **Par moi** : la tolérance pour les entraînements dans le navigateur, et Windows natif d'abord, WSL2 ensuite.
 
 À trancher pendant le plan, par le constructeur : la taille exacte de ton IA et de ses données, à proposer à l'utilisateur avec des chiffres mesurés.
