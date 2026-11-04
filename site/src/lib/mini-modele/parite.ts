@@ -314,10 +314,15 @@ function detailEnAttendus(d: DetailTete): Attendus {
 /**
  * L'exemple à virgule de attendus.py (EXEMPLE_FLOTTANT), pour l'ordre des sommes.
  *
- * Dans la phrase de l'animation, tout est entier : chaque somme y est exacte,
- * dans n'importe quel ordre. Ici, 0,1 ou 0,3 ne s'écrivent pas exactement en
- * binaire : additionner dans un autre ordre change des bits. 5 mots de 4
- * traits, une tête de 3 (l'échelle 1 / √3 arrondit), des valeurs de 4.
+ * Dans la phrase de l'animation, les entrées sont des entiers : les projections
+ * et les scores sont des sommes d'entiers, exactes dans n'importe quel ordre, et
+ * ne disent rien de l'ordre des opérations. Le mélange, lui, additionne des
+ * valeurs fois les poids du softmax, qui ne sont pas exacts : il dépend de
+ * l'ordre en général, et c'est cet exemple-ci qui le fixe. Ici, 0,1 ou 0,3 ne
+ * s'écrivent pas exactement en binaire : additionner la projection, le score ou
+ * le mélange dans un autre ordre, ou multiplier par l'échelle dans la somme,
+ * change des bits. 5 mots de 4 traits, une tête de 3 (l'échelle 1 / √3
+ * arrondit), des valeurs de 4.
  */
 export const EXEMPLE_FLOTTANT: Readonly<Record<'x' | 'wq' | 'wk' | 'wv', Matrice>> = Object.freeze({
   x: [

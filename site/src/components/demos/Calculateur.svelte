@@ -334,6 +334,7 @@
     le processeur, et la durée qu’on en tire pour {nombre(JETONS_PAR_PARAMETRE)} jetons par paramètre.
   </p>
   <p class="indice-defile">Fais défiler le tableau vers la droite pour voir les autres colonnes.</p>
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex (une zone qui défile doit prendre le focus pour se parcourir au clavier : WCAG 2.1.1) -->
   <div class="defile" role="region" aria-label="Débits mesurés, défilable" tabindex="0" data-test="calc-reperes">
     <table class="reperes">
       <thead>

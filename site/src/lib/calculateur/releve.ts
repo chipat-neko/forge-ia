@@ -88,6 +88,19 @@ const OCTETS_BINAIRES =
   `Ici, 1${INSECABLE}Go vaut 1${FINE}024³ octets, comme la mémoire des cartes${FINE}; ` +
   `1${INSECABLE}Mo, 1${FINE}024² octets${FINE}; 1${INSECABLE}To, 1${FINE}024${INSECABLE}Go.`;
 
+/**
+ * Pourquoi le total de l'étape « cartes » peut dépasser d'un chiffre celui qu'on a lu plus haut : voir
+ * formaterGoPourLesCartes. `total` dit lequel (« le total « en tout » », « la mémoire des poids en bf16 »).
+ * Dite seulement quand l'étape est affichée (plus d'une carte).
+ */
+export function explicationArrondiDesCartes(total: string): string {
+  return (
+    'Dans la division par la mémoire de la carte, le total est arrondi vers le haut quand l’arrondi ordinaire ' +
+    `ferait trouver une carte de moins en refaisant le calcul à la main${FINE}: il peut alors dépasser d’un chiffre ` +
+    `${total}.`
+  );
+}
+
 /** Le texte d'une quantité, ses espaces rendues insécables : « 5,9 jours » ne se coupe plus. */
 const lie = (texte: string): string => texte.replace(/ /g, INSECABLE);
 
@@ -623,6 +636,7 @@ export function formulesDuCalcul(rel: Releve): Formule[] {
       `Les 16 octets par paramètre${FINE}: les poids et les gradients en 16 bits, plus une copie des poids, la moyenne et la variance ` +
       `d’AdamW en 32 bits. Les 34 octets${FINE}: les activations d’une séquence de ${lie(`${nombre(f.contexte)} jetons`)}, ` +
       `par couche et par dimension, sans la matrice de l’attention. C’est un minimum${FINE}: ni les logits, ni les tampons, ni la fragmentation. ` +
+      (m.cartesMinimum > 1 ? `${explicationArrondiDesCartes(`le total «${FINE}en tout${FINE}»`)} ` : '') +
       OCTETS_BINAIRES,
     sources: [...SOURCES_FORMULES.etats, ...SOURCES_FORMULES.activations],
   });
@@ -666,7 +680,8 @@ export function formulesDuCalcul(rel: Releve): Formule[] {
             `soit ${bande}. Les poids en bf16 sont ceux de la mémoire pour s’en servir, où 1${INSECABLE}Mo vaut ` +
             `1${FINE}024² octets et 1${INSECABLE}Go, 1${FINE}024³.`
           : `Ici, les poids en bf16 ne tiennent pas sur une seule carte${FINE}: il faudrait les répartir sur plusieurs, et le débit ` +
-            'dépendrait de la façon de les relier. Le calculateur ne le chiffre pas.'),
+            'dépendrait de la façon de les relier. Le calculateur ne le chiffre pas. ' +
+            explicationArrondiDesCartes('la mémoire des poids en bf16')),
       sources: SOURCES_FORMULES.generation,
     });
   }

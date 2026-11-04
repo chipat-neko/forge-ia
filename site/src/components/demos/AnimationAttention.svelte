@@ -236,6 +236,7 @@
 
   {#if etape === 1}
     <!-- Les tableaux sont dans des zones qui défilent : un exemple plus large ne fait jamais déborder la page. -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex (une zone qui défile doit prendre le focus pour se parcourir au clavier : WCAG 2.1.1) -->
     <div class="defile" role="region" aria-label="Traits de chaque mot, défilable" tabindex="0">
       <table class="traits" data-test="att-traits">
         <caption class="vh">Les traits de chaque mot</caption>
@@ -275,6 +276,7 @@
       </div>
     </dl>
     <p class="titre-tableau" id="{id}-cles">La clé k de chaque mot</p>
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex (une zone qui défile doit prendre le focus pour se parcourir au clavier : WCAG 2.1.1) -->
     <div class="defile" role="region" aria-label="Clés de chaque mot, défilable" tabindex="0">
       <table class="cles" data-test="att-cles" aria-labelledby="{id}-cles">
         <thead>
@@ -346,6 +348,7 @@
     <!-- Sur un téléphone, la carte est plus large que l'écran : la phrase le dit à l'œil (« défilable » n'est
          que dans le nom de la zone), et une colonne coupée au bord le montre. CSS seul : vaut aussi sans JavaScript. -->
     <p class="indice-defile" data-test="att-indice-defile">Fais défiler la carte vers la droite pour voir les autres colonnes.</p>
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex (une zone qui défile doit prendre le focus pour se parcourir au clavier : WCAG 2.1.1) -->
     <div class="defile" role="region" aria-label="Carte complète de la tête, défilable" tabindex="0">
       <table data-test="att-carte" aria-labelledby="{id}-carte">
         <thead>

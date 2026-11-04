@@ -181,6 +181,28 @@ describe('formaterGoPourLesCartes : le total en Go, pour que « au moins N carte
     }
   });
 
+  it('dépasse au plus d’une unité d’affichage l’arrondi ordinaire (0,1 Go sous 100 Go, 1 Go au-delà)', () => {
+    const lu = (t: string) => Number(t.replace(/\u202F/g, '').replace(',', '.').replace(' Go', ''));
+    let arrondisAuDessus = 0;
+    for (const memoireGo of [16, 24, 32, 80, 141, 180]) {
+      for (let k = 0; k < 4000; k++) {
+        const go = 0.5 + k * 1.7309;
+        const octets = go * OCTETS_PAR_GO;
+        const decimales = Number(go.toFixed(1)) < 100 ? 1 : 0;
+        const ordinaire = Number(go.toFixed(decimales));
+        const unite = 10 ** -decimales;
+        const ecart = lu(formaterGoPourLesCartes(octets, memoireGo)) - ordinaire;
+        // Jamais en dessous, et au plus une unité de la dernière décimale affichée au-dessus.
+        expect(ecart, `${go} Go sur ${memoireGo} Go`).toBeGreaterThanOrEqual(-1e-9);
+        expect(ecart, `${go} Go sur ${memoireGo} Go`).toBeLessThanOrEqual(unite + 1e-9);
+        if (ecart > 1e-9) arrondisAuDessus++;
+      }
+    }
+    // Le cas existe (sinon ce test ne prouverait rien), mais reste rare.
+    expect(arrondisAuDessus).toBeGreaterThan(0);
+    expect(arrondisAuDessus).toBeLessThan(24_000 / 10);
+  });
+
   it('refuse un total négatif ou non fini', () => {
     expect(() => formaterGoPourLesCartes(-1, 16)).toThrow(RangeError);
     expect(() => formaterGoPourLesCartes(Number.NaN, 16)).toThrow(RangeError);

@@ -103,7 +103,10 @@
   async function creerTravailleur(): Promise<void> {
     creation = true;
     try {
-      const { default: Travailleur } = await import('../../lib/mini-modele/travailleur.ts?worker');
+      // Astro type `?worker` sans argument ; Vite, qui construit le Worker, accepte `{ name }` (son propre type le dit).
+      const { default: Travailleur } = (await import('../../lib/mini-modele/travailleur.ts?worker')) as {
+        default: new (options?: { name?: string }) => Worker;
+      };
       if (detruit) return;
       const w = new Travailleur({ name: `mini-modele ${nom}` });
       w.onmessage = (evenement: MessageEvent<MessageDuTravailleur>) => appliquer({ type: 'message', message: evenement.data });

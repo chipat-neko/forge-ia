@@ -243,8 +243,8 @@ région manque. Dix régions sont posées :
 
 | Région | Fichier | Ce qu'elle contient |
 | --- | --- | --- |
-| `exp` | `calcul.py` | `exp(x)` avec seulement des + − × ÷ (hors de la région : les constantes `LN2_HAUT`, `LN2_BAS`, `INV_LN2` et `deux_puissance`) |
-| `log` | `calcul.py` | `log(x)`, de la même façon |
+| `exp` | `calcul.py` | `exp(x)` avec seulement des + − × ÷. Hors de la région, définis en tête de `calcul.py` et nécessaires à `exp` : `LN2_HAUT`, `LN2_BAS`, `INV_LN2`, la liste `C_EXP` (1/n!, de 0 à 13) et la fonction `deux_puissance` |
+| `log` | `calcul.py` | `log(x)`, de la même façon. Hors de la région et nécessaires à `log` : `LN2_HAUT`, `LN2_BAS`, `SQRT_DEMI` et la liste `C_LOG` (1/(2n + 1), de 0 à 11) |
 | `scores` | `attention.py` | `scores_attention` : requête · clé, fois l'échelle |
 | `softmax` | `attention.py` | `softmax` : des scores aux poids |
 | `melange` | `attention.py` | `melanger_valeurs` : les valeurs, mélangées selon les poids |
@@ -349,4 +349,7 @@ Deux précisions utiles quand on lit son relevé :
   (`JETONS_DU_CACHE`, dans `site/src/lib/calculateur/releve.ts`) ;
 - dans les étapes « au moins N cartes », le total est écrit en Go (« 6 570 Go ÷
   16 Go = au moins 411 cartes »), jamais en To : « 6,4 To ÷ 16 Go » ferait
-  trouver 410 cartes à qui refait la division.
+  trouver 410 cartes à qui refait la division. Quand l'arrondi ordinaire ferait
+  quand même trouver une carte de moins, le total est arrondi vers le haut : il
+  dépasse alors d'une unité de son dernier chiffre (0,1 Go sous 100 Go, 1 Go
+  au-delà) le total lu ailleurs, et l'explication de « Voir le calcul » le dit.

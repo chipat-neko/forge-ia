@@ -97,8 +97,9 @@ describe('jumeau du Python : attendus-attention.json, au bit près', () => {
   });
 
   it('l’exemple à virgule (clé « flottant ») : ses entrées et tout son détail, au bit près', () => {
-    // Dans la phrase, tout est entier et chaque somme est exacte dans n'importe quel ordre :
-    // cet exemple-ci fixe l'ordre des sommes de la projection, du score et du mélange.
+    // Dans la phrase, les projections et les scores sont des sommes d'entiers, exactes dans
+    // n'importe quel ordre ; le mélange (poids du softmax, non exacts) dépend de l'ordre en
+    // général. Cet exemple-ci fixe l'ordre des sommes de la projection, du score et du mélange.
     const e = EXEMPLE_FLOTTANT;
     const detail = detailEnAttendus('', detaillerTete(e.x, e.wq, e.wk, e.wv));
     delete detail.nom;
