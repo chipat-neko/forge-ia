@@ -13,6 +13,7 @@ refait exactement le même calcul en TypeScript (site/src/lib/partie-0/mot-suiva
 import re
 from collections import Counter
 from pathlib import Path
+from typing import NamedTuple
 
 # Les lettres d'un mot, en minuscules : l'alphabet, puis les lettres accentuées du français.
 LETTRES = "abcdefghijklmnopqrstuvwxyzàâäçéèêëîïôöùûüÿœæ"
@@ -52,6 +53,16 @@ def compter_suivants(mots: list[str]) -> dict[str, Counter[str]]:
         suivants[mot][suivant] += 1
     return suivants
 # fin: compter
+
+
+# region: trier
+def suivants_tries(compte: Counter[str]) -> list[tuple[str, int]]:
+    """Les suivants d'un mot et leurs comptes, du plus fréquent au moins fréquent.
+
+    À compte égal, dans l'ordre des points de code, comme pour predire.
+    """
+    return sorted(compte.items(), key=lambda paire: (-paire[1], paire[0]))
+# fin: trier
 
 
 # region: predire
@@ -100,3 +111,18 @@ def premiere_reprise(suite: list[str]) -> int | None:
             return indice
         vus.add(mot)
     return None
+
+
+# region: suivre
+class Suite(NamedTuple):
+    """Une suite de mots, et l'endroit où elle se met à tourner en rond."""
+
+    mots: list[str]  # les mots de la suite, en commençant par le mot de départ
+    reprise: int | None  # l'indice du premier mot qui revient, ou None si aucun ne revient
+
+
+def suivre(suivants: dict[str, Counter[str]], depart: str, longueur: int) -> Suite:
+    """La suite de `longueur` mots au plus qui part de `depart`, avec sa première reprise."""
+    mots = generer(suivants, depart, longueur)
+    return Suite(mots, premiere_reprise(mots))
+# fin: suivre

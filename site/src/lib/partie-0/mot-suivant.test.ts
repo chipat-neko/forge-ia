@@ -1,13 +1,14 @@
 // Le jumeau du mot suivant : mot-suivant.ts refait exactement les attendus du Python.
 //
-// projets/0.1-python/tests/attendus.json est écrit par
+// Le fichier d'attendus (FICHIERS_PARTIE_0['mot-suivant'],
+// projets/0.1-python/tests/attendus.json) est écrit par
 // `uv run python -m mot_suivant.attendus`. Pour chaque texte de référence, les
 // mots, les suivants triés, les prédictions et les suites (avec leur reprise)
 // doivent être les mêmes, à l'identique (toStrictEqual).
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { versJson } from '../mini-modele/parite';
+import { versJson } from '../mini-modele/cles-json';
 import {
   compterSuivants,
   decouperMots,
@@ -17,7 +18,8 @@ import {
   premiereReprise,
   suivantsTries,
 } from './mot-suivant';
-import { CALCULS_PARTIE_0, FICHIERS_PARTIE_0 } from './parite';
+import { FICHIERS_PARTIE_0 } from './fichiers';
+import { CALCULS_PARTIE_0, FICHIERS_PARTIE_0 as FICHIERS_DE_PARITE } from './parite';
 import { TEXTE_DE_DEPART } from './texte-0-1';
 
 interface SuiteAttendue {
@@ -35,9 +37,12 @@ interface TexteAttendu {
   suites: SuiteAttendue[];
 }
 
-// Les chemins sont relatifs à site/, d'où Vitest est lancé.
-const CHEMIN_ATTENDUS = '../projets/0.1-python/tests/attendus.json';
-const ATTENDUS = JSON.parse(readFileSync(CHEMIN_ATTENDUS, 'utf8')) as { textes: TexteAttendu[] };
+/** Un fichier du dépôt, lu depuis site/, d'où Vitest est lancé. */
+function lire(chemin: string): string {
+  return readFileSync(`../${chemin}`, 'utf8');
+}
+
+const ATTENDUS = JSON.parse(lire(FICHIERS_PARTIE_0['mot-suivant'])) as { textes: TexteAttendu[] };
 
 /** Un texte court pour les messages d'échec (le texte du projet fait plus de mille caractères). */
 function nom(texte: string): string {
@@ -136,15 +141,19 @@ describe('vitesse', () => {
 });
 
 describe('parite.ts : la page d’essai de la Partie 0 refait les attendus', () => {
-  it('un calcul par fichier, et chacun nomme son fichier', () => {
+  it('un calcul par fichier de FICHIERS_PARTIE_0, et chaque fichier existe', () => {
     expect(Object.keys(CALCULS_PARTIE_0)).toContain('mot-suivant');
     expect(Object.keys(FICHIERS_PARTIE_0)).toStrictEqual(Object.keys(CALCULS_PARTIE_0));
-    expect(FICHIERS_PARTIE_0['mot-suivant']).toBe('projets/0.1-python/tests/attendus.json');
+    // parite.ts ré-exporte la même liste : la page et les tests lisent la même.
+    expect(FICHIERS_DE_PARITE).toBe(FICHIERS_PARTIE_0);
+    for (const chemin of Object.values(FICHIERS_PARTIE_0)) expect(existsSync(`../${chemin}`), chemin).toBe(true);
   });
 
-  it('mot-suivant : le même fichier, par JSON comme la page', () => {
-    // Par JSON, comme la page : ce qui ne s'écrit pas en JSON (undefined, NaN) ne passerait pas.
-    const calcule = JSON.parse(versJson(CALCULS_PARTIE_0['mot-suivant']()));
-    expect(calcule).toStrictEqual(ATTENDUS);
-  });
+  for (const [nom, chemin] of Object.entries(FICHIERS_PARTIE_0)) {
+    it(`${nom} : le calcul refait ${chemin}, par JSON comme la page`, () => {
+      // Par JSON, comme la page : ce qui ne s'écrit pas en JSON (undefined, NaN) ne passerait pas.
+      const calcule: unknown = JSON.parse(versJson(CALCULS_PARTIE_0[nom]()));
+      expect(calcule).toStrictEqual(JSON.parse(lire(chemin)));
+    });
+  }
 });

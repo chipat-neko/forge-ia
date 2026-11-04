@@ -386,24 +386,6 @@ export const CALCULS_ATTENDUS = Object.freeze({
 /** Le nom d'un fichier d'attendus : calcul, donnees, modele ou attention. */
 export type NomAttendus = keyof typeof CALCULS_ATTENDUS;
 
-/**
- * L'objet en JSON, indenté d'une espace comme les fichiers du Python.
- *
- * Refuse ce que le JSON ne sait pas écrire et changerait sans bruit :
- * undefined (la clé disparaîtrait) et les nombres non finis (ils deviendraient null).
- */
-export function versJson(valeur: unknown): string {
-  return JSON.stringify(
-    valeur,
-    (cle, v: unknown) => {
-      if (v === undefined) {
-        throw new TypeError(`versJson : « ${cle} » vaut undefined. Chaque clé des attendus doit avoir une valeur.`);
-      }
-      if (typeof v === 'number' && !Number.isFinite(v)) {
-        throw new TypeError(`versJson : « ${cle} » vaut ${v}. Un flottant des attendus s'écrit en motif (versHex).`);
-      }
-      return v;
-    },
-    1,
-  );
-}
+// L'écriture en JSON des attendus vit dans cles-json.ts, un module qui n'importe rien :
+// la page de parité de la Partie 0 s'en sert sans charger le mini-modèle.
+export { versJson } from './cles-json';

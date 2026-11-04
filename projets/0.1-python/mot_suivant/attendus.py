@@ -11,10 +11,17 @@ Pour régénérer le fichier (dans projets/0.1-python) :
 """
 
 import json
-from collections import Counter
 from pathlib import Path
 
-from mot_suivant.mots import charger_texte, compter_suivants, decouper_mots, generer, predire, premiere_reprise
+from mot_suivant.mots import (
+    charger_texte,
+    compter_suivants,
+    decouper_mots,
+    generer,
+    predire,
+    premiere_reprise,
+    suivants_tries,
+)
 
 TEXTES_DE_REFERENCE: list[str] = [
     charger_texte(),
@@ -38,11 +45,6 @@ LONGUEURS = [1, 2, 12, 30]
 MOT_ABSENT = "inconnu"
 
 CHEMIN_ATTENDUS = Path(__file__).resolve().parent.parent / "tests" / "attendus.json"
-
-
-def suivants_tries(compte: Counter[str]) -> list[list]:
-    """Les suivants d'un mot et leurs comptes, par compte décroissant, puis par point de code."""
-    return [[mot, n] for mot, n in sorted(compte.items(), key=lambda paire: (-paire[1], paire[0]))]
 
 
 def calculer_texte(texte: str) -> dict:

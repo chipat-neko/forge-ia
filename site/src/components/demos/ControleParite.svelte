@@ -7,15 +7,16 @@
   // Deux jeux (prop `jeu`, lue une fois) :
   //  - « mini-modele » (par défaut) : les quatre fichiers
   //    projets/mini-modele/tests/attendus-<nom>.json, avec mini-modele/parite.ts ;
-  //  - « partie-0 » : les attendus des projets de la Partie 0 dont le jumeau
-  //    tourne dans le navigateur (projets/0.1-python/tests/attendus.json…),
+  //  - « partie-0 » : les fichiers de FICHIERS_PARTIE_0 (partie-0/fichiers.ts),
   //    avec partie-0/parite.ts.
   //
-  // Tout se calcule dans onMount, donc seulement dans le navigateur : le HTML
-  // qu'Astro construit dans Node a des <pre> vides, et pas de data-pret.
-  // Sinon, le parcours comparerait ce que Node a calculé à la construction, et
-  // ne verrait jamais un moteur qui s'écarte. La racine porte aussi le moteur
-  // qui a calculé (data-moteur, navigator.userAgent).
+  // Seul le module du jeu demandé est chargé, par import(), dans onMount :
+  // une page ne charge ni les attendus ni le code de l'autre jeu. Tout se
+  // calcule donc seulement dans le navigateur : le HTML qu'Astro construit
+  // dans Node a des <pre> vides, et pas de data-pret. Sinon, le parcours
+  // comparerait ce que Node a calculé à la construction, et ne verrait jamais
+  // un moteur qui s'écarte. La racine porte aussi le moteur qui a calculé
+  // (data-moteur, navigator.userAgent).
   //
   // Quand tous sont écrits, la racine (data-test="parite") porte
   // data-pret="oui" ; si un calcul échoue, data-pret="erreur" et la ligne
@@ -26,32 +27,59 @@
   //   <ControleParite client:load jeu="partie-0" />
   import { onMount, untrack } from 'svelte';
   import { nombre } from '../../lib/nombres';
-  import { CALCULS_ATTENDUS, versJson, type Attendus } from '../../lib/mini-modele/parite';
-  import { CALCULS_PARTIE_0, FICHIERS_PARTIE_0 } from '../../lib/partie-0/parite';
+  import { versJson } from '../../lib/mini-modele/cles-json';
+  import type { Attendus } from '../../lib/mini-modele/parite';
+  import { FICHIERS_PARTIE_0 } from '../../lib/partie-0/fichiers';
+
+  type NomDuJeu = 'mini-modele' | 'partie-0';
 
   interface Props {
     /** Le jeu d'attendus à refaire : celui du mini-modèle (par défaut) ou celui de la Partie 0. */
-    jeu?: 'mini-modele' | 'partie-0';
+    jeu?: NomDuJeu;
   }
 
   const { jeu = 'mini-modele' }: Props = $props();
 
   const FINE = '\u202F';
 
-  /** Les calculs d'un jeu, par nom, et le fichier d'attendus que refait chacun. */
+  /**
+   * Un jeu : les noms de ses calculs (connus dès la construction, pour écrire
+   * un <pre> vide par calcul), le fichier que refait chacun, et le chargement
+   * de ses calculs.
+   */
   interface Jeu {
-    calculs: Readonly<Record<string, () => Attendus>>;
+    noms: readonly string[];
     fichier: (nom: string) => string;
+    charger: () => Promise<Readonly<Record<string, () => Attendus>>>;
   }
 
-  const JEUX: Record<NonNullable<Props['jeu']>, Jeu> = {
-    'mini-modele': { calculs: CALCULS_ATTENDUS, fichier: (nom) => `attendus-${nom}.json` },
-    'partie-0': { calculs: CALCULS_PARTIE_0, fichier: (nom) => FICHIERS_PARTIE_0[nom] },
+  const JEUX: Readonly<Record<NomDuJeu, Jeu>> = {
+    'mini-modele': {
+      // Les noms de CALCULS_ATTENDUS (mini-modele/parite.ts), vérifiés après le chargement.
+      noms: ['calcul', 'donnees', 'modele', 'attention'],
+      fichier: (nom) => `attendus-${nom}.json`,
+      charger: async () => (await import('../../lib/mini-modele/parite')).CALCULS_ATTENDUS,
+    },
+    'partie-0': {
+      noms: Object.keys(FICHIERS_PARTIE_0),
+      fichier: (nom) => FICHIERS_PARTIE_0[nom],
+      charger: async () => (await import('../../lib/partie-0/parite')).CALCULS_PARTIE_0,
+    },
   };
 
+  /** Le jeu demandé ; un nom inconnu arrête la construction de la page, avec quoi écrire à la place. */
+  function choisirJeu(nom: string): Jeu {
+    if (!Object.hasOwn(JEUX, nom)) {
+      throw new Error(
+        `ControleParite : jeu « ${nom} » inconnu. Dans le MDX, écris jeu="partie-0", ` +
+          'ou rien du tout pour le mini-modèle (jeu="mini-modele").',
+      );
+    }
+    return JEUX[nom as NomDuJeu];
+  }
+
   // Le jeu est choisi une fois pour toutes (untrack le dit) : une page ne change pas de jeu.
-  const { calculs, fichier } = JEUX[untrack(() => jeu)];
-  const NOMS = Object.keys(calculs);
+  const { noms: NOMS, fichier, charger } = choisirJeu(untrack(() => jeu));
 
   // Les nombres de fichiers en toutes lettres, comme dans une phrase.
   const EN_LETTRES = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix'];
@@ -92,8 +120,17 @@
     moteur = navigator.userAgent;
     phase = 'calcul';
     (async () => {
-      const debut = performance.now();
       try {
+        const calculs = await charger();
+        const fournis = Object.keys(calculs);
+        if (fournis.join() !== NOMS.join()) {
+          throw new Error(
+            `les calculs chargés (${fournis.join(', ')}) ne sont pas ceux de la page (${NOMS.join(', ')}). ` +
+              'Mets la liste de noms du jeu à jour dans ControleParite.svelte.',
+          );
+        }
+        // La durée ne compte que les calculs, pas le chargement du module.
+        const debut = performance.now();
         for (const nom of NOMS) {
           await pause();
           if (arrete) return;

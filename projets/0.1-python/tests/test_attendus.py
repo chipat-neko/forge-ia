@@ -26,7 +26,7 @@ def test_attendus_a_jour():
 def test_fichier_en_utf8_et_lf():
     octets = CHEMIN_ATTENDUS.read_bytes()
     assert b"\r" not in octets, f"tests/attendus.json contient des fins de ligne Windows. {REGENERER}"
-    assert octets.endswith(b"}\n")
+    assert octets.endswith(b"}\n"), f"tests/attendus.json doit finir par « }} » puis un retour à la ligne. {REGENERER}"
 
 
 def test_textes_et_longueurs_de_reference():

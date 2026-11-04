@@ -24,3 +24,9 @@ packages = ["mot_suivant"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Sous Windows, pyzmq (le lien entre nbclient et le noyau du notebook) prévient qu'il
+# ajoute un fil pour la boucle Proactor d'asyncio : sans effet sur les tests. Seul cet
+# avertissement est masqué.
+filterwarnings = [
+    "ignore:Proactor event loop does not implement add_reader family of methods required for zmq:RuntimeWarning",
+]

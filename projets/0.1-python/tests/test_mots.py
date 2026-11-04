@@ -1,4 +1,4 @@
-"""Les fonctions du mot suivant : découper, compter, prédire, générer, et la ligne de commande."""
+"""Les fonctions du mot suivant : découper, compter, trier, prédire, générer, suivre, et la ligne de commande."""
 
 from collections import Counter
 from pathlib import Path
@@ -7,12 +7,15 @@ import pytest
 
 from mot_suivant.__main__ import principal
 from mot_suivant.mots import (
+    Suite,
     charger_texte,
     compter_suivants,
     decouper_mots,
     generer,
     predire,
     premiere_reprise,
+    suivants_tries,
+    suivre,
 )
 
 PROJET = Path(__file__).resolve().parents[1]
@@ -46,6 +49,12 @@ def test_compter_suivants_dans_l_ordre_de_premiere_apparition():
     assert compter_suivants([]) == {} and compter_suivants(["seul"]) == {}
 
 
+def test_suivants_tries_par_compte_puis_point_de_code():
+    compte = Counter({"été": 1, "fer": 2, "feu": 1, "axe": 1})
+    assert suivants_tries(compte) == [("fer", 2), ("axe", 1), ("feu", 1), ("été", 1)]
+    assert suivants_tries(Counter()) == []
+
+
 # region: test-predire
 def test_predire_departage_et_rien_ne_suit():
     s = compter_suivants(["a", "c", "a", "b"])
@@ -66,6 +75,22 @@ def test_generer_et_reprise():
     assert generer(s, "a", 5) == ["a", "b", "a", "b", "a"]
     assert generer(s, "z", 5) == ["z"] and generer(s, "a", 0) == []
     assert premiere_reprise(["a", "b", "a"]) == 2 and premiere_reprise(["a", "b"]) is None
+
+
+def test_suivre_donne_une_suite_aux_champs_nommes():
+    assert Suite._fields == ("mots", "reprise")
+    # Avec reprise : « a b a b a » revient sur « a » au mot d'indice 2.
+    avec = suivre(compter_suivants("a b a b a".split()), "a", 5)
+    assert isinstance(avec, Suite)
+    assert avec.mots == ["a", "b", "a", "b", "a"] and avec.reprise == 2
+    assert avec == Suite(mots=["a", "b", "a", "b", "a"], reprise=2)
+    # Sans reprise : la suite s'arrête quand rien ne suit, sans revenir sur un mot.
+    sans = suivre(compter_suivants(["un", "deux", "trois"]), "un", 12)
+    assert sans.mots == ["un", "deux", "trois"] and sans.reprise is None
+    # Un NamedTuple reste un tuple : il se décompose en ses deux champs.
+    mots, reprise = sans
+    assert (mots, reprise) == (["un", "deux", "trois"], None)
+    assert suivre(compter_suivants(["un"]), "un", 0) == Suite([], None)
 
 
 def test_generer_s_arrete_quand_rien_ne_suit():
@@ -114,7 +139,16 @@ def test_ligne_de_commande_avec_un_fichier(tmp_path, capsys):
 def test_ligne_de_commande_mot_absent_et_erreurs(tmp_path, capsys):
     principal(["dragon"])
     sortie = capsys.readouterr().out.replace("\u202f", " ")
-    assert "« dragon » n’est pas dans ce texte : rien ne le suit." in sortie
+    assert "« dragon » n’est pas dans ce texte : rien ne le suit. Essaie un mot du texte, par exemple « le »." in sortie
+    # Sans « le » dans le texte, l'exemple est son premier mot ; un texte sans mot le dit.
+    sans_le = tmp_path / "sans-le.txt"
+    sans_le.write_text("Un chat. Un chien.", encoding="utf-8")
+    principal(["dragon", "--fichier", str(sans_le)])
+    assert "par exemple « un »." in capsys.readouterr().out.replace("\u202f", " ")
+    vide = tmp_path / "vide.txt"
+    vide.write_text("2026 🙂", encoding="utf-8")
+    principal(["le", "--fichier", str(vide)])
+    assert "Ce texte ne contient aucun mot : choisis un texte" in capsys.readouterr().out.replace("\u202f", " ")
     with pytest.raises(SystemExit) as fin:
         principal(["le", "--fichier", str(tmp_path / "absent.txt")])
     assert fin.value.code == 1

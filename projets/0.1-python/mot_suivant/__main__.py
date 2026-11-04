@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
-from mot_suivant.mots import charger_texte, compter_suivants, decouper_mots, generer, predire, premiere_reprise
+from mot_suivant.mots import charger_texte, compter_suivants, decouper_mots, predire, suivants_tries, suivre
 
 FINE = "\u202f"  # l'espace fine insécable de la typographie française
 
@@ -63,26 +63,32 @@ def principal(arguments: list[str] | None = None) -> None:
     # Le texte est mis en minuscules : le mot de départ aussi.
     mot = options.mot.lower()
 
+    if not mots:
+        print(f"Ce texte ne contient aucun mot{FINE}: choisis un texte fait de phrases, puis relance.")
+        return
     if mot not in mots:
-        print(f"{citer(mot)} n’est pas dans ce texte{FINE}: rien ne le suit.")
+        exemple = "le" if "le" in mots else mots[0]
+        print(
+            f"{citer(mot)} n’est pas dans ce texte{FINE}: rien ne le suit. "
+            f"Essaie un mot du texte, par exemple {citer(exemple)}."
+        )
         return
     if mot not in suivants:
         print(f"Rien ne suit {citer(mot)} dans ce texte{FINE}: la suite s’arrête là.")
     else:
         print(f"Après {citer(mot)}, ce texte met{FINE}:")
-        compte = suivants[mot]
-        largeur = max(len(suivant) for suivant in compte)
-        for suivant, n in sorted(compte.items(), key=lambda paire: (-paire[1], paire[0])):
+        tries = suivants_tries(suivants[mot])
+        largeur = max(len(suivant) for suivant, _ in tries)
+        for suivant, n in tries:
             print(f"  {suivant:<{largeur}}  {n} fois")
         print(f"Le mot suivant le plus probable{FINE}: {citer(predire(suivants, mot))}.")
 
-    suite = generer(suivants, mot, options.longueur)
-    pluriel = "mot" if len(suite) == 1 else "mots"
-    print(f"Une suite de {len(suite)} {pluriel}{FINE}: {' '.join(suite)}")
-    reprise = premiere_reprise(suite)
-    if reprise is not None:
+    suite = suivre(suivants, mot, options.longueur)
+    pluriel = "mot" if len(suite.mots) == 1 else "mots"
+    print(f"Une suite de {len(suite.mots)} {pluriel}{FINE}: {' '.join(suite.mots)}")
+    if suite.reprise is not None:
         print(
-            f"La suite revient sur {citer(suite[reprise])} au mot {reprise + 1}{FINE}: "
+            f"La suite revient sur {citer(suite.mots[suite.reprise])} au mot {suite.reprise + 1}{FINE}: "
             "à partir de là, elle tourne en rond."
         )
 
