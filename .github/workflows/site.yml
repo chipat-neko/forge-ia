@@ -110,6 +110,20 @@ jobs:
             exit 1
           fi
           echo "Aucune page d'essai ni la liste des prénoms dans dist/ (prénom cherché : $prenom)."
+      # Garde-fou : aucun brouillon de chapitre (src/brouillons/chapitres/<p>-<n>.mdx) dans le site
+      # publié. Un brouillon ne se construit qu'avec FORGE_ESSAIS=1 ; pour paraître, il passe dans
+      # src/content/chapitres/ (voir « Parution d'un chapitre » dans le README). Sans brouillon,
+      # la boucle ne fait rien.
+      - name: Aucun brouillon de chapitre dans le site construit
+        run: |
+          for f in src/brouillons/chapitres/*.mdx; do
+            [ -e "$f" ] || continue
+            n=$(basename "$f" .mdx); p=${n%%-*}
+            if [ -e "dist/partie-$p/$n" ]; then
+              echo "dist/partie-$p/$n existe : le brouillon $f entrerait dans le site publié." >&2; exit 1
+            fi
+          done
+          echo "Aucun brouillon de chapitre dans dist/."
       - name: Dépôt du site construit pour la publication
         uses: actions/upload-pages-artifact@v5
         with:

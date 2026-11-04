@@ -1,0 +1,113 @@
+---
+// La sortie d'une commande, telle qu'un script l'a vraiment affichée.
+//
+// Le texte n'est jamais recopié : à la construction, le composant lit le
+// fichier enregistré dans le dépôt (chemin depuis la racine du dépôt) et le
+// montre après l'invite « PS> » et la commande, dans une zone qui défile en
+// largeur. Une première ligne `# relevé le AAAA-MM-JJ` ne s'affiche pas : sa
+// date passe dans la légende (voir lib/sorties.ts).
+//
+// Si le fichier manque, par exemple une mesure pas encore faite sur la carte
+// graphique, le composant affiche le texte `absent`, marqué data-a-mesurer.
+// C'est la seule façon de signaler une valeur absente, et un chapitre paru n'en
+// a plus aucune (e2e/parution.spec.ts).
+//
+//   <SortieCommande
+//     fichier="projets/0.3-poste/sorties/processeur.txt"
+//     commande="uv run python -m poste"
+//     legende="Le diagnostic de ce PC, sur le processeur"
+//     absent="À mesurer : …"
+//   />
+import { root } from 'astro:config/server';
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { legendeSortie, lireSortie } from '../../lib/sorties';
+import { typographier } from '../../lib/typo';
+
+interface Props {
+  /** Chemin du fichier de sortie depuis la racine du dépôt. */
+  fichier: string;
+  /** La commande qui a produit cette sortie, affichée après l'invite. */
+  commande: string;
+  /** La légende, sans point final : « Le diagnostic de ce PC ». */
+  legende: string;
+  /** Le texte affiché à la place de la sortie quand le fichier manque. */
+  absent: string;
+}
+
+const { fichier, commande, legende, absent } = Astro.props;
+
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const chemin = fileURLToPath(new URL(fichier, new URL('../', root)));
+const sortie = existsSync(chemin) ? lireSortie(readFileSync(chemin, 'utf8')) : null;
+---
+
+{
+  sortie === null ? (
+    <p class="a-mesurer" data-a-mesurer>
+      {typographier(absent)}
+    </p>
+  ) : (
+    <figure class="sortie" data-sortie={fichier}>
+      <figcaption>{typographier(legendeSortie(legende, sortie.releveLe))}</figcaption>
+      {/* Une zone qui défile doit prendre le focus pour se parcourir au clavier (WCAG 2.1.1). */}
+      <div class="zone-defilable" role="region" aria-label="Sortie de la commande, défilable" tabindex="0">
+        <pre><span class="invite">PS&gt;</span> <span class="commande">{commande}</span>{'\n'}<span data-contenu>{sortie.contenu}</span></pre>
+      </div>
+    </figure>
+  )
+}
+
+<style>
+  .sortie {
+    margin: 1.2em 0;
+  }
+
+  .sortie figcaption {
+    font-family: var(--titres);
+    font-size: 16px;
+    line-height: 1.4;
+    color: var(--indigo-doux);
+    margin-bottom: 8px;
+  }
+
+  .sortie .zone-defilable {
+    background: var(--brume-claire);
+    border-radius: 10px;
+  }
+
+  /* Aussi large que la plus longue ligne : la marge de droite suit le défilement. */
+  .sortie pre {
+    width: max-content;
+    min-width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 16px 22px;
+    font-family: var(--mono);
+    font-size: 15px;
+    line-height: 1.6;
+    font-variant-ligatures: none; /* « -> » reste « -> » : on montre les caractères affichés */
+    color: var(--indigo);
+  }
+
+  .sortie .invite {
+    color: var(--indigo-doux);
+    user-select: none;
+  }
+
+  .sortie .commande {
+    font-weight: 700;
+  }
+
+  .a-mesurer {
+    font-style: italic;
+    color: var(--indigo-doux);
+  }
+
+  @media (max-width: 720px) {
+    .sortie pre {
+      font-size: 14px;
+      padding: 14px 16px;
+    }
+  }
+</style>

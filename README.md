@@ -53,6 +53,33 @@ GitHub Actions lance deux séries de tests :
   projet, sous Linux et sous Windows, seulement quand un envoi ou une pull
   request modifie `projets/`, `notebooks/` ou ce workflow lui-même.
 
+## Parution d'un chapitre
+
+Un chapitre s'écrit d'abord en brouillon, dans
+`site/src/brouillons/chapitres/<p>-<n>.mdx` (par exemple `0-1.mdx` pour le
+chapitre 0.1). Un brouillon n'est construit qu'avec les pages d'essai
+(`npm run build:essais`, la construction des parcours de test), à son adresse
+définitive et hors de la recherche. Le site publié n'en contient rien, et
+GitHub Actions le vérifie après chaque construction. L'accueil, les pages de
+partie et le pied des chapitres le montrent « à venir ».
+
+Pour faire paraître un chapitre :
+
+1. Les conditions : tous les tests sont verts ; la page n'a aucune valeur
+   « à mesurer » (`[data-a-mesurer]`) ; le notebook passe
+   `outils/executer_notebooks.py` dans l'environnement `.colab` (voir la
+   section « Notebooks »), et, s'il utilise la carte graphique, il a tourné
+   sur la RTX 5070 Ti ; l'utilisateur a dit oui à la publication.
+2. Déplacer le brouillon :
+   `git mv site/src/brouillons/chapitres/<p>-<n>.mdx site/src/content/chapitres/<p>-<n>.mdx`.
+3. Mettre à jour les parcours qui disent ce chapitre « à venir »
+   (`navigation.spec.ts`, et le pied des chapitres voisins).
+4. Si le chapitre contient le mini-modèle (0.5), écarter
+   `dist/_astro/travailleur-*.js` de la recherche du prénom dans
+   `.github/workflows/site.yml`, comme le dit son commentaire.
+5. `npm run build`, dans `site/` : le dossier `dist/partie-<p>/<p>-<n>/`
+   existe.
+
 ## Licences
 
 - Le code est sous licence MIT : voir `LICENSE`.

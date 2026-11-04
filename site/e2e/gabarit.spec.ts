@@ -1,5 +1,6 @@
 // Parcours du gabarit de chapitre, sur la page d'essai /forge-ia/essais/gabarit/
 // (construite seulement avec FORGE_ESSAIS=1, voir src/essais/gabarit.mdx).
+import { readFileSync } from 'node:fs';
 import { test, expect, type Page } from '@playwright/test';
 import { contraste, plusLongueLigne, verifierAxe, verifierSansDebordement } from './outils';
 
@@ -262,4 +263,39 @@ test('accessibilité après les paris (verdicts, choix marqués)', async ({ page
   await expect(page.locator('[data-verrou="zone"]')).toHaveCSS('opacity', '1');
   await verifierAxe(page);
   await verifierSansDebordement(page);
+});
+
+// Les sorties de commande (SortieCommande.astro) : le contenu réel d'un fichier
+// du dépôt, ou « à mesurer » quand il manque.
+const SORTIE = 'projets/1.3-tokenizer/donnees/corpus.txt';
+
+test('sortie de commande : le contenu du fichier, sans retour chariot, dans une zone défilable', async ({ page }) => {
+  await page.goto(PAGE);
+  // Playwright tourne dans site/ : le dépôt est un dossier plus haut.
+  const attendu = readFileSync(`../${SORTIE}`, 'utf8').replace(/\r/g, '').replace(/\n+$/, '');
+  const sortie = page.locator(`[data-sortie="${SORTIE}"]`);
+  await expect(sortie).toHaveCount(1);
+  await expect(sortie.locator('.invite')).toHaveText('PS>');
+  await expect(sortie.locator('.commande')).toHaveText(`Get-Content ${SORTIE}`);
+  const contenu = await sortie.locator('[data-contenu]').evaluate((el) => el.textContent);
+  expect(contenu).toBe(attendu);
+  expect(contenu).not.toContain('\r');
+  const zone = sortie.locator('.zone-defilable');
+  await expect(zone).toHaveAttribute('role', 'region');
+  await expect(zone).toHaveAttribute('aria-label', 'Sortie de la commande, défilable');
+  await expect(zone).toHaveAttribute('tabindex', '0');
+  // Sans ligne « # relevé le », la légende n'a pas de date.
+  await expect(sortie.locator('figcaption')).not.toContainText('relevée le');
+  await expect(sortie.locator('[data-a-mesurer]')).toHaveCount(0);
+});
+
+test('sortie de commande absente : son texte « à mesurer », marqué data-a-mesurer', async ({ page }) => {
+  await page.goto(PAGE);
+  await expect(page.locator('[data-sortie="projets/inexistant/sortie.txt"]')).toHaveCount(0);
+  const absente = page.locator('[data-a-mesurer]');
+  await expect(absente).toHaveCount(1);
+  expect(await absente.evaluate((el) => el.tagName)).toBe('P');
+  // textContent : la typographie (espace fine avant « : », apostrophe courbe) compte.
+  expect(await absente.textContent()).toBe('À mesurer\u202F: cette commande n\u2019a pas encore été lancée ici.');
+  await expect(absente).toHaveCSS('font-style', 'italic');
 });

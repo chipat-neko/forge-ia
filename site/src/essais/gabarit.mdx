@@ -18,6 +18,8 @@ acquis:
 
 import AtelierTokenizer from '../components/chapitres/1-3/AtelierTokenizer.svelte';
 import PhraseDecoupee from '../components/chapitres/1-3/PhraseDecoupee.astro';
+import BlocCommande from '../components/gabarit/BlocCommande.astro';
+import SortieCommande from '../components/gabarit/SortieCommande.astro';
 
 <PhraseDecoupee phrase="Le forgeron frappe le métal sur l'enclume." k={165} />
 
@@ -75,6 +77,33 @@ Un extrait de code n'est jamais recopié dans la page : il est lu, à la constru
   <li data-lignes="8">`min` renvoie la paire dont la clé est la plus petite.</li>
   <li data-lignes="7-8">La clé est un couple : `-compte[paire]` d'abord, le signe moins mettant la paire la plus fréquente en tête, puis la paire elle-même pour départager.</li>
 </CodeExplique>
+
+Une commande à taper se copie telle quelle, sans invite ni coloration :
+
+<BlocCommande
+  commandes={[
+    'cd projets/1.3-tokenizer',
+    'uv run python -m tokenizer_pedagogique "Les forgerons forgent des outils et des lames" --fusions 30',
+  ]}
+/>
+
+Ce qu'affiche une commande n'est jamais recopié non plus : c'est le fichier que le script a enregistré, lu à la construction.
+
+<SortieCommande
+  fichier="projets/1.3-tokenizer/donnees/corpus.txt"
+  commande="Get-Content projets/1.3-tokenizer/donnees/corpus.txt"
+  legende="Le texte d'apprentissage du chapitre 1.3, affiché dans PowerShell"
+  absent="À mesurer : ce fichier n'est pas encore enregistré."
+/>
+
+Quand le fichier manque, la page le dit, sans inventer de valeur :
+
+<SortieCommande
+  fichier="projets/inexistant/sortie.txt"
+  commande="uv run python -m inexistant"
+  legende="La sortie d'une commande pas encore lancée"
+  absent="À mesurer : cette commande n'a pas encore été lancée ici."
+/>
 
 <LiensProjet projet="1.3-tokenizer" />
 
