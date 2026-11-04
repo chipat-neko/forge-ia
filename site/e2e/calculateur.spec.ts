@@ -11,7 +11,7 @@ import { nombre, pourcent } from '../src/lib/nombres';
 import { fourchettePrix, materiel, REPERES_EFFICACITE } from '../src/lib/calculateur/donnees';
 import { formaterDate, formaterDuree, formaterPrix, formaterPuissanceDeDix, formaterQuantite } from '../src/lib/calculateur/formats';
 import { dureeSecondes, efficaciteMesuree, efficaciteMesureeAvecAttention, operationsEntrainement } from '../src/lib/calculateur/formules';
-import { PRESETS_FORGE } from '../src/lib/calculateur/ton-ia';
+import { MESURES_TON_IA, PRESETS_FORGE } from '../src/lib/calculateur/ton-ia';
 import { attendreHydratation, verifierAxe, verifierSansDebordement, verifierTypographie } from './outils';
 
 const PAGE = '/forge-ia/essais/calculateur/';
@@ -246,8 +246,10 @@ test('chaque prix affiché a sa source et sa date', async ({ page }) => {
       await expect(ligne.locator('a')).toHaveAttribute('href', prix[i].source.url);
       await expect(ligne).toContainText(`relevé le ${formaterDate(prix[i].source.releveLe)}`);
     }
-    // Les prix bougent vite : une phrase le dit, et le taux de change est sourcé.
-    await expect(sources).toContainText('de 20 à 50');
+    // Les prix changent : une phrase le dit, sans chiffre qu'aucune source ne donne ; le taux de change est sourcé.
+    expect(((await sources.locator('[data-test="calc-avertissement-prix"]').textContent()) ?? '').trim()).toBe(
+      'Les prix de location changent souvent\u202F: ceux-ci sont ceux du jour de leur relevé, hors taxes.',
+    );
     await expect(sources.locator('[data-source="change"]')).toContainText('relevé le 3 novembre 2026');
   }
   // La B200 a deux sources (la crête, puis la mémoire et la bande passante), chacune datée.
@@ -265,6 +267,12 @@ test('chaque prix affiché a sa source et sa date', async ({ page }) => {
     await expect(reperes.nth(i)).toContainText(r.definition);
   }
   await expect(t(page, 'calc-comme-les-grands')).toContainText('avec la définition de PaLM');
+  // Les mesures de ton IA : la date vient de leur source, pas d'un texte écrit à la main.
+  const mesures = MESURES_TON_IA.tres_grand.source;
+  expect(MESURES_TON_IA.mini.source.releveLe).toBe(mesures.releveLe); // une seule date pour les deux liens
+  const sourceMesures = calc(page).locator('.source-mesures');
+  expect(await brut(sourceMesures)).toMatch(new RegExp(`^Mesures du ${norm(formaterDate(mesures.releveLe))} : le rapport de mesure`));
+  await expect(sourceMesures.getByRole('link', { name: 'le rapport de mesure' })).toHaveAttribute('href', mesures.url);
   // Un modèle public : sa source, datée elle aussi.
   await t(page, 'calc-modele').selectOption('llama-3-405b');
   await expect(sources.locator('[data-source="modele"] a').first()).toHaveAttribute('href', 'https://arxiv.org/abs/2407.21783');

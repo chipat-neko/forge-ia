@@ -36,7 +36,9 @@ VINGT = ["an", "bo", "ci", "du", "el", "fa", "gu", "hi", "in", "jo", "ka", "lu",
 # Le résultat de l'entraînement complet (test long), le même en TypeScript
 # (site/src/lib/mini-modele/entrainement-long.test.ts) : si le code change,
 # relance « uv run pytest -q -m lent », puis recopie les nouvelles valeurs ici
-# et dans le test TypeScript.
+# et dans le test TypeScript. L'intégration continue ne lance pas ce test long :
+# un test rapide de Vitest relit ces trois lignes et vérifie qu'elles valent les
+# constantes du test TypeScript (garde la forme NOM = "…", seule sur sa ligne).
 LONG_VALIDATION_DEPART = "400d39161fba8940"
 LONG_VALIDATION_FIN = "40014367b7b1cd81"
 LONG_PARAMS_EMPREINTE = "1637bfe4"

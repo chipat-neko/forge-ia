@@ -217,13 +217,15 @@ describe('les valeurs extrêmes (point à surveiller 4 du plan)', () => {
     expect(memoire.endsWith(`${FINE}: 6,4 To en tout${FINE}; 6${FINE}570 Go ÷ 16 Go = au moins 411 cartes`), memoire).toBe(true);
   });
 
-  it('l’explication de la mémoire dit pourquoi le total de l’étape « cartes » peut dépasser d’un chiffre, seulement quand l’étape existe', () => {
+  it('l’explication de la mémoire dit pourquoi le total de l’étape « cartes » peut dépasser d’une unité sur son dernier chiffre, seulement quand l’étape existe', () => {
     const phrase = 'le total est arrondi vers le haut quand l’arrondi ordinaire ferait trouver une carte de moins';
     const explication = (rel: Releve, cle: string) => n(formulesDuCalcul(rel).find((f) => f.cle === cle)?.explication ?? '');
     const enorme = releve({ modele: 'llama-3-405b' });
     expect(explication(enorme, 'memoire')).toContain(phrase);
-    expect(explication(enorme, 'memoire')).toContain(`dépasser d’un chiffre le total «${FINE}en tout${FINE}»`);
-    expect(explication(enorme, 'generation')).toContain(`dépasser d’un chiffre la mémoire des poids en bf16`);
+    const unite = 'd’une unité sur son dernier chiffre (0,1 Go sous 100 Go, 1 Go au-delà).';
+    expect(explication(enorme, 'memoire')).toContain(`dépasser le total «${FINE}en tout${FINE}» ${unite}`);
+    expect(explication(enorme, 'generation')).toContain(`dépasser la mémoire des poids en bf16 ${unite}`);
+    expect(explication(enorme, 'memoire')).not.toContain('d’un chiffre');
     // Une seule carte suffit : pas d'étape « cartes », donc pas de phrase.
     expect(releve().memoire.cartesMinimum).toBe(1);
     expect(explication(releve(), 'memoire')).not.toContain(phrase);

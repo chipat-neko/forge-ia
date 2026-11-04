@@ -5,8 +5,8 @@
 // Chaque chiffre a sa source primaire : son adresse et la date où on l'a lu
 // (`releveLe`). Seules les sources primaires entrent dans un calcul de prix :
 // les pages des loueurs eux-mêmes, l'API des prix d'Azure, la BCE et la grille
-// d'EDF, jamais un comparateur. Les prix de location bougent de 20 à 50 % en
-// quelques mois : la page les montre en fourchette, avec leur lien et leur date.
+// d'EDF, jamais un comparateur. Les prix de location changent souvent : la page
+// les montre en fourchette, avec leur lien et la date de leur relevé.
 //
 // Relevés : le 3 novembre 2026 pour le matériel, les prix, le taux, le tarif et
 // les formules (recherche du plan 3, prix et pages de NVIDIA revus le 4

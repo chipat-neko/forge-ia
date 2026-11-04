@@ -89,15 +89,15 @@ const OCTETS_BINAIRES =
   `1${INSECABLE}Mo, 1${FINE}024² octets${FINE}; 1${INSECABLE}To, 1${FINE}024${INSECABLE}Go.`;
 
 /**
- * Pourquoi le total de l'étape « cartes » peut dépasser d'un chiffre celui qu'on a lu plus haut : voir
+ * Pourquoi le total de l'étape « cartes » peut dépasser d'une unité, sur son dernier chiffre, celui qu'on a lu plus haut : voir
  * formaterGoPourLesCartes. `total` dit lequel (« le total « en tout » », « la mémoire des poids en bf16 »).
  * Dite seulement quand l'étape est affichée (plus d'une carte).
  */
 export function explicationArrondiDesCartes(total: string): string {
   return (
     'Dans la division par la mémoire de la carte, le total est arrondi vers le haut quand l’arrondi ordinaire ' +
-    `ferait trouver une carte de moins en refaisant le calcul à la main${FINE}: il peut alors dépasser d’un chiffre ` +
-    `${total}.`
+    `ferait trouver une carte de moins en refaisant le calcul à la main${FINE}: il peut alors dépasser ${total} ` +
+    'd’une unité sur son dernier chiffre (0,1 Go sous 100 Go, 1 Go au-delà).'
   );
 }
 

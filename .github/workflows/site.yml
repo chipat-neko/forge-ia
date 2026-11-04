@@ -85,6 +85,27 @@ jobs:
       # Sans FORGE_ESSAIS : les pages d'essai ne sont pas publiées.
       - name: Construction du site
         run: npm run build
+      # Garde-fou : rien des pages d'essai dans le site publié. Ni leur dossier, ni la liste des
+      # prénoms, que seul le Worker du mini-modèle embarque, et qu'aucune page publiée ne montre
+      # encore. On cherche un prénom distinctif, choisi comme dans e2e/mini-modele.spec.ts : le
+      # premier d'au moins 7 lettres à partir du milieu de la liste. Quand une page publiée
+      # montrera le mini-modèle (plan 5), ce contrôle devra écarter le fichier de son Worker.
+      - name: Aucune page d'essai dans le site construit
+        run: |
+          if [ -e dist/essais ]; then
+            echo "dist/essais existe : une page d'essai entrerait dans le site publié. Elles ne se construisent qu'avec FORGE_ESSAIS=1." >&2
+            exit 1
+          fi
+          test -d dist/_astro || { echo "dist/_astro est introuvable : la construction a-t-elle changé de dossier ?" >&2; exit 1; }
+          liste=../projets/mini-modele/donnees/prenoms.txt
+          total=$(grep -c . "$liste")
+          prenom=$(grep . "$liste" | tail -n +$((total / 2 + 1)) | LC_ALL=C.UTF-8 grep -m1 -E '^.{7,}$')
+          test -n "$prenom" || { echo "Aucun prénom d'au moins 7 lettres dans la seconde moitié de $liste." >&2; exit 1; }
+          if grep -rlF -- "$prenom" dist/_astro; then
+            echo "Le prénom « $prenom » est dans les fichiers ci-dessus : la liste des prénoms entrerait dans le site publié." >&2
+            exit 1
+          fi
+          echo "Aucune page d'essai ni la liste des prénoms dans dist/ (prénom cherché : $prenom)."
       - name: Dépôt du site construit pour la publication
         uses: actions/upload-pages-artifact@v5
         with:

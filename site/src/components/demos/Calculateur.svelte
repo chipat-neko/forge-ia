@@ -374,7 +374,7 @@
     {/each}
   </ul>
   <p class="source-mesures">
-    Mesures du 3 novembre 2026{FINE}: <a href={mesures.url}>le rapport de mesure</a>, et
+    Mesures du {formaterDate(mesures.releveLe)}{FINE}: <a href={mesures.url}>le rapport de mesure</a>, et
     <a href={mesuresMini.url}>la configuration de la version courte</a> pour «{FINE}mini{FINE}».
   </p>
 
@@ -414,8 +414,8 @@
         </li>
       {/if}
     </ul>
-    <p class="avertissement">
-      Les prix de location bougent de 20 à 50{FINE}% en quelques mois{FINE}: ceux-ci sont ceux du jour de leur relevé, hors taxes.
+    <p class="avertissement" data-test="calc-avertissement-prix">
+      Les prix de location changent souvent{FINE}: ceux-ci sont ceux du jour de leur relevé, hors taxes.
     </p>
   </div>
 
