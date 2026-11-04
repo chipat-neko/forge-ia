@@ -8,7 +8,8 @@
 
 /* ---------- Le bouton en relief ---------- */
 
-/* Les choix des paris : bord indigo, ombre décalée, soleil au survol. */
+/* Comme les choix des paris (Pari.astro) : bord indigo, ombre décalée, soleil
+   au survol. */
 .bouton-relief {
   cursor: pointer;
   background: var(--papier);
@@ -82,15 +83,23 @@
 /* ---------- La zone qui défile (ZoneDefilable.svelte) ---------- */
 
 /* Un tableau plus large que la colonne défile dans sa zone : la page, elle,
-   ne déborde jamais. */
+   ne déborde jamais. La zone est aussi le bloc conteneur de ce qui est en
+   position absolue dedans, comme les .vh d'un tableau (« masqué », « (mot 8) ») :
+   sans position: relative, ces boîtes échapperaient au défilement, et la page
+   déborderait sur un téléphone. */
 .zone-defilable {
+  position: relative;
   overflow-x: auto;
   max-width: 100%;
 }
 
 /* La phrase qui invite à faire défiler, au-dessus de la zone. Elle ne
    s'affiche que sous la largeur de fenêtre où le tableau ne tient plus dans
-   la colonne (data-seuil, en pixels). CSS seul : vaut aussi sans JavaScript. */
+   la colonne (data-seuil, en pixels). CSS seul : vaut aussi sans JavaScript.
+   Règle faible (0,1,0) : dans un conteneur qui règle ses paragraphes, comme
+   .labo p (EncadreLabo) ou .note p (Etape), la taille, la marge ou la couleur
+   du conteneur l'emportent. Une ZoneDefilable avec indice posée là demande une
+   règle dédiée. */
 .indice-defilement {
   display: none;
   font-family: var(--titres);

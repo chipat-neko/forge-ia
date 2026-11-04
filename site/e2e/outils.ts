@@ -94,13 +94,19 @@ export async function verifierTypographie(zone: Locator): Promise<void> {
   expect(texte.match(/.{0,20}\p{L}'\p{L}.{0,20}/gu) ?? []).toEqual([]);
 }
 
-/** Vérifie que la page ne déborde pas en largeur : pas de défilement horizontal. */
+/**
+ * Vérifie que la page ne déborde pas en largeur : pas de défilement horizontal.
+ * On compare à la largeur visible de la page (clientWidth de html, sans la
+ * barre de défilement), pas à innerWidth : sur mobile, une page qui déborde
+ * élargit la fenêtre de mise en page, et innerWidth grandit avec elle (441 px
+ * pour un écran de 390 px).
+ */
 export async function verifierSansDebordement(page: Page): Promise<void> {
   const { largeur, fenetre } = await page.evaluate(() => ({
     largeur: document.documentElement.scrollWidth,
-    fenetre: window.innerWidth,
+    fenetre: document.documentElement.clientWidth,
   }));
-  expect(largeur).toBeLessThanOrEqual(fenetre);
+  expect(largeur, 'la page déborde en largeur').toBeLessThanOrEqual(fenetre);
 }
 
 /**
