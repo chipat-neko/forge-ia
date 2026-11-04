@@ -22,7 +22,10 @@ test('accueil : 34 chapitres, 1.3 disponible', async ({ page }) => {
   await verifierAxe(page);
   await verifierSansDebordement(page);
   await page.locator('[data-chapitre-carte="1.3"] a').click();
-  await expect(page).toHaveURL(/\/forge-ia\/partie-1\/1-3\/$/);
+  // Attendre la page chargée (waitForURL attend « load »), pas seulement la nouvelle
+  // adresse : sinon axe et le contrôle du débordement lisent un document à moitié
+  // analysé, sans ses CSS, que le navigateur ne peint jamais.
+  await page.waitForURL(/\/forge-ia\/partie-1\/1-3\/$/);
   await verifierAxe(page);
   await verifierSansDebordement(page);
 });

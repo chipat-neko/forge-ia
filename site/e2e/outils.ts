@@ -102,6 +102,12 @@ export async function verifierTypographie(zone: Locator): Promise<void> {
  * pour un écran de 390 px).
  */
 export async function verifierSansDebordement(page: Page): Promise<void> {
+  // On mesure la page telle qu'elle sera peinte : document lu en entier
+  // (readyState « complete », l'événement load), CSS et polices chargées. Juste
+  // après un clic, le document peut être encore à moitié analysé, sans ses CSS :
+  // un état que le navigateur ne peint jamais, mais que scrollWidth mesurerait.
+  await page.waitForLoadState('load');
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
   const { largeur, fenetre } = await page.evaluate(() => ({
     largeur: document.documentElement.scrollWidth,
     fenetre: document.documentElement.clientWidth,
