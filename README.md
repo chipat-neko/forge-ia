@@ -50,8 +50,49 @@ GitHub Actions lance deux séries de tests :
   `main`, quand ces tests passent, le site est construit puis publié sur
   GitHub Pages ;
 - **les projets Python** (`.github/workflows/python.yml`) : pytest dans chaque
-  projet, sous Linux et sous Windows, seulement quand un envoi ou une pull
-  request modifie `projets/`, `notebooks/` ou ce workflow lui-même.
+  projet, sous Linux et sous Windows, et l'exécution des notebooks comme sur
+  Colab (voir « Notebooks »), seulement quand un envoi ou une pull request
+  modifie `projets/`, `notebooks/`, `outils/` ou ce workflow lui-même.
+
+## Notebooks
+
+Les notebooks de `notebooks/` accompagnent les chapitres et s'ouvrent dans
+Colab depuis le site. Avant une parution, personne ne les lance à la main sur
+Colab : ils sont exécutés automatiquement, de deux façons.
+
+- Par le `test_notebook.py` de leur projet, avec les autres tests du projet
+  (son Python et son PyTorch, sous Linux et sous Windows).
+- Par le job `notebooks-colab` de `.github/workflows/python.yml`, qui
+  reproduit le logiciel de l'image de Colab sans carte graphique (relevé du
+  03/11/2026) : Python 3.13, `torch==2.11.0` pour processeur (depuis l'index
+  de PyTorch), puis les paquets de `outils/colab-sans-carte.txt` (numpy 2.4.6,
+  ipykernel 6.17.1…). Le script `outils/executer_notebooks.py` exécute alors
+  chaque notebook dans une copie en mémoire, avec `FORGE_IA_LOCAL` à la racine
+  du dépôt : le notebook prend le code du dépôt, sans rien installer ni
+  télécharger. Il échoue si une cellule lève une erreur, ou si le notebook
+  affiche « Même … que la page du site : non ».
+
+La carte graphique de Colab, elle, n'est pas testée : un notebook qui utilise
+la carte tourne aussi sur la RTX 5070 Ti avant sa parution.
+
+Les mêmes commandes en local, dans PowerShell, depuis la racine du dépôt.
+`env-forge.ps1` place d'abord le cache d'uv dans le dossier des données
+(`FORGE_DONNEES`) ; l'environnement `.colab` n'est pas versionné.
+
+```powershell
+. .\outils\env-forge.ps1
+uv venv --python 3.13 .colab
+uv pip install --python .colab --index-url https://download.pytorch.org/whl/cpu torch==2.11.0
+uv pip install --python .colab -r outils/colab-sans-carte.txt
+.colab\Scripts\python outils\executer_notebooks.py
+```
+
+Le script affiche les versions de Python, de PyTorch et de numpy, puis une
+ligne par notebook : son nom, sa durée, et `ok` ou `ÉCHEC`. Il peut aussi
+exécuter un seul notebook :
+`.colab\Scripts\python outils\executer_notebooks.py notebooks\1.3-tokenizer.ipynb`.
+Toute modification d'un notebook se rejoue ainsi avant son commit, et le
+résultat attendu est `ok`.
 
 ## Parution d'un chapitre
 

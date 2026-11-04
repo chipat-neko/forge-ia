@@ -2,16 +2,20 @@ name: Python
 
 # Les tests des projets Python (et l'exécution des notebooks qui les
 # accompagnent) tournent sous Linux et sous Windows, comme chez les lecteurs.
+# Le job notebooks-colab exécute en plus chaque notebook comme sur Colab sans
+# carte graphique (Python 3.13, PyTorch 2.11 pour processeur).
 on:
   push:
     paths:
       - 'projets/**'
       - 'notebooks/**'
+      - 'outils/**'
       - '.github/workflows/python.yml'
   pull_request:
     paths:
       - 'projets/**'
       - 'notebooks/**'
+      - 'outils/**'
       - '.github/workflows/python.yml'
 
 permissions:
@@ -59,3 +63,25 @@ jobs:
             exit 1
           fi
           exit "$echec"
+
+  # Chaque notebook, exécuté dans un environnement qui reproduit l'image de Colab sans
+  # carte graphique (relevé du 03/11/2026, https://github.com/googlecolab/backend-info) :
+  # Python 3.13, torch 2.11.0 pour processeur (de l'index de PyTorch, pas de PyPI), puis
+  # numpy et le noyau de Colab (outils/colab-sans-carte.txt). La carte de Colab, elle,
+  # n'est pas testée. Les mêmes commandes se lancent en local : voir « Notebooks » dans le README.
+  notebooks-colab:
+    name: Notebooks comme sur Colab, sans carte
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.3.3
+      - name: Environnement de Colab sans carte (.colab)
+        run: |
+          uv venv --python 3.13 .colab
+          uv pip install --python .colab --index-url https://download.pytorch.org/whl/cpu torch==2.11.0
+          uv pip install --python .colab -r outils/colab-sans-carte.txt
+      - name: Exécution des notebooks
+        run: .colab/bin/python outils/executer_notebooks.py

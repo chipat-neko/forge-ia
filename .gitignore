@@ -8,3 +8,4 @@ __pycache__/
 site/test-results/
 site/playwright-report/
 *.ipynb_checkpoints
+.colab/
