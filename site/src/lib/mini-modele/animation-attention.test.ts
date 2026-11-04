@@ -16,6 +16,8 @@ import {
   fondCarte,
   legendeCarte,
   LEGENDE,
+  LEGENDE_CARTE,
+  LEGENDE_VECTEURS,
   ligneEtat,
   lignesEtape,
   messageSansJs,
@@ -416,6 +418,12 @@ describe('les mots qui reviennent, et le classement', () => {
       expect(D[DE_QUI].poids[IL][rangs[k]]).toBeLessThanOrEqual(D[DE_QUI].poids[IL][rangs[k - 1]]);
     }
     expect(classement(D[QUI_AGIT], TORD).slice(0, 2)).toEqual([FORGERON, IL]);
+  });
+
+  it('la légende en deux parties : les vecteurs (toujours), puis la carte (quand elle est là)', () => {
+    expect(LEGENDE).toBe(`${LEGENDE_VECTEURS} ${LEGENDE_CARTE}`);
+    expect(LEGENDE_VECTEURS).not.toMatch(/carte/i);
+    expect(LEGENDE_CARTE).toMatch(/^La carte montre où le calcul lit/);
   });
 
   it('la légende de la figure', () => {

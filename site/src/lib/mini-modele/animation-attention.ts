@@ -378,11 +378,17 @@ export function phraseRequeteNulle(exemple: ExempleAttention, d: DetailTete): st
 // Le fond d'une case est un mélange d'indigo et de papier (color-mix), d'autant
 // plus indigo que le poids est grand ; au-delà de 0,5, le texte passe en papier.
 // Entre 50 % et 65 % d'indigo, ni l'un ni l'autre texte n'atteint le contraste
-// AA (4,5) : au-delà de 0,5, le fond part donc de 65 %, puis monte jusqu'à 100 %.
+// AA (4,5) : au-delà de 0,5, le fond saute donc à 65 %, puis monte jusqu'à 100 %.
+// Le fond n'est pas proportionnel au poids : il est linéaire par morceaux.
 const SEUIL_CLAIR = 0.5;
 const FOND_CLAIR_MIN = 65;
 
-/** La part d'indigo du fond d'une case, en pourcentage (0 à 100) : proportionnelle au poids, de part et d'autre de 0,5. */
+/**
+ * La part d'indigo du fond d'une case, en pourcentage (0 à 100), linéaire par
+ * morceaux : égale au poids jusqu'à 0,5 (0 à 50 %), puis de 65 % à 100 % de
+ * 0,5 à 1. Le saut à 0,5 garde le contraste AA du texte, indigo puis papier.
+ * Elle croît toujours avec le poids, mais elle n'est pas proportionnelle.
+ */
 export function fondCarte(p: number): number {
   if (p <= SEUIL_CLAIR) return arrondi2(p * 100);
   return arrondi2(FOND_CLAIR_MIN + ((100 - FOND_CLAIR_MIN) * (p - SEUIL_CLAIR)) / (1 - SEUIL_CLAIR));
@@ -409,10 +415,17 @@ export function classement(d: DetailTete, requete: number): number[] {
   return Array.from({ length: requete + 1 }, (_, j) => j).sort((a, b) => poids[b] - poids[a] || a - b);
 }
 
-/** La légende de la figure, sous la carte. */
-export const LEGENDE = typographier(
+/** La première partie de la légende : elle vaut à toutes les étapes. */
+export const LEGENDE_VECTEURS = typographier(
   'Ces vecteurs sont écrits à la main, comme si les couches précédentes avaient déjà reconnu le rôle de chaque mot. ' +
-    'Dans un vrai modèle, ils sont appris, et les têtes sont rarement aussi nettes. ' +
-    'La carte montre où le calcul lit, pas pourquoi le modèle répond. ' +
+    'Dans un vrai modèle, ils sont appris, et les têtes sont rarement aussi nettes.',
+);
+
+/** La seconde partie de la légende : elle parle de la carte, et ne s'affiche qu'avec elle. */
+export const LEGENDE_CARTE = typographier(
+  'La carte montre où le calcul lit, pas pourquoi le modèle répond. ' +
     'Une ligne par mot qui demande, une colonne par mot regardé ; score = requête · clé.',
 );
+
+/** La légende complète de la figure, celle des étapes 6 et 7. */
+export const LEGENDE = `${LEGENDE_VECTEURS} ${LEGENDE_CARTE}`;

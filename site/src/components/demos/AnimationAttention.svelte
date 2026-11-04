@@ -41,7 +41,8 @@
     etapesAttention,
     explication,
     fondCarte,
-    LEGENDE,
+    LEGENDE_CARTE,
+    LEGENDE_VECTEURS,
     legendeCarte,
     lignesEtape,
     messageSansJs,
@@ -234,27 +235,30 @@
   <p class="explication">{texteExplication}</p>
 
   {#if etape === 1}
-    <table class="traits" data-test="att-traits">
-      <caption class="vh">Les traits de chaque mot</caption>
-      <thead>
-        <tr>
-          <td></td>
-          {#each ex.traits as trait (trait)}
-            <th scope="col"><span>{trait}</span></th>
-          {/each}
-        </tr>
-      </thead>
-      <tbody>
-        {#each ex.jetons as _, i (i)}
+    <!-- Les tableaux sont dans des zones qui défilent : un exemple plus large ne fait jamais déborder la page. -->
+    <div class="defile" role="region" aria-label="Traits de chaque mot, défilable" tabindex="0">
+      <table class="traits" data-test="att-traits">
+        <caption class="vh">Les traits de chaque mot</caption>
+        <thead>
           <tr>
-            <th scope="row" class:choisi={i === requete}>{@render nomMot(i)}</th>
-            {#each ex.x[i] as v, k (k)}
-              <td class:actif={v !== 0}>{valeur(v)}</td>
+            <td></td>
+            {#each ex.traits as trait (trait)}
+              <th scope="col"><span>{trait}</span></th>
             {/each}
           </tr>
-        {/each}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {#each ex.jetons as _, i (i)}
+            <tr>
+              <th scope="row" class:choisi={i === requete}>{@render nomMot(i)}</th>
+              {#each ex.x[i] as v, k (k)}
+                <td class:actif={v !== 0}>{valeur(v)}</td>
+              {/each}
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
   {:else if etape === 2}
     <dl class="vecteurs">
       <div>
@@ -270,25 +274,27 @@
         <dd>{vecteur(d.valeurs[requete])}</dd>
       </div>
     </dl>
-    <table class="cles" data-test="att-cles">
-      <caption>La clé k de chaque mot</caption>
-      <thead>
-        <tr>
-          <td></td>
-          <th scope="col" colspan={taille}>clé k</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each ex.jetons as _, i (i)}
+    <p class="titre-tableau" id="{id}-cles">La clé k de chaque mot</p>
+    <div class="defile" role="region" aria-label="Clés de chaque mot, défilable" tabindex="0">
+      <table class="cles" data-test="att-cles" aria-labelledby="{id}-cles">
+        <thead>
           <tr>
-            <th scope="row" class:choisi={i === requete}>{@render nomMot(i)}</th>
-            {#each d.cles[i] as v, k (k)}
-              <td>{valeur(v)}</td>
-            {/each}
+            <td></td>
+            <th scope="col" colspan={taille}>clé k</th>
           </tr>
-        {/each}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {#each ex.jetons as _, i (i)}
+            <tr>
+              <th scope="row" class:choisi={i === requete}>{@render nomMot(i)}</th>
+              {#each d.cles[i] as v, k (k)}
+                <td>{valeur(v)}</td>
+              {/each}
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
   {:else}
     <ol class="lignes" class:axe={etape <= 5} data-test="att-lignes">
       {#each lignes as l (l.mot)}
@@ -336,7 +342,10 @@
   <!-- La carte complète : aux étapes 6 et 7, et sans JavaScript (la tête de départ, à l'étape 1). -->
   <div class="carte" class:seulement-sans-js={etape < 6}>
     <!-- Le titre du tableau est hors de la zone qui défile : sur un téléphone, il reste lisible en entier. -->
-    <p class="titre-carte" id="{id}-carte" data-test="att-carte-titre">{legendeCarte(ex, tete)}</p>
+    <p class="titre-tableau" id="{id}-carte" data-test="att-carte-titre">{legendeCarte(ex, tete)}</p>
+    <!-- Sur un téléphone, la carte est plus large que l'écran : la phrase le dit à l'œil (« défilable » n'est
+         que dans le nom de la zone), et une colonne coupée au bord le montre. CSS seul : vaut aussi sans JavaScript. -->
+    <p class="indice-defile" data-test="att-indice-defile">Fais défiler la carte vers la droite pour voir les autres colonnes.</p>
     <div class="defile" role="region" aria-label="Carte complète de la tête, défilable" tabindex="0">
       <table data-test="att-carte" aria-labelledby="{id}-carte">
         <thead>
@@ -369,7 +378,10 @@
     {/if}
   </div>
 
-  <figcaption class="legende">{LEGENDE}</figcaption>
+  <!-- La seconde partie de la légende parle de la carte : elle ne s'affiche qu'avec elle. -->
+  <figcaption class="legende" data-test="att-legende">
+    {LEGENDE_VECTEURS}<span class="legende-carte" class:seulement-sans-js={etape < 6}>{` ${LEGENDE_CARTE}`}</span>
+  </figcaption>
 </figure>
 
 <style>
@@ -551,6 +563,10 @@
     .seulement-sans-js {
       display: block;
     }
+
+    .legende-carte.seulement-sans-js {
+      display: inline;
+    }
   }
 
   /* ---------- L'étape ---------- */
@@ -574,7 +590,7 @@
   }
 
   caption,
-  .titre-carte {
+  .titre-tableau {
     caption-side: top;
     text-align: left;
     font-family: var(--titres);
@@ -585,8 +601,17 @@
     padding: 0 0 6px;
   }
 
-  .titre-carte {
+  .titre-tableau {
     margin: 0;
+  }
+
+  .indice-defile {
+    display: none;
+    font-family: var(--titres);
+    font-size: 14px;
+    line-height: 1.35;
+    color: var(--indigo-doux);
+    margin: 0 0 8px;
   }
 
   th[scope='row'] {
@@ -791,8 +816,12 @@
     max-width: 100%;
   }
 
+  /* Bordures séparées : avec des bordures fusionnées, celles des cases qui
+     défilent passeraient par-dessus la colonne des mots, restée en place. */
   .carte table {
     font-size: 14px;
+    border-collapse: separate;
+    border-spacing: 0;
   }
 
   .carte thead th {
@@ -805,13 +834,15 @@
   }
 
   /* Le fond d'une case : d'autant plus indigo que le poids est grand
-     (--fond, calculé par fondCarte) ; au-delà de 0,5, le texte passe en papier. */
+     (--fond, calculé par fondCarte) ; au-delà de 0,5, le texte passe en papier.
+     Le filet blanc entre deux cases est dessiné dans la case (ombre intérieure). */
   .carte td {
     min-width: 3.3em;
     padding: 5px 4px;
     text-align: center;
     white-space: nowrap;
-    border: 1px solid var(--papier);
+    border: 0;
+    box-shadow: inset -1px -1px 0 var(--papier);
     background: color-mix(in srgb, var(--indigo) var(--fond, 0%), var(--papier));
     color: var(--indigo);
   }
@@ -832,6 +863,7 @@
     left: 0;
     z-index: 1;
     background: var(--papier);
+    border-radius: 0; /* des coins arrondis laisseraient voir les cases qui passent dessous */
   }
 
   .carte th[scope='row'].choisi {
@@ -840,7 +872,7 @@
 
   .carte thead td {
     min-width: 0;
-    border: 0;
+    box-shadow: none;
   }
 
   .note-carte {
@@ -887,6 +919,25 @@
     .ligne {
       grid-template-columns: 5.6em minmax(0, 1fr) 4.2em;
       gap: 8px;
+    }
+
+    /* Des colonnes plus étroites : sur un téléphone, une colonne coupée au
+       bord de la zone montre qu'il en reste d'autres à droite. */
+    .carte table {
+      font-size: 13px;
+    }
+
+    .carte td {
+      min-width: 2.9em;
+      padding: 5px 3px;
+    }
+  }
+
+  /* En dessous de 480 px, la carte est plus large que la colonne : la phrase
+     qui invite à la faire défiler s'affiche. */
+  @media (max-width: 480px) {
+    .indice-defile {
+      display: block;
     }
   }
 </style>

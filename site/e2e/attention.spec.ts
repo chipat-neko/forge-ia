@@ -49,6 +49,15 @@ const ETAPES = [
   `Softmax${F}: des poids qui font 1`,
   'Le mélange des valeurs',
 ];
+// La légende du brief, en deux parties : la seconde ne s'affiche qu'avec la carte.
+const LEGENDE_VECTEURS =
+  'Ces vecteurs sont écrits à la main, comme si les couches précédentes avaient déjà reconnu le rôle de chaque mot. ' +
+  'Dans un vrai modèle, ils sont appris, et les têtes sont rarement aussi nettes.';
+const LEGENDE_CARTE =
+  'La carte montre où le calcul lit, pas pourquoi le modèle répond. ' +
+  `Une ligne par mot qui demande, une colonne par mot regardé${F}; score = requête · clé.`;
+/** En dessous de cette largeur de fenêtre, la carte est plus large que la colonne de texte. */
+const LARGEUR_CARTE_DEFILE = 480;
 const COURTS = ['les traits', 'requête, clé, valeur', 'les scores', 'divisés par 2', 'le masque', 'softmax', 'le mélange'];
 
 /** Un mot entre guillemets, avec les espaces fines. */
@@ -65,6 +74,19 @@ const tete = (p: Page, t: number) => anim(p).locator(`[data-test="att-tete"][dat
 const barre = (p: Page, i: number) => anim(p).locator(`[data-test="att-barre"][data-mot="${i}"]`);
 const nombreDe = (p: Page, i: number) => anim(p).locator(`[data-test="att-nombre"][data-mot="${i}"]`);
 const carte = (p: Page) => anim(p).locator('[data-test="att-carte"]');
+const regionCarte = (p: Page) => anim(p).getByRole('region', { name: 'Carte complète de la tête, défilable' });
+const legende = (p: Page) => anim(p).locator('[data-test="att-legende"]');
+
+/** Les mesures de défilement d'une zone. */
+const defilement = (zone: Locator) =>
+  zone.evaluate((el) => ({ total: el.scrollWidth, visible: el.clientWidth, gauche: el.scrollLeft }));
+
+/** Vérifie qu'une zone qui défile est focalisable et contient son tableau. */
+async function verifierZone(zone: Locator, tableau: string): Promise<void> {
+  await expect(zone).toHaveAttribute('tabindex', '0');
+  await expect(zone).toHaveCSS('overflow-x', 'auto');
+  await expect(zone.locator(`[data-test="${tableau}"]`)).toHaveCount(1);
+}
 
 /** Le texte brut (textContent : Playwright ramène U+202F à une espace dans toHaveText). */
 const brut = async (zone: Locator) => ((await zone.textContent()) ?? '').trim();
@@ -174,13 +196,23 @@ test('les sept étapes, dans l’ordre, avec leur compteur et leur ligne d’ét
     if (n === 7) await expect(suivante(page)).toBeDisabled();
     else await expect(suivante(page)).toBeEnabled();
   }
-  // Étape 1 : le tableau des traits ; étape 2 : les vecteurs de « il » et la clé de chaque mot.
+  // Étape 1 : le tableau des traits ; étape 2 : les vecteurs de « il » et la clé de chaque mot,
+  // chaque tableau dans une zone nommée qui défile.
   await allerA(page, 1);
   await expect(anim(page).locator('[data-test="att-traits"] tbody tr')).toHaveCount(N);
   await expect(anim(page).locator('[data-test="att-traits"] tbody tr').first().locator('td')).toHaveCount(NB_TRAITS);
+  await verifierZone(anim(page).getByRole('region', { name: 'Traits de chaque mot, défilable' }), 'att-traits');
+  // La légende ne parle de la carte qu'avec la carte.
+  expect((await legende(page).innerText()).trim()).toBe(LEGENDE_VECTEURS);
   await allerA(page, 2);
   await expect(anim(page).locator('[data-test="att-cles"] tbody tr')).toHaveCount(N);
+  await verifierZone(anim(page).getByRole('region', { name: 'Clés de chaque mot, défilable' }), 'att-cles');
+  await expect(anim(page).getByRole('table', { name: 'La clé k de chaque mot' })).toHaveCount(1);
   expect(await brut(anim(page).locator('.vecteurs dd').first())).toBe(`(${D[DE_QUI].requetes[IL].join(`${F}; `)})`);
+  await allerA(page, 5);
+  expect((await legende(page).innerText()).trim()).toBe(LEGENDE_VECTEURS);
+  await allerA(page, 6);
+  expect((await legende(page).innerText()).trim()).toBe(`${LEGENDE_VECTEURS} ${LEGENDE_CARTE}`);
 });
 
 test('« il » regarde « forgeron » dans la tête 2', async ({ page }) => {
@@ -300,8 +332,10 @@ test('mouvement réduit : les barres prennent leur valeur tout de suite', async 
   }
 });
 
-test('sans JavaScript : la carte est lisible', async ({ browser, baseURL }) => {
-  const ctx = await browser.newContext({ javaScriptEnabled: false, baseURL });
+test('sans JavaScript : la carte est lisible', async ({ browser, baseURL }, info) => {
+  // Le contexte reprend la fenêtre du projet (390 px sur mobile) : la carte y défile.
+  const { viewport, deviceScaleFactor, isMobile } = info.project.use;
+  const ctx = await browser.newContext({ javaScriptEnabled: false, baseURL, viewport, deviceScaleFactor, isMobile });
   const page = await ctx.newPage();
   await page.goto(PAGE);
   const a = anim(page);
@@ -322,7 +356,17 @@ test('sans JavaScript : la carte est lisible', async ({ browser, baseURL }) => {
   const caseIl = carte(page).locator('tbody tr').nth(IL).locator('td').nth(FORGERON);
   await expect(caseIl).toBeVisible();
   expect(await brut(caseIl)).toBe(pourcentDe(D[DE_QUI].poids[IL][FORGERON]));
-  await expect(a.locator('figcaption')).toBeVisible();
+  expect((await legende(page).innerText()).trim()).toBe(`${LEGENDE_VECTEURS} ${LEGENDE_CARTE}`);
+  // Sur un téléphone, la phrase qui invite à faire défiler la carte est là aussi, et rien ne déborde.
+  const indice = a.locator('[data-test="att-indice-defile"]');
+  if (viewport!.width <= LARGEUR_CARTE_DEFILE) {
+    await expect(indice).toBeVisible();
+    const m = await defilement(regionCarte(page));
+    expect(m.total).toBeGreaterThan(m.visible);
+  } else {
+    await expect(indice).toBeHidden();
+  }
+  await verifierSansDebordement(page);
   // Les réponses des paris aussi.
   await expect(page.locator('[data-pari="regard"] .verdict')).toBeVisible();
   await ctx.close();
@@ -332,11 +376,17 @@ test('accessibilité, largeur, typographie aux étapes 6 et 7', async ({ page })
   await ouvrir(page);
   // Au départ, et à l'étape 2 (vecteurs et tableau des clés).
   await verifierAxe(page);
+  await verifierSansDebordement(page);
   await verifierTypographie(anim(page));
   await allerA(page, 2);
   await verifierAxe(page);
   await verifierSansDebordement(page);
   await verifierTypographie(anim(page));
+  // Aucun débordement aux étapes des barres non plus.
+  for (const n of [3, 4, 5]) {
+    await allerA(page, n);
+    await verifierSansDebordement(page);
+  }
   for (const n of [6, 7]) {
     await allerA(page, n);
     await verifierAxe(page);
@@ -349,10 +399,6 @@ test('accessibilité, largeur, typographie aux étapes 6 et 7', async ({ page })
   await verifierAxe(page);
   await verifierTypographie(anim(page));
   await verifierTypographie(page.locator('main'));
-  // La carte défile au clavier, sans faire déborder la page.
-  const region = anim(page).getByRole('region', { name: 'Carte complète de la tête, défilable' });
-  await region.focus();
-  await expect(region).toBeFocused();
   // Des cibles d'au moins 24 px sur 24 px.
   for (const bouton of await anim(page).locator('button').all()) {
     const boite = (await bouton.boundingBox())!;
@@ -361,4 +407,53 @@ test('accessibilité, largeur, typographie aux étapes 6 et 7', async ({ page })
   }
   // La ligne d'état n'a jamais pris le focus.
   await expect(etat(page)).not.toBeFocused();
+});
+
+test('la carte défile au clavier, sans faire déborder la page', async ({ page }) => {
+  await ouvrir(page);
+  await allerA(page, 6);
+  const region = regionCarte(page);
+  await verifierZone(region, 'att-carte');
+  const indice = anim(page).locator('[data-test="att-indice-defile"]');
+  const avant = await defilement(region);
+  if (page.viewportSize()!.width > LARGEUR_CARTE_DEFILE) {
+    // Sur ordinateur, la carte tient dans la colonne : rien à faire défiler, pas de phrase.
+    expect(avant.total).toBeLessThanOrEqual(avant.visible);
+    await expect(indice).toBeHidden();
+    return;
+  }
+  // Sur un téléphone, elle est plus large que sa zone…
+  expect(avant.total).toBeGreaterThan(avant.visible);
+  expect(avant.gauche).toBe(0);
+  await expect(indice).toBeVisible();
+  expect(await brut(indice)).toBe('Fais défiler la carte vers la droite pour voir les autres colonnes.');
+  // … et une colonne est coupée au bord droit : on en voit le début, pas la fin.
+  const bord = (await region.boundingBox())!;
+  const droite = bord.x + bord.width;
+  const colonnes = await carte(page)
+    .locator('thead th')
+    .evaluateAll((ths) => ths.map((th) => ({ gauche: th.getBoundingClientRect().left, fin: th.getBoundingClientRect().right })));
+  const coupee = colonnes.find((c) => c.gauche < droite && c.fin > droite);
+  expect(coupee, 'une colonne à cheval sur le bord droit').toBeDefined();
+  expect(droite - coupee!.gauche, 'partie visible de la colonne coupée').toBeGreaterThanOrEqual(10);
+  expect(coupee!.fin - droite, 'partie cachée de la colonne coupée').toBeGreaterThanOrEqual(5);
+  // Au clavier : la flèche droite fait défiler la zone, et la page ne déborde toujours pas.
+  await region.focus();
+  await expect(region).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(async () => (await defilement(region)).gauche).toBeGreaterThan(0);
+  await verifierSansDebordement(page);
+  // La colonne des mots reste en place pendant le défilement.
+  const premierMot = (await carte(page).locator('tbody th').first().boundingBox())!;
+  expect(Math.abs(premierMot.x - bord.x)).toBeLessThanOrEqual(1);
+  // Jusqu'au bout, toujours à la flèche droite : la dernière colonne devient visible.
+  const auBout = async () => {
+    const m = await defilement(region);
+    return m.gauche + m.visible >= m.total - 1;
+  };
+  for (let i = 0; i < 30 && !(await auBout()); i++) await page.keyboard.press('ArrowRight');
+  await expect.poll(auBout).toBe(true);
+  const derniere = (await carte(page).locator('thead th').last().boundingBox())!;
+  expect(derniere.x + derniere.width).toBeLessThanOrEqual(droite + 1);
+  await verifierSansDebordement(page);
 });
