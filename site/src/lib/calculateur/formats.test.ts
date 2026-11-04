@@ -10,6 +10,7 @@ import {
   formaterDuree,
   formaterEnergie,
   formaterEuros,
+  formaterGoPourLesCartes,
   formaterHeures,
   formaterOctets,
   formaterPrix,
@@ -135,6 +136,55 @@ describe('formaterOctets', () => {
 
   it('refuse une valeur non finie ou négative', () => {
     for (const x of [NaN, Infinity, -1]) expect(() => formaterOctets(x), String(x)).toThrow(RangeError);
+  });
+});
+
+describe('formaterGoPourLesCartes : le total en Go, pour que « au moins N cartes » se refasse à la main', () => {
+  it('toujours en Go, jamais en To : 6,4 To deviennent « 6 570 Go »', () => {
+    // Un total du même ordre que celui de Llama 3 405B sur des cartes de 16 Go : 6 570,2 Go.
+    const total = 6570.2 * OCTETS_PAR_GO;
+    expect(formaterOctets(total)).toBe('6,4 To');
+    expect(formaterGoPourLesCartes(total, 16)).toBe(`6${FINE}570 Go`);
+    expect(cartesMinimum(total, 16)).toBe(411);
+  });
+
+  it('une décimale sous 100 Go, un entier au-delà, comme formaterOctets', () => {
+    expect(formaterGoPourLesCartes(20.34 * OCTETS_PAR_GO, 16)).toBe('20,3 Go');
+    expect(formaterGoPourLesCartes(99.94 * OCTETS_PAR_GO, 16)).toBe('99,9 Go');
+    expect(formaterGoPourLesCartes(99.96 * OCTETS_PAR_GO, 16)).toBe('100 Go');
+    expect(formaterGoPourLesCartes(150.4 * OCTETS_PAR_GO, 80)).toBe('150 Go');
+  });
+
+  it('arrondi au-dessus quand l’arrondi ordinaire ferait trouver une carte de moins', () => {
+    // 6 560,3 Go : l'arrondi ordinaire donne 6 560 Go, 6 560 ÷ 16 = 410 pile, alors qu'il faut 411 cartes.
+    const juste = (6560 + 0.3) * OCTETS_PAR_GO;
+    expect(cartesMinimum(juste, 16)).toBe(411);
+    expect(formaterGoPourLesCartes(juste, 16)).toBe(`6${FINE}561 Go`);
+    // Pareil sous 100 Go : 32,04 Go ne tiennent pas sur 2 cartes de 16 Go, « 32,0 Go » le laisserait croire.
+    expect(cartesMinimum(32.04 * OCTETS_PAR_GO, 16)).toBe(3);
+    expect(formaterGoPourLesCartes(32.04 * OCTETS_PAR_GO, 16)).toBe('32,1 Go');
+    // Et pile sur un multiple, rien ne change.
+    expect(formaterGoPourLesCartes(6560 * OCTETS_PAR_GO, 16)).toBe(`6${FINE}560 Go`);
+  });
+
+  it('refait toujours le nombre de cartes : le total affiché, divisé à la main par la mémoire, arrondi au-dessus', () => {
+    const lu = (t: string) => Number(t.replace(/\u202F/g, '').replace(',', '.').replace(' Go', ''));
+    for (const memoireGo of [16, 24, 32, 80, 141, 180]) {
+      for (let k = 0; k < 4000; k++) {
+        const go = 0.5 + k * 1.7309;
+        const octets = go * OCTETS_PAR_GO;
+        const affiche = formaterGoPourLesCartes(octets, memoireGo);
+        expect(Math.ceil(lu(affiche) / memoireGo - 1e-9), `${go} Go sur des cartes de ${memoireGo} Go, affiché ${affiche}`).toBe(
+          cartesMinimum(octets, memoireGo),
+        );
+      }
+    }
+  });
+
+  it('refuse un total négatif ou non fini', () => {
+    expect(() => formaterGoPourLesCartes(-1, 16)).toThrow(RangeError);
+    expect(() => formaterGoPourLesCartes(Number.NaN, 16)).toThrow(RangeError);
+    expect(() => formaterGoPourLesCartes(Number.POSITIVE_INFINITY, 16)).toThrow(RangeError);
   });
 });
 

@@ -10,7 +10,7 @@
 // « 1 min », jamais « 60 s ».
 
 import { nombre } from '../nombres';
-import { OCTETS_PAR_GO } from './formules';
+import { cartesMinimum, OCTETS_PAR_GO } from './formules';
 
 const FINE = '\u202F';
 const SECONDES_PAR_HEURE = 3600;
@@ -120,6 +120,25 @@ export function formaterOctets(octets: number): string {
   if (arrondi(go, 0) < 1024) return `${nombre(go)} Go`;
   const to = go / 1024;
   return `${nombre(to, arrondi(to, 1) < 100 ? 1 : 0)} To`;
+}
+
+/**
+ * Des octets toujours en Go (jamais en To ni en Mo), pour la division « total ÷ mémoire d'une
+ * carte = au moins N cartes » : « 6 571 Go » et non « 6,4 To », pour que le lecteur retrouve N
+ * à la main (« 6,4 To ÷ 16 Go » donnerait 410, et non 411). Une décimale sous 100 Go, un entier
+ * au-delà, arrondi comme formaterOctets. Si cet arrondi faisait trouver une carte de moins à la
+ * main (le total vraiment un peu au-dessus d'un multiple de la mémoire de la carte), le total est
+ * arrondi au-dessus : « au moins N cartes » se refait alors toujours à partir du nombre affiché.
+ */
+export function formaterGoPourLesCartes(octets: number, memoireGo: number): string {
+  verifier(octets, 'formaterGoPourLesCartes');
+  const cartes = cartesMinimum(octets, memoireGo);
+  const go = octets / OCTETS_PAR_GO;
+  const decimales = arrondi(go, 1) < 100 ? 1 : 0;
+  const echelle = 10 ** decimales;
+  let unites = Math.round(arrondi(go, decimales) * echelle);
+  if (Math.ceil(unites / (memoireGo * echelle)) < cartes) unites = Math.ceil(go * echelle);
+  return `${nombre(unites / echelle, decimales)} Go`;
 }
 
 /** Comment s'écrit une monnaie : sous un, son symbole, et « d’euros » après les millions. */

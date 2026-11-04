@@ -9,13 +9,17 @@
 // Firefox et WebKit (projets parite-firefox et parite-webkit, voir
 // playwright.config.ts) : c'est la seule façon de voir qu'un moteur
 // JavaScript s'écarte du Python.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { test, expect, type Page } from '@playwright/test';
 import { cheminsDesCles } from '../src/lib/mini-modele/cles-json';
 import { verifierAxe, verifierSansDebordement, verifierTypographie } from './outils';
 
 const PAGE = '/forge-ia/essais/parite/';
 const NOMS = ['calcul', 'donnees', 'modele', 'attention'] as const;
+
+// calculer() attend jusqu'à 60 s la fin du calcul (Firefox et WebKit sont plus lents que Chrome) :
+// le délai par défaut de Playwright, 30 s, couperait le test avant ce délai d'attente.
+test.describe.configure({ timeout: 90_000 });
 
 /** Un fichier d'attendus écrit par le Python (Playwright tourne dans site/). */
 function lireAttendus(nom: string): unknown {
@@ -34,6 +38,9 @@ async function calculer(page: Page): Promise<void> {
 }
 
 test('le navigateur refait tous les attendus du Python, au bit près', async ({ page, browserName }) => {
+  // Chaque fichier d'attendus du Python est comparé : aucun ne doit échapper à la liste NOMS.
+  const fichiers = readdirSync('../projets/mini-modele/tests').flatMap((f) => /^attendus-(.+)\.json$/.exec(f)?.[1] ?? []);
+  expect(fichiers.sort(), 'fichiers projets/mini-modele/tests/attendus-*.json').toEqual([...NOMS].sort());
   await calculer(page);
   // La durée du calcul dans ce moteur, lue dans la ligne d'état : elle apparaît dans le rapport.
   test.info().annotations.push({ type: 'calcul', description: `${browserName} : ${await etat(page).innerText()}` });

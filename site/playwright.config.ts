@@ -29,20 +29,31 @@ const chrome = {
 // Ce sont les navigateurs de Playwright (sans canal), sans fenêtre : aucun de
 // leurs processus n'apparaît dans nvidia-smi pendant le parcours (relevé du
 // 04/11/2026). Firefox coupe en plus l'accélération graphique et WebGL.
-const autresNavigateurs =
-  process.env.FORGE_TOUS_NAVIGATEURS === '1'
-    ? [
-        {
-          name: 'parite-firefox',
-          testMatch: /parite\.spec\.ts/,
-          use: {
-            browserName: 'firefox' as const,
-            launchOptions: { firefoxUserPrefs: { 'layers.acceleration.disabled': true, 'webgl.disabled': true } },
-          },
+//
+// Garde-fou : en intégration continue, sans cette variable, les projets Firefox et
+// WebKit disparaîtraient en silence et le parcours de parité ne tournerait plus que
+// dans Chrome, tout en restant vert. On s'arrête donc avec un message qui dit quoi faire.
+const tousLesNavigateurs = process.env.FORGE_TOUS_NAVIGATEURS === '1';
+if (process.env.CI && !tousLesNavigateurs) {
+  throw new Error(
+    'En intégration continue, la variable FORGE_TOUS_NAVIGATEURS doit valoir 1 : sans elle, les projets ' +
+      'parite-firefox et parite-webkit ne tournent pas, et la parité n’est vérifiée que dans Chrome. ' +
+      'Ajoute FORGE_TOUS_NAVIGATEURS: 1 dans le bloc env de l’étape Playwright de .github/workflows/site.yml.',
+  );
+}
+const autresNavigateurs = tousLesNavigateurs
+  ? [
+      {
+        name: 'parite-firefox',
+        testMatch: /parite\.spec\.ts/,
+        use: {
+          browserName: 'firefox' as const,
+          launchOptions: { firefoxUserPrefs: { 'layers.acceleration.disabled': true, 'webgl.disabled': true } },
         },
-        { name: 'parite-webkit', testMatch: /parite\.spec\.ts/, use: { browserName: 'webkit' as const } },
-      ]
-    : [];
+      },
+      { name: 'parite-webkit', testMatch: /parite\.spec\.ts/, use: { browserName: 'webkit' as const } },
+    ]
+  : [];
 
 export default defineConfig({
   testDir: './e2e',

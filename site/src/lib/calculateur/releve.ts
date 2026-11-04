@@ -44,6 +44,7 @@ import {
   formaterDuree,
   formaterEnergie,
   formaterEuros,
+  formaterGoPourLesCartes,
   formaterHeures,
   formaterOctets,
   formaterPrix,
@@ -611,7 +612,7 @@ export function formulesDuCalcul(rel: Releve): Formule[] {
   const parCarte =
     m.cartesMinimum <= 1
       ? ''
-      : `${FINE}; ${o(m.total)}${DIVISE}${memoireCarte(carte)}${EGAL}au moins ${cartesTexte(m.cartesMinimum)}`;
+      : `${FINE}; ${lie(formaterGoPourLesCartes(m.total, carte.memoireGo))}${DIVISE}${memoireCarte(carte)}${EGAL}au moins ${cartesTexte(m.cartesMinimum)}`;
   formules.push({
     cle: 'memoire',
     titre: 'La mémoire pour l’entraîner',
@@ -633,10 +634,11 @@ export function formulesDuCalcul(rel: Releve): Formule[] {
     cle: 'service',
     titre: 'La mémoire pour s’en servir',
     formule:
-      `${q(f.parametres)}${FOIS}2 octets${EGAL}${o(s.bf16)} en bf16,${FOIS}1${EGAL}${o(s.int8)} en int8,${FOIS}0,5${EGAL}${o(s.int4)} en int4${FINE}; ` +
+      `${q(f.parametres)}${FOIS}${lie('2 octets')}${EGAL}${o(s.bf16)} en bf16,${FOIS}${lie('1 octet')}${EGAL}${o(s.int8)} en int8,${FOIS}${lie('0,5 octet')}${EGAL}${o(s.int4)} en int4${FINE}; ` +
       `cache${FINE}: 2${FOIS}2${FOIS}${nombre(f.couches)} couches${FOIS}${nombre(f.tetesKv)} têtes${FOIS}${nombre(dTete)}` +
       `${FOIS}${lie(`${nombre(s.jetonsDuCache)} jetons`)}${EGAL}${o(s.cache)}`,
     explication:
+      'Un poids prend 2 octets en bf16, 1 octet en int8 (8 bits) et un demi-octet en int4 (4 bits). ' +
       `Le cache garde les clés et les valeurs de chaque jeton déjà lu, en 16 bits${FINE}: le premier 2 pour les clés et les valeurs, ` +
       `le second pour les 2 octets. ${
         groupee
@@ -655,7 +657,7 @@ export function formulesDuCalcul(rel: Releve): Formule[] {
       titre: 'La génération, au plus',
       formule: tiennent
         ? `${bande}${DIVISE}${o(s.bf16)}${EGAL}${debitJetons(g.jetonsParSeconde)} par seconde`
-        : `${o(s.bf16)}${DIVISE}${memoireCarte(carte)}${EGAL}au moins ${cartesTexte(g.cartesPourLesPoids)}`,
+        : `${lie(formaterGoPourLesCartes(s.bf16, carte.memoireGo))}${DIVISE}${memoireCarte(carte)}${EGAL}au moins ${cartesTexte(g.cartesPourLesPoids)}`,
       explication:
         `À chaque jeton qu’elle écrit, une carte relit tous les poids qu’elle garde${FINE}: la bande passante de sa mémoire borne le débit, ` +
         'pour une seule conversation à la fois. ' +

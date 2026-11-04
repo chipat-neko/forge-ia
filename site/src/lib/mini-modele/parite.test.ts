@@ -6,7 +6,7 @@
 // d'essai de parité (ControleParite.svelte) appelle les mêmes fonctions dans le
 // navigateur, et e2e/parite.spec.ts compare ce qu'elle écrit aux mêmes fichiers.
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { depuisHex, versHex } from './calcul';
 import { cheminsDesCles } from './cles-json';
@@ -21,9 +21,18 @@ import {
   versJson,
 } from './parite';
 
-// Les chemins sont relatifs à site/, d'où Vitest est lancé (comme e2e/atelier.spec.ts).
+// Le chemin est relatif à site/, d'où Vitest est lancé (comme e2e/atelier.spec.ts).
+const DOSSIER_ATTENDUS = '../projets/mini-modele/tests';
+
 function lireAttendus(nom: string): unknown {
-  return JSON.parse(readFileSync(`../projets/mini-modele/tests/attendus-${nom}.json`, 'utf8'));
+  return JSON.parse(readFileSync(`${DOSSIER_ATTENDUS}/attendus-${nom}.json`, 'utf8'));
+}
+
+/** Les noms des fichiers attendus-<nom>.json que le Python a écrits, triés. */
+function nomsDesFichiersAttendus(): string[] {
+  return readdirSync(DOSSIER_ATTENDUS)
+    .flatMap((fichier) => /^attendus-(.+)\.json$/.exec(fichier)?.[1] ?? [])
+    .sort();
 }
 
 const CALCULS = {
@@ -40,6 +49,14 @@ describe('parite.ts refait chaque fichier d’attendus du Python', { timeout: 60
     for (const [nom, calcul] of Object.entries(CALCULS)) {
       expect(CALCULS_ATTENDUS[nom as keyof typeof CALCULS_ATTENDUS], nom).toBe(calcul);
     }
+  });
+
+  it('chaque fichier attendus-<nom>.json du Python est refait ici, et aucun calcul n’est sans fichier', () => {
+    // Sans cela, un nouveau fichier d'attendus pourrait échapper à la parité dans les navigateurs :
+    // la page d'essai (ControleParite.svelte) ne refait que les calculs de CALCULS_ATTENDUS.
+    expect(nomsDesFichiersAttendus(), 'fichiers projets/mini-modele/tests/attendus-*.json').toEqual(
+      Object.keys(CALCULS_ATTENDUS).sort(),
+    );
   });
 
   for (const nom of ['calcul', 'donnees', 'modele', 'attention'] as const) {

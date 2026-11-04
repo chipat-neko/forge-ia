@@ -212,6 +212,9 @@ describe('les valeurs extrêmes (point à surveiller 4 du plan)', () => {
       `pas sur une seule carte${FINE}: les poids en bf16 n’y tiennent pas, il faut au moins 48 cartes de 16 Go pour les loger`,
     );
     expect(n(formulesDuCalcul(rel).find((f) => f.cle === 'generation')?.formule ?? '')).toBe('754 Go ÷ 16 Go = au moins 48 cartes');
+    // L'étape des cartes divise le total en Go (« 6 570 Go »), pas « 6,4 To » : 6,4 To ÷ 16 Go ferait trouver 410 cartes à la main.
+    const memoire = n(formulesDuCalcul(rel).find((f) => f.cle === 'memoire')?.formule ?? '');
+    expect(memoire.endsWith(`${FINE}: 6,4 To en tout${FINE}; 6${FINE}570 Go ÷ 16 Go = au moins 411 cartes`), memoire).toBe(true);
   });
 
   it('puis 16 384 H100 à 40 % : 35 jours, des millions d’euros, et la carte de 80 Go (jamais un « 16 Go » écrit en dur)', () => {
@@ -316,7 +319,7 @@ describe('« Voir le calcul » : chaque formule avec ses nombres et ses sources'
       `16 octets × 433,6 millions = 6,5 Go, plus 34 × 2${FINE}048 × 1${FINE}280 × 20 octets = 1,7 Go${FINE}: 8,1 Go en tout`,
     );
     expect(formule('service')).toBe(
-      `433,6 millions × 2 octets = 827 Mo en bf16, × 1 = 413 Mo en int8, × 0,5 = 207 Mo en int4${FINE}; ` +
+      `433,6 millions × 2 octets = 827 Mo en bf16, × 1 octet = 413 Mo en int8, × 0,5 octet = 207 Mo en int4${FINE}; ` +
         `cache${FINE}: 2 × 2 × 20 couches × 20 têtes × 64 × 2${FINE}048 jetons = 200 Mo`,
     );
     // Le diviseur est dans l'unité de la ligne « mémoire pour s'en servir » (827 Mo en bf16).
@@ -563,10 +566,13 @@ function proche(refait: Lu, affiche: Lu, quoi: string): void {
   expect(ecart, `${quoi} : refait ${refait.v}, affiché ${affiche.v}`).toBeLessThanOrEqual(refait.e + affiche.e + 1e-9 * Math.abs(affiche.v));
 }
 
-/** « au moins N cartes » de `memoire` pour loger `total` : N est le plus petit entier qui suffit, à l'arrondi de `total` près. */
+/**
+ * « au moins N cartes » de `memoire` pour loger `total` : le lecteur divise le total affiché par la mémoire
+ * affichée, arrondit au-dessus, et trouve exactement N. Pas de marge d'arrondi : le total est en Go, et
+ * affiché de façon que cette division refasse N (formaterGoPourLesCartes).
+ */
 function cartesSuffisent(total: Lu, memoire: Lu, cartes: Lu, quoi: string): void {
-  expect(cartes.v * memoire.v, `${quoi} : ${cartes.v} cartes suffisent`).toBeGreaterThanOrEqual(total.v - total.e);
-  expect((cartes.v - 1) * memoire.v, `${quoi} : il en faut ${cartes.v}`).toBeLessThan(total.v + total.e);
+  expect(Math.ceil(total.v / memoire.v - 1e-9), `${quoi} : ${total.v / memoire.v} cartes, arrondi au-dessus`).toBe(cartes.v);
 }
 
 function verifierALaMain(rel: Releve, quoi: string): number {
@@ -576,7 +582,7 @@ function verifierALaMain(rel: Releve, quoi: string): number {
     duree: /^(.+?) ÷ \(([\d\u202F]+) cartes? × (.+?) opérations par seconde × (\d+) %\) = (.+)$/,
     memoire: /^16 octets × (.+?) = (.+?), plus 34 × ([\d\u202F]+) × ([\d\u202F]+) × ([\d\u202F]+) octets = (.+?) : (.+?) en tout(?: ; (.+?) ÷ (.+?) = au moins ([\d\u202F]+) cartes)?$/,
     service:
-      /^(.+?) × 2 octets = (.+?) en bf16, × 1 = (.+?) en int8, × 0,5 = (.+?) en int4 ; cache : 2 × 2 × ([\d\u202F]+) couches × ([\d\u202F]+) têtes × ([\d\u202F]+) × ([\d\u202F]+) jetons = (.+)$/,
+      /^(.+?) × 2 octets = (.+?) en bf16, × 1 octet = (.+?) en int8, × 0,5 octet = (.+?) en int4 ; cache : 2 × 2 × ([\d\u202F]+) couches × ([\d\u202F]+) têtes × ([\d\u202F]+) × ([\d\u202F]+) jetons = (.+)$/,
     generation: /^([\d\u202F]+) × 10⁹ octets par seconde ÷ (.+?) = (.+) par seconde$|^(.+?) ÷ (.+?) = au moins ([\d\u202F]+) cartes$/,
     electricite: /^([\d\u202F]+) W × ([\d\u202F]+) cartes? × (.+?) = (.+?) ; × (.+?) € le kWh = (.+)$/,
     location: /^(.+?) × ([\d\u202F]+) cartes? × (.+?) = (.+?) ; ÷ ([\d,]+) = (.+)$/,

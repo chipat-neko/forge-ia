@@ -31,6 +31,10 @@ jobs:
           cache: npm
           cache-dependency-path: site/package-lock.json
       - run: npm ci
+      # Vitest ne vérifie pas les types : sans cette étape, une erreur de type passerait
+      # tous les tests. astro check lit aussi les composants .astro et .svelte.
+      - name: Vérification des types (astro check)
+        run: npx astro check
       - name: Tests unitaires (vitest)
         run: npx vitest run
       # Firefox et WebKit ne servent qu'au parcours de parité (e2e/parite.spec.ts) :

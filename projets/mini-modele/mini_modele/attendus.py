@@ -302,13 +302,15 @@ def detail_en_attendus(d: DetailTete) -> dict:
     }
 
 
-# Un exemple à virgule, pour l'ordre des sommes. Dans la phrase de l'animation, tout est entier
-# (des traits 0 ou 1, des matrices d'entiers) : chaque somme y est exacte, dans n'importe quel
-# ordre, et ne dit donc rien de l'ordre des opérations. Ici, 0,1 ou 0,3 ne s'écrivent pas
-# exactement en binaire : additionner la projection x · W, le score requête · clé ou le mélange
-# dans un autre ordre, ou multiplier par l'échelle dans la somme, change des bits
-# (test_l_exemple_flottant_voit_l_ordre_des_sommes le vérifie). 5 mots de 4 traits, une tête
-# de 3 (l'échelle 1 / √3 arrondit), des valeurs de 4.
+# Un exemple à virgule, pour l'ordre des sommes. Dans la phrase de l'animation, les entrées sont
+# des entiers (des traits 0 ou 1, des matrices d'entiers) : les projections x · W et les scores
+# requête · clé sont donc des sommes d'entiers, exactes dans n'importe quel ordre, et ne disent
+# rien de l'ordre des opérations. Le mélange, lui, additionne des valeurs fois les poids du
+# softmax, qui ne sont pas exacts : il dépend de l'ordre en général, et c'est cet exemple-ci qui
+# le fixe. Ici, 0,1 ou 0,3 ne s'écrivent pas exactement en binaire : additionner la projection,
+# le score ou le mélange dans un autre ordre, ou multiplier par l'échelle dans la somme, change
+# des bits (test_l_exemple_flottant_voit_l_ordre_des_sommes le vérifie). 5 mots de 4 traits, une
+# tête de 3 (l'échelle 1 / √3 arrondit), des valeurs de 4.
 EXEMPLE_FLOTTANT = {
     "x": (
         (0.1, 0.2, 0.3, -0.4),

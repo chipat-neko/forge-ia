@@ -270,9 +270,9 @@ def _a_rebours(a: list[float], b: list[float]) -> float:
 
 
 def test_l_exemple_flottant_voit_l_ordre_des_sommes():
-    # Dans la phrase de l'animation, tout est entier : une somme faite dans un autre ordre donne les
-    # mêmes bits, et l'exemple ne dit rien de l'ordre. L'exemple à virgule, lui, voit chacun de ces
-    # écarts : la projection, le score, l'échelle et le mélange (sinon, il ne prouverait rien).
+    # L'exemple à virgule voit chacun de ces écarts : une somme faite dans un autre ordre (la
+    # projection, le score, le mélange) ou l'échelle multipliée dans la somme change des bits. Sans
+    # cela, il ne prouverait rien de l'ordre des sommes.
     a = lire("attention")["flottant"]
     ex = EXEMPLE_FLOTTANT
     d = detailler_tete(ex["x"], ex["wq"], ex["wk"], ex["wv"])
@@ -297,10 +297,21 @@ def test_l_exemple_flottant_voit_l_ordre_des_sommes():
         for k in range(len(d.valeurs[0])):
             melanges += vers_hex(_a_rebours(d.poids[i][: i + 1], [v[k] for v in d.valeurs[: i + 1]])) != a["sorties"][i][k]
     assert projections > 0 and scores > 0 and echelles > 0 and melanges > 0, (projections, scores, echelles, melanges)
-    # Le même renversement ne change rien à l'exemple entier : d'où l'exemple à virgule.
+    # Dans la phrase de l'animation, les entrées sont des entiers : les projections et les scores sont
+    # des sommes d'entiers, exactes dans n'importe quel ordre. Le même renversement n'y change rien,
+    # et ces deux étapes ne disent donc rien de l'ordre des opérations. Le mélange, lui, additionne des
+    # valeurs fois les poids du softmax, qui ne sont pas exacts : on ne l'affirme pas ici, c'est
+    # l'exemple à virgule ci-dessus qui le fixe.
     phrase = charger_exemple()
     for t, tete in zip(lire("attention")["tetes"], phrase["tetes"]):
-        for i, x in enumerate(phrase["x"]):
-            for j in range(len(tete["wq"][0])):
-                colonne = [float(tete["wq"][k][j]) for k in range(len(tete["wq"]))]
-                assert vers_hex(_a_rebours([float(v) for v in x], colonne)) == t["requetes"][i][j]
+        for nom, w in (("requetes", tete["wq"]), ("cles", tete["wk"]), ("valeurs", tete["wv"])):
+            for i, x in enumerate(phrase["x"]):
+                for j in range(len(w[0])):
+                    colonne = [float(w[k][j]) for k in range(len(w))]
+                    assert vers_hex(_a_rebours([float(v) for v in x], colonne)) == t[nom][i][j], (nom, i, j)
+        for i in range(len(phrase["x"])):
+            for j in range(i + 1):
+                requete = [depuis_hex(m) for m in t["requetes"][i]]
+                cle = [depuis_hex(m) for m in t["cles"][j]]
+                renverse = _a_rebours(requete, cle)
+                assert vers_hex(renverse) == t["scores"][i][j], (i, j)
