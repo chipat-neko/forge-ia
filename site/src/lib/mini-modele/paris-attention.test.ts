@@ -16,8 +16,10 @@ import {
 } from './paris-attention';
 
 /** Une copie de l'exemple, modifiée par la fonction donnée (l'original est figé). */
-function exempleModifie(modifier: (e: { jetons: string[]; x: number[][] }) => void): ExempleAttention {
-  const e = structuredClone(exempleAttention) as unknown as { jetons: string[]; x: number[][] };
+function exempleModifie(
+  modifier: (e: { jetons: string[]; x: number[][]; tetes: { nom: string }[] }) => void,
+): ExempleAttention {
+  const e = structuredClone(exempleAttention) as unknown as { jetons: string[]; x: number[][]; tetes: { nom: string }[] };
   modifier(e);
   return e as unknown as ExempleAttention;
 }
@@ -102,6 +104,27 @@ describe('choixRegardDeIl', () => {
     });
     expect(motLePlusRegarde(TETE_DE_QUI_ON_PARLE, MOT_IL, echange)).toBe(4);
     expect(() => choixRegardDeIl(echange)).toThrow(/^Exemple devenu faux : /);
+    expect(() => choixRegardDeIl(echange)).toThrow(/regarde surtout « fer », et non plus « forgeron »/);
+  });
+
+  it('Exemple devenu faux, et pas une TypeError : la tête « de qui on parle » manque', () => {
+    const uneTete = exempleModifie((e) => {
+      e.tetes.splice(TETE_DE_QUI_ON_PARLE, 1);
+    });
+    expect(() => choixRegardDeIl(uneTete)).toThrow(/^Exemple devenu faux : .*2 têtes/);
+    expect(() => choixMasque(uneTete)).toThrow(/^Exemple devenu faux : .*2 têtes/);
+  });
+
+  it('Exemple devenu faux : une tête a changé de nom ou de place', () => {
+    const renommee = exempleModifie((e) => {
+      e.tetes[TETE_DE_QUI_ON_PARLE].nom = 'qui reçoit';
+    });
+    expect(() => choixRegardDeIl(renommee)).toThrow(/^Exemple devenu faux : la tête 1 .*« de qui on parle »/);
+    expect(() => choixMasque(renommee)).toThrow(/^Exemple devenu faux : /);
+    const echangees = exempleModifie((e) => {
+      e.tetes.reverse();
+    });
+    expect(() => choixRegardDeIl(echangees)).toThrow(/^Exemple devenu faux : la tête 0 .*« qui agit »/);
   });
 
   it('Exemple devenu faux : un autre mot reçoit autant que « forgeron »', () => {

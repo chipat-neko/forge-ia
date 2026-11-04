@@ -35,7 +35,11 @@ function exiger(condition: boolean, message: string): void {
   }
 }
 
-// Le détail de chaque exemple, calculé une fois.
+// Le détail de chaque exemple, calculé une fois et rangé sous l'objet exemple
+// lui-même. Ne modifie donc jamais un exemple après l'avoir passé à l'une de
+// ces fonctions : elles rendraient le détail de son ancien contenu. Pour en
+// essayer une variante, fais-en une copie (structuredClone), comme les tests.
+// L'exemple par défaut est figé, il ne peut pas changer.
 const detailsCalcules = new WeakMap<ExempleAttention, DetailTete[]>();
 
 function details(exemple: ExempleAttention): DetailTete[] {
@@ -45,6 +49,22 @@ function details(exemple: ExempleAttention): DetailTete[] {
     detailsCalcules.set(exemple, d);
   }
   return d;
+}
+
+/**
+ * Les deux têtes dont parlent les paris et leurs explications sont toujours là,
+ * à leur place : avant d'indexer TETE_DE_QUI_ON_PARLE, pour qu'un exemple
+ * changé dise « Exemple devenu faux » plutôt qu'une TypeError.
+ */
+function verifierTetes(exemple: ExempleAttention): void {
+  const noms = exemple.tetes.map((t) => t.nom);
+  exiger(noms.length === 2, `il faut 2 têtes, « qui agit » et « de qui on parle » (il y en a ${noms.length})`);
+  for (const [indice, nom] of [
+    [TETE_QUI_AGIT, 'qui agit'],
+    [TETE_DE_QUI_ON_PARLE, 'de qui on parle'],
+  ] as const) {
+    exiger(noms[indice] === nom, `la tête ${indice} n'est plus « ${nom} » (c'est « ${noms[indice]} »)`);
+  }
 }
 
 /** Les mots dont parlent les paris sont toujours à leur place dans la phrase. */
@@ -89,12 +109,13 @@ export function motLePlusRegarde(tete: number, requete: number, exemple: Exemple
  * deuxième est « puis »). Les choix sont dans l'ordre de la phrase.
  */
 export function choixRegardDeIl(exemple: ExempleAttention = exempleAttention): Choix[] {
+  verifierTetes(exemple);
   verifierMots(exemple);
   const poids = details(exemple)[TETE_DE_QUI_ON_PARLE].poids[MOT_IL];
   const juste = motLePlusRegarde(TETE_DE_QUI_ON_PARLE, MOT_IL, exemple);
   exiger(
     juste === MOT_FORGERON,
-    `dans la tête « de qui on parle », « il » regarde surtout « ${exemple.jetons[juste]} », et plus « forgeron »`,
+    `dans la tête « de qui on parle », « il » regarde surtout « ${exemple.jetons[juste]} », et non plus « forgeron »`,
   );
   for (let j = 0; j <= MOT_IL; j++) {
     exiger(
@@ -122,6 +143,7 @@ export function choixRegardDeIl(exemple: ExempleAttention = exempleAttention): C
  * est devenu faux.
  */
 export function choixMasque(exemple: ExempleAttention = exempleAttention): Choix[] {
+  verifierTetes(exemple);
   verifierMots(exemple);
   details(exemple).forEach((d, t) => {
     const p = d.poids[MOT_FORGERON][MOT_IL];

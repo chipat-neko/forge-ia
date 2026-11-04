@@ -1,0 +1,77 @@
+---
+partie: 1
+numero: "1.4"
+titre: "Page d'essai de l'animation de l'attention"
+chapeau: "Cette page sert aux parcours de test de l'animation de l'attention : dans « Le forgeron chauffe le fer puis il le tord », chaque mot regarde ceux d'avant, en sept étapes. Elle n'est jamais publiée."
+programme: "2 étapes, 2 paris, environ 5 minutes."
+acquis:
+  - cle: regard
+    texte: "Dans une tête d'attention, un pronom peut regarder surtout le nom qu'il remplace."
+    ou: "à l'étape 1, au pari"
+  - cle: attention
+    texte: "L'attention mélange les valeurs des mots, selon des poids tirés des scores requête · clé."
+    ou: "à l'étape 2, à la dernière étape de l'animation"
+  - cle: masque
+    texte: "Le masque empêche un mot de regarder ceux qui viennent après lui."
+    ou: "à l'étape 2, au pari sur le masque"
+---
+
+import AnimationAttention from '../components/demos/AnimationAttention.svelte';
+import { classement, pourcentPoids } from '../lib/mini-modele/animation-attention';
+import { detaillerExemple, exempleAttention } from '../lib/mini-modele/exemple-attention';
+import {
+  choixMasque,
+  choixRegardDeIl,
+  MOT_FORGERON,
+  MOT_IL,
+  TETE_DE_QUI_ON_PARLE,
+  TETE_QUI_AGIT,
+} from '../lib/mini-modele/paris-attention';
+
+export const regards = choixRegardDeIl();
+export const masques = choixMasque();
+export const deQui = detaillerExemple(exempleAttention)[TETE_DE_QUI_ON_PARLE];
+export const poidsDeIl = deQui.poids[MOT_IL];
+export const deuxieme = classement(deQui, MOT_IL)[1];
+
+<Etape numero={1} titre="Un mot regarde les autres">
+
+Dans « Le forgeron chauffe le fer puis il le tord », qui est « il » ? Toi, tu le sais sans y penser. Un modèle de langage, lui, doit le calculer. Pour chaque mot, une tête d'attention pose une question aux mots qui le précèdent, et chacun y répond plus ou moins bien.
+
+Cette phrase a deux têtes. La première, « {exempleAttention.tetes[TETE_QUI_AGIT].nom} » : {exempleAttention.tetes[TETE_QUI_AGIT].description.toLowerCase()} La seconde, « {exempleAttention.tetes[TETE_DE_QUI_ON_PARLE].nom} » : {exempleAttention.tetes[TETE_DE_QUI_ON_PARLE].description.toLowerCase()}
+
+<Pari
+  id="regard"
+  question="Dans la tête « de qui on parle », vers quel mot « il » regarde-t-il le plus ?"
+  choix={regards}
+  acquis="regard"
+  ouvre="attention"
+>
+
+« forgeron » : « il » lui donne {pourcentPoids(poidsDeIl[MOT_FORGERON])} de son attention, et seulement {pourcentPoids(poidsDeIl[deuxieme])} au deuxième mot le plus regardé, « {exempleAttention.jetons[deuxieme]} ». Le calcul complet est juste en dessous : avance d'une étape à la fois, et regarde d'où viennent ces nombres.
+
+</Pari>
+
+</Etape>
+
+<Etape numero={2} titre="Pas à pas">
+
+Choisis le mot qui pose la question et la tête, puis avance d'une étape à la fois. Tout se fait aussi au clavier.
+
+<Verrou nom="attention" message="Fais le pari sur « il » : l'animation s'ouvre juste après.">
+  <AnimationAttention client:load verrou="attention" acquis="attention" />
+</Verrou>
+
+<Pari
+  id="masque"
+  question="Combien vaut le poids de « forgeron » vers « il » ?"
+  precision="Quand « forgeron » pose la question, quelle part de son attention va à « il » ?"
+  choix={masques}
+  acquis="masque"
+>
+
+0 : « forgeron » vient avant « il », et le masque l'empêche de regarder la suite. Dans la carte, c'est la case de la ligne « forgeron » et de la colonne « il » : elle est masquée, dans les deux têtes.
+
+</Pari>
+
+</Etape>
