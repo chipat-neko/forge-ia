@@ -12,16 +12,17 @@ import re
 
 from mini_modele.attendus import (
     CALCULS,
+    EXEMPLE_FLOTTANT,
     PRENOMS_COURT,
     calculer_attendus_attention,
     calculer_attendus_calcul,
     calculer_attendus_donnees,
     calculer_attendus_modele,
 )
-from mini_modele.calcul import depuis_hex, empreinte, empreinte_texte
+from mini_modele.calcul import depuis_hex, empreinte, empreinte_texte, racine, vers_hex
 from mini_modele.donnees import donnees_par_defaut, preparer
 from mini_modele.entrainement import Entraineur, ReglagesMini
-from mini_modele.exemple_attention import charger_exemple
+from mini_modele.exemple_attention import charger_exemple, detailler_tete
 from mini_modele.modele import ConfigMini, nombre_parametres
 
 DOSSIER = pathlib.Path(__file__).resolve().parent
@@ -208,7 +209,7 @@ def test_l_entrainement_court_n_ecrete_jamais():
 def test_attendus_attention_au_complet():
     a = lire("attention")
     ex = charger_exemple()
-    assert set(a) == {"phrase", "jetons", "tetes"}
+    assert set(a) == {"phrase", "jetons", "tetes", "flottant"}
     assert a["phrase"] == ex["phrase"] and a["jetons"] == ex["jetons"]
     assert [t["nom"] for t in a["tetes"]] == [t["nom"] for t in ex["tetes"]] == ["qui agit", "de qui on parle"]
     n = len(ex["jetons"])
@@ -228,3 +229,78 @@ def test_attendus_attention_au_complet():
                         assert m == "0000000000000000", (i, j)  # un poids masqué vaut +0,0
                     else:
                         assert re.fullmatch(r"[0-9a-f]{16}", m), (cle, i, j)
+
+
+def test_attendus_attention_flottant():
+    a = lire("attention")["flottant"]
+    ex = EXEMPLE_FLOTTANT
+    assert set(a) == {
+        "x", "wq", "wk", "wv", "requetes", "cles", "valeurs", "scores", "scores_echelles", "poids", "sorties",
+    }
+    # Les entrées sont écrites en motifs : le TypeScript doit lire exactement les mêmes nombres.
+    for cle in ("x", "wq", "wk", "wv"):
+        assert a[cle] == [[vers_hex(float(v)) for v in ligne] for ligne in ex[cle]], cle
+    n, traits, taille, largeur = len(ex["x"]), len(ex["x"][0]), len(ex["wq"][0]), len(ex["wv"][0])
+    assert (n, traits, taille, largeur) == (5, 4, 3, 4)
+    # Une tête de 3 : l'échelle 1 / √3 n'est pas une puissance de 2, sa multiplication arrondit.
+    assert len(ex["wk"][0]) == taille
+    # Des nombres à virgule : au moins un n'est pas entier dans chaque entrée.
+    for cle in ("x", "wq", "wk", "wv"):
+        assert any(v != int(v) for ligne in ex[cle] for v in ligne), cle
+    for cle, colonnes in (("requetes", taille), ("cles", taille), ("valeurs", largeur), ("sorties", largeur)):
+        assert len(a[cle]) == n and all(len(ligne) == colonnes for ligne in a[cle]), cle
+        assert all(re.fullmatch(r"[0-9a-f]{16}", m) for ligne in a[cle] for m in ligne), cle
+    for cle in ("scores", "scores_echelles", "poids"):
+        assert len(a[cle]) == n and all(len(ligne) == n for ligne in a[cle]), cle
+        for i in range(n):
+            for j in range(n):
+                m = a[cle][i][j]
+                if j > i:
+                    assert m == (None if cle != "poids" else "0000000000000000"), (cle, i, j)
+                else:
+                    assert re.fullmatch(r"[0-9a-f]{16}", m), (cle, i, j)
+
+
+def _a_rebours(a: list[float], b: list[float]) -> float:
+    """a · b, mais par indices décroissants."""
+    s = 0.0
+    for i in range(len(a) - 1, -1, -1):
+        s += a[i] * b[i]
+    return s
+
+
+def test_l_exemple_flottant_voit_l_ordre_des_sommes():
+    # Dans la phrase de l'animation, tout est entier : une somme faite dans un autre ordre donne les
+    # mêmes bits, et l'exemple ne dit rien de l'ordre. L'exemple à virgule, lui, voit chacun de ces
+    # écarts : la projection, le score, l'échelle et le mélange (sinon, il ne prouverait rien).
+    a = lire("attention")["flottant"]
+    ex = EXEMPLE_FLOTTANT
+    d = detailler_tete(ex["x"], ex["wq"], ex["wk"], ex["wv"])
+    n = len(ex["x"])
+    projections = 0
+    for nom, w in (("requetes", ex["wq"]), ("cles", ex["wk"]), ("valeurs", ex["wv"])):
+        for i, x in enumerate(ex["x"]):
+            for j in range(len(w[0])):
+                colonne = [float(w[k][j]) for k in range(len(w))]
+                projections += vers_hex(_a_rebours([float(v) for v in x], colonne)) != a[nom][i][j]
+    scores = 0
+    echelles = 0
+    melanges = 0
+    e = 1.0 / racine(float(len(ex["wq"][0])))
+    for i in range(n):
+        for j in range(i + 1):
+            scores += vers_hex(_a_rebours(d.requetes[i], d.cles[j])) != a["scores"][i][j]
+            dans_la_somme = 0.0
+            for k in range(len(d.requetes[i])):
+                dans_la_somme += d.requetes[i][k] * d.cles[j][k] * e
+            echelles += vers_hex(dans_la_somme) != a["scores_echelles"][i][j]
+        for k in range(len(d.valeurs[0])):
+            melanges += vers_hex(_a_rebours(d.poids[i][: i + 1], [v[k] for v in d.valeurs[: i + 1]])) != a["sorties"][i][k]
+    assert projections > 0 and scores > 0 and echelles > 0 and melanges > 0, (projections, scores, echelles, melanges)
+    # Le même renversement ne change rien à l'exemple entier : d'où l'exemple à virgule.
+    phrase = charger_exemple()
+    for t, tete in zip(lire("attention")["tetes"], phrase["tetes"]):
+        for i, x in enumerate(phrase["x"]):
+            for j in range(len(tete["wq"][0])):
+                colonne = [float(tete["wq"][k][j]) for k in range(len(tete["wq"]))]
+                assert vers_hex(_a_rebours([float(v) for v in x], colonne)) == t["requetes"][i][j]

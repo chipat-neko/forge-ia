@@ -22,6 +22,28 @@ const chrome = {
   launchOptions: { args: ['--disable-gpu'] },
 };
 
+// Firefox et WebKit, pour le seul parcours de parité (e2e/parite.spec.ts) : la
+// page d'essai y refait tous les attendus du Python, pour voir si un moteur
+// JavaScript s'écarte. Seulement avec FORGE_TOUS_NAVIGATEURS=1 : en
+// intégration continue, et en local après `npx playwright install firefox webkit`.
+// Ce sont les navigateurs de Playwright (sans canal), sans fenêtre : aucun de
+// leurs processus n'apparaît dans nvidia-smi pendant le parcours (relevé du
+// 04/11/2026). Firefox coupe en plus l'accélération graphique et WebGL.
+const autresNavigateurs =
+  process.env.FORGE_TOUS_NAVIGATEURS === '1'
+    ? [
+        {
+          name: 'parite-firefox',
+          testMatch: /parite\.spec\.ts/,
+          use: {
+            browserName: 'firefox' as const,
+            launchOptions: { firefoxUserPrefs: { 'layers.acceleration.disabled': true, 'webgl.disabled': true } },
+          },
+        },
+        { name: 'parite-webkit', testMatch: /parite\.spec\.ts/, use: { browserName: 'webkit' as const } },
+      ]
+    : [];
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -38,6 +60,7 @@ export default defineConfig({
       name: 'mobile',
       use: { ...chrome, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
     },
+    ...autresNavigateurs,
   ],
   webServer: adressePublique
     ? undefined

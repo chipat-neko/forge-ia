@@ -38,7 +38,7 @@ from mini_modele.calcul import (
 )
 from mini_modele.donnees import FICHIER_PRENOMS, decoder, donnees_par_defaut, preparer, prenoms_du_texte
 from mini_modele.entrainement import PRESETS_MINI, TAUX_PROPOSES, Entraineur, ReglagesMini, taux
-from mini_modele.exemple_attention import charger_exemple, detailler_exemple
+from mini_modele.exemple_attention import DetailTete, charger_exemple, detailler_exemple, detailler_tete
 from mini_modele.modele import (
     ConfigMini,
     avant,
@@ -289,25 +289,64 @@ def motifs(matrice: list) -> list[list[str | None]]:
     return [[None if v is None else vers_hex(v) for v in ligne] for ligne in matrice]
 
 
+def detail_en_attendus(d: DetailTete) -> dict:
+    """Tout le détail d'une tête, en motifs : requêtes, clés, valeurs, scores, poids et sorties."""
+    return {
+        "requetes": motifs(d.requetes),
+        "cles": motifs(d.cles),
+        "valeurs": motifs(d.valeurs),
+        "scores": motifs(d.scores),
+        "scores_echelles": motifs(d.scores_echelles),
+        "poids": motifs(d.poids),
+        "sorties": motifs(d.sorties),
+    }
+
+
+# Un exemple à virgule, pour l'ordre des sommes. Dans la phrase de l'animation, tout est entier
+# (des traits 0 ou 1, des matrices d'entiers) : chaque somme y est exacte, dans n'importe quel
+# ordre, et ne dit donc rien de l'ordre des opérations. Ici, 0,1 ou 0,3 ne s'écrivent pas
+# exactement en binaire : additionner la projection x · W, le score requête · clé ou le mélange
+# dans un autre ordre, ou multiplier par l'échelle dans la somme, change des bits
+# (test_l_exemple_flottant_voit_l_ordre_des_sommes le vérifie). 5 mots de 4 traits, une tête
+# de 3 (l'échelle 1 / √3 arrondit), des valeurs de 4.
+EXEMPLE_FLOTTANT = {
+    "x": (
+        (0.1, 0.2, 0.3, -0.4),
+        (0.7, -0.4, 0.5, 0.1),
+        (-0.3, 0.9, 0.2, 0.6),
+        (0.6, 0.1, -0.8, 0.3),
+        (0.2, -0.7, 0.4, 0.9),
+    ),
+    "wq": ((0.1, 0.2, 0.3), (0.4, -0.5, 0.6), (-0.7, 0.8, 0.9), (0.3, 0.1, -0.6)),
+    "wk": ((0.3, -0.1, 0.2), (0.5, 0.7, -0.3), (0.2, 0.6, 0.1), (-0.4, 0.3, 0.8)),
+    "wv": ((0.2, 0.3, -0.1, 0.6), (-0.6, 0.4, 0.7, 0.1), (0.9, -0.2, 0.3, -0.5), (0.1, 0.8, -0.4, 0.3)),
+}
+
+
+def calculer_attendus_flottant() -> dict:
+    """La clé « flottant » : les entrées de EXEMPLE_FLOTTANT en motifs, puis tout le détail de sa tête."""
+    e = EXEMPLE_FLOTTANT
+    d = detailler_tete(e["x"], e["wq"], e["wk"], e["wv"])
+    entrees = {cle: motifs(e[cle]) for cle in ("x", "wq", "wk", "wv")}
+    return {**entrees, **detail_en_attendus(d)}
+
+
 def calculer_attendus_attention() -> dict:
     """Les attendus de l'exemple d'attention (tests/attendus-attention.json) : tout le détail de chaque tête.
 
     Les scores masqués sont null ; les poids masqués valent +0,0 (motif 0000000000000000), comme dans le détail.
+    La clé « flottant » ajoute l'exemple à virgule, qui fixe l'ordre des sommes.
     """
     exemple = charger_exemple()
     tetes = []
     for tete, d in zip(exemple["tetes"], detailler_exemple(exemple)):
-        tetes.append({
-            "nom": tete["nom"],
-            "requetes": motifs(d.requetes),
-            "cles": motifs(d.cles),
-            "valeurs": motifs(d.valeurs),
-            "scores": motifs(d.scores),
-            "scores_echelles": motifs(d.scores_echelles),
-            "poids": motifs(d.poids),
-            "sorties": motifs(d.sorties),
-        })
-    return {"phrase": exemple["phrase"], "jetons": exemple["jetons"], "tetes": tetes}
+        tetes.append({"nom": tete["nom"], **detail_en_attendus(d)})
+    return {
+        "phrase": exemple["phrase"],
+        "jetons": exemple["jetons"],
+        "tetes": tetes,
+        "flottant": calculer_attendus_flottant(),
+    }
 
 
 # Chaque fichier tests/attendus-<nom>.json et la fonction qui le calcule.

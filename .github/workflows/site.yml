@@ -33,12 +33,17 @@ jobs:
       - run: npm ci
       - name: Tests unitaires (vitest)
         run: npx vitest run
-      - name: Navigateur de Playwright
-        run: npx playwright install --with-deps chromium
+      # Firefox et WebKit ne servent qu'au parcours de parité (e2e/parite.spec.ts) :
+      # la page d'essai y refait tous les attendus du Python, au bit près.
+      - name: Navigateurs de Playwright
+        run: npx playwright install --with-deps chromium firefox webkit
       # Playwright construit le site avec les pages d'essai et le sert lui-même
-      # (voir webServer dans site/playwright.config.ts).
+      # (voir webServer dans site/playwright.config.ts). FORGE_TOUS_NAVIGATEURS
+      # ajoute les projets parite-firefox et parite-webkit.
       - name: Parcours de test (Playwright)
         run: npx playwright test
+        env:
+          FORGE_TOUS_NAVIGATEURS: '1'
       - name: Rapport Playwright
         if: failure()
         uses: actions/upload-artifact@v7

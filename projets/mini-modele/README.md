@@ -121,7 +121,15 @@ dans les deux.
 
 `tests/attendus-attention.json` : tout le détail de l'exemple d'attention (voir
 plus bas), tête par tête. Les scores des cases masquées y sont `null`, et leurs
-poids valent `+0,0`.
+poids valent `+0,0`. Sa clé `flottant` ajoute un petit exemple à virgule (des
+entrées comme 0,1 ou 0,3, une tête de 3) : dans la phrase, tout est entier et
+chaque somme est exacte dans n'importe quel ordre, alors qu'ici, additionner
+dans un autre ordre change des bits.
+
+Ces quatre fichiers sont aussi refaits dans le navigateur, par la page d'essai
+de parité du site (`site/src/lib/mini-modele/parite.ts`, parcours
+`site/e2e/parite.spec.ts`) : dans Chrome, et en intégration continue dans
+Firefox et WebKit.
 
 ## L'exemple d'attention
 

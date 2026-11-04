@@ -1,0 +1,18 @@
+---
+partie: 1
+numero: "1.1"
+titre: "Page d'essai de la parité"
+chapeau: "Cette page sert aux parcours de test de la parité : ton navigateur refait les calculs du jumeau Python du mini-modèle, au bit près. Elle n'est jamais publiée."
+programme: "1 étape, aucun pari, moins d'une minute."
+acquis: []
+---
+
+import ControleParite from '../components/demos/ControleParite.svelte';
+
+<Etape numero={1} titre="Les mêmes bits que le Python">
+
+Ton navigateur refait ici tous les attendus du mini-modèle, pour que les parcours de test les comparent à ceux du Python, au bit près.
+
+<ControleParite client:load />
+
+</Etape>

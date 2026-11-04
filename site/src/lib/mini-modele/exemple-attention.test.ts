@@ -20,6 +20,7 @@ import {
   type DetailTete,
   type ExempleAttention,
 } from './exemple-attention';
+import { EXEMPLE_FLOTTANT } from './parite';
 
 const PHRASE = 'Le forgeron chauffe le fer puis il le tord';
 const TRAITS = ['déterminant', 'nom', 'verbe', 'pronom', 'sujet', 'objet', 'personne', 'chose'];
@@ -95,8 +96,20 @@ describe('jumeau du Python : attendus-attention.json, au bit près', () => {
     });
   });
 
+  it('l’exemple à virgule (clé « flottant ») : ses entrées et tout son détail, au bit près', () => {
+    // Dans la phrase, tout est entier et chaque somme est exacte dans n'importe quel ordre :
+    // cet exemple-ci fixe l'ordre des sommes de la projection, du score et du mélange.
+    const e = EXEMPLE_FLOTTANT;
+    const detail = detailEnAttendus('', detaillerTete(e.x, e.wq, e.wk, e.wv));
+    delete detail.nom;
+    expect({ x: motifs(e.x), wq: motifs(e.wq), wk: motifs(e.wk), wv: motifs(e.wv), ...detail }).toEqual(attendus.flottant);
+  });
+
   it('toutes les clés des attendus sont comparées', () => {
-    expect(Object.keys(attendus).sort()).toEqual(['jetons', 'phrase', 'tetes']);
+    expect(Object.keys(attendus).sort()).toEqual(['flottant', 'jetons', 'phrase', 'tetes']);
+    expect(Object.keys(attendus.flottant).sort()).toEqual(
+      ['x', 'wq', 'wk', 'wv', 'requetes', 'cles', 'valeurs', 'scores', 'scores_echelles', 'poids', 'sorties'].sort(),
+    );
     for (const t of attendus.tetes) {
       expect(Object.keys(t).sort()).toEqual(
         ['nom', 'requetes', 'cles', 'valeurs', 'scores', 'scores_echelles', 'poids', 'sorties'].sort(),

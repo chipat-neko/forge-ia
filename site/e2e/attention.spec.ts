@@ -412,6 +412,11 @@ test('accessibilité, largeur, typographie aux étapes 6 et 7', async ({ page })
 test('la carte défile au clavier, sans faire déborder la page', async ({ page }) => {
   await ouvrir(page);
   await allerA(page, 6);
+  // Les largeurs mesurées ici dépendent des polices : on attend qu'elles soient chargées
+  // (en intégration continue, Chromium sous Linux mesurerait sinon une police de secours).
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
   const region = regionCarte(page);
   await verifierZone(region, 'att-carte');
   const indice = anim(page).locator('[data-test="att-indice-defile"]');
@@ -436,7 +441,8 @@ test('la carte défile au clavier, sans faire déborder la page', async ({ page 
   const coupee = colonnes.find((c) => c.gauche < droite && c.fin > droite);
   expect(coupee, 'une colonne à cheval sur le bord droit').toBeDefined();
   expect(droite - coupee!.gauche, 'partie visible de la colonne coupée').toBeGreaterThanOrEqual(10);
-  expect(coupee!.fin - droite, 'partie cachée de la colonne coupée').toBeGreaterThanOrEqual(5);
+  // Au moins 2 px cachés : assez pour voir la coupe, avec de la marge pour l'arrondi des polices.
+  expect(coupee!.fin - droite, 'partie cachée de la colonne coupée').toBeGreaterThanOrEqual(2);
   // Au clavier : la flèche droite fait défiler la zone, et la page ne déborde toujours pas.
   await region.focus();
   await expect(region).toBeFocused();
