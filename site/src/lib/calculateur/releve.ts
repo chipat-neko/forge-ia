@@ -9,8 +9,14 @@
 //
 // Une quantité garde son nombre et son unité ensemble : l'espace entre les
 // deux est insécable (U+00A0), une ligne ne se coupe jamais entre « 5,9 » et
-// « jours ». Dans une formule, l'espace avant ×, ÷, + et = est insécable
-// aussi : une ligne ne commence jamais par un opérateur.
+// « jours ». Dans une formule, l'espace après ×, ÷, + et = est insécable
+// aussi : un opérateur reste avec le nombre qui le suit, jamais seul en fin
+// de ligne.
+//
+// Les octets se comptent comme la mémoire des cartes : 1 Go vaut 1 024³
+// octets (1 Mo, 1 024² ; 1 To, 1 024 Go). Les explications de « Voir le
+// calcul » le disent, et chaque étape affichée se refait à la main à partir
+// des nombres affichés (releve.test.ts le vérifie).
 //
 // Ce module est en TypeScript pur, sans import propre à Vite : les parcours
 // Playwright l'importent directement.
@@ -29,6 +35,7 @@ import {
   type Categorie,
   type Materiel,
   type PrixLocation,
+  type RepereEfficacite,
   type Source,
 } from './donnees';
 import {
@@ -71,10 +78,14 @@ import {
 
 const FINE = '\u202F';
 const INSECABLE = '\u00A0';
-const FOIS = `${INSECABLE}× `;
-const DIVISE = `${INSECABLE}÷ `;
-const PLUS = `${INSECABLE}+ `;
-const EGAL = `${INSECABLE}= `;
+const FOIS = ` ×${INSECABLE}`;
+const DIVISE = ` ÷${INSECABLE}`;
+const PLUS = ` +${INSECABLE}`;
+const EGAL = ` =${INSECABLE}`;
+/** La phrase qui dit l'unité des octets, dans les explications de la mémoire. */
+const OCTETS_BINAIRES =
+  `Ici, 1${INSECABLE}Go vaut 1${FINE}024³ octets, comme la mémoire des cartes${FINE}; ` +
+  `1${INSECABLE}Mo, 1${FINE}024² octets${FINE}; 1${INSECABLE}To, 1${FINE}024${INSECABLE}Go.`;
 
 /** Le texte d'une quantité, ses espaces rendues insécables : « 5,9 jours » ne se coupe plus. */
 const lie = (texte: string): string => texte.replace(/ /g, INSECABLE);
@@ -380,14 +391,17 @@ function debitJetons(j: number): string {
   return lie(`${nombre(j, decimales)} ${affiche < 2 ? 'jeton' : 'jetons'}`);
 }
 
-/** La ligne « Génération, au plus », ou null si la bande passante de la carte n'est pas connue. */
+/**
+ * La ligne « Génération, au plus » : le débit sur une carte, seulement si les
+ * poids en bf16 y tiennent ; sinon, combien de cartes il faut pour les loger.
+ * Null si la bande passante de la carte n'est pas connue.
+ */
 export function texteGeneration(rel: Releve): string | null {
   const g = rel.generation;
   if (g === null) return null;
-  const debit = `${debitJetons(g.jetonsParSeconde)} par seconde en bf16`;
-  if (g.cartesPourLesPoids <= 1) return `${debit}, sur une carte`;
+  if (g.cartesPourLesPoids <= 1) return `${debitJetons(g.jetonsParSeconde)} par seconde en bf16, sur une carte`;
   return (
-    `${debit} sur une carte, mais les poids n’y tiennent pas${FINE}: ` +
+    `pas sur une seule carte${FINE}: les poids en bf16 n’y tiennent pas, ` +
     `il faut au moins ${cartesTexte(g.cartesPourLesPoids)} de ${memoireCarte(rel.materiel)} pour les loger`
   );
 }
@@ -454,6 +468,28 @@ export function phraseRepere(rel: Releve): string | null {
 /** Une efficacité publiée : « 46,2 % », « 38 % ». */
 const pourcentPublie = (x: number): string => pourcent(x, decimalesUtiles(Number((x * 100).toFixed(6)), 1));
 
+/** Les efficacités d'un repère publié : « 46,2 % », « de 38 % à 43 % ». */
+const pourcentsPublies = (r: RepereEfficacite): string =>
+  r.min === r.max ? pourcentPublie(r.min) : `de ${pourcentPublie(r.min)} à ${pourcentPublie(r.max)}`;
+
+/** Un repère publié, pour la liste de leurs sources : son texte, sa définition et sa source. */
+export interface SourceRepere {
+  modele: string;
+  texte: string;
+  definition: string;
+  source: Source;
+}
+
+/** Les repères publiés (PaLM, Llama 3), chacun avec ses efficacités, sa définition et sa source datée. */
+export function sourcesDesReperes(): SourceRepere[] {
+  return REPERES_EFFICACITE.map((r) => ({
+    modele: r.modele,
+    texte: `${r.modele}, ${pourcentsPublies(r)} (${r.materiel})`,
+    definition: r.definition,
+    source: r.source,
+  }));
+}
+
 /**
  * La phrase qui compare ton IA aux grands entraînements publiés, en comptant
  * les opérations comme eux. La taille choisie si c'est une taille de ton IA,
@@ -462,9 +498,7 @@ const pourcentPublie = (x: number): string => pourcent(x, decimalesUtiles(Number
 export function phraseCommeLesGrands(rel: Releve): string {
   const cle = rel.modele.tonIA ?? 'tres_grand';
   const ligne = ligneRepere(cle);
-  const reperes = REPERES_EFFICACITE.map(
-    (r) => `${r.modele} (${r.min === r.max ? pourcentPublie(r.min) : `de ${pourcentPublie(r.min)} à ${pourcentPublie(r.max)}`})`,
-  );
+  const reperes = REPERES_EFFICACITE.map((r) => `${r.modele} (${pourcentsPublies(r)}${r.noteCourte === null ? '' : `, ${r.noteCourte}`})`);
   const avec = REPERES_EFFICACITE.every((r) => r.compteAttention);
   if (!avec) {
     throw new Error('Calculateur : un repère publié ne compte pas l’attention. Revoir la phrase de comparaison (releve.ts).');
@@ -477,9 +511,23 @@ export function phraseCommeLesGrands(rel: Releve): string {
   );
 }
 
-/** Ce que la ligne d'état annonce aux lecteurs d'écran après un réglage : la durée et la location. */
-export function annonce(rel: Releve): string {
-  return `Durée${FINE}: ${texteDuree(rel)}. Location${FINE}: ${texteLocation(rel)}.`;
+const CARTE_DE_LA_CATEGORIE: Readonly<Record<Categorie, string>> = {
+  'grand-public': 'd’une carte grand public',
+  colab: 'd’une carte de Colab',
+  'centre-de-donnees': 'd’une carte de centre de données',
+};
+
+/**
+ * Ce que la ligne d'état annonce aux lecteurs d'écran après un réglage : la
+ * durée et la location. Si l'efficacité vient de suivre la carte
+ * (`efficaciteSuivie`), elle le dit d'abord : « Efficacité : 40 %, celle
+ * d’une carte de centre de données. »
+ */
+export function annonce(rel: Releve, efficaciteSuivie = false): string {
+  const efficacite = efficaciteSuivie
+    ? `Efficacité${FINE}: ${pourcentRegle(rel.reglage.efficacitePourcent)}, celle ${CARTE_DE_LA_CATEGORIE[rel.materiel.categorie]}. `
+    : '';
+  return `${efficacite}Durée${FINE}: ${texteDuree(rel)}. Location${FINE}: ${texteLocation(rel)}.`;
 }
 
 // ---------- « Voir le calcul » ----------
@@ -491,6 +539,43 @@ export interface Formule {
   formule: string;
   explication: string;
   sources: readonly Source[];
+}
+
+/**
+ * D'où viennent les efficacités par défaut : celle des cartes grand public est
+ * proche de ce que ton IA tient sur ce PC, les autres sont dans la fourchette
+ * des grands entraînements publiés. Tout est calculé à partir des données.
+ */
+function explicationEfficaciteParDefaut(): string {
+  const d = EFFICACITE_PAR_DEFAUT;
+  let bas = REPERES_EFFICACITE[0].min;
+  let haut = REPERES_EFFICACITE[0].max;
+  for (const r of REPERES_EFFICACITE) {
+    if (r.min < bas) bas = r.min;
+    if (r.max > haut) haut = r.max;
+  }
+  const tonIA = ligneRepere('tres_grand').carte.efficacite;
+  return (
+    `Par défaut, le calculateur suppose ${pourcentPublie(d['grand-public'])} sur une carte grand public ` +
+    `(ton IA en tient ${pourcent(tonIA, 1)} sur ce PC), ${pourcentPublie(d.colab)} sur Colab et ` +
+    `${pourcentPublie(d['centre-de-donnees'])} en centre de données, dans la fourchette des grands entraînements publiés ` +
+    `(de ${pourcentPublie(bas)} à ${pourcentPublie(haut)}). Quand tu changes de carte, l’efficacité prend celle de sa catégorie, ` +
+    'tant que tu ne l’as pas réglée toi-même.'
+  );
+}
+
+/** Une énergie en kWh, toujours dans cette unité : « 42,8 kWh », « 8 640 kWh », « 1,87 million de kWh ». */
+function energieEnKwh(kwh: number): string {
+  if (Number(kwh.toFixed(1)) < 0.1) return lie('moins de 0,1 kWh');
+  if (Number(kwh.toFixed(1)) < 100) return lie(`${nombre(kwh, 1)} kWh`);
+  if (Number(kwh.toFixed(0)) < 1e6) return lie(`${nombre(kwh)} kWh`);
+  const enMillions = Number((kwh / 1e6).toPrecision(3)) < 1000;
+  const valeur = enMillions ? kwh / 1e6 : kwh / 1e9;
+  const trois = Number(valeur.toPrecision(3));
+  const decimales = trois < 10 ? 2 : trois < 100 ? 1 : 0;
+  const affiche = Number(valeur.toFixed(decimales));
+  const mot = enMillions ? (affiche < 2 ? 'million' : 'millions') : affiche < 2 ? 'milliard' : 'milliards';
+  return lie(`${nombre(valeur, decimales)} ${mot} de kWh`);
 }
 
 /** Chaque formule du relevé, avec ses nombres ; les deux efficacités mesurées quand le modèle est une taille de ton IA. */
@@ -517,8 +602,9 @@ export function formulesDuCalcul(rel: Releve): Formule[] {
       ` opérations par seconde${FOIS}${pourcentRegle(rel.reglage.efficacitePourcent)})${EGAL}${texteDuree(rel)}`,
     explication:
       `${crete(carte.creteTflops)} opérations par seconde, c’est la crête de calcul en bf16 d’une ${carte.nom}, sans sparsité. ` +
-      `L’efficacité dit quelle part de cette crête sert vraiment${FINE}; ici, elle compte 6 opérations par paramètre et par jeton, sans l’attention.`,
-    sources: [carte.source, ...SOURCES_FORMULES.efficacite],
+      `L’efficacité dit quelle part de cette crête sert vraiment${FINE}; ici, elle compte 6 opérations par paramètre et par jeton, sans l’attention. ` +
+      explicationEfficaciteParDefaut(),
+    sources: [carte.source, ...SOURCES_FORMULES.efficacite, ...REPERES_EFFICACITE.map((r) => r.source)],
   });
 
   const m = rel.memoire;
@@ -535,7 +621,8 @@ export function formulesDuCalcul(rel: Releve): Formule[] {
     explication:
       `Les 16 octets par paramètre${FINE}: les poids et les gradients en 16 bits, plus une copie des poids, la moyenne et la variance ` +
       `d’AdamW en 32 bits. Les 34 octets${FINE}: les activations d’une séquence de ${lie(`${nombre(f.contexte)} jetons`)}, ` +
-      `par couche et par dimension, sans la matrice de l’attention. C’est un minimum${FINE}: ni les logits, ni les tampons, ni la fragmentation.`,
+      `par couche et par dimension, sans la matrice de l’attention. C’est un minimum${FINE}: ni les logits, ni les tampons, ni la fragmentation. ` +
+      OCTETS_BINAIRES,
     sources: [...SOURCES_FORMULES.etats, ...SOURCES_FORMULES.activations],
   });
 
@@ -546,7 +633,7 @@ export function formulesDuCalcul(rel: Releve): Formule[] {
     cle: 'service',
     titre: 'La mémoire pour s’en servir',
     formule:
-      `${q(f.parametres)}${FOIS}2 octets${EGAL}${o(s.bf16)} en bf16, × 1${EGAL}${o(s.int8)} en int8, × 0,5${EGAL}${o(s.int4)} en int4${FINE}; ` +
+      `${q(f.parametres)}${FOIS}2 octets${EGAL}${o(s.bf16)} en bf16,${FOIS}1${EGAL}${o(s.int8)} en int8,${FOIS}0,5${EGAL}${o(s.int4)} en int4${FINE}; ` +
       `cache${FINE}: 2${FOIS}2${FOIS}${nombre(f.couches)} couches${FOIS}${nombre(f.tetesKv)} têtes${FOIS}${nombre(dTete)}` +
       `${FOIS}${lie(`${nombre(s.jetonsDuCache)} jetons`)}${EGAL}${o(s.cache)}`,
     explication:
@@ -555,20 +642,29 @@ export function formulesDuCalcul(rel: Releve): Formule[] {
         groupee
           ? `Avec l’attention groupée, seules ${nombre(f.tetesKv)} têtes sur ${nombre(f.tetes)} gardent leurs clés et leurs valeurs.`
           : `Chacune des ${nombre(f.tetes)} têtes garde ses clés et ses valeurs, de ${nombre(dTete)} nombres chacune.`
-      }`,
+      } ${OCTETS_BINAIRES}`,
     sources: SOURCES_FORMULES.cacheKv,
   });
 
-  if (rel.generation !== null && carte.bandePassanteGoS !== null) {
+  const g = rel.generation;
+  if (g !== null && carte.bandePassanteGoS !== null) {
+    const tiennent = g.cartesPourLesPoids <= 1;
+    const bande = `${nombre(carte.bandePassanteGoS)}${FINE}×${FINE}${dixPuissance(9)} octets par seconde`;
     formules.push({
       cle: 'generation',
       titre: 'La génération, au plus',
-      formule:
-        `${nombre(carte.bandePassanteGoS)}${FINE}×${FINE}${dixPuissance(9)} octets par seconde${DIVISE}` +
-        `${q(s.bf16)} d’octets${EGAL}${debitJetons(rel.generation.jetonsParSeconde)} par seconde`,
+      formule: tiennent
+        ? `${bande}${DIVISE}${o(s.bf16)}${EGAL}${debitJetons(g.jetonsParSeconde)} par seconde`
+        : `${o(s.bf16)}${DIVISE}${memoireCarte(carte)}${EGAL}au moins ${cartesTexte(g.cartesPourLesPoids)}`,
       explication:
-        `À chaque jeton qu’elle écrit, la carte relit tous les poids${FINE}: la bande passante de sa mémoire borne le débit, ` +
-        'pour une seule conversation à la fois.',
+        `À chaque jeton qu’elle écrit, une carte relit tous les poids qu’elle garde${FINE}: la bande passante de sa mémoire borne le débit, ` +
+        'pour une seule conversation à la fois. ' +
+        (tiennent
+          ? `La bande passante vient de la fiche de la carte, en octets décimaux${FINE}: ${lie(`${nombre(carte.bandePassanteGoS)} Go/s`)}, ` +
+            `soit ${bande}. Les poids en bf16 sont ceux de la mémoire pour s’en servir, où 1${INSECABLE}Mo vaut ` +
+            `1${FINE}024² octets et 1${INSECABLE}Go, 1${FINE}024³.`
+          : `Ici, les poids en bf16 ne tiennent pas sur une seule carte${FINE}: il faudrait les répartir sur plusieurs, et le débit ` +
+            'dépendrait de la façon de les relier. Le calculateur ne le chiffre pas.'),
       sources: SOURCES_FORMULES.generation,
     });
   }
@@ -579,9 +675,11 @@ export function formulesDuCalcul(rel: Releve): Formule[] {
       titre: 'L’électricité',
       formule:
         `${lie(`${nombre(carte.puissanceW)} W`)}${FOIS}${cartesTexte(rel.reglage.cartes)}${FOIS}${texteDuree(rel)}${EGAL}` +
-        `${lie(formaterEnergie(rel.electricite.kwh))}${FINE}; × ${lie(`${nombre(ELECTRICITE.eurParKwh, decimalesUtiles(ELECTRICITE.eurParKwh))} €`)} le kWh` +
+        `${energieEnKwh(rel.electricite.kwh)}${FINE};${FOIS}${lie(`${nombre(ELECTRICITE.eurParKwh, decimalesUtiles(ELECTRICITE.eurParKwh))} €`)} le kWh` +
         `${EGAL}${lie(formaterEuros(rel.electricite.euros))}`,
-      explication: `La puissance maximale de la carte, sans le reste du PC, au prix du kWh ${ELECTRICITE.libelle.replace(/^EDF, /, 'd’EDF, ')}.`,
+      explication:
+        `La puissance maximale de la carte, sans le reste du PC (1${INSECABLE}kWh, c’est 1${FINE}000${INSECABLE}W pendant une heure), ` +
+        `au prix du kWh ${ELECTRICITE.libelle.replace(/^EDF, /, 'd’EDF, ')}.`,
       sources: [ELECTRICITE.source],
     });
   }
@@ -595,12 +693,12 @@ export function formulesDuCalcul(rel: Releve): Formule[] {
       titre: 'La location',
       formule:
         `${lie(formaterHeures(l.heures))}${FOIS}${cartesTexte(rel.reglage.cartes)}${FOIS}${fourchette(formaterPrix(premier), formaterPrix(dernier))}` +
-        `${EGAL}${fourchette(formaterDollars(l.usdMin), formaterDollars(l.usdMax))}${FINE}; ` +
-        `÷ ${nombre(TAUX_DE_CHANGE.usdPourUnEur, decimalesUtiles(TAUX_DE_CHANGE.usdPourUnEur))}${EGAL}` +
+        `${EGAL}${fourchette(formaterDollars(l.usdMin), formaterDollars(l.usdMax))}${FINE};` +
+        `${DIVISE}${nombre(TAUX_DE_CHANGE.usdPourUnEur, decimalesUtiles(TAUX_DE_CHANGE.usdPourUnEur))}${EGAL}` +
         `${fourchette(formaterEuros(l.eurMin), formaterEuros(l.eurMax))}`,
       explication:
         'Le prix par carte et par heure, hors taxes, du loueur le moins cher au plus cher, puis en euros au taux de la BCE. ' +
-        `Deux fois plus de cartes, c’est deux fois moins longtemps${FINE}: le prix ne change pas.`,
+        `Deux fois plus de cartes, c’est deux fois moins longtemps${FINE}: le prix ne change pas, à efficacité égale.`,
       sources: [TAUX_DE_CHANGE.source],
     });
   }

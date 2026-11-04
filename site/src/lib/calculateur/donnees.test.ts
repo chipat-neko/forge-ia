@@ -49,7 +49,7 @@ function textesVisibles(): [string, string][] {
     textes.push([m.id, m.nom]);
     if (m.note) textes.push([m.id, m.note]);
   }
-  for (const r of REPERES_EFFICACITE) textes.push([r.modele, r.modele], [r.modele, r.materiel], [r.modele, r.definition]);
+  for (const r of REPERES_EFFICACITE) textes.push([r.modele, r.modele], [r.modele, r.materiel], [r.modele, r.definition], [r.modele, r.noteCourte ?? '']);
   textes.push(['électricité', ELECTRICITE.libelle]);
   for (const [lieu, s] of toutesLesSources()) textes.push([lieu, s.titre]);
   return textes;
@@ -248,6 +248,8 @@ describe('le taux de change, l’électricité et les efficacités', () => {
     expect(REPERES_EFFICACITE[0].definition).toMatch(/12·L·H·Q·T/);
     expect(REPERES_EFFICACITE[1].definition).toMatch(/^Section 3\.3\.2/);
     expect(REPERES_EFFICACITE[1].definition).toMatch(/Chowdhery/);
+    // Llama 3 ne compte l'attention que par renvoi à PaLM : la phrase de comparaison le dit.
+    expect(REPERES_EFFICACITE.map((r) => r.noteCourte)).toEqual([null, 'avec la définition de PaLM']);
   });
 
   it('chaque formule a ses sources (article et section ou équation)', () => {

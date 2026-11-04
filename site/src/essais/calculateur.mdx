@@ -9,7 +9,7 @@ acquis:
     texte: "Entraîner un modèle demande environ 6 opérations par paramètre et par jeton lu."
     ou: "à l'étape 1, au pari"
   - cle: cout
-    texte: "Louer plus de cartes ne change pas le prix d'un entraînement : deux fois plus de cartes, c'est deux fois moins longtemps."
+    texte: "Louer plus de cartes ne change pas le prix d'un entraînement, à efficacité égale : deux fois plus de cartes, c'est deux fois moins longtemps."
     ou: "à l'étape 2, au pari sur le coût"
   - cle: calcul
     texte: "La durée, la mémoire et le prix d'un entraînement se calculent à partir de quelques nombres : paramètres, jetons, cartes et efficacité."
@@ -66,7 +66,7 @@ Règle la phrase : le modèle, le nombre de jetons qu'il lit pour chacun de ses 
 
 <p>{`Sur une seule ${h100.nom} à ${pourcent(EFFICACITE_PARI_H100)} d’efficacité, ton IA demande ${formaterDuree(cout.secondes)}. Aux prix relevés le ${releveH100}, ${fourchette(formaterPrix(cout.usdParHeureMin), formaterPrix(cout.usdParHeureMax))} par carte et par heure, cela fait ${fourchette(formaterEuros(cout.eurMin), formaterEuros(cout.eurMax))}.`}</p>
 
-Avec 8 cartes, c'est 8 fois plus court, pour le même prix. Essaie-le dans le calculateur : choisis la H100 SXM, puis double le nombre de cartes.
+Avec 8 cartes, c'est 8 fois plus court, pour le même prix à efficacité égale. Essaie-le dans le calculateur : choisis la H100 SXM, puis double le nombre de cartes.
 
 </Pari>
 

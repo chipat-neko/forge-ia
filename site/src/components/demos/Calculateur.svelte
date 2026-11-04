@@ -19,7 +19,9 @@
   //
   // L'efficacité part de la valeur par défaut de la catégorie de la carte
   // (50 % pour une carte grand public, 40 % sinon), et la suit quand le
-  // lecteur change de carte, tant qu'il ne l'a pas réglée lui-même.
+  // lecteur change de carte, tant qu'il ne l'a pas réglée lui-même. Le
+  // composant le sait par un drapeau, posé dès que le canal de l'efficacité
+  // change sans lui. Quand elle suit la carte, la ligne d'état le dit.
   //
   // Sans JavaScript : la phrase, le relevé du réglage de départ, les
   // formules dépliées, le repère et les sources sont dans le HTML ; les
@@ -30,11 +32,11 @@
   // Les réglages restent désactivés tant que le verrou n'est pas ouvert, et
   // l'acquis est annoncé (forge:acquis) au premier changement de modèle ou
   // de carte. Le plan 5 l'ouvrira déjà réglé avec `initial`.
-  import { untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { readable } from 'svelte/store';
   import { canal, ouverture } from '../../lib/canal';
   import { decimalesUtiles, nombre } from '../../lib/nombres';
-  import { ELECTRICITE, TAUX_DE_CHANGE, type Source } from '../../lib/calculateur/donnees';
+  import { ELECTRICITE, materiel as materielDe, TAUX_DE_CHANGE, type Source } from '../../lib/calculateur/donnees';
   import { formaterDate, formaterPrix } from '../../lib/calculateur/formats';
   import {
     annonce,
@@ -51,6 +53,7 @@
     phraseCommeLesGrands,
     phraseRepere,
     reglageDeDepart,
+    sourcesDesReperes,
     texteCalcul,
     texteDuree,
     texteElectricite,
@@ -96,8 +99,12 @@
   let modele = $state(depart.modele);
   let materiel = $state(depart.materiel);
   let voirCalcul = $state(false);
-  // L'efficacité posée d'office (celle de la catégorie), tant que le lecteur ne l'a pas réglée ; null ensuite.
-  let efficaciteSuivie: number | null = untrack(() => (initial?.efficacite === undefined ? depart.efficacitePourcent : null));
+  // Vrai dès que le lecteur a réglé l'efficacité (ou si `initial` la donne) : elle ne suit plus la carte.
+  let efficaciteReglee = untrack(() => initial?.efficacite !== undefined);
+  // Vrai pendant que le calculateur pose lui-même l'efficacité : ce n'est pas le lecteur.
+  let poseParLeCalculateur = false;
+  // Vrai si l'efficacité vient de suivre la carte : la prochaine annonce le dit.
+  let efficaciteAAnnoncer = false;
 
   const rel = $derived(
     calculerReleve({
@@ -113,17 +120,32 @@
   const repere = $derived(phraseRepere(rel));
   const formules = $derived(formulesDuCalcul(rel));
   const lignes = lignesReperes();
+  const sourcesReperes = sourcesDesReperes();
 
   // La ligne d'état ne parle qu'après un réglage du lecteur, pas au chargement.
   let etat = $state('');
   let premierPassage = true;
   $effect(() => {
-    const texte = annonce(rel);
+    const r = rel;
     if (premierPassage) {
       premierPassage = false;
       return;
     }
-    etat = texte;
+    const suivie = efficaciteAAnnoncer;
+    efficaciteAAnnoncer = false;
+    etat = annonce(r, suivie);
+  });
+
+  onMount(() => {
+    // Le canal prévient tout de suite avec sa valeur : ce premier appel n'est pas un réglage.
+    let premier = true;
+    return efficaciteCanal.subscribe(() => {
+      if (premier) {
+        premier = false;
+        return;
+      }
+      if (!poseParLeCalculateur) efficaciteReglee = true;
+    });
   });
 
   function annoncerAcquis(): void {
@@ -144,11 +166,12 @@
     const nouveau = (evenement.currentTarget as HTMLSelectElement).value;
     materiel = nouveau;
     // L'efficacité suit la catégorie de la carte, tant que le lecteur ne l'a pas réglée.
-    if (efficaciteSuivie !== null && efficaciteCanal.get() === efficaciteSuivie) {
-      efficaciteSuivie = efficaciteParDefautPourcent(nouveau);
-      efficaciteCanal.set(efficaciteSuivie);
-    } else {
-      efficaciteSuivie = null;
+    const defaut = efficaciteParDefautPourcent(nouveau);
+    if (!efficaciteReglee && efficaciteCanal.get() !== defaut) {
+      poseParLeCalculateur = true;
+      efficaciteCanal.set(defaut);
+      poseParLeCalculateur = false;
+      efficaciteAAnnoncer = true;
     }
     annoncerAcquis();
   }
@@ -157,7 +180,10 @@
   const texteCartes = (i: number) => nombre(CARTES_PROPOSEES[i]);
   const texteEfficacite = (p: number) => `${nombre(p)}${FINE}%`;
   const date = (s: Source) => `relevé le ${formaterDate(s.releveLe)}`;
+  /** Un nombre et son unité, liés par une espace insécable : « 2,69 $ ». */
+  const lie = (texte: string) => texte.replace(/ /g, INSECABLE);
   const mesures = MESURES_TON_IA.tres_grand.source;
+  const materielDesMesures = materielDe(MATERIEL_DES_MESURES).nom;
   const mesuresMini = MESURES_TON_IA.mini.source;
 </script>
 
@@ -302,15 +328,14 @@
     {/each}
   </div>
 
-  <p class="titre-tableau" id="{id}-reperes">Repère mesuré{FINE}: ton IA sur ce PC</p>
+  <h3 class="titre-section">Repère mesuré{FINE}: ton IA sur ce PC</h3>
   <p class="intro-reperes">
-    Les débits de ton IA, mesurés pendant son entraînement sur la carte de ce PC (une {rel.materiel.id === MATERIEL_DES_MESURES
-      ? 'RTX 5070 Ti, celle du réglage de départ'
-      : 'RTX 5070 Ti'}) et sur son processeur, et la durée qu’on en tire pour {nombre(JETONS_PAR_PARAMETRE)} jetons par paramètre.
+    Les débits de ton IA, mesurés pendant son entraînement sur la carte (une {materielDesMesures}, celle de ce PC) et sur
+    le processeur, et la durée qu’on en tire pour {nombre(JETONS_PAR_PARAMETRE)} jetons par paramètre.
   </p>
   <p class="indice-defile">Fais défiler le tableau vers la droite pour voir les autres colonnes.</p>
-  <div class="defile" role="region" aria-labelledby="{id}-reperes" tabindex="0" data-test="calc-reperes">
-    <table class="reperes" aria-labelledby="{id}-reperes">
+  <div class="defile" role="region" aria-label="Débits mesurés, défilable" tabindex="0" data-test="calc-reperes">
+    <table class="reperes">
       <thead>
         <tr>
           <td rowspan="2"></td>
@@ -340,13 +365,20 @@
     </table>
   </div>
   <p class="comme-les-grands" data-test="calc-comme-les-grands">{phraseCommeLesGrands(rel)}</p>
+  <ul class="sources-reperes" data-test="calc-sources-reperes">
+    {#each sourcesReperes as r (r.modele)}
+      <li data-repere={r.modele}>
+        {r.texte}{FINE}: <a href={r.source.url}>{r.source.titre}</a>, {date(r.source)}. {r.definition}
+      </li>
+    {/each}
+  </ul>
   <p class="source-mesures">
     Mesures du 3 novembre 2026{FINE}: <a href={mesures.url}>le rapport de mesure</a>, et
     <a href={mesuresMini.url}>la configuration de la version courte</a> pour «{FINE}mini{FINE}».
   </p>
 
   <div class="liste-sources" data-test="calc-sources">
-    <p class="titre-tableau">Les sources</p>
+    <h3 class="titre-section">Les sources</h3>
     <ul>
       <li data-source="materiel">
         La carte, {rel.materiel.nom}{FINE}: {#each [rel.materiel.source, ...(rel.materiel.autresSources ?? [])] as s, i (i)}{#if i > 0}{`${FINE}; `}{/if}<a
@@ -365,18 +397,18 @@
       {#if rel.location !== null}
         {#each rel.location.prix as p, i (i)}
           <li data-prix={i}>
-            <a href={p.source.url}>{p.fournisseur}, {p.offre}</a>{FINE}: {formaterPrix(p.usdParHeure)} par carte et par heure, hors
-            taxes, {date(p.source)}.
+            <a href={p.source.url}>{p.fournisseur}, {p.offre}</a>{FINE}: {lie(formaterPrix(p.usdParHeure))} par carte et par
+            heure, hors taxes, {date(p.source)}.
           </li>
         {/each}
         <li data-source="change">
-          Le taux de change{FINE}: 1 € = {nombre(TAUX_DE_CHANGE.usdPourUnEur, decimalesUtiles(TAUX_DE_CHANGE.usdPourUnEur))} $,
+          Le taux de change{FINE}: 1{INSECABLE}€ = {nombre(TAUX_DE_CHANGE.usdPourUnEur, decimalesUtiles(TAUX_DE_CHANGE.usdPourUnEur))}{INSECABLE}$,
           <a href={TAUX_DE_CHANGE.source.url}>{TAUX_DE_CHANGE.source.titre}</a>, {date(TAUX_DE_CHANGE.source)}.
         </li>
       {/if}
       {#if electricite !== null}
         <li data-source="electricite">
-          L’électricité{FINE}: {nombre(ELECTRICITE.eurParKwh, decimalesUtiles(ELECTRICITE.eurParKwh))} € le kWh,
+          L’électricité{FINE}: {nombre(ELECTRICITE.eurParKwh, decimalesUtiles(ELECTRICITE.eurParKwh))}{INSECABLE}€ le kWh,
           <a href={ELECTRICITE.source.url}>{ELECTRICITE.source.titre}</a>, {date(ELECTRICITE.source)}.
         </li>
       {/if}
@@ -482,8 +514,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  caption,
-  .titre-tableau {
+  caption {
     caption-side: top;
     text-align: left;
     font-family: var(--titres);
@@ -628,8 +659,13 @@
 
   /* ---------- Le repère mesuré ---------- */
 
-  .titre-tableau {
-    margin-top: 1.2em;
+  /* « Repère mesuré » et « Les sources » : de vrais titres, sous celui de l'étape. */
+  .titre-section {
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 20px;
+    line-height: 1.25;
+    margin: 1.4em 0 0.35em;
   }
 
   .intro-reperes {
@@ -654,6 +690,7 @@
   }
 
   .reperes {
+    min-width: 100%;
     font-size: 15px;
     border-top: 2px solid var(--indigo);
   }
@@ -715,7 +752,23 @@
     margin: 0 0 6px;
   }
 
+  .sources-reperes {
+    list-style: none;
+    margin: 0 0 8px;
+    padding: 0;
+  }
+
+  .sources-reperes li {
+    padding: 3px 0;
+  }
+
+  .sources-reperes a,
+  .source-mesures a {
+    color: var(--indigo);
+  }
+
   .source-mesures,
+  .sources-reperes,
   .avertissement {
     font-family: var(--titres);
     font-size: 14px;
@@ -727,7 +780,7 @@
   /* ---------- Les sources ---------- */
 
   .liste-sources {
-    margin: 0.6em 0 0;
+    margin: 0.4em 0 0;
   }
 
   .liste-sources ul {

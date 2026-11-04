@@ -246,12 +246,13 @@ describe('formaterHeures', () => {
 });
 
 describe('formaterDate', () => {
-  it('une date de relevé en toutes lettres, « 1er » le premier du mois', () => {
-    expect(formaterDate('2026-11-03')).toBe('3 novembre 2026');
-    expect(formaterDate('2026-11-04')).toBe('4 novembre 2026');
-    expect(formaterDate('2026-08-01')).toBe('1er août 2026');
-    expect(formaterDate('2026-02-28')).toBe('28 février 2026');
-    expect(formaterDate('2025-12-31')).toBe('31 décembre 2025');
+  it('une date de relevé en toutes lettres, « 1er » le premier du mois, le jour lié au mois', () => {
+    const J = '\u00A0';
+    expect(formaterDate('2026-11-03')).toBe(`3${J}novembre 2026`);
+    expect(formaterDate('2026-11-04')).toBe(`4${J}novembre 2026`);
+    expect(formaterDate('2026-08-01')).toBe(`1er${J}août 2026`);
+    expect(formaterDate('2026-02-28')).toBe(`28${J}février 2026`);
+    expect(formaterDate('2025-12-31')).toBe(`31${J}décembre 2025`);
   });
 
   it('refuse ce qui n’est pas une vraie date AAAA-MM-JJ', () => {

@@ -8,7 +8,7 @@
 // nombre n'est recopié.
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { nombre, pourcent } from '../src/lib/nombres';
-import { fourchettePrix, materiel } from '../src/lib/calculateur/donnees';
+import { fourchettePrix, materiel, REPERES_EFFICACITE } from '../src/lib/calculateur/donnees';
 import { formaterDate, formaterDuree, formaterPrix, formaterPuissanceDeDix, formaterQuantite } from '../src/lib/calculateur/formats';
 import { dureeSecondes, efficaciteMesuree, efficaciteMesureeAvecAttention, operationsEntrainement } from '../src/lib/calculateur/formules';
 import { PRESETS_FORGE } from '../src/lib/calculateur/ton-ia';
@@ -192,18 +192,33 @@ test('au clavier : tous les réglages', async ({ page }) => {
   await expect(etat(page)).not.toBeFocused();
 });
 
-test('l’efficacité suit la catégorie de la carte, tant qu’on ne l’a pas réglée', async ({ page }) => {
+test('l’efficacité suit la catégorie de la carte, tant qu’on ne l’a pas réglée, et la ligne d’état le dit', async ({ page }) => {
   await ouvrir(page);
   const efficacite = t(page, 'calc-efficacite');
   await t(page, 'calc-materiel').selectOption('h100-sxm');
   await expect(efficacite).toHaveAttribute('aria-valuetext', `40${F}%`);
+  await expect(etat(page)).toContainText(`Efficacité${F}: 40${F}%, celle d’une carte de centre de données.`);
   await t(page, 'calc-materiel').selectOption('rtx-5090');
   await expect(efficacite).toHaveAttribute('aria-valuetext', `50${F}%`);
+  await expect(etat(page)).toContainText(`Efficacité${F}: 50${F}%, celle d’une carte grand public.`);
+  // Une carte de la même catégorie : l'efficacité ne bouge pas, l'annonce n'en parle pas.
+  await t(page, 'calc-materiel').selectOption('rtx-4090');
+  await expect(etat(page)).toContainText('Durée');
+  await expect(etat(page)).not.toContainText('Efficacité');
+  // Le lecteur la règle, puis revient à 50 % : elle reste à lui, même revenue à la valeur par défaut.
   await efficacite.focus();
   await page.keyboard.press('ArrowRight');
   await expect(efficacite).toHaveAttribute('aria-valuetext', `51${F}%`);
+  await page.keyboard.press('ArrowLeft');
+  await expect(efficacite).toHaveAttribute('aria-valuetext', `50${F}%`);
   await t(page, 'calc-materiel').selectOption('h100-sxm');
-  await expect(efficacite).toHaveAttribute('aria-valuetext', `51${F}%`);
+  await expect(efficacite).toHaveAttribute('aria-valuetext', `50${F}%`);
+  const h100 = dureeSecondes(operationsEntrainement(N, 20 * N), materiel('h100-sxm').creteTflops, 0.5, 1);
+  await expect(etat(page)).toContainText(`Durée${F}: ${formaterDuree(h100)}`);
+  await expect(etat(page)).not.toContainText('Efficacité');
+  // L'explication de la durée donne les valeurs par défaut et leur base.
+  await t(page, 'calc-voir').click();
+  await expect(t(page, 'calc-formules').locator('[data-formule="duree"]')).toContainText('Par défaut, le calculateur suppose 50');
 });
 
 test('chaque prix affiché a sa source et sa date', async ({ page }) => {
@@ -239,6 +254,17 @@ test('chaque prix affiché a sa source et sa date', async ({ page }) => {
   const b200 = materiel('b200');
   await expect(sources.locator('[data-source="materiel"] a')).toHaveCount(2);
   await expect(sources.locator('[data-source="materiel"]')).toContainText(`relevé le ${formaterDate(b200.autresSources![0].releveLe)}`);
+  // Les repères publiés (PaLM, Llama 3) : chacun sa source, sa date et sa définition.
+  const reperes = t(page, 'calc-sources-reperes').locator('[data-repere]');
+  await expect(reperes).toHaveCount(REPERES_EFFICACITE.length);
+  for (let i = 0; i < REPERES_EFFICACITE.length; i++) {
+    const r = REPERES_EFFICACITE[i];
+    await expect(reperes.nth(i)).toContainText(r.modele);
+    await expect(reperes.nth(i).locator('a')).toHaveAttribute('href', r.source.url);
+    await expect(reperes.nth(i)).toContainText(`relevé le ${formaterDate(r.source.releveLe)}`);
+    await expect(reperes.nth(i)).toContainText(r.definition);
+  }
+  await expect(t(page, 'calc-comme-les-grands')).toContainText('avec la définition de PaLM');
   // Un modèle public : sa source, datée elle aussi.
   await t(page, 'calc-modele').selectOption('llama-3-405b');
   await expect(sources.locator('[data-source="modele"] a').first()).toHaveAttribute('href', 'https://arxiv.org/abs/2407.21783');
@@ -265,6 +291,10 @@ test('« Voir le calcul » déplie les formules', async ({ page }) => {
   const efficacites = formules.locator('[data-formule="efficacites"]');
   await expect(efficacites).toContainText(pourcent(efficaciteMesuree(N, 17_855, 87.9), 1));
   await expect(efficacites).toContainText(pourcent(efficaciteMesureeAvecAttention(PRESETS_FORGE.tres_grand, 17_855, 87.9), 1));
+  // Les unités des octets sont dites, et la génération divise par la mémoire des poids affichée plus haut.
+  await expect(formules.locator('[data-formule="memoire"]')).toContainText('Ici, 1 Go vaut 1 024³ octets, comme la mémoire des cartes');
+  await expect(formules.locator('[data-formule="service"]')).toContainText('Ici, 1 Go vaut 1 024³ octets');
+  await expect(formules.locator('[data-formule="generation"]')).toContainText('÷ 827 Mo =');
   // Chaque formule a au moins une source.
   for (const f of await formules.locator('[data-formule]').all()) await expect(f.locator('a[href^="https://"]').first()).toBeVisible();
   // Un modèle public : pas d'efficacité mesurée ; une carte louée : la location.
@@ -344,7 +374,10 @@ test('accessibilité, largeur, typographie', async ({ page }) => {
     expect(boite.width, nom).toBeGreaterThanOrEqual(24);
   }
   // Le tableau des repères défile dans sa zone, focalisable, sans faire déborder la page.
-  const zone = calc(page).getByRole('region', { name: /Repère mesuré/ });
+  // « Repère mesuré » et « Les sources » sont de vrais titres, sous celui de l'étape ; la zone qui défile a son propre nom.
+  await expect(calc(page).getByRole('heading', { level: 3, name: /^Repère mesuré\s*: ton IA sur ce PC$/ })).toHaveCount(1);
+  await expect(calc(page).getByRole('heading', { level: 3, name: 'Les sources' })).toHaveCount(1);
+  const zone = calc(page).getByRole('region', { name: 'Débits mesurés, défilable' });
   await expect(zone).toHaveAttribute('tabindex', '0');
   await expect(zone).toHaveCSS('overflow-x', 'auto');
   // La ligne d'état n'a jamais pris le focus.

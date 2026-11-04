@@ -81,6 +81,8 @@ export interface RepereEfficacite {
   compteAttention: boolean;
   /** Où et comment la source dit compter les opérations. */
   definition: string;
+  /** Ce que la phrase de comparaison ajoute après les pourcentages, quand la définition n'est pas celle de la source elle-même ; null sinon. */
+  noteCourte: string | null;
   source: Source;
 }
 
@@ -357,6 +359,7 @@ export const REPERES_EFFICACITE: readonly RepereEfficacite[] = Object.freeze([
     definition:
       `Annexe B${FINE}: 6N + 12·L·H·Q·T opérations par jeton, l’attention comprise (sans remise pour le masque causal), ` +
       'rapportées à la crête des puces.',
+    noteCourte: null,
     source: primaire(
       `Chowdhery et al., «${FINE}PaLM: Scaling Language Modeling with Pathways${FINE}» (arXiv 2204.02311), section 4.1 et tableau 3`,
       'https://arxiv.org/abs/2204.02311',
@@ -371,6 +374,7 @@ export const REPERES_EFFICACITE: readonly RepereEfficacite[] = Object.freeze([
     definition:
       `Section 3.3.2${FINE}: l’article définit son efficacité («${FINE}BF16 Model FLOPs Utilization${FINE}») par renvoi à ` +
       `PaLM (Chowdhery et al., 2023), sans donner sa propre formule${FINE}: il compte donc l’attention, comme PaLM.`,
+    noteCourte: 'avec la définition de PaLM',
     source: primaire(
       `Llama Team (Meta), «${FINE}The Llama 3 Herd of Models${FINE}» (arXiv 2407.21783), section 3.3.2 et tableau 4`,
       'https://arxiv.org/abs/2407.21783',

@@ -220,7 +220,10 @@ const MOIS = [
   'décembre',
 ] as const;
 
-/** Une date de relevé (AAAA-MM-JJ) en toutes lettres : « 3 novembre 2026 », « 1er août 2026 ». */
+/**
+ * Une date de relevé (AAAA-MM-JJ) en toutes lettres : « 3 novembre 2026 », « 1er août 2026 ».
+ * Le jour et le mois sont liés par une espace insécable : une ligne ne les sépare pas.
+ */
 export function formaterDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   const date = m ? new Date(`${iso}T00:00:00Z`) : null;
@@ -228,5 +231,5 @@ export function formaterDate(iso: string): string {
     throw new RangeError(`formaterDate : «${FINE}${iso}${FINE}» n’est pas une date AAAA-MM-JJ du calendrier. Corrige la date de relevé.`);
   }
   const jour = Number(m[3]);
-  return `${jour === 1 ? '1er' : String(jour)} ${MOIS[Number(m[2]) - 1]} ${m[1]}`;
+  return `${jour === 1 ? '1er' : String(jour)}\u00A0${MOIS[Number(m[2]) - 1]} ${m[1]}`;
 }
