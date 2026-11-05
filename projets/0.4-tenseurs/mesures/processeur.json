@@ -1,0 +1,87 @@
+{
+ "version": 1,
+ "releve_le": "2026-11-05",
+ "appareil": "cpu",
+ "nom": "AMD Ryzen 7 9800X3D 8-Core Processor",
+ "torch": "2.15.0+cpu",
+ "fils_par_defaut": 8,
+ "fils_max": 16,
+ "mesures": [
+  {
+   "taille": 64,
+   "fils": 1,
+   "millisecondes": 0.0077
+  },
+  {
+   "taille": 64,
+   "fils": 8,
+   "millisecondes": 0.0074
+  },
+  {
+   "taille": 64,
+   "fils": 16,
+   "millisecondes": 0.0301
+  },
+  {
+   "taille": 256,
+   "fils": 1,
+   "millisecondes": 0.2532
+  },
+  {
+   "taille": 256,
+   "fils": 8,
+   "millisecondes": 0.0744
+  },
+  {
+   "taille": 256,
+   "fils": 16,
+   "millisecondes": 0.0931
+  },
+  {
+   "taille": 1024,
+   "fils": 1,
+   "millisecondes": 17.48
+  },
+  {
+   "taille": 1024,
+   "fils": 8,
+   "millisecondes": 3.517
+  },
+  {
+   "taille": 1024,
+   "fils": 16,
+   "millisecondes": 3.195
+  },
+  {
+   "taille": 2048,
+   "fils": 1,
+   "millisecondes": 135.1
+  },
+  {
+   "taille": 2048,
+   "fils": 8,
+   "millisecondes": 25.83
+  },
+  {
+   "taille": 2048,
+   "fils": 16,
+   "millisecondes": 23.1
+  },
+  {
+   "taille": 4096,
+   "fils": 1,
+   "millisecondes": 1066.0
+  },
+  {
+   "taille": 4096,
+   "fils": 8,
+   "millisecondes": 192.3
+  },
+  {
+   "taille": 4096,
+   "fils": 16,
+   "millisecondes": 160.0
+  }
+ ],
+ "transfert_ms": null
+}
