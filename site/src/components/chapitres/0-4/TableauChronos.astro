@@ -14,7 +14,8 @@
 //
 // Le tableau est plus large qu'un téléphone : il défile dans sa zone
 // (ZoneDefilable, rendue ici sans îlot), avec une phrase qui le dit sous
-// 600 px de fenêtre.
+// 600 px de fenêtre. La colonne de la carte vient juste après la taille : sur
+// un téléphone, elle se lit sans défiler (point mis de côté à la tâche 15).
 import { root } from 'astro:config/server';
 import ZoneDefilable from '../../interactif/ZoneDefilable.svelte';
 import { materiel } from '../../../lib/calculateur/donnees';
@@ -82,8 +83,8 @@ const appareils = [
       <thead>
         <tr>
           <th scope="col" rowspan="2">Taille</th>
-          <th scope="colgroup" colspan={fils.length} class="groupe">Processeur</th>
           <th scope="col" rowspan="2" class="nombre" data-a-mesurer={carte === null ? '' : undefined}>Carte</th>
+          <th scope="colgroup" colspan={fils.length} class="groupe">Processeur</th>
         </tr>
         <tr>
           {fils.map((f) => <th scope="col" class="nombre">{typographier(enTeteFils(f))}</th>)}
@@ -94,10 +95,10 @@ const appareils = [
           lignes.map((l) => (
             <tr>
               <th scope="row">{`${nombre(l.taille)} × ${nombre(l.taille)}`}</th>
+              <td class:list={['nombre', { 'a-mesurer': l.carte === null }]}>{l.carte ?? 'à mesurer'}</td>
               {l.processeur.map((ms) => (
                 <td class="nombre">{ms}</td>
               ))}
-              <td class:list={['nombre', { 'a-mesurer': l.carte === null }]}>{l.carte ?? 'à mesurer'}</td>
             </tr>
           ))
         }

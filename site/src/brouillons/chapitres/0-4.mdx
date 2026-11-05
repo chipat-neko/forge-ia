@@ -18,7 +18,7 @@ acquis:
     texte: "Pour un petit calcul, la carte ne gagne pas toujours."
     ou: "à l'étape 6"
   - cle: fils
-    texte: "Le processeur aussi calcule en parallèle, sur plusieurs fils ; pour les prendre tous, il faut le demander."
+    texte: "Le processeur aussi calcule en parallèle, sur plusieurs fils ; quand chaque cœur en fait tourner deux, PyTorch n'en prend qu'un par défaut."
     ou: "à l'étape 7"
 ---
 
@@ -26,7 +26,9 @@ import { root } from 'astro:config/server';
 import AtelierFormes from '../../components/chapitres/0-4/AtelierFormes.svelte';
 import OuvertureTenseurs from '../../components/chapitres/0-4/OuvertureTenseurs.astro';
 import TableauChronos from '../../components/chapitres/0-4/TableauChronos.astro';
+import SourcesNote from '../../components/chapitres/0-3/SourcesNote.astro';
 import BlocCommande from '../../components/gabarit/BlocCommande.astro';
+import RecupererProjet from '../../components/gabarit/RecupererProjet.astro';
 import attendusFormes from '../../../../projets/0.4-tenseurs/tests/attendus-formes.json';
 import { materiel, REPERES_EFFICACITE } from '../../lib/calculateur/donnees';
 import { formaterOctets } from '../../lib/calculateur/formats';
@@ -35,18 +37,15 @@ import { MESURES_TON_IA, PRESETS_FORGE, reperesTonIA } from '../../lib/calculate
 import { DEPOT } from '../../lib/depot';
 import { A_DEPART, B_DEPART, expliquer } from '../../lib/partie-0/atelier-formes';
 import {
-  ALLER_AU_PROJET_0_4,
-  CLONER_DEPOT,
   FORCER_PROCESSEUR_BASH,
   FORCER_PROCESSEUR_POWERSHELL,
-  METTRE_A_JOUR_DEPOT,
   TENSEURS_FORMES,
   TENSEURS_MESURER_CPU,
   TENSEURS_MESURER_GPU,
 } from '../../lib/partie-0/commandes';
 import { ecrireForme, formeDiffusee, memoireOctets } from '../../lib/partie-0/formes';
 import { lireMesures } from '../../lib/partie-0/mesures';
-import { enGo, OCTETS_ROUE_CU132_WINDOWS } from '../../lib/partie-0/sources-0-3';
+import { SOURCES_0_3, TAILLE_ROUE_CU132_WINDOWS } from '../../lib/partie-0/sources-0-3';
 import {
   choixDiffusion,
   choixFils,
@@ -186,12 +185,11 @@ export const DIFFUSION = (() => {
 
 export const PAIRES = nombre(attendusFormes.paires.length);
 
-export const ROUE_CARTE = (() => {
+export const ROUE_CARTE =
   // La version de PyTorch pour la carte, sous Windows (relevée pour le chapitre 0.3) : une taille de
-  // téléchargement, en Go décimaux comme PyPI et le chapitre 0.3 (« 2,1 Go », l'unité insécable). Les Go de
-  // 2³⁰ octets restent ceux de la mémoire des tenseurs (étape 5).
-  return enGo(OCTETS_ROUE_CU132_WINDOWS);
-})();
+  // téléchargement, en Go décimaux comme PyPI et le chapitre 0.3 (« 2,1 Go », l'unité insécable). Les Go
+  // de 2³⁰ octets restent ceux de la mémoire des tenseurs (étape 5).
+  TAILLE_ROUE_CU132_WINDOWS;
 
 export const MEMOIRE = (() => {
   // La place d'un nombre selon son type, telle que PyTorch la donne (attendus du projet), et le pari.
@@ -265,8 +263,14 @@ export const PETITE = (() => {
 
 export const FILS = (() => {
   // Le pari « fils » : 1 fil, le réglage par défaut et tous les fils, au plus gros produit des chronos.
+  // L'étape 7 et l'acquis disent « un fil par cœur » pour un processeur à deux fils par cœur, comme celui de
+  // ce PC (revue finale, m3 ; le code de PyTorch et le guide de MKL, SOURCES_0_3.fils).
   const m = PROCESSEUR;
   const t = TAILLE_DU_PARI_FILS;
+  exiger(
+    m.fils_max === 2 * m.fils_par_defaut,
+    'le processeur des chronos n’a plus deux fils par cœur, dont PyTorch prendrait un : l’étape 7 et l’acquis « fils » sont à revoir',
+  );
   return {
     taille: nombre(t),
     defaut: nombre(m.fils_par_defaut),
@@ -432,15 +436,11 @@ Les deux règles de l'atelier tiennent en quelques lignes de Python, sans PyTorc
   <li data-lignes="17-21">On retire le 1 ajouté à un vecteur.</li>
 </CodeExplique>
 
-Le projet du chapitre a aussi un script qui applique ces deux règles aux formes que tu lui donnes. Il est dans le dépôt du site : si tu l'as téléchargé avec git au chapitre 0.1, mets-le à jour, pour recevoir les projets parus depuis. Puis entre dans le projet de ce chapitre :
-
-<BlocCommande commandes={[METTRE_A_JOUR_DEPOT, ALLER_AU_PROJET_0_4]} ou="un terminal, depuis le dossier où tu as téléchargé le dépôt" />
-
-Sinon, télécharge-le, puis entre dans le projet :
-
-<BlocCommande commandes={[CLONER_DEPOT, ALLER_AU_PROJET_0_4]} ou="un terminal, depuis le dossier où tu veux télécharger le dépôt" />
-
-Si tu avais pris le fichier zip au chapitre 0.1, télécharge-le de nouveau : un zip ne se met pas à jour. Son dossier s'appelle `forge-ia-main` : écris ce nom à la place de `forge-ia` dans la commande `cd`. Puis, dans le dossier du projet :
+<RecupererProjet
+  projet="0.4-tenseurs"
+  intro="Le projet du chapitre a aussi un script qui applique ces deux règles aux formes que tu lui donnes. Il est dans le dépôt du site."
+  suite="Puis, dans le dossier du projet :"
+/>
 
 <BlocCommande commandes={[TENSEURS_FORMES]} ou="un terminal, dans le dossier du projet" />
 
@@ -460,7 +460,7 @@ Dans la grille, un trait en pointillé entoure une taille qui s'étire. Pour A @
 
 Un tenseur range ses nombres les uns à la suite des autres, et chacun y prend la même place, selon son type. `float32`, le type par défaut des nombres à virgule, prend {MEMOIRE.float32} octets par nombre. `bfloat16`, qu'on écrit bf16, n'en prend que {MEMOIRE.bfloat16} : il va des très petits aux très grands nombres comme `float32`, mais avec moins de chiffres significatifs. `int64`, le type des entiers, en prend {MEMOIRE.int64} : c'est celui des numéros des morceaux de texte.
 
-Sur la carte, ton IA fait ses calculs en bf16, grâce à `torch.autocast` : chaque nombre calculé y prend {MEMOIRE.moitie} fois moins de place qu'en `float32`. Ses poids, eux, restent en `float32`. Pour compter en mégaoctets, ce site fait comme le calculateur : 1 Mo vaut 2²⁰ octets, soit {MEMOIRE.unMo}, et 1 Go vaut 2³⁰ octets.
+Sur la carte, ton IA fait ses calculs en bf16, grâce à `torch.autocast` : chaque nombre calculé y prend {MEMOIRE.moitie} fois moins de place qu'en `float32`. Ses poids, eux, restent en `float32`. Pour la mémoire des tenseurs, ce site compte comme le calculateur : 1 Mo vaut 2²⁰ octets, soit {MEMOIRE.unMo}, et 1 Go vaut 2³⁰ octets.
 
 <Pari
   id="memoire"
@@ -481,7 +481,14 @@ Sur la carte, ton IA fait ses calculs en bf16, grâce à `torch.autocast` : chaq
   <li data-lignes="5">Les deux, multipliés.</li>
 </CodeExplique>
 
-Les poids de ton IA, dans sa plus grande taille, sont {POIDS.nombre} nombres. Rangés en `float32`, ils prennent {POIDS.float32} ; en bf16, ils n'en prendraient que {POIDS.bf16}. Le tenseur de l'ouverture, pour un micro-lot de 1, prend {POIDS.ouvertureFloat32} en `float32`, {POIDS.ouverture} en bf16 : à côté des poids, c'est peu. Mais l'entraînement garde bien d'autres tenseurs, pour calculer les pentes des poids et les régler : au plus fort, ton IA occupe {TON_IA.pic} de la carte, avec un micro-lot d'un seul texte.
+Les poids de ton IA, dans sa plus grande taille, sont {POIDS.nombre} nombres. Rangés en `float32`, ils prennent {POIDS.float32} ; en bf16, ils n'en prendraient que {POIDS.bf16}. {/* Le tenseur de l'ouverture reste en float32 : torch.autocast ne passe en bf16 que les opérations de sa liste,
+    comme linear et matmul, et nn.Embedding n'y est pas, pas plus que l'addition de la connexion résiduelle
+    (PyTorch 2.15, « Autocast Op Reference », https://docs.pytorch.org/docs/2.15/amp.html, lu le 05/11/2026 :
+    « Ops not listed below do not go through autocasting. They run in the type defined by their inputs. ») ;
+    projets/forge/forge/modele/transformer.py : plongement nn.Embedding, puis x = x + attention(...). Vérifié le
+    05/11/2026 sous torch.autocast('cpu', bfloat16) : sortie d'Embedding en float32, de Linear en bfloat16, et
+    leur somme en float32. */}
+Le tenseur de l'ouverture, lui, reste en `float32` dans ton IA : `torch.autocast` ne passe en bf16 que certains calculs, comme les produits de matrices. Pour un micro-lot de 1, il prend {POIDS.ouvertureFloat32}, et ses copies en bf16, le temps d'un calcul, {POIDS.ouverture} : à côté des poids, c'est peu. Mais l'entraînement garde bien d'autres tenseurs, pour calculer les pentes des poids et les régler : au plus fort, ton IA occupe {TON_IA.pic} de la carte, avec un micro-lot d'un seul texte.
 
 <Fragment slot="note">
 
@@ -518,7 +525,7 @@ Chronométrer un calcul sur la carte cache un piège : PyTorch ne l'attend pas. 
   <li data-lignes="28-29">`finally` rend à PyTorch son réglage des fils, même si le calcul a échoué.</li>
 </CodeExplique>
 
-Le tableau qui suit chronomètre ce produit sur le processeur et sur la carte, pour des matrices carrées de plus en plus grandes. Avant de le lire, parie sur la plus petite.
+L'étape suivante chronomètre ce produit sur le processeur et sur la carte, pour des matrices carrées de plus en plus grandes. Avant de lire ses chronos, parie sur la plus petite.
 
 <Pari
   id="petite"
@@ -531,6 +538,32 @@ Le tableau qui suit chronomètre ce produit sur le processeur et sur la carte, p
 <p>{PETITE.explication}</p>
 
 </Pari>
+
+<Fragment slot="note">
+
+Dans PyTorch, l'appareil de la carte s'appelle `cuda`, du nom de la boîte à outils de NVIDIA du chapitre 0.3. Celui du processeur s'appelle `cpu`.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={7} titre="Les chronos">
+
+Le processeur aussi calcule en parallèle : PyTorch partage un produit en morceaux, et chaque fil en calcule un. Sur ce PC, pour le produit {FILS.taille} × {FILS.taille}, un seul fil prend {FILS.msUn} ms, et les {FILS.defaut} fils du réglage par défaut de PyTorch {FILS.msDefaut} ms : {FILS.gainDefaut} fois moins. Le processeur de ce PC a pourtant {FILS.max} fils en tout.
+
+<Pari
+  id="fils"
+  question={FILS.question}
+  precision={`Le réglage par défaut en prend ${FILS.defaut} ; \`torch.set_num_threads(${FILS.max})\` les prend tous.`}
+  choix={choixFils(PROCESSEUR)}
+  acquis="fils"
+>
+
+<p>{FILS.explication}</p>
+
+</Pari>
+
+Au chapitre 0.3, le script de vérification le signalait déjà : sur un processeur dont chaque cœur fait tourner deux fils, comme celui de ce PC, PyTorch n'en prend par défaut qu'un par cœur. Pour les prendre tous, `torch.set_num_threads` reçoit leur nombre, que donne `os.cpu_count()`.
 
 Voici les chronos de ce PC. Doubler la taille fait 4 fois plus de cases dans le résultat, et chaque case demande 2 fois plus de produits : 8 fois plus de calcul.
 
@@ -558,37 +591,13 @@ Avec une carte NVIDIA, la version de PyTorch pour la carte la chronomètre, si P
 
 <BlocCommande commandes={[TENSEURS_MESURER_GPU]} ou="un terminal, dans le dossier du projet" />
 
-Pour chronométrer quand même le processeur avec cette version, règle d'abord la variable `FORGE_APPAREIL` du chapitre 0.3, dans le même terminal : <code>{FORCER_PROCESSEUR_POWERSHELL}</code> dans PowerShell, ou <code>{FORCER_PROCESSEUR_BASH}</code> sous Linux ou macOS.
-
-<Fragment slot="note">
-
-Dans PyTorch, l'appareil de la carte s'appelle `cuda`, du nom de la boîte à outils de NVIDIA du chapitre 0.3. Celui du processeur s'appelle `cpu`.
-
-</Fragment>
-
-</Etape>
-
-<Etape numero={7} titre="Les fils du processeur">
-
-Le processeur aussi calcule en parallèle : PyTorch partage un produit en morceaux, et chaque fil en calcule un. Le tableau de l'étape 6 le montre. Sur le produit {FILS.taille} × {FILS.taille}, un seul fil prend {FILS.msUn} ms, et les {FILS.defaut} fils du réglage par défaut de PyTorch {FILS.msDefaut} ms : {FILS.gainDefaut} fois moins. Le processeur de ce PC a pourtant {FILS.max} fils en tout.
-
-<Pari
-  id="fils"
-  question={FILS.question}
-  precision={`Le réglage par défaut en prend ${FILS.defaut} ; \`torch.set_num_threads(${FILS.max})\` les prend tous.`}
-  choix={choixFils(PROCESSEUR)}
-  acquis="fils"
->
-
-<p>{FILS.explication}</p>
-
-</Pari>
-
-Au chapitre 0.3, le script de vérification le signalait déjà : sans réglage, PyTorch ne prend pas tous les fils du processeur. Pour les prendre tous, `torch.set_num_threads` reçoit leur nombre, que donne `os.cpu_count()`.
+Pour chronométrer quand même le processeur avec cette version, règle d'abord la variable `FORGE_APPAREIL` du chapitre 0.3, dans le même terminal : <code>{FORCER_PROCESSEUR_POWERSHELL}</code> dans PowerShell, ou <code>{FORCER_PROCESSEUR_BASH}</code> sous Linux ou macOS. Si le script dit que ta carte n'a pas pu calculer, le diagnostic du chapitre 0.3 dit pourquoi.
 
 <Fragment slot="note">
 
 Un fil se dit thread en anglais : c'est le mot de `set_num_threads`.
+
+<SourcesNote sources={SOURCES_0_3.fils} />
 
 </Fragment>
 

@@ -234,7 +234,7 @@ describe('pari « petite matrice » : le processeur contre la carte', () => {
     'Pour un si petit produit, ce prix dépasse le calcul lui-même. ';
   /** La preuve, lue dans les chronos de la carte : la taille suivante, 64 fois plus de calcul. */
   const preuve = (fois: string) =>
-    `Le tableau juste en dessous le montre${FINE}: le produit 256${INSECABLE}×${INSECABLE}256 demande 64 fois plus de calcul, ` +
+    `Les chronos de l’étape suivante le montrent${FINE}: le produit 256${INSECABLE}×${INSECABLE}256 demande 64 fois plus de calcul, ` +
     `et la carte n’y met que ${fois} fois plus de temps.`;
 
   it('le meilleur chrono du processeur, tous fils confondus', () => {

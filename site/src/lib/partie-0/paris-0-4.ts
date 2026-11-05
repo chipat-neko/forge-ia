@@ -354,7 +354,7 @@ function preuveDuPrixFixe(carte: MesuresChrono): string {
   // À deux décimales, 1,00 ou moins ne s'écrit pas « 1,00 fois plus de temps ».
   const temps = Number(r.toFixed(2)) > 1 ? `n’y met que ${nombre(r, 2)} fois plus de temps` : 'n’y met pas plus de temps';
   return (
-    `Le tableau juste en dessous le montre${FINE}: le produit ${ecrireTaille(suivante)} demande ` +
+    `Les chronos de l’étape suivante le montrent${FINE}: le produit ${ecrireTaille(suivante)} demande ` +
     `${nombre(calcul)} fois plus de calcul, et la carte ${temps}.`
   );
 }

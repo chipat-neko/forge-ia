@@ -15,14 +15,14 @@
 // rien ici ne fige une durée, tout se recalcule depuis les fichiers. Le
 // chapitre n'a plus aucune valeur « à mesurer » : le fichier de la carte doit
 // être là.
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { materiel, REPERES_EFFICACITE } from '../src/lib/calculateur/donnees';
 import { formaterDate, formaterOctets } from '../src/lib/calculateur/formats';
 import { memoirePoidsOctets } from '../src/lib/calculateur/formules';
 import { MESURES_TON_IA, PRESETS_FORGE } from '../src/lib/calculateur/ton-ia';
-import { enGo, OCTETS_ROUE_CU132_WINDOWS } from '../src/lib/partie-0/sources-0-3';
+import { enGo, OCTETS_ROUE_CU132_WINDOWS, SOURCES_0_3 } from '../src/lib/partie-0/sources-0-3';
 import { nombre, pourcent } from '../src/lib/nombres';
 import { trouverChapitre } from '../src/lib/parcours';
 import { extraireRegion } from '../src/lib/regions';
@@ -51,6 +51,7 @@ import {
   verifierLiensVersParus,
   verifierSansDebordement,
   verifierTypographieHorsCode,
+  verifierVoisin,
 } from './outils';
 
 const PAGE = '/forge-ia/partie-0/0-4/';
@@ -82,18 +83,18 @@ const TITRES = [
   'La diffusion',
   'Les types de nombres et la mémoire',
   'Sur la carte',
-  'Les fils du processeur',
+  'Les chronos',
   'À grande échelle',
 ];
-/** Les paris, dans l'ordre de la page : `petite` est à l'étape 6, avant le tableau des chronos. */
+/** Les paris, dans l'ordre de la page : `petite` à la fin de l'étape 6, `fils` à l'étape 7, tous deux avant le tableau des chronos. */
 const PARIS = ['diffusion', 'memoire', 'petite', 'fils'];
-/** Les acquis, dans l'ordre du chapitre ; le texte de `fils` est celui de la décision du contrôleur (ronde 1). */
+/** Les acquis, dans l'ordre du chapitre ; `fils` ne dit « un par cœur » que pour un cœur à deux fils (revue finale, m3). */
 const ACQUIS: [string, string][] = [
   ['diffusion', "Une dimension de taille 1 s'étire pour suivre l'autre."],
   ['formes', 'Pour A @ B, les colonnes de A doivent égaler les lignes de B.'],
   ['memoire', "La mémoire d'un tenseur, c'est son nombre de cases fois la taille d'un nombre."],
   ['petite', 'Pour un petit calcul, la carte ne gagne pas toujours.'],
-  ['fils', 'Le processeur aussi calcule en parallèle, sur plusieurs fils ; pour les prendre tous, il faut le demander.'],
+  ['fils', "Le processeur aussi calcule en parallèle, sur plusieurs fils ; quand chaque cœur en fait tourner deux, PyTorch n'en prend qu'un par défaut."],
 ];
 const NB_ACQUIS = ACQUIS.length;
 
@@ -133,17 +134,6 @@ function sansBlancsDeBalisage(texte: string): string {
 /** Attend la fin des animations en cours (fondu du verrou, verdict des paris) : axe mesure alors les vraies couleurs. */
 async function attendreAnimations(page: Page): Promise<void> {
   await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)).then(() => undefined));
-}
-
-/** Le pied vers un voisin : un lien s'il a paru (son fichier est dans src/content/chapitres/), sinon « à venir » (S2). */
-async function verifierVoisin(page: Page, sens: 'precedent' | 'suivant', fichier: string, href: string): Promise<void> {
-  const voisin = page.locator(`footer .voisin.${sens}`);
-  if (existsSync(`src/content/chapitres/${fichier}`)) {
-    await expect(voisin).toHaveAttribute('href', href);
-  } else {
-    await expect(voisin).toContainText('à venir');
-    await expect(page.locator(`footer a.voisin.${sens}`)).toHaveCount(0);
-  }
 }
 
 /** Règle un nombre jaune au clavier sur une valeur (aria-valuenow), par les flèches. */
@@ -253,6 +243,19 @@ test('chapitre 0.4 complet', async ({ page }) => {
 
 test('les choix des paris viennent du jumeau des formes et des mesures', async ({ page }) => {
   await page.goto(PAGE);
+  // Le texte d'un choix garde de l'air de chaque côté dans son bouton, même « Impossible » sur un téléphone
+  // (point mis de côté à la tâche 15).
+  for (const bouton of await page.locator('[data-pari] button[data-choix]').all()) {
+    const { gauche, droite, texte } = await bouton.evaluate((b) => {
+      const plage = document.createRange();
+      plage.selectNodeContents(b);
+      const t = plage.getBoundingClientRect();
+      const r = b.getBoundingClientRect();
+      const bord = Number.parseFloat(getComputedStyle(b).borderLeftWidth);
+      return { gauche: t.left - r.left - bord, droite: r.right - t.right - bord, texte: b.textContent ?? '' };
+    });
+    expect(Math.min(gauche, droite), `« ${texte} » touche le bord de son bouton`).toBeGreaterThanOrEqual(6);
+  }
   const attendus: Record<string, { texte: string; juste?: boolean }[]> = {
     diffusion: choixDiffusion(),
     memoire: choixMemoire(),
@@ -393,10 +396,11 @@ test('le tableau des chronos est celui des fichiers de mesures', async ({ page }
   // Les colonnes du processeur : 1 fil, le réglage par défaut, tous les fils (lus dans le fichier).
   const fils = [...new Set([1, d, m])];
   const entetes = await tableau.locator('thead th').evaluateAll((th) => th.map((e) => e.textContent ?? ''));
+  // « Carte » juste après « Taille » : sur un téléphone, elle se lit sans faire défiler (point mis de côté à la tâche 15).
   expect(entetes).toEqual([
     'Taille',
-    'Processeur',
     'Carte',
+    'Processeur',
     ...fils.map((f) => typographier(`${f} fil${f > 1 ? 's' : ''}${f === d ? ' (réglage par défaut)' : ''}`)),
   ]);
   // Une ligne par taille mesurée : la taille, puis les durées, à trois chiffres significatifs.
@@ -406,7 +410,7 @@ test('le tableau des chronos est celui des fichiers de mesures', async ({ page }
   for (const [i, t] of tailles.entries()) {
     const cellules = await lignes.nth(i).locator('th, td').evaluateAll((c) => c.map((e) => e.textContent ?? ''));
     const carte = ecrireMillisecondes(ms(CARTE, t, null));
-    expect(cellules, `${t}`).toEqual([`${nombre(t)} × ${nombre(t)}`, ...fils.map((f) => ecrireMillisecondes(ms(PROCESSEUR, t, f))), carte]);
+    expect(cellules, `${t}`).toEqual([`${nombre(t)} × ${nombre(t)}`, carte, ...fils.map((f) => ecrireMillisecondes(ms(PROCESSEUR, t, f)))]);
   }
   // La carte a été mesurée à la porte : plus aucune valeur « à mesurer » dans le chapitre.
   await expect(page.locator('[data-a-mesurer]')).toHaveCount(0);
@@ -434,6 +438,13 @@ test('le tableau des chronos est celui des fichiers de mesures', async ({ page }
   const indice = page.locator('[data-test="chronos-indice"]');
   if ((page.viewportSize()?.width ?? 0) <= 600) await expect(indice).toBeVisible();
   else await expect(indice).toBeHidden();
+  // La colonne de la carte tient dans la zone sans défiler, téléphone compris.
+  const entete = tableau.locator('thead th', { hasText: 'Carte' });
+  const [droiteCarte, droiteZone] = await Promise.all([
+    entete.evaluate((e) => e.getBoundingClientRect().right),
+    zone.evaluate((e) => e.getBoundingClientRect().right),
+  ]);
+  expect(droiteCarte).toBeLessThanOrEqual(droiteZone + 0.5);
   await verifierSansDebordement(page);
 });
 
@@ -487,9 +498,11 @@ test('l’ouverture, les exemples, la mémoire et l’encadré viennent des donn
   for (const nom of ['vecteur', 'matrice', 'lot']) expect(etape1, nom).toContain(ecrireForme(ATTENDUS.exemples.creer[nom].forme));
   expect(etape1).toContain('(4,)');
   // Étape 5 : 1 Mo = 2²⁰ octets, et les poids de ton IA en bf16, par le calculateur.
-  // La taille de la version pour la carte (étape 6) : une taille de téléchargement, en Go décimaux comme
+  // La taille de la version pour la carte (étape 7) : une taille de téléchargement, en Go décimaux comme
   // PyPI et le chapitre 0.3 (« 2,1 Go »), et non en Go de 2³⁰ octets comme la mémoire des tenseurs.
-  expect(await texteExact(page.locator('#etape-6'))).toContain(enGo(OCTETS_ROUE_CU132_WINDOWS));
+  expect(await texteExact(page.locator('#etape-7'))).toContain(enGo(OCTETS_ROUE_CU132_WINDOWS));
+  // m1 : la convention des Mo et des Go de 2²⁰ et 2³⁰ octets ne vaut que pour la mémoire des tenseurs.
+  expect(await texteExact(page.locator('#etape-5 .texte'))).toContain('Pour la mémoire des tenseurs, ce site compte comme le calculateur');
   const etape5 = await texteExact(page.locator('#etape-5'));
   expect(etape5).toContain(nombre(2 ** 20));
   // Les poids de ton IA restent en float32 (autocast calcule en bf16) : les deux tailles, calculées.
@@ -505,18 +518,28 @@ test('l’ouverture, les exemples, la mémoire et l’encadré viennent des donn
   expect(etape5).toContain(pic);
   // Étape 7 : l'explication du pari « fils » est celle que tirent les mesures (phraseFils).
   expect(await texteExact(page.locator('[data-pari="fils"] .explication'))).toContain(phraseFils(PROCESSEUR));
-  // Étape 6 : le pari « petite », avant le tableau (qui donnerait la réponse), puis ce que montrent les chronos,
-  // puis le prix du transfert ; chaque phrase est celle que tirent les deux fichiers de mesures.
+  // Les deux paris avant le tableau, qui donnerait leurs réponses (revue finale, m2) : « petite » à la fin de
+  // l'étape 6, « fils » au début de l'étape 7, puis le tableau, ce qu'il montre, et le prix du transfert.
+  // Chaque phrase est celle que tirent les deux fichiers de mesures.
   const etape6 = page.locator('#etape-6');
+  const etape7 = page.locator('#etape-7');
   expect(await texteExact(etape6.locator('[data-pari="petite"] .explication'))).toContain(explicationPetite(PROCESSEUR, CARTE));
-  expect(await texteExact(etape6.locator('[data-test="chronos-phrase"]'))).toBe(phraseCarteEtProcesseur(PROCESSEUR, CARTE));
-  expect(await texteExact(etape6.locator('[data-test="transfert-phrase"]'))).toBe(phraseTransfert(CARTE));
-  const ordre = await etape6.evaluate((etape) =>
-    [...etape.querySelectorAll('[data-pari="petite"], [data-test="chronos"], [data-test="chronos-phrase"], [data-test="transfert-phrase"]')].map(
-      (e) => e.getAttribute('data-pari') ?? e.getAttribute('data-test'),
-    ),
+  expect(await texteExact(etape7.locator('[data-test="chronos-phrase"]'))).toBe(phraseCarteEtProcesseur(PROCESSEUR, CARTE));
+  expect(await texteExact(etape7.locator('[data-test="transfert-phrase"]'))).toBe(phraseTransfert(CARTE));
+  const ordre = await page.locator('main').evaluate((main) =>
+    [
+      ...main.querySelectorAll(
+        '[data-pari="petite"], [data-pari="fils"], [data-test="chronos"], [data-test="chronos-phrase"], [data-test="transfert-phrase"]',
+      ),
+    ].map((e) => e.getAttribute('data-pari') ?? e.getAttribute('data-test')),
   );
-  expect(ordre).toEqual(['petite', 'chronos', 'chronos-phrase', 'transfert-phrase']);
+  expect(ordre).toEqual(['petite', 'fils', 'chronos', 'chronos-phrase', 'transfert-phrase']);
+  await expect(etape6.locator('[data-test="chronos"]')).toHaveCount(0);
+  // m3 : « un par cœur », seulement pour un processeur à deux fils par cœur, et sourcé.
+  const texte7 = await texteExact(etape7.locator('.texte'));
+  expect(texte7).toContain(typographier('sur un processeur dont chaque cœur fait tourner deux fils, comme celui de ce PC'));
+  expect(texte7).not.toContain('ne prend pas tous les fils');
+  for (const source of SOURCES_0_3.fils) await expect(etape7.locator(`.note a[href="${source.url}"]`)).toHaveCount(1);
   // L'encadré : la crête d'une H100 en bf16, et les efficacités de PaLM et de Llama 3, sourcées.
   const labo = page.locator('#etape-8 .labo');
   const texteLabo = await texteExact(labo);
@@ -528,8 +551,10 @@ test('l’ouverture, les exemples, la mémoire et l’encadré viennent des donn
     expect(liens, r.modele).toContain(r.source.url);
     expect(texteLabo, r.modele).toContain(r.min === r.max ? pourcent(r.min, 1) : `${pourcent(r.min, 0).replace(`${FINE}%`, '')} à ${pourcent(r.max, 0)}`);
   }
-  // Aucune version de Colab ni de PyTorch dans le texte, sauf celles des fichiers de mesures, dans la légende des chronos.
-  const texte = (await texteExact(page.locator('main'))).replaceAll(PROCESSEUR.torch, '').replaceAll(CARTE.torch, '');
+  // Aucune version de Colab ni de PyTorch dans le texte, sauf celles des fichiers de mesures, dans la légende des chronos,
+  // et celle du code de PyTorch que citent les sources de l'étape 7 (le réglage des fils, revue finale m3).
+  let texte = (await texteExact(page.locator('main'))).replaceAll(PROCESSEUR.torch, '').replaceAll(CARTE.torch, '');
+  for (const note of await page.locator('main .sources-poste').all()) texte = texte.replace(await texteExact(note), '');
   expect(texte).not.toMatch(/\b2\.\d+\.\d+/);
 });
 
