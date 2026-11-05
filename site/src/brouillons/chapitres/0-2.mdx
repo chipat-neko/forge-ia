@@ -95,7 +95,7 @@ import {
   X_DU_PARI_PENTE,
 } from '../../lib/partie-0/paris-0-2';
 import { exigeur } from '../../lib/exiger';
-import { nombre, pourcent } from '../../lib/nombres';
+import { decimalesUtiles, nombre, pourcent } from '../../lib/nombres';
 import { typographier } from '../../lib/typo';
 
 export const exiger = exigeur('le texte du chapitre 0.2 (0-2.mdx)');
@@ -197,12 +197,12 @@ export const LLAMA = (() => {
   // Meta : wq va de dim à têtes × (dim ÷ têtes) = dim nombres).
   const m = modelePublic('llama-3-405b');
   const operations = 6 * m.parametres * m.jetonsOrigine;
-  // Ce que Meta annonce pour cet entraînement (article de Llama 3, section 1) : 3,8 × 10²⁵.
-  const annonce = { mantisse: 3.8, exposant: 25 };
-  exiger(
-    Math.abs(operations / (annonce.mantisse * 10 ** annonce.exposant) - 1) < 0.02,
-    '6 × N × D ne tombe plus sur les 3,8 × 10²⁵ opérations annoncées par Meta',
-  );
+  // Ce que Meta annonce pour cet entraînement (article de Llama 3, section 1), rangé avec le modèle
+  // dans les données du calculateur.
+  const annonce = m.operationsPubliees;
+  exiger(annonce !== undefined, 'les données de Llama 3 405B n’ont plus les opérations annoncées par Meta');
+  exiger(Math.abs(operations / annonce - 1) < 0.02, '6 × N × D ne tombe plus sur les opérations annoncées par Meta');
+  const [mantisseAnnonce, exposantAnnonce] = annonce.toExponential().split('e').map(Number);
   const [mantisse, exposant] = operations.toExponential(2).split('e');
   const chiffres = mantisse.replace('.', '');
   const poidsMatrice = m.dim * m.dim;
@@ -214,7 +214,7 @@ export const LLAMA = (() => {
     jetons: formaterQuantite(m.jetonsOrigine),
     operations: formaterPuissanceDeDix(operations),
     enChiffres: `${chiffres} suivi de ${Number(exposant) - (chiffres.length - 1)} zéros`,
-    annonce: `${nombre(annonce.mantisse, 1)}\u202F×\u202F${dixPuissance(annonce.exposant)}`,
+    annonce: `${nombre(mantisseAnnonce, decimalesUtiles(mantisseAnnonce))}\u202F×\u202F${dixPuissance(exposantAnnonce)}`,
     dim: nombre(m.dim),
     couches: nombre(m.couches),
     poidsMatrice: formaterQuantite(poidsMatrice),
@@ -423,7 +423,7 @@ Chaque ligne de la matrice fait un produit scalaire avec le vecteur. Une ligne a
 <CodeExplique fichier="projets/0.2-maths/maths_utiles/vecteurs.py" region="matrice">
   <li data-lignes="1-4">`matrice_fois_vecteur` reçoit une matrice, écrite comme une liste de lignes (`list[list[float]]`), et un vecteur. Elle rend un vecteur.</li>
   <li data-lignes="10-11">Le résultat part d'une liste vide, et la boucle prend les lignes de la matrice une à une.</li>
-  <li data-lignes="12-17">Une ligne qui n'a pas autant de nombres que le vecteur arrête le calcul, avec un message en français. `quantite`, définie plus haut dans le fichier, met « colonne » et « nombre » au pluriel quand il le faut.</li>
+  <li data-lignes="12-17">Une ligne qui n'a pas autant de nombres que le vecteur arrête le calcul, avec un message en français. `quantite`, définie plus haut dans le fichier, met « colonne » et « nombre » au pluriel quand il le faut. Dans ce message, `\u202f` est l'espace fine de la typographie française, écrite ainsi pour rester visible dans le code.</li>
   <li data-lignes="18">Chaque ligne, fois le vecteur : le `produit_scalaire` de l'étape 1. Il devient la case suivante du résultat.</li>
 </CodeExplique>
 
@@ -431,7 +431,7 @@ Dans chaque couche de ton IA, une matrice de {COUCHE.dim} lignes et {COUCHE.dim}
 
 <Fragment slot="note">
 
-Le nombre de lignes, puis le nombre de colonnes : c'est la forme de la matrice. Celle de l'exemple est une matrice <span class="formule">{MATRICE.lignes} × {MATRICE.colonnes}</span>.
+Le nombre de lignes, puis le nombre de colonnes : c'est la forme de la matrice. Celle de l'exemple est une matrice <span class="formule-en-texte">{MATRICE.lignes} × {MATRICE.colonnes}</span>.
 
 Un vecteur peut se voir comme une matrice d'une seule colonne : c'est pour cela qu'on parle de nombres « en colonne ».
 
@@ -441,7 +441,7 @@ Un vecteur peut se voir comme une matrice d'une seule colonne : c'est pour cela 
 
 <Etape numero={3} titre="La pente">
 
-Une IA apprend en réglant ses poids, des nombres qu'elle ajuste pour faire baisser son erreur. Prends un seul poids, x, et une erreur toute simple, qui vaut <span class="formule">(x − 3)² + 1</span>. Cette erreur est la plus basse en x = {ecrireNombre(FOND)}, où elle vaut {ecrireNombre(erreur(FOND))} : c'est le fond. Mais l'IA ne voit pas la courbe en entier. Elle ne connaît que sa position, et la pente sous ses pieds.
+Une IA apprend en réglant ses poids, des nombres qu'elle ajuste pour faire baisser son erreur. Prends un seul poids, x, et une erreur toute simple, qui vaut <span class="formule-en-texte">(x − 3)² + 1</span>. Cette erreur est la plus basse en x = {ecrireNombre(FOND)}, où elle vaut {ecrireNombre(erreur(FOND))} : c'est le fond. Mais l'IA ne voit pas la courbe en entier. Elle ne connaît que sa position, et la pente sous ses pieds.
 
 La pente dit à quelle vitesse l'erreur monte quand x avance vers la droite : c'est la montée de l'erreur sur un tout petit pas, divisée par la longueur de ce pas. Si l'erreur descend, la pente est négative.
 
@@ -454,7 +454,7 @@ La pente dit à quelle vitesse l'erreur monte quand x avance vers la droite : c'
   ouvre="descente"
 >
 
-En x = {PENTE_ZERO.x}, on est à gauche du fond : vers la droite, l'erreur descend, et la pente est négative. Pour cette erreur, la pente vaut <span class="formule">2 × (x − 3)</span>, soit {PENTE_ZERO.exacte} en x = {PENTE_ZERO.x}. Pour descendre, il faut donc aller du côté opposé au signe de la pente : ici, vers la droite. La figure juste en dessous est ouverte.
+En x = {PENTE_ZERO.x}, on est à gauche du fond : vers la droite, l'erreur descend, et la pente est négative. Pour cette erreur, la pente vaut <span class="formule-en-texte">2 × (x − 3)</span>, soit {PENTE_ZERO.exacte} en x = {PENTE_ZERO.x}. Pour descendre, il faut donc aller du côté opposé au signe de la pente : ici, vers la droite. La figure juste en dessous est ouverte.
 
 </Pari>
 
@@ -489,14 +489,14 @@ La pente s'appelle aussi la dérivée. Avec plusieurs poids, la liste de toutes 
 
 <Etape numero={4} titre="Descendre la pente">
 
-Voici toute la règle : à chaque pas, <span class="formule">x ← x − taux × pente(x)</span>. La flèche se lit « devient » : la nouvelle position est l'ancienne, moins le taux fois la pente. Une pente négative fait avancer x vers la droite, une pente positive le fait reculer, et le taux règle la longueur du pas.
+Voici toute la règle : à chaque pas, <span class="formule-en-texte">x ← x − taux × pente(x)</span>. La flèche se lit « devient » : la nouvelle position est l'ancienne, moins le taux fois la pente. Une pente négative fait avancer x vers la droite, une pente positive le fait reculer, et le taux règle la longueur du pas.
 
-Au taux {PREMIER_PAS.taux}, depuis x = {PREMIER_PAS.x0}, la pente vaut {PREMIER_PAS.pente}, et x devient <span class="formule">{PREMIER_PAS.x0} − {PREMIER_PAS.taux} × ({PREMIER_PAS.pente}) = {PREMIER_PAS.x1}</span>. C'est exactement ce que fait le bouton « Un pas » de la figure, à l'étape 3.
+Au taux {PREMIER_PAS.taux}, depuis x = {PREMIER_PAS.x0}, la pente vaut {PREMIER_PAS.pente}, et x devient <span class="formule-en-texte">{PREMIER_PAS.x0} − {PREMIER_PAS.taux} × ({PREMIER_PAS.pente}) = {PREMIER_PAS.x1}</span>. C'est exactement ce que fait le bouton « Un pas » de la figure, à l'étape 3.
 
 <CodeExplique fichier="projets/0.2-maths/maths_utiles/derivees.py" region="descendre">
   <li data-lignes="1-5">`descendre` reçoit le départ, le taux et un nombre de pas ; elle rend la liste des positions.</li>
   <li data-lignes="12-13">La liste commence par le départ.</li>
-  <li data-lignes="14-16">À chaque pas, la règle <span class="formule">x ← x − taux × pente(x)</span>, puis la nouvelle position rejoint la liste. La boucle n'a pas besoin du numéro du pas : son nom est `_`.</li>
+  <li data-lignes="14-16">À chaque pas, la règle <span class="formule-en-texte">x ← x − taux × pente(x)</span>, puis la nouvelle position rejoint la liste. La boucle n'a pas besoin du numéro du pas : son nom est `_`.</li>
 </CodeExplique>
 
 <Pari
@@ -506,7 +506,7 @@ Au taux {PREMIER_PAS.taux}, depuis x = {PREMIER_PAS.x0}, la pente vaut {PREMIER_
   choix={choixTauxMoitie()}
 >
 
-Au taux {MOITIE.taux}, x devient <span class="formule">{PREMIER_PAS.x0} − {MOITIE.taux} × ({PREMIER_PAS.pente}) = {MOITIE.x1}</span> : le premier pas tombe pile sur le fond. Un seul pas suffit. Ce taux convient exactement à cette courbe ; pour une vraie IA, personne ne connaît le bon taux à l'avance.
+Au taux {MOITIE.taux}, x devient <span class="formule-en-texte">{PREMIER_PAS.x0} − {MOITIE.taux} × ({PREMIER_PAS.pente}) = {MOITIE.x1}</span> : le premier pas tombe pile sur le fond. Un seul pas suffit. Ce taux convient exactement à cette courbe ; pour une vraie IA, personne ne connaît le bon taux à l'avance.
 
 </Pari>
 
@@ -535,14 +535,14 @@ Ton IA apprend sur ce principe. À chaque pas d'entraînement, elle calcule la p
 
 Une IA n'est pas une seule formule : c'est une longue chaîne d'opérations, chacune appliquée au résultat de la précédente. Pour descendre la pente, il lui faut pourtant la pente de toute la chaîne. La règle de la chaîne la donne, maillon par maillon.
 
-Prends <span class="formule">h(x) = (2x + 1)²</span>. Elle enchaîne deux opérations :
+Prends <span class="formule-en-texte">h(x) = (2x + 1)²</span>. Elle enchaîne deux opérations :
 
-- d'abord <span class="formule">f(x) = 2x + 1</span>, dont la pente vaut 2 partout ;
-- puis <span class="formule">g(u) = u²</span>, le carré du résultat u de f, dont la pente vaut 2u.
+- d'abord <span class="formule-en-texte">f(x) = 2x + 1</span>, dont la pente vaut 2 partout ;
+- puis <span class="formule-en-texte">g(u) = u²</span>, le carré du résultat u de f, dont la pente vaut 2u.
 
-La règle dit : la pente de h en x, c'est la pente de g en <span class="formule">u = f(x)</span>, multipliée par la pente de f. Quand x avance d'un tout petit pas, u avance 2 fois plus ; et quand u avance d'un tout petit pas, h avance 2u fois plus. Les deux effets se multiplient.
+La règle dit : la pente de h en x, c'est la pente de g en <span class="formule-en-texte">u = f(x)</span>, multipliée par la pente de f. Quand x avance d'un tout petit pas, u avance 2 fois plus ; et quand u avance d'un tout petit pas, h avance 2u fois plus. Les deux effets se multiplient.
 
-En <span class="formule">x = {CHAINE.x}</span>, <span class="formule">u = 2 × {CHAINE.x} + 1 = {CHAINE.u}</span>, et <span class="formule">h = {CHAINE.u}² = {CHAINE.h}</span>. La pente de g en {CHAINE.u} vaut <span class="formule">2 × {CHAINE.u} = {CHAINE.penteExterieur}</span>, celle de f vaut {CHAINE.penteInterieur} : la pente de h en {CHAINE.x} vaut <span class="formule">{CHAINE.penteExterieur} × {CHAINE.penteInterieur} = {CHAINE.exacte}</span>. Mesurée sans formule, comme à l'étape 3, la pente approchée de Python vaut {CHAINE.approchee} : presque {CHAINE.exacte}.
+En <span class="formule-en-texte">x = {CHAINE.x}</span>, <span class="formule-en-texte">u = 2 × {CHAINE.x} + 1 = {CHAINE.u}</span>, et <span class="formule-en-texte">h = {CHAINE.u}² = {CHAINE.h}</span>. La pente de g en {CHAINE.u} vaut <span class="formule-en-texte">2 × {CHAINE.u} = {CHAINE.penteExterieur}</span>, celle de f vaut {CHAINE.penteInterieur} : la pente de h en {CHAINE.x} vaut <span class="formule-en-texte">{CHAINE.penteExterieur} × {CHAINE.penteInterieur} = {CHAINE.exacte}</span>. Mesurée sans formule, comme à l'étape 3, la pente approchée de Python vaut {CHAINE.approchee} : presque {CHAINE.exacte}.
 
 <CodeExplique fichier="projets/0.2-maths/maths_utiles/derivees.py" region="chaine">
   <li data-lignes="1-3">`interieur` : f(x) = 2x + 1, l'opération du dedans.</li>
@@ -556,7 +556,7 @@ Une IA enchaîne des centaines d'opérations, mais la règle reste la même : on
 
 <Fragment slot="note">
 
-En maths, la pente d'une fonction f s'écrit souvent avec un prime : f′(x). La règle de la chaîne devient <span class="formule">h′(x) = g′(f(x)) × f′(x)</span>.
+En maths, la pente d'une fonction f s'écrit souvent avec un prime : f′(x). La règle de la chaîne devient <span class="formule-en-texte">h′(x) = g′(f(x)) × f′(x)</span>.
 
 </Fragment>
 
@@ -575,6 +575,7 @@ Pour tirer au sort, on range ces probabilités bout à bout entre 0 et 1 : {TIRA
   <li data-lignes="8-12">`cumul` additionne les probabilités une à une : dès que `u` passe sous le cumul, il est tombé dans la case de ce mot.</li>
   <li data-lignes="13-15">Les arrondis des nombres à virgule peuvent laisser le cumul un peu sous 1 : un `u` tout au bout prend le dernier mot.</li>
   <li data-lignes="18-34">`tirages` tire `n` fois, et compte combien de fois chaque mot est sorti.</li>
+  <li data-lignes="25-29">Sans aucune issue, rien à tirer : la fonction s'arrête, avec un message où `\u202f` est l'espace fine de l'étape 2.</li>
 </CodeExplique>
 
 Le hasard d'un ordinateur est un calcul : on part d'un nombre, la graine, et chaque nouveau nombre découle du précédent. La même graine donne toujours la même suite, sur toutes les machines. Ce site refait les tirages du Python dans ton navigateur, et trouve exactement les mêmes comptes.
@@ -631,13 +632,13 @@ Chaque ligne fait {pourcent(1)} : ce sont des probabilités. Plus la températur
 
 <CodeExplique fichier="projets/0.2-maths/maths_utiles/probabilites.py" region="softmax">
   <li data-lignes="1-4">`softmax` reçoit les scores et une température, 1 par défaut. Elle rend une probabilité par score.</li>
-  <li data-lignes="11-15">Une température nulle ou négative n'a pas de sens : la fonction s'arrête, et dit quoi essayer.</li>
+  <li data-lignes="11-15">Une température nulle ou négative n'a pas de sens : la fonction s'arrête, et dit quoi essayer. `\u202f` est l'espace fine de l'étape 2.</li>
   <li data-lignes="16-18">On retire d'abord le plus grand score à chacun. Les probabilités ne changent pas, car toutes les exponentielles sont divisées par le même nombre ; mais `exp` ne reçoit plus jamais de grand nombre, qui la ferait déborder.</li>
   <li data-lignes="19-22">`math.exp` de chaque score, divisé par la température.</li>
   <li data-lignes="23-26">Une boucle additionne les exponentielles, de gauche à droite, puis chacune est divisée par ce total.</li>
 </CodeExplique>
 
-Pour apprendre, le modèle mesure son erreur sur chaque prédiction. Si p est la probabilité qu'il donnait à la bonne réponse, son erreur vaut <span class="formule">−ln p</span>. Ici, ln est le logarithme naturel : <span class="formule">ln 1 = 0</span>, et <span class="formule">ln p</span> est négatif quand p est entre 0 et 1 ; le signe moins rend donc l'erreur positive. Sûr de la bonne réponse (<span class="formule">p = 1</span>), le modèle ne fait aucune erreur ; moins il lui donnait de chances, plus l'erreur est grande.
+Pour apprendre, le modèle mesure son erreur sur chaque prédiction. Si p est la probabilité qu'il donnait à la bonne réponse, son erreur vaut <span class="formule-en-texte">−ln p</span>. Ici, ln est le logarithme naturel : <span class="formule-en-texte">ln 1 = 0</span>, et <span class="formule-en-texte">ln p</span> est négatif quand p est entre 0 et 1 ; le signe moins rend donc l'erreur positive. Sûr de la bonne réponse (<span class="formule-en-texte">p = 1</span>), le modèle ne fait aucune erreur ; moins il lui donnait de chances, plus l'erreur est grande.
 
 <Pari
   id="erreur"
@@ -647,7 +648,7 @@ Pour apprendre, le modèle mesure son erreur sur chaque prédiction. Si p est la
   acquis="erreur"
 >
 
-Une chance sur {V}, c'est <span class="formule">p = 1 ÷ {V} = {ERREUR.p}</span>. L'erreur vaut <span class="formule">−ln {ERREUR.p}</span>, c'est-à-dire <span class="formule">ln {V}</span> : environ {ERREUR.erreur}. Ce n'est ni la chance, ni le nombre de caractères. Le logarithme grandit lentement : diviser la chance par {V} ajoute toujours <span class="formule">ln {V}</span> à l'erreur, quelle que soit la chance de départ.
+Une chance sur {V}, c'est <span class="formule-en-texte">p = 1 ÷ {V} = {ERREUR.p}</span>. L'erreur vaut <span class="formule-en-texte">−ln {ERREUR.p}</span>, c'est-à-dire <span class="formule-en-texte">ln {V}</span> : environ {ERREUR.erreur}. Ce n'est ni la chance, ni le nombre de lettres possibles. Le logarithme grandit lentement : diviser la chance par {V} ajoute toujours <span class="formule-en-texte">ln {V}</span> à l'erreur, quelle que soit la chance de départ.
 
 </Pari>
 
@@ -659,19 +660,19 @@ Une chance sur {V}, c'est <span class="formule">p = 1 ÷ {V} = {ERREUR.p}</span>
   nombres={[0, 1, 2]}
 />
 
-La dernière ligne est l'erreur de départ d'un modèle qui devine au hasard parmi {V} caractères, comme le mini-modèle qui invente des prénoms au chapitre 0.5. Avant tout entraînement, il donne à peu près une chance sur {V} à chaque caractère, et son erreur est proche de <span class="formule">ln {V}</span>. Apprendre, pour lui, c'est faire baisser ce nombre.
+La dernière ligne est l'erreur de départ d'un modèle qui devine au hasard parmi {V} caractères, comme le mini-modèle qui invente des prénoms au chapitre 0.5. Avant tout entraînement, il donne à peu près une chance sur {V} à chaque caractère, et son erreur est proche de <span class="formule-en-texte">ln {V}</span>. Apprendre, pour lui, c'est faire baisser ce nombre.
 
 <CodeExplique fichier="projets/0.2-maths/maths_utiles/probabilites.py" region="erreur-de-prediction">
   <li data-lignes="1">`erreur_de_prediction` reçoit p, la probabilité donnée à la bonne réponse, et rend l'erreur.</li>
-  <li data-lignes="8-12">p doit être plus grand que 0, et au plus 1 : ln 0 n'existe pas.</li>
+  <li data-lignes="8-12">p doit être plus grand que 0, et au plus 1 : ln 0 n'existe pas. Le message emploie lui aussi `\u202f`, l'espace fine.</li>
   <li data-lignes="13">`math.log` est le logarithme naturel, ln. Le signe moins rend l'erreur positive.</li>
 </CodeExplique>
 
 <Fragment slot="note">
 
-Cette erreur s'appelle l'entropie croisée. C'est elle que ton IA fait baisser pendant son entraînement : la moyenne de <span class="formule">−ln p</span> sur tous les morceaux de texte qu'elle doit deviner.
+Cette erreur s'appelle l'entropie croisée. C'est elle que ton IA fait baisser pendant son entraînement : la moyenne de <span class="formule-en-texte">−ln p</span> sur tous les morceaux de texte qu'elle doit deviner.
 
-Le logarithme et l'exponentielle se défont l'un l'autre : <span class="formule">ln(exp(y)) = y</span>.
+Le logarithme et l'exponentielle se défont l'un l'autre : <span class="formule-en-texte">ln(exp(y)) = y</span>.
 
 </Fragment>
 
@@ -683,9 +684,9 @@ Pour l'essentiel, ton IA fait les calculs de ce chapitre : des produits scalaire
 
 <EncadreLabo sources={SOURCES_LABO}>
 
-Pour entraîner un modèle de N poids sur D morceaux de texte, il faut environ <span class="formule">6 × N × D</span> opérations. Pour chaque morceau de texte, la prédiction coûte à peu près 2 opérations par poids, une multiplication et une addition, comme dans un produit scalaire ; remonter l'erreur jusqu'aux pentes en coûte environ deux fois plus.
+Pour entraîner un modèle de N poids sur D morceaux de texte, il faut environ <span class="formule-en-texte">6 × N × D</span> opérations. Pour chaque morceau de texte, la prédiction coûte à peu près 2 opérations par poids, une multiplication et une addition, comme dans un produit scalaire ; remonter l'erreur jusqu'aux pentes en coûte environ deux fois plus.
 
-Llama 3 405B, de Meta, a {LLAMA.parametres} de poids, entraînés sur {LLAMA.jetons} de morceaux de texte : <span class="formule">6 × N × D</span> en fait <span class="formule">{LLAMA.operations}</span> opérations, environ un {LLAMA.enChiffres}. Meta annonce <span class="formule">{LLAMA.annonce}</span> dans son article.
+Llama 3 405B, de Meta, a {LLAMA.parametres} de poids, entraînés sur {LLAMA.jetons} de morceaux de texte : <span class="formule-en-texte">6 × N × D</span> en fait <span class="formule-en-texte">{LLAMA.operations}</span> opérations, environ un {LLAMA.enChiffres}. Meta annonce <span class="formule-en-texte">{LLAMA.annonce}</span> dans son article.
 
 Un morceau de texte y est un vecteur de {LLAMA.dim} nombres, et chacune de ses {LLAMA.couches} couches contient des matrices de {LLAMA.dim} lignes et {LLAMA.dim} colonnes : {LLAMA.poidsMatrice} de poids pour une seule d'entre elles, plus de la moitié de ton IA tout entière.
 

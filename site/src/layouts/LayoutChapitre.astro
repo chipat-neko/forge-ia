@@ -169,8 +169,9 @@ const { numero, titre, chapeau, programme, acquis, indexer = true } = Astro.prop
     white-space: nowrap;
   }
 
-  /* Une courte formule écrite en texte (« f(x) = 2x + 1 ») ne se coupe pas en fin de ligne. */
-  .chapitre .formule {
+  /* Une courte formule écrite en texte (« f(x) = 2x + 1 ») ne se coupe pas en fin de ligne.
+     Un nom à part : la classe « formule » est déjà celle des explications du calculateur. */
+  .chapitre span.formule-en-texte {
     white-space: nowrap;
   }
 

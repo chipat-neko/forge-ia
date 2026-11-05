@@ -304,6 +304,8 @@ describe('les modèles publics', () => {
     const calcul = (id: string) => operationsEntrainement(modelePublic(id).parametres, modelePublic(id).jetonsOrigine);
     expect(Math.abs(calcul('gpt-3-175b') / 3.14e23 - 1)).toBeLessThan(0.01);
     expect(Math.abs(calcul('llama-3-405b') / 3.8e25 - 1)).toBeLessThan(0.01);
+    // Le chiffre que Meta annonce est rangé avec le modèle (le chapitre 0.2 le lit là).
+    expect(modelePublic('llama-3-405b').operationsPubliees).toBe(3.8e25);
   });
 
   it('les écarts avec le plan sont dits : le vocabulaire de GPT-3 vient de GPT-2, les jetons des petits Llama 3 sont « environ 15 000 milliards »', () => {

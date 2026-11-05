@@ -91,6 +91,8 @@ export type ModelePublic = Forme & {
   nom: string;
   /** Les jetons de l'entraînement d'origine. */
   jetonsOrigine: number;
+  /** Les opérations de l'entraînement d'origine, telles que la source les annonce, quand elle les donne. */
+  operationsPubliees?: number;
   /** Ce qui s'écarte du plan ou ne se lit pas directement dans la source. */
   note?: string;
   source: Source;
@@ -462,6 +464,8 @@ export const MODELES_PUBLICS: readonly ModelePublic[] = Object.freeze([
     contexte: 8192,
     vocabulaire: 128_000,
     jetonsOrigine: 15.6e12,
+    // Section 1 : « pre-trained using 3.8 × 10^25 FLOPs ».
+    operationsPubliees: 3.8e25,
     source: LLAMA3,
   },
 ] satisfies ModelePublic[]);

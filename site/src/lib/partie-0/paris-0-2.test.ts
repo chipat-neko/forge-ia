@@ -74,7 +74,7 @@ const FINE = '\u202F';
 const MOINS = '\u2212';
 const INSECABLE = '\u00A0';
 
-/** Les sections des attendus du Python que lisent l'\u00E9tape 2, l'\u00E9tape 5 et l'\u00E9tape 7 (Vitest tourne dans site/). */
+/** Les sections des attendus du Python que lisent l'étape 2, l'étape 5 et l'étape 7 (Vitest tourne dans site/). */
 interface AttendusLus {
   matrices: { m: number[][]; v: number[]; resultat: number[] | null }[];
   chaine: ChaineAttendue;

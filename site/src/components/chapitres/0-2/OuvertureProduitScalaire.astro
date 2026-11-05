@@ -2,8 +2,9 @@
 // L'ouverture du chapitre 0.2 : « (3, 1) · (1, 2) = 5 », le produit scalaire
 // des deux vecteurs que la figure de l'étape 1 montre à l'arrivée. Tout est
 // calculé à la construction par le jumeau du Python (maths.ts, paris-0-2.ts) :
-// la page arrive prête, sans script. Puis la phrase du chapitre : ton IA ne
-// fait rien d'autre que ces calculs-là, des milliards de fois.
+// la page arrive prête, sans script. Puis, hors de la figure, la phrase du
+// chapitre : ton IA ne fait rien d'autre que ces calculs-là, des milliards de
+// fois.
 //
 // Le calcul en grand est caché aux lecteurs d'écran (des parenthèses et des
 // points isolés s'écoutent mal) : la légende le redit en entier. Sous chaque
@@ -29,15 +30,21 @@ const constat = typographier(
 );
 ---
 
-<figure class="ouverture-scalaire" data-test="ouverture">
-  <p class="calcul" data-test="ouverture-calcul" aria-hidden="true"><span class="vecteur a">{a}</span> · <span class="vecteur b">{b}</span> = <span class="resultat">{resultat}</span></p>
-  <figcaption>{legende}</figcaption>
+<div class="ouverture-scalaire" data-test="ouverture">
+  <figure>
+    <p class="calcul" data-test="ouverture-calcul" aria-hidden="true"><span class="vecteur a">{a}</span> · <span class="vecteur b">{b}</span> = <span class="resultat">{resultat}</span></p>
+    <figcaption>{legende}</figcaption>
+  </figure>
   <p class="constat">{constat}</p>
-</figure>
+</div>
 
 <style>
   .ouverture-scalaire {
     margin: 40px 0 0;
+  }
+
+  figure {
+    margin: 0;
   }
 
   /* Le calcul en grand, dans la police du texte, comme une formule de livre. */

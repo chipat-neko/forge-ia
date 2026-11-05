@@ -237,6 +237,9 @@ test('l’ouverture et les tableaux viennent du jumeau et des attendus du Python
   expect(labo).toContain(formaterPuissanceDeDix(6 * llama.parametres * llama.jetonsOrigine));
   expect(labo).toContain(`${nombre(llama.dim)} lignes et ${nombre(llama.dim)} colonnes`);
   expect(labo).toContain(formaterQuantite(llama.dim * llama.dim));
+  // Ce que Meta annonce, lu dans les données du calculateur.
+  expect(llama.operationsPubliees).toBe(3.8e25);
+  expect(labo).toContain(`Meta annonce 3,8${FINE}×${FINE}10²⁵`);
 });
 
 test('le code affiché est celui des régions testées', async ({ page }) => {
