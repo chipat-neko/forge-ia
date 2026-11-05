@@ -102,6 +102,12 @@ def derniere_ligne_d_erreur(cellule, erreur: CellExecutionError) -> str:
     return f"{erreur.ename}: {erreur.evalue}"
 
 
+def lieu(nom: str, numero: int) -> str:
+    """Où le notebook a échoué : « nom, cellule 3 », ou le nom seul quand l'échec précède
+    la première cellule (un noyau qui ne démarre pas, par exemple), jamais « cellule 0 »."""
+    return f"{nom}, cellule {numero}" if numero else nom
+
+
 def executer(chemin: pathlib.Path) -> list[str]:
     """Exécute une copie en mémoire du notebook ; renvoie ses fautes (vide si tout va bien).
     Chaque faute dit ce qui ne va pas et quoi faire."""
@@ -120,7 +126,7 @@ def executer(chemin: pathlib.Path) -> list[str]:
             "par Jupyter ou Colab, puis relance."
         ]
 
-    # Le numéro (à partir de 1, cellules Markdown comprises) de la cellule en cours.
+    # Le numéro (à partir de 1, cellules Markdown comprises) de la cellule en cours ; 0 avant la première.
     en_cours = {"numero": 0}
 
     def suivre(cell, cell_index, **_):
@@ -141,24 +147,27 @@ def executer(chemin: pathlib.Path) -> list[str]:
             numero = en_cours["numero"]
             cellule = nb.cells[numero - 1] if numero else None
             return [
-                f"{nom}, cellule {numero} : {derniere_ligne_d_erreur(cellule, erreur)}. "
+                f"{lieu(nom, numero)} : {derniere_ligne_d_erreur(cellule, erreur)}. "
                 "Ouvre le notebook dans Jupyter ou Colab pour voir toute la trace, corrige cette cellule "
                 "(ou le code du projet qu'elle appelle), puis relance."
             ]
         except CellTimeoutError:
             return [
-                f"{nom}, cellule {en_cours['numero']} : plus de {DELAI_PAR_CELLULE} s sans finir. "
+                f"{lieu(nom, en_cours['numero'])} : plus de {DELAI_PAR_CELLULE} s sans finir. "
                 "Vérifie qu'elle n'attend pas une saisie et qu'elle ne tourne pas sans fin, "
                 "allège-la si elle est seulement longue, puis relance."
             ]
         except DeadKernelError as erreur:
-            return [
-                f"{nom}, cellule {en_cours['numero']} : le noyau s'est arrêté ({resume(erreur)}). "
+            conseil = (
                 "La cellule a peut-être épuisé la mémoire : allège-la, puis relance."
-            ]
+                if en_cours["numero"]
+                else "Il s'est arrêté avant la première cellule : vérifie que l'environnement .colab a bien "
+                "ipykernel (outils/colab-sans-carte.txt), puis relance."
+            )
+            return [f"{lieu(nom, en_cours['numero'])} : le noyau s'est arrêté ({resume(erreur)}). {conseil}"]
         except Exception as erreur:
             return [
-                f"{nom}, cellule {en_cours['numero']} : l'exécution s'est arrêtée ({resume(erreur)}). "
+                f"{lieu(nom, en_cours['numero'])} : l'exécution s'est arrêtée ({resume(erreur)}). "
                 "Relance ; si ça recommence, exécute le notebook dans Jupyter pour voir où il bloque."
             ]
 
