@@ -190,7 +190,10 @@ const { numero, titre, chapeau, programme, acquis, indexer = true } = Astro.prop
     }
   }
 
-  /* Sur téléphone, une seule colonne : le numéro passe au-dessus du titre. */
+  /* Sur téléphone, une seule colonne : le numéro passe au-dessus du titre. Elle garde la largeur de
+     lecture du texte (--col-texte), centrée : sur une tablette de 600 à 720 px, une colonne pleine largeur
+     donnerait des lignes de 100 caractères (point mis de côté à la tâche 7) ; sur un téléphone, elle prend
+     toute la largeur moins les marges, comme avant. */
   @media (max-width: 720px) {
     body {
       font-size: 1.125rem;
@@ -199,9 +202,9 @@ const { numero, titre, chapeau, programme, acquis, indexer = true } = Astro.prop
     .chapitre {
       --marge: 20px;
       --grille:
-        [plein-start] var(--marge)
-        [num-start texte-start note-start] minmax(0, 1fr) [num-end texte-end note-end]
-        var(--marge) [plein-end];
+        [plein-start] minmax(var(--marge), 1fr)
+        [num-start texte-start note-start] minmax(0, var(--col-texte)) [num-end texte-end note-end]
+        minmax(var(--marge), 1fr) [plein-end];
     }
 
     .bloc > .num-etape {
