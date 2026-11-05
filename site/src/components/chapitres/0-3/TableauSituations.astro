@@ -1,0 +1,170 @@
+---
+// Le tableau des situations du chapitre 0.3 : pour chaque situation nommée du
+// projet (SITUATIONS, dans poste/diagnostic.py), ce que dit le script et ce
+// qu'il faut faire. Les lignes viennent des attendus du Python, déjà mises en
+// morceaux par lignesDesSituations (situations-0-3.ts) : le composant ne fait
+// que les ranger, sans rien recalculer ni réécrire. Ce qui est entre accents
+// graves dans les attendus (une commande) s'affiche comme du code.
+//
+// Une situation par groupe de lignes (tbody), une ligne par constat : un
+// conseil reste en face du constat qu'il suit, et le nom de la situation
+// couvre ses lignes (scope="rowgroup").
+//
+// Un tableau typographié, avec des filets. Sous 720 px, trois colonnes de
+// phrases ne tiennent plus : chaque situation devient un bloc, et chaque
+// cellule reprend le nom de sa colonne au-dessus d'elle (data-etiquette).
+import type { LigneSituation } from '../../../lib/partie-0/situations-0-3';
+import { typographier } from '../../../lib/typo';
+import TexteDuScript from './TexteDuScript.astro';
+
+interface Props {
+  lignes: LigneSituation[];
+  /** La légende, au-dessus du tableau. */
+  legende: string;
+}
+
+const { lignes, legende } = Astro.props;
+
+const DEUX_POINTS = '\u202F: ';
+const COLONNES = ['Situation', 'Ce que dit le script', typographier("Ce qu'il faut faire")];
+---
+
+<figure class="tableau-situations">
+  <figcaption id="legende-situations">{typographier(legende)}</figcaption>
+  <table data-test="situations" aria-labelledby="legende-situations">
+    <thead>
+      <tr>{COLONNES.map((c) => <th scope="col">{c}</th>)}</tr>
+    </thead>
+    {
+      lignes.map((ligne) => (
+        <tbody data-situation={ligne.nom}>
+          {ligne.constats.map((c, j) => (
+            <tr>
+              {j === 0 && (
+                <th scope="rowgroup" rowspan={ligne.constats.length}>
+                  <TexteDuScript morceaux={ligne.situation} />
+                </th>
+              )}
+              <td data-colonne="dit" data-etiquette={COLONNES[1]}>
+                <p><span class="niveau">{c.niveau}</span>{DEUX_POINTS}<TexteDuScript morceaux={c.message} /></p>
+              </td>
+              <td data-colonne="faire" data-etiquette={COLONNES[2]}>
+                <p><TexteDuScript morceaux={c.aFaire} /></p>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      ))
+    }
+  </table>
+</figure>
+
+<style>
+  .tableau-situations {
+    margin: 1.1em 0 1.2em;
+  }
+
+  figcaption {
+    margin-bottom: 8px;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 17px;
+    line-height: 1.4;
+  }
+
+  thead th {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1.3;
+    color: var(--indigo-doux);
+    text-align: left;
+    vertical-align: bottom;
+    padding: 0 16px 6px 0;
+    border-bottom: 2px solid var(--indigo);
+  }
+
+  tbody th,
+  td {
+    text-align: left;
+    vertical-align: top;
+    padding: 10px 16px 10px 0;
+  }
+
+  /* Un filet entre deux situations ; aucun entre les constats d'une même situation. */
+  tbody + tbody {
+    border-top: 1px solid var(--brume);
+  }
+
+  tbody tr + tr td {
+    padding-top: 0;
+  }
+
+  tbody th {
+    font-weight: 600;
+    width: 24%;
+  }
+
+  td[data-colonne='dit'] {
+    width: 40%;
+  }
+
+  th:last-child,
+  td:last-child {
+    padding-right: 0;
+  }
+
+  td p {
+    margin: 0;
+  }
+
+  .niveau {
+    font-family: var(--titres);
+    font-weight: 600;
+  }
+
+  @media (max-width: 720px) {
+    table,
+    tbody,
+    tr,
+    tbody th,
+    td,
+    td[data-colonne] {
+      display: block;
+      width: auto;
+    }
+
+    /* Les noms des colonnes passent au-dessus de chaque cellule (::before). */
+    thead {
+      display: none;
+    }
+
+    tbody {
+      padding: 10px 0 12px;
+    }
+
+    tbody,
+    tbody + tbody {
+      border-top: 2px solid var(--indigo);
+    }
+
+    tbody th,
+    td,
+    tbody tr + tr td {
+      padding: 4px 0;
+    }
+
+    td::before {
+      content: attr(data-etiquette);
+      display: block;
+      font-family: var(--titres);
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--indigo-doux);
+      margin: 6px 0 2px;
+    }
+  }
+</style>

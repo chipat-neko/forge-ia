@@ -1,0 +1,53 @@
+---
+// Les sources d'un fait de la recherche cité par le chapitre 0.3, dans la note
+// de l'étape : leurs liens, et la date où chacune a été relue (formaterDate).
+// « Sources, vérifiées le 5 novembre 2026 : a, b. » quand elles ont la même
+// date ; sinon, la date suit chaque lien.
+//
+//   <SourcesNote sources={SOURCES_0_3.pilote} />
+import { formaterDate } from '../../../lib/calculateur/formats';
+import type { SourceVerifiee } from '../../../lib/partie-0/sources-0-3';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  sources: readonly SourceVerifiee[];
+}
+
+const { sources } = Astro.props;
+if (sources.length === 0) {
+  throw new Error('SourcesNote sans source : passe au moins une source dans la prop sources.');
+}
+
+const dates = [...new Set(sources.map((s) => s.verifieLe))];
+const memeDate = dates.length === 1;
+const plusieurs = sources.length > 1;
+const debut = memeDate
+  ? `${plusieurs ? 'Sources, vérifiées' : 'Source, vérifiée'} le ${formaterDate(dates[0])} : `
+  : `${plusieurs ? 'Sources' : 'Source'} : `;
+---
+
+<p class="sources-poste">
+  {typographier(debut)}{
+    sources.map((s, i) => (
+      <>
+        <a href={s.url}>{typographier(s.titre)}</a>
+        {!memeDate && ` (vérifiée le ${formaterDate(s.verifieLe)})`}
+        {i < sources.length - 1 ? (memeDate ? ', ' : typographier(' ; ')) : '.'}
+      </>
+    ))
+  }
+</p>
+
+<style>
+  .sources-poste {
+    font-family: var(--titres);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--indigo-doux);
+  }
+
+  .sources-poste a {
+    color: var(--indigo-doux);
+    overflow-wrap: anywhere;
+  }
+</style>

@@ -1,0 +1,118 @@
+---
+// Les cartes de l'encadré « labo » du chapitre 0.3, dans un même tableau
+// typographié : leur mémoire et leur calcul, lus dans les données sourcées du
+// calculateur (MATERIELS, dans calculateur/donnees.ts), jamais recopiés. Les
+// sources des cartes sont celles de l'encadré.
+//
+// Posé dans l'encadré, sur son fond indigo : les filets et les en-têtes
+// prennent les teintes claires de l'encadré.
+import { materiel } from '../../../lib/calculateur/donnees';
+import { decimalesUtiles, nombre } from '../../../lib/nombres';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  /** Les identifiants des cartes dans MATERIELS, dans l'ordre du tableau. */
+  cartes: string[];
+  /** La légende, au-dessus du tableau. */
+  legende: string;
+}
+
+const { cartes, legende } = Astro.props;
+const lignes = cartes.map((id) => {
+  const m = materiel(id);
+  return [m.nom, `${nombre(m.memoireGo)} Go`, nombre(m.creteTflops, decimalesUtiles(m.creteTflops))];
+});
+---
+
+<figure class="tableau-cartes">
+  <figcaption id="legende-cartes">{typographier(legende)}</figcaption>
+  <table data-test="cartes" aria-labelledby="legende-cartes">
+    <thead>
+      <tr>
+        <th scope="col">Carte</th>
+        <th scope="col" class="nombre">Mémoire</th>
+        <th scope="col" class="nombre">Calcul, en TFLOPS</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        lignes.map(([nom, memoire, calcul]) => (
+          <tr>
+            <th scope="row">{nom}</th>
+            <td class="nombre">{memoire}</td>
+            <td class="nombre">{calcul}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</figure>
+
+<style>
+  .tableau-cartes {
+    margin: 18px 0 0;
+  }
+
+  figcaption {
+    font-size: 17px;
+    line-height: 1.45;
+    margin-bottom: 8px;
+  }
+
+  table {
+    border-collapse: collapse;
+    font-size: 18px;
+    line-height: 1.35;
+  }
+
+  thead th {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--brume);
+    text-align: left;
+    vertical-align: bottom;
+    padding: 0 24px 6px 0;
+    border-bottom: 2px solid var(--brume-claire);
+  }
+
+  tbody th,
+  td {
+    text-align: left;
+    padding: 6px 24px 6px 0;
+    border-bottom: 1px solid var(--indigo-doux);
+  }
+
+  tbody th {
+    font-weight: 600;
+    color: var(--papier);
+  }
+
+  th:last-child,
+  td:last-child {
+    padding-right: 0;
+  }
+
+  .nombre {
+    text-align: right;
+    font-family: var(--titres);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  thead .nombre {
+    white-space: normal;
+  }
+
+  @media (max-width: 720px) {
+    table {
+      font-size: 16px;
+    }
+
+    thead th,
+    tbody th,
+    td {
+      padding-right: 14px;
+    }
+  }
+</style>

@@ -26,3 +26,29 @@ export const ALLER_AU_PROJET_0_1 = 'cd forge-ia/projets/0.1-python';
 export const LANCER_MOT_SUIVANT = 'uv run python -m mot_suivant le';
 /** Lancer les tests d'un projet, depuis son dossier. */
 export const LANCER_TESTS = 'uv run pytest';
+
+// ---------- Chapitre 0.3 : le poste, PyTorch et la carte graphique ----------
+// Les extras gpu et cpu sont ceux de projets/0.3-poste/pyproject.toml :
+// commandes.test.ts le vérifie.
+
+/** Voir le pilote NVIDIA, sa version, et la plus haute version de CUDA qu'il accepte. */
+export const NVIDIA_SMI = 'nvidia-smi';
+/** Entrer dans le projet du chapitre 0.3, depuis le dossier où le dépôt a été cloné. */
+export const ALLER_AU_PROJET_0_3 = 'cd forge-ia/projets/0.3-poste';
+/** Installer la version de PyTorch pour la carte NVIDIA (CUDA 13.2), sans rien lancer. */
+export const SYNC_GPU = 'uv sync --extra gpu';
+/** Installer la version de PyTorch pour le processeur seul, sans rien lancer. */
+export const SYNC_CPU = 'uv sync --extra cpu';
+/** Vérifier son poste avec la version de PyTorch pour la carte. */
+export const VERIFIER_POSTE_GPU = 'uv run --extra gpu python -m poste';
+/** Vérifier son poste avec la version de PyTorch pour le processeur seul. */
+export const VERIFIER_POSTE_CPU = 'uv run --extra cpu python -m poste';
+
+// Ce que d'anciens tutoriels font taper, et que le chapitre 0.3 cite pour dire
+// pourquoi ne pas le faire. À ne pas taper : ces commandes ne sont pas
+// vérifiées contre le dépôt, seulement citées.
+
+/** Sous Windows, PyPI ne sert que la version de PyTorch pour le processeur. */
+export const PIP_INSTALL_TORCH = 'pip install torch';
+/** Le canal pytorch d'Anaconda s'est arrêté à PyTorch 2.5. */
+export const CONDA_INSTALL_PYTORCH = 'conda install pytorch -c pytorch';

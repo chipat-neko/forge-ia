@@ -1,0 +1,99 @@
+---
+// L'ouverture du chapitre 0.3 : la ligne que le lecteur veut voir à la fin du
+// chapitre, celle du diagnostic quand PyTorch est prêt à calculer sur la carte.
+// Elle n'est pas recopiée : c'est le constat « carte_prete » de la situation
+// windows_cu132_rtx5070ti des attendus du projet (la RTX 5070 Ti de ce PC, avec
+// la version de PyTorch du projet), écrit comme le script l'écrit
+// (ligneDuRapport). Elle est montrée comme dans un terminal, après la commande
+// qui la produit ; les lignes d'avant sont élidées.
+//
+// Ce n'est pas un relevé : la sortie réelle sur la carte sera relevée à la
+// porte (tâche 16), et le parcours du chapitre vérifiera alors qu'elle contient
+// cette ligne. La légende le dit.
+import { VERIFIER_POSTE_GPU } from '../../../lib/partie-0/commandes';
+import { constat } from '../../../lib/partie-0/poste';
+import { ligneDuRapport } from '../../../lib/partie-0/situations-0-3';
+import { typographier } from '../../../lib/typo';
+
+const ligne = ligneDuRapport(constat('windows_cu132_rtx5070ti', 'carte_prete')).trim();
+const legende = typographier(
+  "La ligne que tu veux voir à la fin de ce chapitre : ce que le script du projet écrit quand tout est prêt, d'après " +
+    'les faits de ce PC, sa RTX 5070 Ti et la version de PyTorch du projet.',
+);
+const constatTexte = typographier(
+  "Pour qu'une carte graphique entraîne ton IA, trois pièces doivent s'accorder : la carte, son pilote et la version " +
+    'de PyTorch. Tu vas les mettre en place, puis lancer un script qui vérifie tout, et qui dit quoi faire quand une ' +
+    'pièce cloche.',
+);
+---
+
+<div class="ouverture-poste" data-test="ouverture">
+  <figure>
+    <div class="terminal">
+      <pre><span class="invite">PS&gt;</span> <span class="commande">{VERIFIER_POSTE_GPU}</span>{'\n'}<span class="elision">…</span>{'\n'}<span class="ligne" data-test="ouverture-ligne">{ligne}</span></pre>
+    </div>
+    <figcaption>{legende}</figcaption>
+  </figure>
+  <p class="constat">{constatTexte}</p>
+</div>
+
+<style>
+  .ouverture-poste {
+    margin: 40px 0 0;
+  }
+
+  figure {
+    margin: 0;
+  }
+
+  /* Le terminal en grand, sur le fond brume claire des blocs de commande. Les lignes passent à la
+     ligne plutôt que de défiler : l'ouverture se lit d'un coup d'œil, sur un téléphone aussi. */
+  .terminal {
+    background: var(--brume-claire);
+    border-radius: 10px;
+  }
+
+  pre {
+    margin: 0;
+    padding: 22px 26px;
+    font-family: var(--mono);
+    font-size: 19px;
+    line-height: 1.55;
+    font-variant-ligatures: none;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--indigo);
+  }
+
+  .invite,
+  .elision {
+    color: var(--indigo-doux);
+    user-select: none;
+  }
+
+  .commande {
+    font-weight: 700;
+  }
+
+  .ligne {
+    font-weight: 600;
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 15px;
+    color: var(--indigo-doux);
+    margin-top: 8px;
+  }
+
+  .constat {
+    margin: 18px 0 0;
+  }
+
+  @media (max-width: 720px) {
+    pre {
+      font-size: 15px;
+      padding: 16px 16px;
+    }
+  }
+</style>

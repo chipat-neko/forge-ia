@@ -1,0 +1,50 @@
+---
+// Un texte du script du projet 0.3 (le message ou le conseil d'un constat, lu
+// dans les attendus), en ligne dans la prose ou dans le tableau du chapitre :
+// ce qui est entre accents graves s'affiche comme du code, le reste est
+// typographié (morceaux, dans situations-0-3.ts). Rien n'est réécrit.
+//
+// Une commande ne se coupe qu'entre ses mots : jamais après le tiret de « -m »
+// ou de « --extra ». Seul un mot plus long que MOT_LONG peut se couper
+// n'importe où, pour tenir dans une colonne étroite. Le texte lu (textContent)
+// est exactement celui du script, accents graves en moins.
+//
+//   <TexteDuScript texte={constat.a_faire} />
+//   <TexteDuScript morceaux={ligne.situation} />
+import { morceaux as decouper, type Morceau } from '../../../lib/partie-0/situations-0-3';
+
+interface Props {
+  /** Le texte, avec ses commandes entre accents graves. */
+  texte?: string;
+  /** Ou le même texte, déjà découpé. */
+  morceaux?: Morceau[];
+}
+
+const { texte, morceaux } = Astro.props;
+if ((texte === undefined) === (morceaux === undefined)) {
+  throw new Error('TexteDuScript : passe soit texte, soit morceaux, mais pas les deux.');
+}
+const MOT_LONG = 20;
+const liste = morceaux ?? decouper(texte!);
+---
+
+{
+  liste.map((m) =>
+    m.code ? (
+      <code class="code-du-script">{m.texte.split(' ').map((mot, i, mots) => <><span class:list={['mot', { long: mot.length > MOT_LONG }]}>{mot}</span>{i < mots.length - 1 ? ' ' : ''}</>)}</code>
+    ) : (
+      m.texte
+    ),
+  )
+}
+
+<style>
+  .mot {
+    white-space: nowrap;
+  }
+
+  .mot.long {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+</style>
