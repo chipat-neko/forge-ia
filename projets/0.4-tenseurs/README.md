@@ -79,16 +79,24 @@ faire, pas une trace Python, et le code de sortie 2.
 ## Les mesures du PC de La Forge IA
 
 Le chapitre 0.4 montre les chronos du PC de La Forge IA (processeur AMD Ryzen
-7 9800X3D, 16 fils ; carte RTX 5070 Ti). Ils sont dans `mesures/` :
+7 9800X3D, 16 fils ; carte RTX 5070 Ti). Ils sont dans `mesures/`, et ont été
+relevés le 05/11/2026, l'un après l'autre, carte au repos : l'entraînement de
+l'IA qui occupait la carte était en pause.
 
 - `mesures/processeur.json`, écrit par
-  `uv run --extra cpu python -m tenseurs mesurer --appareil cpu --sortie mesures/processeur.json`.
-  **Ces chronos sont provisoires** : ils ont été relevés pendant que la carte
-  entraînait une IA, et le processeur en faisait un peu pour elle. Ils seront
-  remesurés à la porte de la Partie 0, machine au repos ;
-- `mesures/rtx-5070-ti.json`, la carte, mesurée seulement à la porte, avec
+  `uv run --extra gpu python -m tenseurs mesurer --appareil cpu --sortie mesures/processeur.json`.
+  C'est la version de PyTorch pour la carte (son champ `torch` le dit), mais
+  `--appareil cpu` fait tout calculer sur le processeur. Pendant la mesure, un
+  relevé de la charge de chaque fil (avec la bibliothèque psutil, hors du
+  projet) a montré les 16 fils au travail avec le réglage « tous les fils ».
+  Sans carte, la même mesure se lance avec `--extra cpu` ;
+- `mesures/rtx-5070-ti.json`, la carte, écrit par
   `uv run --extra gpu python -m tenseurs mesurer --appareil cuda --sortie mesures/rtx-5070-ti.json`.
-  Tant qu'il manque, le chapitre affiche « à mesurer ».
+
+Ces chronos remplacent ceux du processeur relevés pendant l'écriture du
+chapitre, quand la carte entraînait encore cette IA et que le processeur en
+faisait un peu pour elle. Aucun test ne fige une durée : elles dépendent de la
+machine.
 
 Le format (version 1) :
 

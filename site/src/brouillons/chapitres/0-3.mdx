@@ -23,6 +23,8 @@ import TableauSituations from '../../components/chapitres/0-3/TableauSituations.
 import RapportDuScript from '../../components/chapitres/0-3/RapportDuScript.astro';
 import BlocCommande from '../../components/gabarit/BlocCommande.astro';
 import SortieCommande from '../../components/gabarit/SortieCommande.astro';
+import sortieProcesseur from '../../../../projets/0.3-poste/sorties/processeur.txt?raw';
+import sortieCarte from '../../../../projets/0.3-poste/sorties/rtx-5070-ti.txt?raw';
 import { materiel } from '../../lib/calculateur/donnees';
 import { formaterDate } from '../../lib/calculateur/formats';
 import { MESURES_TON_IA, NOMS_TAILLES } from '../../lib/calculateur/ton-ia';
@@ -50,7 +52,9 @@ import {
   architectureQuiSert,
   capaciteArchitecture,
   CONSTATS_HORS_TABLEAU,
+  ligneDuRapport,
   lignesDesSituations,
+  lignesDuRapport,
   nomArchitecture,
 } from '../../lib/partie-0/situations-0-3';
 import {
@@ -127,6 +131,27 @@ export const PYPI = (() => {
   // La situation de PyPI : ce que dit le script, mot pour mot.
   const { faits } = situation('windows_pypi_rtx5070ti');
   return { torch: faits.torch, roue: constat('windows_pypi_rtx5070ti', 'roue_processeur') };
+})();
+
+export const SORTIES = (() => {
+  // Ce que l'étape 5 dit des deux sorties de ce PC (sorties/processeur.txt, et sorties/rtx-5070-ti.txt, relevée à la
+  // porte de la Partie 0, carte au repos), vérifié dans les fichiers : avec la version pour la carte, PyTorch la
+  // voit et l'essai de calcul tourne aussi sur elle ; la carte laissée de côté n'est que dans la sortie du
+  // processeur ; les fils, dans les deux. Et le pilote de l'étape 2, lu dans les attendus, est celui des sorties.
+  const lignes = (texte) => texte.replace(/\r\n?/g, '\n').split('\n');
+  const [processeur, carte] = [lignes(sortieProcesseur), lignes(sortieCarte)];
+  const prete = ligneDuRapport(constat('windows_cu132_rtx5070ti', 'carte_prete'));
+  const roue = ligneDuRapport(PYPI.roue);
+  exiger(carte.includes(prete) && !processeur.includes(prete), 'la carte n’est plus prête avec la version pour la carte, et seulement avec elle : l’étape 5 (« PyTorch la voit ») est à revoir');
+  exiger(carte.some((l) => /^ {2}carte graphique \(cuda\)/.test(l)), 'la sortie de la carte n’a plus d’essai de calcul sur la carte : l’étape 5 est à revoir');
+  exiger(processeur.includes(roue) && !carte.includes(roue), 'la carte laissée de côté n’est plus dans la seule sortie du processeur : l’étape 5 est à revoir');
+  exiger(
+    [processeur, carte].every((s) => lignesDuRapport(FILS.constat).every((l) => s.includes(l))),
+    'les fils que PyTorch n’utilise pas ne sont plus dans les deux sorties : l’étape 5 (« avec l’une comme avec l’autre ») est à revoir',
+  );
+  const pilote = `  Pilote NVIDIA\u202F: ${PC.pilote}, jusqu’à CUDA ${PC.cudaMax}`;
+  exiger(processeur.includes(pilote) && carte.includes(pilote), `les sorties de ce PC n’ont plus le pilote ${PC.pilote} des attendus : l’étape 2 et les attendus sont à revoir`);
+  return { processeur: sortieProcesseur, carte: sortieCarte };
 })();
 
 export const RECENTE = (() => {
@@ -338,6 +363,8 @@ Voici ce qu'il affiche sur ce PC, avec la version pour le processeur. La carte e
   absent="La sortie sur ce PC, avec la version pour processeur, s'affichera ici."
 />
 
+Et voici ce qu'il affiche avec la version pour la carte : PyTorch la voit, et l'essai de calcul tourne aussi sur elle.
+
 <SortieCommande
   fichier="projets/0.3-poste/sorties/rtx-5070-ti.txt"
   commande={VERIFIER_POSTE_GPU}
@@ -345,7 +372,7 @@ Voici ce qu'il affiche sur ce PC, avec la version pour le processeur. La carte e
   absent="La sortie sur la RTX 5070 Ti s'affichera ici : on la relève quand la carte sera libre."
 />
 
-Chaque constat a un niveau : « bon », « attention » si ça marche moins bien que ça pourrait, « problème » s'il faut agir. Ici, le script met au niveau « attention » la carte laissée de côté, et les fils du processeur que PyTorch n'utilise pas. La dernière ligne compte les problèmes ; s'il y en a, le script rend un code d'erreur.
+Chaque constat a un niveau : « bon », « attention » si ça marche moins bien que ça pourrait, « problème » s'il faut agir. Avec la version pour le processeur, le script met au niveau « attention » la carte laissée de côté. Avec l'une comme avec l'autre, il y met aussi les fils du processeur que PyTorch n'utilise pas. La dernière ligne compte les problèmes ; s'il y en a, le script rend un code d'erreur.
 
 Le diagnostic est une seule fonction, `diagnostiquer`. Elle ne lance rien : elle lit des faits et rend des constats. On peut donc la tester sur les postes d'autres lecteurs, décrits à la main, sans leur ordinateur. Voici la règle des générations, puis la chaîne de décision ; le texte de chaque constat est plus bas dans le fichier.
 
@@ -375,9 +402,9 @@ Les projets suivants calculent sur la carte quand PyTorch la voit, sinon sur le 
 
 <Fragment slot="note">
 
-Le script enregistre aussi sa sortie, avec la date du relevé : c'est ainsi que cette page montre la vraie sortie de ce PC, et pas une copie.
+Le script enregistre aussi sa sortie, avec la date du relevé : c'est ainsi que cette page montre les vraies sorties de ce PC, et pas des copies.
 
-Les projets des chapitres 0.4 et 0.5 auront une copie de `appareil.py`.
+Les projets des chapitres 0.4 et 0.5 ont une copie de `appareil.py`.
 
 </Fragment>
 

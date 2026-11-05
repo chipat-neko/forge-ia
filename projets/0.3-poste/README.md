@@ -70,6 +70,11 @@ Voici sa sortie sur le PC de La Forge IA, avec la version de PyTorch pour le
 processeur, alors que ce PC a une RTX 5070 Ti : `sorties/processeur.txt`. Elle
 montre deux constats « attention » et aucun problème.
 
+Avec la version pour la carte, sa sortie est `sorties/rtx-5070-ti.txt`,
+relevée le 05/11/2026, carte au repos (l'entraînement de l'IA qui l'occupait
+était en pause) : la carte est prête, l'essai de calcul tourne aussi sur elle,
+et seul le constat des fils reste en « attention ».
+
 Chaque constat a un niveau : **bon**, **attention** (ça marche, mais moins bien
 que ça pourrait) ou **problème** (il faut agir). La dernière ligne compte les
 problèmes : « Diagnostic terminé : 0 problème(s). ». S'il y en a, le script
@@ -126,6 +131,7 @@ changer de version de PyTorch.
 
 ```bash
 uv run --extra cpu python -m poste --enregistrer sorties/processeur.txt
+uv run --extra gpu python -m poste --enregistrer sorties/rtx-5070-ti.txt
 ```
 
 Le fichier contient la même sortie, en UTF-8, précédée de la ligne

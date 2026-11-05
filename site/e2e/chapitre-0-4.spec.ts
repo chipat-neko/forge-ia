@@ -10,9 +10,11 @@
 // sans Vite, peut les importer (B1). Les attendus du projet (attendus-formes.json,
 // 210 Ko) sont lus par readFileSync, jamais importés.
 //
-// Les chronos du processeur sont provisoires (refaits à la porte) et ceux de la
-// carte n'existent pas encore : rien ici ne fige une durée, tout se recalcule
-// depuis les fichiers.
+// Les chronos du processeur et de la carte ont été relevés à la porte de la
+// Partie 0, carte au repos (le 5 novembre 2026), et pourraient l'être encore :
+// rien ici ne fige une durée, tout se recalcule depuis les fichiers. Le
+// chapitre n'a plus aucune valeur « à mesurer » : le fichier de la carte doit
+// être là.
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test, expect, type Locator, type Page } from '@playwright/test';
@@ -29,7 +31,19 @@ import { A_DEPART, B_DEPART, DEFI_FORMES_REUSSI, expliquer, type Operation } fro
 import * as commandes from '../src/lib/partie-0/commandes';
 import { ecrireForme, formeDiffusee, formeProduit } from '../src/lib/partie-0/formes';
 import { FICHIERS_MESURES, lireMesures, type MesuresChrono } from '../src/lib/partie-0/mesures';
-import { choixDiffusion, choixFils, choixMemoire, ecrireMillisecondes, phraseFils, questionFils } from '../src/lib/partie-0/paris-0-4';
+import {
+  choixDiffusion,
+  choixFils,
+  choixMemoire,
+  choixPetiteMatrice,
+  ecrireMillisecondes,
+  explicationPetite,
+  phraseCarteEtProcesseur,
+  phraseFils,
+  phraseTransfert,
+  questionFils,
+  questionPetite,
+} from '../src/lib/partie-0/paris-0-4';
 import {
   attendreHydratation,
   plusLongueLigne,
@@ -47,7 +61,15 @@ const FINE = '\u202F';
 // Playwright tourne dans site/ : le dépôt est un dossier plus haut.
 const RACINE = resolve('..');
 const PROCESSEUR = lireMesures('processeur', RACINE)!;
-const CARTE = lireMesures('rtx-5070-ti', RACINE);
+const CARTE_LUE = lireMesures('rtx-5070-ti', RACINE);
+if (CARTE_LUE === null) {
+  throw new Error(
+    `${FICHIERS_MESURES['rtx-5070-ti']} manque : le chapitre 0.4 a besoin des chronos de la carte (pari « petite », ` +
+      'tableau, phrases de l’étape 6). Mesure-la avec « uv run --extra gpu python -m tenseurs mesurer --appareil cuda ' +
+      '--sortie mesures/rtx-5070-ti.json », dans projets/0.4-tenseurs, carte au repos.',
+  );
+}
+const CARTE: MesuresChrono = CARTE_LUE;
 const ATTENDUS = JSON.parse(readFileSync('../projets/0.4-tenseurs/tests/attendus-formes.json', 'utf8')) as {
   exemples: { creer: Record<string, { forme: number[] }> };
 };
@@ -63,12 +85,14 @@ const TITRES = [
   'Les fils du processeur',
   'À grande échelle',
 ];
-const PARIS = ['diffusion', 'memoire', 'fils'];
+/** Les paris, dans l'ordre de la page : `petite` est à l'étape 6, avant le tableau des chronos. */
+const PARIS = ['diffusion', 'memoire', 'petite', 'fils'];
 /** Les acquis, dans l'ordre du chapitre ; le texte de `fils` est celui de la décision du contrôleur (ronde 1). */
 const ACQUIS: [string, string][] = [
   ['diffusion', "Une dimension de taille 1 s'étire pour suivre l'autre."],
   ['formes', 'Pour A @ B, les colonnes de A doivent égaler les lignes de B.'],
   ['memoire', "La mémoire d'un tenseur, c'est son nombre de cases fois la taille d'un nombre."],
+  ['petite', 'Pour un petit calcul, la carte ne gagne pas toujours.'],
   ['fils', 'Le processeur aussi calcule en parallèle, sur plusieurs fils ; pour les prendre tous, il faut le demander.'],
 ];
 const NB_ACQUIS = ACQUIS.length;
@@ -185,11 +209,13 @@ test('chapitre 0.4 complet', async ({ page }) => {
   await attendreHydratation(page);
   const { total } = trouverChapitre('0.4');
   await expect(page.locator('header')).toContainText(`Partie 0, chapitre 0.4 sur ${total}`);
-  // Huit étapes, dans l'ordre, trois paris et quatre acquis.
+  // Huit étapes, dans l'ordre, quatre paris et cinq acquis ; le programme les compte.
   const titres = page.locator('.etape h2');
   await expect(titres).toHaveCount(TITRES.length);
   expect(await titres.evaluateAll((h) => h.map((e) => e.textContent))).toEqual(TITRES.map(typographier));
+  expect(await texteExact(page.locator('.programme'))).toContain(`${TITRES.length} étapes, ${PARIS.length} paris`);
   await expect(page.locator('[data-pari]')).toHaveCount(PARIS.length);
+  expect(await page.locator('[data-pari]').evaluateAll((p) => p.map((e) => e.getAttribute('data-pari')))).toEqual(PARIS);
   await expect(page.locator('#recap [data-acquis]')).toHaveCount(NB_ACQUIS);
   for (const [cle, texte] of ACQUIS) {
     expect(await texteExact(page.locator(`#recap [data-acquis="${cle}"]`)), cle).toContain(typographier(texte));
@@ -230,6 +256,7 @@ test('les choix des paris viennent du jumeau des formes et des mesures', async (
   const attendus: Record<string, { texte: string; juste?: boolean }[]> = {
     diffusion: choixDiffusion(),
     memoire: choixMemoire(),
+    petite: choixPetiteMatrice(PROCESSEUR, CARTE),
     fils: choixFils(PROCESSEUR),
   };
   for (const id of PARIS) {
@@ -250,6 +277,20 @@ test('les choix des paris viennent du jumeau des formes et des mesures', async (
   const question = await texteExact(page.locator('[data-pari="fils"] .q'));
   expect(question).toContain(typographier(questionFils(PROCESSEUR)));
   expect(question).toContain(`Avec ${PROCESSEUR.fils_max} fils au lieu de ${PROCESSEUR.fils_par_defaut}`);
+  // La petite matrice : le meilleur chrono du processeur à 64, tous fils confondus, contre celui de la carte ;
+  // « autant » sous 10 % d'écart.
+  const meilleurP = Math.min(...PROCESSEUR.mesures.filter((x) => x.taille === 64).map((x) => x.millisecondes));
+  const surLaCarte = ms(CARTE, 64, null);
+  const petite =
+    Math.max(meilleurP, surLaCarte) / Math.min(meilleurP, surLaCarte) < 1.1
+      ? "Autant l'un que l'autre"
+      : meilleurP < surLaCarte
+        ? 'Le processeur'
+        : 'La carte';
+  expect(await page.locator('[data-pari="petite"] [data-juste]').textContent()).toBe(typographier(petite));
+  expect(await texteExact(page.locator('[data-pari="petite"] .q'))).toContain(questionPetite());
+  // La carte ne gagne pas au plus petit produit : c'est ce que l'acquis « petite » retient.
+  expect(petite).not.toBe('La carte');
 });
 
 test('l’atelier suit formeDiffusee et formeProduit, réglé au clavier', async ({ page }) => {
@@ -364,23 +405,19 @@ test('le tableau des chronos est celui des fichiers de mesures', async ({ page }
   await expect(lignes).toHaveCount(tailles.length);
   for (const [i, t] of tailles.entries()) {
     const cellules = await lignes.nth(i).locator('th, td').evaluateAll((c) => c.map((e) => e.textContent ?? ''));
-    const carte = CARTE === null ? 'à mesurer' : ecrireMillisecondes(ms(CARTE, t, null));
+    const carte = ecrireMillisecondes(ms(CARTE, t, null));
     expect(cellules, `${t}`).toEqual([`${nombre(t)} × ${nombre(t)}`, ...fils.map((f) => ecrireMillisecondes(ms(PROCESSEUR, t, f))), carte]);
   }
-  // La carte est mesurée à la porte : d'ici là, seul l'en-tête de sa colonne porte data-a-mesurer.
-  const aMesurer = page.locator('[data-a-mesurer]');
-  if (existsSync(`../${FICHIERS_MESURES['rtx-5070-ti']}`)) {
-    await expect(aMesurer).toHaveCount(0);
-  } else {
-    await expect(aMesurer).toHaveCount(1);
-    await expect(tableau.locator('thead th[data-a-mesurer]')).toHaveText('Carte');
-  }
+  // La carte a été mesurée à la porte : plus aucune valeur « à mesurer » dans le chapitre.
+  await expect(page.locator('[data-a-mesurer]')).toHaveCount(0);
+  await expect(tableau.locator('.a-mesurer')).toHaveCount(0);
   // La légende : les appareils, la version de PyTorch et la date du relevé, lus dans les fichiers.
   const legende = await texteExact(page.locator('[data-test="chronos-legende"]'));
-  expect(legende).toContain(PROCESSEUR.nom);
-  expect(legende).toContain(PROCESSEUR.torch);
-  expect(legende).toContain(formaterDate(PROCESSEUR.releve_le));
-  expect(legende).toContain(CARTE === null ? materiel('rtx-5070-ti').nom : CARTE.nom);
+  for (const m of [PROCESSEUR, CARTE]) {
+    expect(legende, m.appareil).toContain(m.nom);
+    expect(legende, m.appareil).toContain(`PyTorch ${m.torch}, relevé le ${formaterDate(m.releve_le)}`);
+  }
+  expect(legende).not.toContain('à mesurer');
   // Pas d'espace vide au-dessus du tableau (ronde 1) : le premier mot de la légende suit de près le paragraphe d'avant.
   const ecart = await page.locator('.tableau-chronos').evaluate((figure) => {
     const marcheur = document.createTreeWalker(figure.querySelector('figcaption')!, NodeFilter.SHOW_TEXT);
@@ -468,6 +505,18 @@ test('l’ouverture, les exemples, la mémoire et l’encadré viennent des donn
   expect(etape5).toContain(pic);
   // Étape 7 : l'explication du pari « fils » est celle que tirent les mesures (phraseFils).
   expect(await texteExact(page.locator('[data-pari="fils"] .explication'))).toContain(phraseFils(PROCESSEUR));
+  // Étape 6 : le pari « petite », avant le tableau (qui donnerait la réponse), puis ce que montrent les chronos,
+  // puis le prix du transfert ; chaque phrase est celle que tirent les deux fichiers de mesures.
+  const etape6 = page.locator('#etape-6');
+  expect(await texteExact(etape6.locator('[data-pari="petite"] .explication'))).toContain(explicationPetite(PROCESSEUR, CARTE));
+  expect(await texteExact(etape6.locator('[data-test="chronos-phrase"]'))).toBe(phraseCarteEtProcesseur(PROCESSEUR, CARTE));
+  expect(await texteExact(etape6.locator('[data-test="transfert-phrase"]'))).toBe(phraseTransfert(CARTE));
+  const ordre = await etape6.evaluate((etape) =>
+    [...etape.querySelectorAll('[data-pari="petite"], [data-test="chronos"], [data-test="chronos-phrase"], [data-test="transfert-phrase"]')].map(
+      (e) => e.getAttribute('data-pari') ?? e.getAttribute('data-test'),
+    ),
+  );
+  expect(ordre).toEqual(['petite', 'chronos', 'chronos-phrase', 'transfert-phrase']);
   // L'encadré : la crête d'une H100 en bf16, et les efficacités de PaLM et de Llama 3, sourcées.
   const labo = page.locator('#etape-8 .labo');
   const texteLabo = await texteExact(labo);
@@ -479,8 +528,8 @@ test('l’ouverture, les exemples, la mémoire et l’encadré viennent des donn
     expect(liens, r.modele).toContain(r.source.url);
     expect(texteLabo, r.modele).toContain(r.min === r.max ? pourcent(r.min, 1) : `${pourcent(r.min, 0).replace(`${FINE}%`, '')} à ${pourcent(r.max, 0)}`);
   }
-  // Aucune version de Colab ni de PyTorch dans le texte, sauf celle du fichier de mesures, dans la légende des chronos.
-  const texte = (await texteExact(page.locator('main'))).replaceAll(PROCESSEUR.torch, '');
+  // Aucune version de Colab ni de PyTorch dans le texte, sauf celles des fichiers de mesures, dans la légende des chronos.
+  const texte = (await texteExact(page.locator('main'))).replaceAll(PROCESSEUR.torch, '').replaceAll(CARTE.torch, '');
   expect(texte).not.toMatch(/\b2\.\d+\.\d+/);
 });
 
@@ -497,9 +546,11 @@ test('sans JavaScript, l’atelier montre (3, 1) + (4,) = (3, 4), et tout se lit
   expect(await texteExact(page.locator('[data-test="formes-resultat"]'))).toBe('(3, 4)');
   expect(await texteExact(page.locator('[data-test="formes-explication"]'))).toBe(expliquer(A_DEPART, B_DEPART, 'plus'));
   await expect(page.locator('[data-test="formes-grille"]')).toBeVisible();
-  // Les explications des trois paris sont données d'emblée, et le tableau des chronos est là.
+  // Les explications des quatre paris sont données d'emblée ; le tableau des chronos et ses phrases sont là.
   for (const id of PARIS) await expect(page.locator(`[data-pari="${id}"] .verdict`)).toBeVisible();
   await expect(page.locator('[data-test="chronos"]')).toBeVisible();
+  await expect(page.locator('[data-test="chronos-phrase"]')).toBeVisible();
+  await expect(page.locator('[data-test="transfert-phrase"]')).toBeVisible();
   await expect(page.locator('#etape-8 .labo')).toBeVisible();
   await verifierSansDebordement(page);
   await ctx.close();

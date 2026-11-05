@@ -1,9 +1,9 @@
 // Les chronos du projet 0.4, lus dans projets/0.4-tenseurs/mesures/*.json.
 //
-// Le processeur est mesuré pendant les tâches (mesures provisoires, refaites à
-// la porte, machine au repos). La carte n'est mesurée qu'à la porte : tant que
-// mesures/rtx-5070-ti.json manque, lireMesures('rtx-5070-ti', …) vaut null, et
-// le chapitre affiche « à mesurer ». Quand il existe, son format est vérifié.
+// Le processeur et la carte ont été mesurés à la porte de la Partie 0, carte au
+// repos. Tant que mesures/rtx-5070-ti.json manque, lireMesures('rtx-5070-ti', …)
+// vaut null, et le tableau affiche « à mesurer ». Quand il existe, son format
+// est vérifié.
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

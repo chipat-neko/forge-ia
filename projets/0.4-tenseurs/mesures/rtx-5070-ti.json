@@ -1,0 +1,43 @@
+{
+ "version": 1,
+ "releve_le": "2026-11-05",
+ "appareil": "cuda",
+ "nom": "NVIDIA GeForce RTX 5070 Ti",
+ "torch": "2.15.0+cu132",
+ "fils_par_defaut": 8,
+ "fils_max": 16,
+ "mesures": [
+  {
+   "taille": 64,
+   "fils": null,
+   "millisecondes": 0.019
+  },
+  {
+   "taille": 256,
+   "fils": null,
+   "millisecondes": 0.0216
+  },
+  {
+   "taille": 1024,
+   "fils": null,
+   "millisecondes": 0.0997
+  },
+  {
+   "taille": 2048,
+   "fils": null,
+   "millisecondes": 0.5442
+  },
+  {
+   "taille": 4096,
+   "fils": null,
+   "millisecondes": 3.82
+  }
+ ],
+ "transfert_ms": {
+  "64": 0.0157,
+  "256": 0.0654,
+  "1024": 0.2367,
+  "2048": 0.7835,
+  "4096": 3.75
+ }
+}

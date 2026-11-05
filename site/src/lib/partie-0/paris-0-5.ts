@@ -263,3 +263,74 @@ export function ecartsDeLaSortie(texte: string): { gradients: string; valeurGrad
   }
   return { gradients: g[1], valeurGradients: lireEcart(g[1]), poids: p[1], valeurPoids: lireEcart(p[1]) };
 }
+
+// ---------- Les durées des sorties : la carte contre le processeur ----------
+
+/** La carte est « la plus lente » si elle met au moins 10 % de temps de plus que le processeur. */
+export const SEUIL_PLUS_LENTE = 1.1;
+
+/** La durée de l'entraînement PyTorch dans une sortie du script, telle qu'il l'écrit et en nombre. */
+export interface DureeDeSortie {
+  /** Le nombre de pas, tel que le script l'écrit (« 3 000 », l'espace fine comprise). */
+  pas: string;
+  appareil: 'cpu' | 'cuda';
+  /** La durée telle que le script l'écrit, sans « ms » : « 439 », « 2 307 », « 0,50 ». */
+  texte: string;
+  millisecondes: number;
+}
+
+/**
+ * La durée de l'entraînement PyTorch dans une sortie enregistrée du script
+ * (sorties/*.txt), lue sur la ligne « 3 000 pas sur … (cpu) : 439 ms. ». Le
+ * nombre est celui du script (au moins 2 chiffres significatifs, espace fine
+ * entre les milliers, virgule) : il n'est jamais recalculé.
+ */
+export function dureeDeLaSortie(texte: string): DureeDeSortie {
+  const ligne = new RegExp(
+    `^ {2}(\\d[\\d${FINE}]*) pas sur .+ \\((cpu|cuda)\\)${FINE}: (\\d[\\d${FINE}]*(?:,\\d+)?) ms\\.$`,
+    'm',
+  );
+  const m = ligne.exec(texte.replace(/\r\n?/g, '\n'));
+  if (m === null) {
+    throw new Error(
+      'La sortie du projet 0.5 n’a plus sa ligne de durée (« … pas sur … (cpu) : … ms. »). Relance ' +
+        '« uv run --extra cpu python -m premier_reseau entrainer --appareil cpu --enregistrer sorties/processeur.txt », ' +
+        'ou avec --extra gpu et --appareil cuda pour sorties/rtx-5070-ti.txt, dans projets/0.5-reseau.',
+    );
+  }
+  return {
+    pas: m[1],
+    appareil: m[2] as 'cpu' | 'cuda',
+    texte: m[3],
+    millisecondes: Number(m[3].replaceAll(FINE, '').replace(',', '.')),
+  };
+}
+
+/**
+ * La phrase de l'étape 8 : les deux durées, telles que les sorties les
+ * écrivent, la carte plus lente, et pourquoi. Elle ne vaut que si la carte met
+ * au moins 10 % de temps de plus, pour les mêmes pas : sinon la garde tombe,
+ * et la phrase est à revoir. Le renvoi aux petites matrices du chapitre 0.4
+ * est gardé par le chapitre 0.5 lui-même (explicationPetite des mesures de 0.4).
+ */
+export function phraseDurees(processeur: DureeDeSortie, carte: DureeDeSortie): string {
+  exiger(
+    processeur.appareil === 'cpu' && carte.appareil === 'cuda',
+    'la phrase des durées attend la sortie du processeur, puis celle de la carte',
+  );
+  exiger(
+    processeur.pas === carte.pas,
+    `les deux sorties n’ont pas fait les mêmes pas (${processeur.pas} et ${carte.pas}) : relance-les avec le même projet`,
+  );
+  exiger(
+    carte.millisecondes >= processeur.millisecondes * SEUIL_PLUS_LENTE,
+    `la carte (${carte.texte} ms) n’est plus plus lente que le processeur (${processeur.texte} ms) d’au moins 10${FINE}% : ` +
+      'la phrase de l’étape 8 (« la carte est la plus lente », le prix fixe) est à revoir',
+  );
+  return (
+    `Pour les mêmes ${processeur.pas} pas, la carte a mis ${carte.texte}${INSECABLE}ms, et le processeur ${processeur.texte}${INSECABLE}ms${FINE}: ` +
+    'ici, la carte est la plus lente. ' +
+    `Ce petit réseau ne fait que de tout petits calculs${FINE}: comme pour les petites matrices du chapitre 0.4, ` +
+    'le prix fixe de chacun sur la carte dépasse le calcul lui-même.'
+  );
+}

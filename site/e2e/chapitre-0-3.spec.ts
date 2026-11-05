@@ -4,8 +4,9 @@
 // atelier, c'est le terminal du lecteur et le script `python -m poste`.
 //
 // Les attendus viennent des fichiers du projet lus sur le disque (le
-// diagnostic, tests/attendus.json, et la sortie enregistrée sur ce PC,
-// sorties/processeur.txt), des commandes (commandes.ts), des données du
+// diagnostic, tests/attendus.json, et les sorties enregistrées sur ce PC,
+// sorties/processeur.txt et sorties/rtx-5070-ti.txt, relevée à la porte de la
+// Partie 0, carte au repos), des commandes (commandes.ts), des données du
 // calculateur et des faits sourcés du chapitre (sources-0-3.ts). Un parcours,
 // chargé par Node sans Vite, n'importe aucun module à ?raw, .json ou astro:*
 // (B1) : il n'importe ni poste.ts ni paris-0-3.ts, qui lisent le fichier
@@ -50,6 +51,14 @@ const ATTENDUS = JSON.parse(readFileSync('../projets/0.3-poste/tests/attendus.js
 const FICHIER_PROCESSEUR = 'projets/0.3-poste/sorties/processeur.txt';
 const FICHIER_CARTE = 'projets/0.3-poste/sorties/rtx-5070-ti.txt';
 const SORTIE_PROCESSEUR = readFileSync(`../${FICHIER_PROCESSEUR}`, 'utf8');
+// Relevée à la porte : le chapitre n'a plus rien « à mesurer ».
+const SORTIE_CARTE = readFileSync(`../${FICHIER_CARTE}`, 'utf8');
+
+/** Ce que l'étape 5 dit des deux sorties, tel que le MDX l'écrit (avant typographie). */
+const INTRO_CARTE = 'Et voici ce qu’il affiche avec la version pour la carte : PyTorch la voit, et l’essai de calcul tourne aussi sur elle.';
+const NIVEAUX =
+  'Avec la version pour le processeur, le script met au niveau « attention » la carte laissée de côté. ' +
+  'Avec l’une comme avec l’autre, il y met aussi les fils du processeur que PyTorch n’utilise pas.';
 
 /** Les titres des huit étapes, dans l'ordre. */
 const TITRES = [
@@ -163,10 +172,8 @@ test('l’ouverture est la ligne du diagnostic quand la carte est prête', async
   expect(prete.cle).toBe('carte_prete');
   expect(await texteExact(page.locator('[data-test="ouverture-ligne"]'))).toBe(ligneDuRapport(prete).trim());
   await expect(page.locator('[data-test="ouverture"] .commande')).toHaveText(commandes.VERIFIER_POSTE_GPU);
-  // Le jour où la sortie de la carte est relevée (tâche 16), elle doit contenir cette ligne.
-  if (existsSync(`../${FICHIER_CARTE}`)) {
-    expect(readFileSync(`../${FICHIER_CARTE}`, 'utf8').split('\n')).toContain(ligneDuRapport(prete));
-  }
+  // La sortie de la carte, relevée à la porte, contient cette ligne.
+  expect(SORTIE_CARTE.split('\n')).toContain(ligneDuRapport(prete));
 });
 
 test('le tableau des situations est celui des attendus', async ({ page }) => {
@@ -199,28 +206,53 @@ test('le tableau des situations est celui des attendus', async ({ page }) => {
   expect(ligneColab).not.toContain('fils');
 });
 
-test('les sorties : celle du processeur est le fichier, celle de la carte reste à mesurer', async ({ page }) => {
+test('les sorties : celles du processeur et de la carte sont les fichiers, et le texte dit ce qu’elles montrent', async ({ page }) => {
   await page.goto(PAGE);
-  const sortie = page.locator(`[data-sortie="${FICHIER_PROCESSEUR}"]`);
-  await expect(sortie).toHaveCount(1);
-  const lue = lireSortie(SORTIE_PROCESSEUR, FICHIER_PROCESSEUR)!;
-  // Le fichier sans sa première ligne « # relevé le … », caractère pour caractère ; la date est celle du fichier.
-  expect(SORTIE_PROCESSEUR.split('\n')[0]).toMatch(/^# relevé le \d{4}-\d{2}-\d{2}$/);
-  expect(await texteExact(sortie.locator('[data-contenu]'))).toBe(SORTIE_PROCESSEUR.replace(/^[^\n]*\n/, '').replace(/\n+$/, ''));
-  expect(await texteExact(sortie.locator('[data-contenu]'))).toBe(lue.contenu);
-  expect(await texteExact(sortie.locator('figcaption'))).toContain(`relevée le ${formaterDate(lue.releveLe!)}`);
-  await expect(sortie.locator('.commande')).toHaveText(commandes.VERIFIER_POSTE_CPU);
-  // Une seule valeur à mesurer : la sortie de la carte, relevée à la porte (tâche 16).
-  const aMesurer = page.locator('[data-a-mesurer]');
-  if (existsSync(`../${FICHIER_CARTE}`)) {
-    await expect(aMesurer).toHaveCount(0);
-    await expect(page.locator(`[data-sortie="${FICHIER_CARTE}"]`)).toHaveCount(1);
-  } else {
-    await expect(aMesurer).toHaveCount(1);
-    expect(await texteExact(aMesurer)).toBe(
-      typographier('La sortie sur la RTX 5070 Ti s’affichera ici : on la relève quand la carte sera libre.'),
-    );
+  for (const [fichier, texte, commande] of [
+    [FICHIER_PROCESSEUR, SORTIE_PROCESSEUR, commandes.VERIFIER_POSTE_CPU],
+    [FICHIER_CARTE, SORTIE_CARTE, commandes.VERIFIER_POSTE_GPU],
+  ]) {
+    const sortie = page.locator(`#etape-5 [data-sortie="${fichier}"]`);
+    await expect(sortie, fichier).toHaveCount(1);
+    const lue = lireSortie(texte, fichier)!;
+    // Le fichier sans sa première ligne « # relevé le … », caractère pour caractère ; la date est celle du fichier.
+    expect(texte.split('\n')[0], fichier).toMatch(/^# relevé le \d{4}-\d{2}-\d{2}$/);
+    expect(await texteExact(sortie.locator('[data-contenu]')), fichier).toBe(texte.replace(/^[^\n]*\n/, '').replace(/\n+$/, ''));
+    expect(await texteExact(sortie.locator('[data-contenu]')), fichier).toBe(lue.contenu);
+    expect(await texteExact(sortie.locator('figcaption')), fichier).toContain(`relevée le ${formaterDate(lue.releveLe!)}`);
+    await expect(sortie.locator('.commande'), fichier).toHaveText(commande);
   }
+  // La sortie de la carte a été relevée à la porte : plus aucune valeur « à mesurer ».
+  await expect(page.locator('[data-a-mesurer]')).toHaveCount(0);
+
+  // Ce que le texte en dit, vérifié dans les deux sorties.
+  const etape5 = await texteExact(page.locator('#etape-5 .texte'));
+  expect(etape5).toContain(typographier(INTRO_CARTE));
+  expect(etape5).toContain(typographier(NIVEAUX));
+  const lignes = (t: string) => t.split('\n');
+  const prete = trouverSituation(ATTENDUS, 'windows_cu132_rtx5070ti').constats[0];
+  const roue = trouverSituation(ATTENDUS, 'windows_pypi_rtx5070ti').constats[0];
+  const fils = trouverSituation(ATTENDUS, 'fils_par_defaut').constats[1];
+  expect([prete.cle, roue.cle, fils.cle]).toEqual(['carte_prete', 'roue_processeur', 'fils']);
+  // « PyTorch la voit » : la carte est prête avec la version pour la carte, et seulement avec elle.
+  expect(lignes(SORTIE_CARTE)).toContain(ligneDuRapport(prete));
+  expect(lignes(SORTIE_PROCESSEUR)).not.toContain(ligneDuRapport(prete));
+  // « la carte laissée de côté » : seulement avec la version pour le processeur.
+  expect(lignes(SORTIE_PROCESSEUR)).toContain(ligneDuRapport(roue));
+  expect(lignes(SORTIE_CARTE)).not.toContain(ligneDuRapport(roue));
+  // « avec l'une comme avec l'autre », les fils.
+  for (const sortie of [SORTIE_PROCESSEUR, SORTIE_CARTE]) {
+    for (const ligne of lignesDuRapport(fils)) expect(lignes(sortie)).toContain(ligne);
+  }
+  // « l'essai de calcul tourne aussi sur elle ».
+  expect(SORTIE_CARTE).toMatch(new RegExp(`^ {2}carte graphique \\(cuda\\)${FINE}: `, 'm'));
+  expect(SORTIE_PROCESSEUR).not.toMatch(/\(cuda\)/);
+  // Le pilote de ce PC, dit à l'étape 2 d'après les attendus, est celui des deux sorties.
+  const { pilote, cuda_max_pilote: cudaMax } = trouverSituation(ATTENDUS, 'windows_cu132_rtx5070ti').faits;
+  for (const sortie of [SORTIE_PROCESSEUR, SORTIE_CARTE]) {
+    expect(lignes(sortie)).toContain(`  Pilote NVIDIA${FINE}: ${pilote}, jusqu’à CUDA ${cudaMax}`);
+  }
+  expect(await texteExact(page.locator('#etape-2 .texte'))).toContain(`le pilote ${pilote} va jusqu’à CUDA ${cudaMax}`);
 });
 
 test('les commandes affichées sont celles de commandes.ts', async ({ page }) => {
@@ -351,6 +383,7 @@ test('sans JavaScript, tout le chapitre se lit', async ({ browser, baseURL }) =>
   // Les explications des trois paris sont données d'emblée.
   for (const [id] of PARIS) await expect(page.locator(`[data-pari="${id}"] .verdict`)).toBeVisible();
   await expect(page.locator(`[data-sortie="${FICHIER_PROCESSEUR}"]`)).toBeVisible();
+  await expect(page.locator(`[data-sortie="${FICHIER_CARTE}"]`)).toBeVisible();
   await expect(page.locator('#etape-8 .labo')).toBeVisible();
   await verifierSansDebordement(page);
   await ctx.close();

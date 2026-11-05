@@ -1,0 +1,21 @@
+# relevé le 2026-11-05
+Ton poste
+  Système : Windows 11
+  Python : 3.12.13
+  PyTorch : 2.15.0+cu132
+  CUDA dans PyTorch : 13.2
+  Carte vue par PyTorch : NVIDIA GeForce RTX 5070 Ti, capacité 12.0
+  Architectures de ce PyTorch : sm_75, sm_80, sm_86, sm_90, sm_100, sm_120
+  Pilote NVIDIA : 621.01, jusqu’à CUDA 13.5
+  Fils du processeur : 16, dont 8 utilisés par PyTorch
+
+Diagnostic
+  bon : PyTorch 2.15.0+cu132 voit ta carte, NVIDIA GeForce RTX 5070 Ti (capacité 12.0), et sait calculer dessus.
+  attention : PyTorch n’utilise que 8 fils de calcul sur les 16 de ton processeur.
+    À faire : Au début d’un programme qui calcule sur le processeur, écris `torch.set_num_threads(os.cpu_count())` (avec `import os`) : PyTorch prendra tous les fils.
+
+Essai de calcul : deux matrices 512 × 512 multipliées en float32, comparées au calcul en float64
+  processeur (cpu) : 0,47 ms par produit, écart maximal 0,000000077
+  carte graphique (cuda) : 0,033 ms par produit, écart maximal 0,000000077
+
+Diagnostic terminé : 0 problème(s).

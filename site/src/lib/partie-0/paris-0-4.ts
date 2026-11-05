@@ -4,10 +4,11 @@
 // Les bonnes réponses sont calculées, jamais écrites à la main : par le jumeau
 // des formes (formes.ts) pour la diffusion et la mémoire, par les mesures
 // (projets/0.4-tenseurs/mesures/*.json, que lit mesures.ts) pour les fils et la
-// petite matrice. Les chronos du processeur seront refaits à la porte, machine
-// au repos, et ceux de la carte n'y existent qu'à partir de là : tout ce qui en
-// est tiré ici (verdicts, phrases) vaut pour n'importe quelles mesures valides,
-// et paris-0-4.test.ts l'essaie sur de fausses mesures.
+// petite matrice. Les chronos du processeur et de la carte ont été relevés à la
+// porte de la Partie 0, carte au repos, et pourront l'être encore : tout ce qui
+// en est tiré ici (verdicts, phrases) vaut pour n'importe quelles mesures
+// valides, ou s'arrête sur une garde qui dit quelle phrase revoir.
+// paris-0-4.test.ts l'essaie sur de fausses mesures, puis sur les vrais fichiers.
 //
 // Ce module n'importe ni ?raw, ni .json, ni astro:* : le parcours du chapitre
 // l'importe (B1). De mesures.ts, il ne prend que des types.
@@ -15,7 +16,7 @@
 import { OCTETS_PAR_GO } from '../calculateur/formules';
 import type { Choix } from '../choix';
 import { exigeur } from '../exiger';
-import { nombre } from '../nombres';
+import { nombre, pourcent } from '../nombres';
 import { A_DEPART, B_DEPART } from './atelier-formes';
 import { ecrireForme, formeDiffusee, memoireOctets } from './formes';
 import type { MesuresChrono } from './mesures';
@@ -234,7 +235,7 @@ export function phraseFils(m: MesuresChrono): string {
   }
 }
 
-// ---------- Le pari « petite matrice » (à la porte, avec la carte) ----------
+// ---------- Le pari « petite matrice », et ce que montrent les chronos ----------
 
 /** La taille du pari : la plus petite des chronos. */
 export const TAILLE_PETITE = 64;
@@ -242,18 +243,177 @@ export const TAILLE_PETITE = 64;
 export const SEUIL_AUTANT = 1.1;
 
 /**
- * « Pour deux matrices 64 × 64, qui calcule le plus vite ? », d'après le
- * meilleur chrono de chacun à cette taille. N'entre dans le chapitre qu'à la
- * porte (tâche 16), avec les mesures de la carte et l'acquis `petite`.
+ * Le prix fixe de la carte. Une durée sur la carte, c'est un prix fixe P
+ * (envoyer le calcul, attendre qu'elle ait fini) plus le calcul C. Le produit
+ * de la taille suivante demande bien plus d'opérations (64 fois plus de 64 à
+ * 256) : on admet seulement, très prudemment, que son calcul prend au moins
+ * 2 fois celui du petit. Si la carte n'y met que r fois plus de temps, alors
+ * C(petit) ≤ (r − 1) × t et P ≥ (2 − r) × t, où t est la durée du petit
+ * produit : P dépasse C dès que r < 1,5. Au-delà, l'explication du pari ne
+ * serait plus démontrée par le tableau.
  */
-export function choixPetiteMatrice(cpu: MesuresChrono, carte: MesuresChrono): Choix[] {
-  exiger(cpu.appareil === 'cpu' && carte.appareil === 'cuda', 'choixPetiteMatrice attend le processeur, puis la carte');
+export const SEUIL_PRIX_FIXE = 1.5;
+/** Au plus grand produit, la carte va « des dizaines de fois plus vite » que le processeur : de 20 fois à 100 fois. */
+export const SEUIL_BIEN_PLUS_VITE = 20;
+export const SEUIL_CENTAINES = 100;
+/** Copier une matrice prend « à peu près autant » que son produit à 25 % près, dans un sens ou dans l'autre. */
+export const SEUIL_A_PEU_PRES = 1.25;
+
+type VerdictPetite = 'processeur' | 'carte' | 'autant';
+
+/** « 64 × 64 », « 4 096 × 4 096 » : le × entre deux espaces insécables, la taille ne se coupe pas. */
+function ecrireTaille(t: number): string {
+  return `${nombre(t)}${INSECABLE}×${INSECABLE}${nombre(t)}`;
+}
+
+/** Les tailles d'un fichier de mesures, dans l'ordre (croissant, vérifié par mesures.ts). */
+function taillesDe(m: MesuresChrono): number[] {
+  return [...new Set(m.mesures.map((x) => x.taille))];
+}
+
+/** Le verdict du pari « petite » : le meilleur chrono du processeur à 64, tous fils confondus, contre celui de la carte. */
+function verdictPetite(cpu: MesuresChrono, carte: MesuresChrono): { verdict: VerdictPetite; p: number; c: number } {
+  exiger(
+    cpu.appareil === 'cpu' && carte.appareil === 'cuda',
+    'le pari « petite » et ce qui en est tiré attendent les mesures du processeur, puis celles de la carte',
+  );
   const p = meilleurChrono(cpu, TAILLE_PETITE);
   const c = meilleurChrono(carte, TAILLE_PETITE);
   const autant = (p > c ? p / c : c / p) < SEUIL_AUTANT;
+  return { verdict: autant ? 'autant' : p < c ? 'processeur' : 'carte', p, c };
+}
+
+/** La garde commune : si la carte gagne au plus petit produit, l'acquis « petite » n'est plus montré. */
+function exigerPasLaCarte(verdict: VerdictPetite, c: number, p: number): void {
+  exiger(
+    verdict !== 'carte',
+    `la carte calcule le produit ${TAILLE_PETITE} × ${TAILLE_PETITE} en ${ecrireMillisecondes(c)} ms, plus vite que le processeur ` +
+      `(${ecrireMillisecondes(p)} ms) : l’acquis « petite » (« la carte ne gagne pas toujours »), l’explication du pari ` +
+      'et la phrase sous le tableau des chronos sont à revoir',
+  );
+}
+
+/** La question du pari « petite » : « Pour deux matrices 64 × 64, qui calcule le plus vite ? » ; « 64 × 64 » ne se coupe pas. */
+export function questionPetite(): string {
+  return `Pour deux matrices ${ecrireTaille(TAILLE_PETITE)}, qui calcule le plus vite${FINE}?`;
+}
+
+/**
+ * « Pour deux matrices 64 × 64, qui calcule le plus vite ? », d'après le
+ * meilleur chrono de chacun à cette taille. Le pari de l'étape 6 du chapitre,
+ * avant le tableau des chronos, avec l'acquis `petite`.
+ */
+export function choixPetiteMatrice(cpu: MesuresChrono, carte: MesuresChrono): Choix[] {
+  const { verdict } = verdictPetite(cpu, carte);
   return [
-    { texte: 'Le processeur', juste: !autant && p < c },
-    { texte: 'La carte', juste: !autant && c < p },
-    { texte: "Autant l'un que l'autre", juste: autant },
+    { texte: 'Le processeur', juste: verdict === 'processeur' },
+    { texte: 'La carte', juste: verdict === 'carte' },
+    { texte: "Autant l'un que l'autre", juste: verdict === 'autant' },
   ];
+}
+
+/** La preuve du prix fixe, lue dans les chronos de la carte : la taille suivante, bien plus de calcul, à peine plus de temps. */
+function preuveDuPrixFixe(carte: MesuresChrono): string {
+  const tailles = taillesDe(carte);
+  const suivante = tailles[tailles.indexOf(TAILLE_PETITE) + 1];
+  exiger(
+    tailles.includes(TAILLE_PETITE) && suivante !== undefined,
+    `la carte n’a pas de mesure après ${TAILLE_PETITE} : l’explication du pari « petite » n’a plus la preuve de son prix fixe`,
+  );
+  const r = chrono(carte, suivante, null) / chrono(carte, TAILLE_PETITE, null);
+  exiger(
+    r < SEUIL_PRIX_FIXE,
+    `sur la carte, le produit ${suivante} × ${suivante} prend ${nombre(r, 2)} fois le temps du ${TAILLE_PETITE} × ${TAILLE_PETITE}, ` +
+      `pas moins de ${nombre(SEUIL_PRIX_FIXE, 1)} : le tableau ne montre plus que le prix fixe dépasse le calcul ` +
+      '(explication du pari « petite »)',
+  );
+  const calcul = (suivante / TAILLE_PETITE) ** 3;
+  // À deux décimales, 1,00 ou moins ne s'écrit pas « 1,00 fois plus de temps ».
+  const temps = Number(r.toFixed(2)) > 1 ? `n’y met que ${nombre(r, 2)} fois plus de temps` : 'n’y met pas plus de temps';
+  return (
+    `Le tableau juste en dessous le montre${FINE}: le produit ${ecrireTaille(suivante)} demande ` +
+    `${nombre(calcul)} fois plus de calcul, et la carte ${temps}.`
+  );
+}
+
+/**
+ * L'explication du pari « petite », juste pour n'importe quel fichier valide :
+ * les deux chronos ; le prix fixe de la carte, qui dépasse le calcul d'un si
+ * petit produit ; et sa preuve dans le tableau. Si la carte gagne, la garde
+ * tombe : l'acquis « petite » ne serait plus montré.
+ */
+export function explicationPetite(cpu: MesuresChrono, carte: MesuresChrono): string {
+  const { verdict, p, c } = verdictPetite(cpu, carte);
+  exigerPasLaCarte(verdict, c, p);
+  const [tp, tc] = [ecrireMillisecondes(p), ecrireMillisecondes(c)];
+  const debut =
+    verdict === 'processeur'
+      ? `Le processeur${FINE}: ${tp}${INSECABLE}ms au mieux, contre ${tc}${INSECABLE}ms pour la carte.`
+      : `Autant l’un que l’autre${FINE}: ${tp}${INSECABLE}ms au mieux pour le processeur, ${tc}${INSECABLE}ms pour la carte, ` +
+        `moins de ${pourcent(SEUIL_AUTANT - 1)} d’écart.`;
+  const prix =
+    `Sur la carte, chaque calcul a un prix fixe${FINE}: PyTorch doit le lui envoyer, puis attendre qu’elle ait fini. ` +
+    'Pour un si petit produit, ce prix dépasse le calcul lui-même.';
+  return `${debut} ${prix} ${preuveDuPrixFixe(carte)}`;
+}
+
+/**
+ * La phrase sous le tableau des chronos : au plus petit produit, le processeur
+ * (ou autant l'un que l'autre) ; la taille dès laquelle la carte le dépasse, et
+ * reste devant ; au plus grand, des dizaines de fois plus vite que le
+ * processeur au mieux de ses fils. Chaque morceau a sa garde.
+ */
+export function phraseCarteEtProcesseur(cpu: MesuresChrono, carte: MesuresChrono): string {
+  const { verdict, p, c } = verdictPetite(cpu, carte);
+  exigerPasLaCarte(verdict, c, p);
+  const tailles = taillesDe(cpu);
+  // Combien de fois la carte va plus vite que le processeur au mieux de ses fils.
+  const gain = (t: number) => meilleurChrono(cpu, t) / chrono(carte, t, null);
+  const depasse = tailles.findIndex((t) => gain(t) >= SEUIL_AUTANT);
+  const plusGrand = tailles[tailles.length - 1];
+  exiger(
+    depasse >= 0 && depasse < tailles.length - 1,
+    'la carte ne dépasse le processeur qu’au plus grand produit, ou jamais : « dès … » et « pour … » de la phrase ' +
+      'sous le tableau des chronos sont à revoir',
+  );
+  exiger(
+    tailles.slice(depasse).every((t) => gain(t) >= SEUIL_AUTANT),
+    `la carte dépasse le processeur dès ${tailles[depasse]} × ${tailles[depasse]}, puis plus à une taille au-dessus : ` +
+      '« dès … » dans la phrase sous le tableau des chronos est à revoir',
+  );
+  const g = gain(plusGrand);
+  exiger(
+    g >= SEUIL_BIEN_PLUS_VITE && g < SEUIL_CENTAINES,
+    `au plus grand produit, la carte va ${nombre(g, 1)} fois plus vite que le processeur au mieux de ses fils : ` +
+      '« des dizaines de fois » dans la phrase sous le tableau des chronos est à revoir',
+  );
+  const auPlusPetit =
+    verdict === 'processeur' ? 'le processeur va plus vite que la carte' : 'le processeur et la carte vont à peu près aussi vite';
+  return (
+    `Le tableau le montre${FINE}: pour le plus petit produit, ${auPlusPetit}${FINE}; ` +
+    `dès ${ecrireTaille(tailles[depasse])}, la carte le dépasse, et pour ${ecrireTaille(plusGrand)}, ` +
+    'elle va des dizaines de fois plus vite que lui, même avec tous ses fils.'
+  );
+}
+
+/**
+ * Le prix du transfert, au plus grand produit de la carte : la copie d'une
+ * matrice vers la carte, face à son produit par une autre. « À peu près
+ * autant » à 25 % près ; sinon « plus » ou « moins ».
+ */
+export function phraseTransfert(carte: MesuresChrono): string {
+  exiger(
+    carte.appareil === 'cuda' && carte.transfert_ms !== null,
+    'la phrase du transfert attend les mesures de la carte, avec leurs copies vers la carte',
+  );
+  const plusGrand = taillesDe(carte).at(-1)!;
+  const produit = chrono(carte, plusGrand, null);
+  const copie = carte.transfert_ms![String(plusGrand)];
+  exiger(copie !== undefined, `la copie d’une matrice ${plusGrand} × ${plusGrand} vers la carte n’a pas été mesurée`);
+  const comparaison =
+    copie > produit * SEUIL_A_PEU_PRES ? 'plus que' : produit > copie * SEUIL_A_PEU_PRES ? 'moins que' : 'à peu près autant que';
+  return (
+    `Copier une matrice ${ecrireTaille(plusGrand)} sur la carte de ce PC prend ${ecrireMillisecondes(copie)}${INSECABLE}ms${FINE}: ` +
+    `${comparaison} de la multiplier par une autre, ${ecrireMillisecondes(produit)}${INSECABLE}ms.`
+  );
 }

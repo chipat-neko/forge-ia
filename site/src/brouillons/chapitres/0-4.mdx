@@ -3,7 +3,7 @@ partie: 0
 numero: "0.4"
 titre: "Tenseurs et calcul sur GPU"
 chapeau: "Ton IA range tous ses nombres dans des tableaux à plusieurs dimensions, les tenseurs. Tu apprends ici à les créer et à lire leur forme, à prévoir dans un atelier ce qui se multiplie avec quoi, puis à les faire calculer sur la carte graphique, chronomètre en main."
-programme: "8 étapes, 3 paris, environ 30 minutes."
+programme: "8 étapes, 4 paris, environ 30 minutes."
 acquis:
   - cle: diffusion
     texte: "Une dimension de taille 1 s'étire pour suivre l'autre."
@@ -14,6 +14,9 @@ acquis:
   - cle: memoire
     texte: "La mémoire d'un tenseur, c'est son nombre de cases fois la taille d'un nombre."
     ou: "à l'étape 5"
+  - cle: petite
+    texte: "Pour un petit calcul, la carte ne gagne pas toujours."
+    ou: "à l'étape 6"
   - cle: fils
     texte: "Le processeur aussi calcule en parallèle, sur plusieurs fils ; pour les prendre tous, il faut le demander."
     ou: "à l'étape 7"
@@ -48,13 +51,18 @@ import {
   choixDiffusion,
   choixFils,
   choixMemoire,
+  choixPetiteMatrice,
   chrono,
   ecrireMillisecondes,
+  explicationPetite,
   gainDuReglageParDefaut,
   OCTETS_FLOAT32,
   OCTETS_PAR_MO,
+  phraseCarteEtProcesseur,
   phraseFils,
+  phraseTransfert,
   questionFils,
+  questionPetite,
   TAILLE_DU_PARI_FILS,
   TAILLE_DU_PARI_MEMOIRE,
 } from '../../lib/partie-0/paris-0-4';
@@ -230,6 +238,29 @@ export const PROCESSEUR = (() => {
   const m = lireMesures('processeur', new URL('../', root));
   exiger(m !== null, 'le fichier projets/0.4-tenseurs/mesures/processeur.json manque');
   return m;
+})();
+
+export const CARTE = (() => {
+  // Les chronos de la carte, lus dans projets/0.4-tenseurs/mesures/rtx-5070-ti.json : relevés à la porte de la
+  // Partie 0, carte au repos. Le pari « petite » et les phrases de l'étape 6 en ont besoin.
+  const m = lireMesures('rtx-5070-ti', new URL('../', root));
+  exiger(
+    m !== null,
+    'le fichier projets/0.4-tenseurs/mesures/rtx-5070-ti.json manque : le pari « petite » et les phrases de l’étape 6 ont besoin des chronos de la carte',
+  );
+  return m;
+})();
+
+export const PETITE = (() => {
+  // Le pari « petite », avant le tableau des chronos, puis ce que montre le tableau et le prix du transfert : tout
+  // est tiré des deux fichiers de mesures, et chaque phrase a sa garde dans paris-0-4.ts (paris-0-4.test.ts).
+  return {
+    question: questionPetite(),
+    choix: choixPetiteMatrice(PROCESSEUR, CARTE),
+    explication: explicationPetite(PROCESSEUR, CARTE),
+    phrase: phraseCarteEtProcesseur(PROCESSEUR, CARTE),
+    transfert: phraseTransfert(CARTE),
+  };
 })();
 
 export const FILS = (() => {
@@ -487,9 +518,25 @@ Chronométrer un calcul sur la carte cache un piège : PyTorch ne l'attend pas. 
   <li data-lignes="28-29">`finally` rend à PyTorch son réglage des fils, même si le calcul a échoué.</li>
 </CodeExplique>
 
-Voici les chronos de ce PC, pour des matrices carrées de plus en plus grandes. Doubler la taille fait 4 fois plus de cases dans le résultat, et chaque case demande 2 fois plus de produits : 8 fois plus de calcul.
+Le tableau qui suit chronomètre ce produit sur le processeur et sur la carte, pour des matrices carrées de plus en plus grandes. Avant de le lire, parie sur la plus petite.
+
+<Pari
+  id="petite"
+  question={PETITE.question}
+  precision="Les deux matrices sont déjà là où elles calculent : seul le produit est chronométré."
+  choix={PETITE.choix}
+  acquis="petite"
+>
+
+<p>{PETITE.explication}</p>
+
+</Pari>
+
+Voici les chronos de ce PC. Doubler la taille fait 4 fois plus de cases dans le résultat, et chaque case demande 2 fois plus de produits : 8 fois plus de calcul.
 
 <TableauChronos />
+
+<p data-test="chronos-phrase">{PETITE.phrase}</p>
 
 Copier vers la carte a aussi un prix :
 
@@ -498,6 +545,8 @@ Copier vers la carte a aussi un prix :
   <li data-lignes="6-12">Le même chronomètre, autour de `a.to(carte)` : la copie de la mémoire du processeur à celle de la carte, entre deux attentes.</li>
   <li data-lignes="13">La médiane, comme pour le produit.</li>
 </CodeExplique>
+
+<p data-test="transfert-phrase">{PETITE.transfert}</p>
 
 Pour que la carte vaille le voyage, mieux vaut que les tenseurs y restent. C'est ce que fait ton IA : ses poids y sont rangés une fois pour toutes, et seuls les morceaux de texte y voyagent, micro-lot après micro-lot.
 

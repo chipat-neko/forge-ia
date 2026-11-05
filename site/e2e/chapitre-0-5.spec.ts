@@ -33,10 +33,12 @@ import {
   choixExact,
   choixGradientSortie,
   choixXor,
+  dureeDeLaSortie,
   ecartsDeLaSortie,
   ecrireValeur,
   etiquetteCourbe,
   lignesPredictions,
+  phraseDurees,
   type AttenduGraine,
   type AttendusEntrainement,
 } from '../src/lib/partie-0/paris-0-5';
@@ -65,6 +67,8 @@ const E = ATTENDUS.entrainement;
 const FICHIER_PROCESSEUR = 'projets/0.5-reseau/sorties/processeur.txt';
 const FICHIER_CARTE = 'projets/0.5-reseau/sorties/rtx-5070-ti.txt';
 const SORTIE_PROCESSEUR = readFileSync(`../${FICHIER_PROCESSEUR}`, 'utf8');
+// La sortie de la carte, relevée à la porte de la Partie 0, carte au repos : le chapitre n'a plus rien « à mesurer ».
+const SORTIE_CARTE = readFileSync(`../${FICHIER_CARTE}`, 'utf8');
 const AVANT_GOUT = PRESETS_MINI['avant-gout'];
 
 /** Les titres des dix étapes, dans l'ordre. */
@@ -400,34 +404,43 @@ test('le tableau des prédictions est celui des attendus', async ({ page }) => {
   }
 });
 
-test('les sorties : celle du processeur est le fichier, celle de la carte reste à mesurer', async ({ page }) => {
+test('les sorties : celles du processeur et de la carte sont les fichiers, et la phrase des durées en vient', async ({ page }) => {
   await page.goto(PAGE);
-  const sortie = page.locator(`[data-sortie="${FICHIER_PROCESSEUR}"]`);
-  await expect(sortie).toHaveCount(1);
-  const lue = lireSortie(SORTIE_PROCESSEUR, FICHIER_PROCESSEUR)!;
-  expect(await texteExact(sortie.locator('[data-contenu]'))).toBe(lue.contenu);
-  expect(await texteExact(sortie.locator('figcaption'))).toContain(`relevée le ${formaterDate(lue.releveLe!)}`);
-  await expect(sortie.locator('.commande')).toHaveText(commandes.RESEAU_ENTRAINER_CPU);
-  // Le texte cite les deux écarts tels que la sortie les écrit.
+  // Les deux sorties, telles que le script les a enregistrées : contenu, date du relevé, commande.
+  for (const [fichier, texte, commande] of [
+    [FICHIER_PROCESSEUR, SORTIE_PROCESSEUR, commandes.RESEAU_ENTRAINER_CPU],
+    [FICHIER_CARTE, SORTIE_CARTE, commandes.RESEAU_ENTRAINER_GPU],
+  ]) {
+    const sortie = page.locator(`[data-sortie="${fichier}"]`);
+    await expect(sortie, fichier).toHaveCount(1);
+    const lue = lireSortie(texte, fichier)!;
+    expect(await texteExact(sortie.locator('[data-contenu]')), fichier).toBe(lue.contenu);
+    expect(await texteExact(sortie.locator('figcaption')), fichier).toContain(`relevée le ${formaterDate(lue.releveLe!)}`);
+    await expect(sortie.locator('.commande'), fichier).toHaveText(commande);
+  }
+  // La sortie de la carte est à l'étape 8, celle du processeur à l'étape 7.
+  await expect(page.locator(`#etape-7 [data-sortie="${FICHIER_PROCESSEUR}"]`)).toHaveCount(1);
+  await expect(page.locator(`#etape-8 [data-sortie="${FICHIER_CARTE}"]`)).toHaveCount(1);
+  // Le texte cite les deux écarts tels que la sortie du processeur les écrit.
   const { gradients, poids } = ecartsDeLaSortie(SORTIE_PROCESSEUR);
   expect(await texteExact(page.locator('#etape-7 .texte'))).toContain(gradients);
   expect(await texteExact(page.locator('#etape-7 .texte'))).toContain(poids);
-  // Une seule valeur à mesurer : la sortie de la carte, relevée à la porte (tâche 16).
-  const aMesurer = page.locator('[data-a-mesurer]');
-  if (existsSync(`../${FICHIER_CARTE}`)) {
-    await expect(aMesurer).toHaveCount(0);
-    await expect(page.locator(`[data-sortie="${FICHIER_CARTE}"] .commande`)).toHaveText(commandes.RESEAU_ENTRAINER_GPU);
-  } else {
-    await expect(aMesurer).toHaveCount(1);
-    expect(await texteExact(aMesurer)).toBe(
-      typographier('La sortie sur la RTX 5070 Ti s’affichera ici : on la relève quand la carte sera libre.'),
-    );
-  }
-  // Avant la porte, aucune phrase ne compare la vitesse de la carte et celle du processeur.
+  // La carte a été relevée à la porte : plus aucune valeur « à mesurer ».
+  await expect(page.locator('[data-a-mesurer]')).toHaveCount(0);
+  // L'étape 8 ne parle de vitesse que dans la phrase des durées, tirée des deux sorties.
+  const processeur = dureeDeLaSortie(SORTIE_PROCESSEUR);
+  const carte = dureeDeLaSortie(SORTIE_CARTE);
+  expect([processeur.appareil, carte.appareil]).toEqual(['cpu', 'cuda']);
+  const durees = page.locator('#etape-8 [data-test="durees"]');
+  expect(await texteExact(durees)).toBe(phraseDurees(processeur, carte));
+  expect(await texteExact(durees)).toContain(`la carte a mis ${carte.texte}\u00A0ms, et le processeur ${processeur.texte}\u00A0ms`);
+  // Recalculé ici : la carte est bien la plus lente, d'au moins 10 %.
+  expect(carte.millisecondes / processeur.millisecondes).toBeGreaterThanOrEqual(1.1);
   const etape8 = await texteExact(page.locator('#etape-8 .texte'));
   // La taille de la version pour la carte : en Go décimaux, comme PyPI et le chapitre 0.3 (« 2,1 Go »).
   expect(etape8).toContain(enGo(OCTETS_ROUE_CU132_WINDOWS));
-  expect(etape8).not.toMatch(/plus vite|plus lent|moins vite|fois plus|rapide/);
+  const horsPhrase = etape8.replace(await texteExact(durees), '');
+  expect(horsPhrase).not.toMatch(/plus vite|plus lent|moins vite|fois plus|rapide/);
 });
 
 test('le code affiché est celui des régions testées', async ({ page }) => {
@@ -523,6 +536,10 @@ test('sans JavaScript, le neurone est sur ET avec 2 points sur 4, et tout se lit
   for (const id of PARIS) await expect(page.locator(`[data-pari="${id}"] .verdict`)).toBeVisible();
   await expect(page.locator('[data-test="courbe-xor"]')).toBeVisible();
   await expect(page.locator('[data-test="predictions"]')).toBeVisible();
+  // Les deux sorties, et la phrase des durées.
+  await expect(page.locator(`[data-sortie="${FICHIER_PROCESSEUR}"]`)).toBeVisible();
+  await expect(page.locator(`[data-sortie="${FICHIER_CARTE}"]`)).toBeVisible();
+  await expect(page.locator('[data-test="durees"]')).toBeVisible();
   const tableau = page.locator('[data-test="mini-avant-apres"]');
   await verifierStructureAvantApres(tableau, AVANT_GOUT.nbEchantillons);
   await verifierDroiteEnTirets(tableau, AVANT_GOUT.nbEchantillons);

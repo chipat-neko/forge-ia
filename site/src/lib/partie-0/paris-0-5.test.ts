@@ -15,17 +15,20 @@ import {
   choixExact,
   choixGradientSortie,
   choixXor,
+  dureeDeLaSortie,
   ecartsDeLaSortie,
   ecrireValeur,
   etiquetteCourbe,
   lignesPredictions,
   nbCoinces,
   P_DU_PARI,
+  phraseDurees,
   questionCoince,
   questionExact,
   questionGradient,
   type AttenduGraine,
   type AttendusEntrainement,
+  SEUIL_PLUS_LENTE,
   Y_DU_PARI,
 } from './paris-0-5';
 
@@ -40,6 +43,7 @@ const ATTENDUS = JSON.parse(readFileSync('../projets/0.5-reseau/tests/attendus.j
 };
 const E = ATTENDUS.entrainement;
 const SORTIE = readFileSync('../projets/0.5-reseau/sorties/processeur.txt', 'utf8');
+const SORTIE_CARTE = readFileSync('../projets/0.5-reseau/sorties/rtx-5070-ti.txt', 'utf8');
 
 /** Le texte du choix juste (et vérifie qu'il est seul). */
 function juste(choix: Choix[]): string {
@@ -177,5 +181,54 @@ describe('les écarts de la sortie enregistrée (sorties/processeur.txt)', () =>
     });
     expect(ecartsDeLaSortie(texte('1,5 × 10⁻¹³', '5,3 × 10⁻¹⁵')).valeurPoids).toBe(5.3e-15);
     expect(() => ecartsDeLaSortie('rien')).toThrow(/premier_reseau entrainer/);
+  });
+});
+
+describe('les durées des sorties : la carte contre le processeur (étape 8)', () => {
+  /** Une ligne de durée, telle que le script l'écrit. */
+  const ligne = (pas: string, sur: string, appareil: string, ms: string) => `  ${pas} pas sur ${sur} (${appareil})${FINE}: ${ms} ms.
+`;
+  const TROIS_MILLE = `3${FINE}000`;
+  const processeur = dureeDeLaSortie(`avant
+${ligne(TROIS_MILLE, 'le processeur', 'cpu', '439')}après
+`);
+  const carte = dureeDeLaSortie(ligne(TROIS_MILLE, 'la carte graphique, NVIDIA GeForce RTX 5070 Ti', 'cuda', `2${FINE}307`));
+
+  it('lit la durée telle que le script l’écrit, et en nombre', () => {
+    expect(processeur).toEqual({ pas: TROIS_MILLE, appareil: 'cpu', texte: '439', millisecondes: 439 });
+    expect(carte).toEqual({ pas: TROIS_MILLE, appareil: 'cuda', texte: `2${FINE}307`, millisecondes: 2307 });
+    // Le script écrit 2 chiffres significatifs au moins : « 0,50 » sous la milliseconde.
+    expect(dureeDeLaSortie(ligne(TROIS_MILLE, 'le processeur', 'cpu', '0,50')).millisecondes).toBe(0.5);
+    expect(() => dureeDeLaSortie('rien')).toThrow(/premier_reseau entrainer/);
+  });
+
+  it('la phrase : les deux durées, la carte plus lente, et pourquoi', () => {
+    expect(SEUIL_PLUS_LENTE).toBe(1.1);
+    expect(phraseDurees(processeur, carte)).toBe(
+      `Pour les mêmes ${TROIS_MILLE} pas, la carte a mis 2${FINE}307${INSECABLE}ms, et le processeur 439${INSECABLE}ms${FINE}: ici, la carte est la plus lente. ` +
+        `Ce petit réseau ne fait que de tout petits calculs${FINE}: comme pour les petites matrices du chapitre 0.4, ` +
+        'le prix fixe de chacun sur la carte dépasse le calcul lui-même.',
+    );
+  });
+
+  it('chaque garde : la carte au moins 10 % plus lente, les appareils dans l’ordre, les mêmes pas', () => {
+    const surLaCarte = (ms: string) => dureeDeLaSortie(ligne(TROIS_MILLE, 'la carte graphique', 'cuda', ms));
+    expect(() => phraseDurees(processeur, surLaCarte('480'))).toThrow(/plus lente/);
+    expect(() => phraseDurees(processeur, surLaCarte('483'))).not.toThrow();
+    expect(() => phraseDurees(processeur, surLaCarte('120'))).toThrow(/plus lente/);
+    expect(() => phraseDurees(carte, processeur)).toThrow(/processeur.*carte/);
+    const moinsDePas = dureeDeLaSortie(ligne(`2${FINE}000`, 'la carte graphique', 'cuda', '900'));
+    expect(() => phraseDurees(processeur, moinsDePas)).toThrow(/mêmes pas/);
+  });
+
+  it('les vraies sorties : celle du processeur, puis celle de la carte, relevées carte au repos', () => {
+    const p = dureeDeLaSortie(SORTIE);
+    const c = dureeDeLaSortie(SORTIE_CARTE);
+    expect([p.appareil, c.appareil]).toEqual(['cpu', 'cuda']);
+    expect(SORTIE).toContain(`(cpu)${FINE}: ${p.texte} ms.`);
+    expect(SORTIE_CARTE).toContain(`(cuda)${FINE}: ${c.texte} ms.`);
+    const phrase = phraseDurees(p, c);
+    expect(phrase).toContain(`la carte a mis ${c.texte}${INSECABLE}ms, et le processeur ${p.texte}${INSECABLE}ms`);
+    expect(c.millisecondes / p.millisecondes).toBeGreaterThanOrEqual(1.1);
   });
 });

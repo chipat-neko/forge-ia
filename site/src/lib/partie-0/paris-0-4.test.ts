@@ -1,8 +1,9 @@
 // Les paris du chapitre 0.4 : leurs bonnes réponses viennent du jumeau des
 // formes (formes.ts) et des mesures (mesures/*.json), jamais écrites à la main.
-// Les mesures du processeur seront refaites à la porte, et celles de la carte
-// n'existent pas encore : les fonctions qui en tirent un verdict sont essayées
-// ici sur de fausses mesures, qui couvrent chaque verdict.
+// Les mesures du processeur et de la carte ont été relevées à la porte, carte au
+// repos, et pourront l'être encore : les fonctions qui en tirent un verdict ou
+// une phrase sont essayées ici sur de fausses mesures, qui couvrent chaque
+// verdict et font tomber chaque garde, puis sur les vrais fichiers.
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -18,15 +19,23 @@ import {
   choixPetiteMatrice,
   chrono,
   ecrireMillisecondes,
+  explicationPetite,
   filsDesColonnes,
   lignesChronos,
   meilleurChrono,
   OCTETS_FLOAT32,
   OCTETS_PAR_MO,
+  phraseCarteEtProcesseur,
   phraseFils,
+  phraseTransfert,
   gainDuReglageParDefaut,
+  SEUIL_A_PEU_PRES,
+  SEUIL_BIEN_PLUS_VITE,
+  SEUIL_CENTAINES,
   SEUIL_PARALLELE,
+  SEUIL_PRIX_FIXE,
   questionFils,
+  questionPetite,
   rapportFils,
   TAILLE_DU_PARI_FILS,
   TAILLE_DU_PARI_MEMOIRE,
@@ -63,8 +72,8 @@ function processeur(ms: Record<number, Record<number, number>>, defaut = 8, max 
   };
 }
 
-/** De fausses mesures de la carte : `ms[taille]` en millisecondes. */
-function carte(ms: Record<number, number>): MesuresChrono {
+/** De fausses mesures de la carte : `ms[taille]` en millisecondes, et la copie vers la carte (1 ms par défaut). */
+function carte(ms: Record<number, number>, transfert: Record<number, number> = {}): MesuresChrono {
   return {
     version: 1,
     releve_le: '2026-11-10',
@@ -74,7 +83,7 @@ function carte(ms: Record<number, number>): MesuresChrono {
     fils_par_defaut: 8,
     fils_max: 16,
     mesures: Object.entries(ms).map(([taille, millisecondes]) => ({ taille: Number(taille), fils: null, millisecondes })),
-    transfert_ms: Object.fromEntries(Object.keys(ms).map((t) => [t, 1])),
+    transfert_ms: Object.fromEntries(Object.keys(ms).map((t) => [t, transfert[Number(t)] ?? 1])),
   };
 }
 
@@ -157,7 +166,7 @@ describe('pari « fils » : tous les fils contre le réglage par défaut', () =>
     expect(phraseFils(processeur({ [T]: { 1: 1000, 8: 200, 16: 100 } }))).toBe(
       `${avant('100', '200')}2,00 fois plus vite. Ici, les fils en plus calculent presque autant que les premiers.`,
     );
-    // Un peu plus vite (les chronos provisoires de ce PC : 192 et 160 ms).
+    // Un peu plus vite (les chronos de ce PC relevés avant la porte, carte au travail : 192 et 160 ms).
     expect(phraseFils(processeur({ [T]: { 1: 1000, 8: 192.3, 16: 160 } }))).toBe(
       `${avant('160', '192')}1,20 fois plus vite. Les fils en plus aident, mais bien moins que les premiers. ${coeurs}`,
     );
@@ -194,13 +203,53 @@ describe('pari « fils » : tous les fils contre le réglage par défaut', () =>
   });
 });
 
-describe('pari « petite matrice » (à la porte, avec la carte)', () => {
-  const cpu = processeur({ [TAILLE_PETITE]: { 1: 0.0077, 8: 0.0074, 16: 0.0301 } });
+describe('pari « petite matrice » : le processeur contre la carte', () => {
+  const cpu = processeur({
+    [TAILLE_PETITE]: { 1: 0.0077, 8: 0.0074, 16: 0.0301 },
+    256: { 1: 0.25, 8: 0.07, 16: 0.09 },
+    4096: { 1: 1000, 8: 190, 16: 150 },
+  });
+  /** Le prix fixe de la carte, dit de la même façon quel que soit le verdict. */
+  const PRIX =
+    `Sur la carte, chaque calcul a un prix fixe${FINE}: PyTorch doit le lui envoyer, puis attendre qu’elle ait fini. ` +
+    'Pour un si petit produit, ce prix dépasse le calcul lui-même. ';
+  /** La preuve, lue dans les chronos de la carte : la taille suivante, 64 fois plus de calcul. */
+  const preuve = (fois: string) =>
+    `Le tableau juste en dessous le montre${FINE}: le produit 256${INSECABLE}×${INSECABLE}256 demande 64 fois plus de calcul, ` +
+    `et la carte n’y met que ${fois} fois plus de temps.`;
 
   it('le meilleur chrono du processeur, tous fils confondus', () => {
     expect(TAILLE_PETITE).toBe(64);
     expect(meilleurChrono(cpu, TAILLE_PETITE)).toBe(0.0074);
     expect(meilleurChrono(carte({ 64: 0.02 }), TAILLE_PETITE)).toBe(0.02);
+  });
+
+  it('la question nomme la plus petite taille, « 64 × 64 » d’un seul bloc', () => {
+    expect(questionPetite()).toBe(`Pour deux matrices 64${INSECABLE}×${INSECABLE}64, qui calcule le plus vite${FINE}?`);
+  });
+
+  it('l’explication : les deux chronos, le prix fixe de la carte, et sa preuve à la taille suivante', () => {
+    expect(explicationPetite(cpu, carte({ 64: 0.019, 256: 0.0216, 4096: 3.8 }))).toBe(
+      `Le processeur${FINE}: 0,00740${INSECABLE}ms au mieux, contre 0,0190${INSECABLE}ms pour la carte. ${PRIX}${preuve('1,14')}`,
+    );
+    // Autant l'un que l'autre : l'écart (moins de 10 %) est dit, le prix fixe aussi.
+    expect(explicationPetite(cpu, carte({ 64: 0.0078, 256: 0.0081, 4096: 3.8 }))).toBe(
+      `Autant l’un que l’autre${FINE}: 0,00740${INSECABLE}ms au mieux pour le processeur, 0,00780${INSECABLE}ms pour la carte, ` +
+        `moins de 10${FINE}% d’écart. ${PRIX}${preuve('1,04')}`,
+    );
+    // Une carte aussi rapide, voire plus, à la taille suivante : « pas plus de temps », jamais « 0,95 fois plus ».
+    expect(explicationPetite(cpu, carte({ 64: 0.019, 256: 0.018 }))).toContain('et la carte n’y met pas plus de temps.');
+  });
+
+  it('l’explication tombe si la carte gagne, ou si la taille suivante ne montre plus le prix fixe', () => {
+    // La carte plus rapide : l'acquis « la carte ne gagne pas toujours » ne serait plus montré.
+    expect(() => explicationPetite(cpu, carte({ 64: 0.005, 256: 0.006 }))).toThrow(/acquis « petite »/);
+    // 1,5 fois plus de temps pour 64 fois plus de calcul : le prix fixe ne dépasse plus forcément le calcul.
+    expect(() => explicationPetite(cpu, carte({ 64: 0.02, 256: 0.031 }))).toThrow(/prix fixe/);
+    expect(() => explicationPetite(cpu, carte({ 64: 0.02, 256: 0.0299 }))).not.toThrow();
+    // Sans taille après 64 sur la carte, pas de preuve.
+    expect(() => explicationPetite(cpu, carte({ 64: 0.02 }))).toThrow(/après 64/);
+    expect(SEUIL_PRIX_FIXE).toBe(1.5);
   });
 
   it('le processeur, la carte, ou autant l’un que l’autre (écart sous 10 %)', () => {
@@ -218,6 +267,100 @@ describe('pari « petite matrice » (à la porte, avec la carte)', () => {
 
   it('les appareils doivent être dans le bon ordre', () => {
     expect(() => choixPetiteMatrice(carte({ 64: 0.02 }), cpu)).toThrow(/processeur.*carte/);
+    expect(() => explicationPetite(carte({ 64: 0.02, 256: 0.021 }), cpu)).toThrow(/processeur.*carte/);
+  });
+
+  it('les vrais fichiers : un choix juste, et une explication qui tient', () => {
+    const p = lireMesures('processeur', RACINE)!;
+    const c = lireMesures('rtx-5070-ti', RACINE);
+    expect(c, 'mesures/rtx-5070-ti.json manque : la carte se mesure à la porte').not.toBeNull();
+    const meilleurP = Math.min(...p.mesures.filter((x) => x.taille === 64).map((x) => x.millisecondes));
+    const surLaCarte = c!.mesures.find((x) => x.taille === 64)!.millisecondes;
+    const autant = Math.max(meilleurP, surLaCarte) / Math.min(meilleurP, surLaCarte) < 1.1;
+    expect(juste(choixPetiteMatrice(p, c!))).toBe(autant ? "Autant l'un que l'autre" : meilleurP < surLaCarte ? 'Le processeur' : 'La carte');
+    expect(explicationPetite(p, c!)).toContain(`${ecrireMillisecondes(meilleurP)}${INSECABLE}ms`);
+    expect(explicationPetite(p, c!)).toContain(`${ecrireMillisecondes(surLaCarte)}${INSECABLE}ms`);
+  });
+});
+
+describe('ce que montrent les chronos : le processeur, puis la carte', () => {
+  /** « 1 024 × 1 024 » : les milliers séparés par une espace fine, le × entre deux insécables. */
+  const milliers = (t: number) => String(t).replace(/\B(?=(\d{3})+(?!\d))/g, FINE);
+  const T = (t: number) => `${milliers(t)}${INSECABLE}×${INSECABLE}${milliers(t)}`;
+  const cpu = processeur({
+    64: { 1: 0.0078, 8: 0.0058, 16: 0.0194 },
+    256: { 1: 0.26, 8: 0.11, 16: 0.071 },
+    1024: { 1: 16, 8: 3.5, 16: 3 },
+    4096: { 1: 1047, 8: 194, 16: 150 },
+  });
+  const fin = `, elle va des dizaines de fois plus vite que lui, même avec tous ses fils.`;
+
+  it('le plus petit produit au processeur, la carte dès la taille où elle le dépasse, et des dizaines de fois au plus grand', () => {
+    expect([SEUIL_BIEN_PLUS_VITE, SEUIL_CENTAINES]).toEqual([20, 100]);
+    expect(phraseCarteEtProcesseur(cpu, carte({ 64: 0.019, 256: 0.0216, 1024: 0.0997, 4096: 3.82 }))).toBe(
+      `Le tableau le montre${FINE}: pour le plus petit produit, le processeur va plus vite que la carte${FINE}; ` +
+        `dès ${T(256)}, la carte le dépasse, et pour ${T(4096)}${fin}`,
+    );
+    // Autant l'un que l'autre au plus petit ; la carte ne dépasse le processeur qu'à 1 024.
+    expect(phraseCarteEtProcesseur(cpu, carte({ 64: 0.006, 256: 0.075, 1024: 0.0997, 4096: 3.82 }))).toBe(
+      `Le tableau le montre${FINE}: pour le plus petit produit, le processeur et la carte vont à peu près aussi vite${FINE}; ` +
+        `dès ${T(1024)}, la carte le dépasse, et pour ${T(4096)}${fin}`,
+    );
+  });
+
+  it('chaque morceau de la phrase a sa garde', () => {
+    // La carte gagne dès le plus petit produit.
+    expect(() => phraseCarteEtProcesseur(cpu, carte({ 64: 0.004, 256: 0.02, 1024: 0.1, 4096: 3.8 }))).toThrow(/acquis « petite »/);
+    // La carte dépasse le processeur, puis le laisse repasser devant.
+    expect(() => phraseCarteEtProcesseur(cpu, carte({ 64: 0.019, 256: 0.02, 1024: 4, 4096: 3.8 }))).toThrow(/dès/);
+    // La carte ne le dépasse qu'au plus grand produit : « dès » et « pour » nommeraient la même taille.
+    expect(() => phraseCarteEtProcesseur(cpu, carte({ 64: 0.019, 256: 0.08, 1024: 3.1, 4096: 3.8 }))).toThrow(/plus grand/);
+    // Moins de 20 fois, ou 100 fois et plus : « des dizaines de fois » serait faux.
+    expect(() => phraseCarteEtProcesseur(cpu, carte({ 64: 0.019, 256: 0.02, 1024: 0.1, 4096: 7.6 }))).toThrow(/dizaines/);
+    expect(() => phraseCarteEtProcesseur(cpu, carte({ 64: 0.019, 256: 0.02, 1024: 0.1, 4096: 7.4 }))).not.toThrow();
+    expect(() => phraseCarteEtProcesseur(cpu, carte({ 64: 0.019, 256: 0.02, 1024: 0.1, 4096: 1.5 }))).toThrow(/dizaines/);
+    // Une taille du processeur absente de la carte.
+    expect(() => phraseCarteEtProcesseur(cpu, carte({ 64: 0.019, 256: 0.02, 4096: 3.8 }))).toThrow(/1024/);
+  });
+
+  it('les vrais fichiers : la phrase tient, et la carte dépasse le processeur à la taille qu’elle nomme', () => {
+    const p = lireMesures('processeur', RACINE)!;
+    const c = lireMesures('rtx-5070-ti', RACINE)!;
+    const phrase = phraseCarteEtProcesseur(p, c);
+    const tailles = [...new Set(p.mesures.map((x) => x.taille))];
+    const meilleurP = (t: number) => Math.min(...p.mesures.filter((x) => x.taille === t).map((x) => x.millisecondes));
+    const surLaCarte = (t: number) => c.mesures.find((x) => x.taille === t)!.millisecondes;
+    const depasse = tailles.find((t) => meilleurP(t) / surLaCarte(t) >= 1.1)!;
+    expect(phrase).toContain(`dès ${T(depasse)}, la carte le dépasse`);
+    const plusGrand = tailles.at(-1)!;
+    expect(meilleurP(plusGrand) / surLaCarte(plusGrand)).toBeGreaterThanOrEqual(20);
+  });
+});
+
+describe('le prix du transfert vers la carte', () => {
+  const debut = `Copier une matrice 4${FINE}096${INSECABLE}×${INSECABLE}4${FINE}096 sur la carte de ce PC prend`;
+
+  it('la copie d’une matrice face à son produit, au plus grand produit : à peu près autant, plus, ou moins', () => {
+    expect(SEUIL_A_PEU_PRES).toBe(1.25);
+    expect(phraseTransfert(carte({ 64: 0.019, 4096: 3.82 }, { 4096: 3.75 }))).toBe(
+      `${debut} 3,75${INSECABLE}ms${FINE}: à peu près autant que de la multiplier par une autre, 3,82${INSECABLE}ms.`,
+    );
+    expect(phraseTransfert(carte({ 4096: 4 }, { 4096: 5 }))).toBe(`${debut} 5,00${INSECABLE}ms${FINE}: à peu près autant que de la multiplier par une autre, 4,00${INSECABLE}ms.`);
+    expect(phraseTransfert(carte({ 4096: 4 }, { 4096: 3.2 }))).toBe(`${debut} 3,20${INSECABLE}ms${FINE}: à peu près autant que de la multiplier par une autre, 4,00${INSECABLE}ms.`);
+    expect(phraseTransfert(carte({ 4096: 4 }, { 4096: 5.1 }))).toBe(`${debut} 5,10${INSECABLE}ms${FINE}: plus que de la multiplier par une autre, 4,00${INSECABLE}ms.`);
+    expect(phraseTransfert(carte({ 4096: 4 }, { 4096: 3.1 }))).toBe(`${debut} 3,10${INSECABLE}ms${FINE}: moins que de la multiplier par une autre, 4,00${INSECABLE}ms.`);
+  });
+
+  it('il faut les mesures de la carte', () => {
+    expect(() => phraseTransfert(processeur({ 4096: { 1: 1000, 8: 190, 16: 150 } }))).toThrow(/carte/);
+  });
+
+  it('le vrai fichier de la carte', () => {
+    const c = lireMesures('rtx-5070-ti', RACINE)!;
+    const plusGrand = c.mesures.at(-1)!;
+    const phrase = phraseTransfert(c);
+    expect(phrase).toContain(`prend ${ecrireMillisecondes(c.transfert_ms![String(plusGrand.taille)])}${INSECABLE}ms`);
+    expect(phrase).toContain(`par une autre, ${ecrireMillisecondes(plusGrand.millisecondes)}${INSECABLE}ms.`);
   });
 });
 

@@ -106,18 +106,21 @@ du notebook l'exécute de bout en bout, sur la carte si elle est là.
 
 ## La sortie du PC de La Forge IA
 
-Le chapitre 0.5 montre la sortie du script sur le PC de La Forge IA. Elle est
-dans `sorties/` :
+Le chapitre 0.5 montre la sortie du script sur le PC de La Forge IA
+(processeur AMD Ryzen 7 9800X3D, 16 fils ; carte RTX 5070 Ti). Elle est dans
+`sorties/`, en deux fichiers relevés le 05/11/2026, l'un après l'autre, carte
+au repos : l'entraînement de l'IA qui occupait la carte était en pause.
 
 - `sorties/processeur.txt`, écrit par
   `uv run --extra cpu python -m premier_reseau entrainer --appareil cpu --enregistrer sorties/processeur.txt`.
-  **Sa durée PyTorch est provisoire** : elle a été relevée pendant que la
-  carte entraînait une IA, et le processeur en faisait un peu pour elle. Elle
-  sera remesurée à la porte de la Partie 0, machine au repos. Aucun test ne
-  fige cette durée ;
-- `sorties/rtx-5070-ti.txt`, la carte, relevée seulement à la porte, avec
+  Il remplace la sortie relevée pendant l'écriture du chapitre, quand la carte
+  entraînait encore cette IA et que le processeur en faisait un peu pour elle ;
+- `sorties/rtx-5070-ti.txt`, la carte, écrit par
   `uv run --extra gpu python -m premier_reseau entrainer --appareil cuda --enregistrer sorties/rtx-5070-ti.txt`.
-  Tant qu'il manque, le chapitre affiche « à mesurer ».
+
+Aucun test ne fige leurs durées : elles dépendent de la machine. Le chapitre
+0.5 les compare, et le chapitre 0.4 explique pourquoi la carte ne gagne pas
+sur de tout petits calculs.
 
 ## Les attendus de référence
 

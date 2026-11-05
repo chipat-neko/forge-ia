@@ -20,5 +20,5 @@ Le réseau 2-2-1, entraîné à la main sur le OU exclusif
 
 Le même réseau dans PyTorch 2.15.0+cpu, en float64, avec les mêmes poids de départ
   Gradients de départ, à la main et par autograd : plus grand écart 2,8 × 10⁻¹⁷.
-  3 000 pas sur le processeur (cpu) : 578 ms.
+  3 000 pas sur le processeur (cpu) : 439 ms.
   Perte finale 0,00370, et plus grand écart des poids finaux avec la main : 5,3 × 10⁻¹⁵.

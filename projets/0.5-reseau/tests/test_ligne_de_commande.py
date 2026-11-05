@@ -185,7 +185,7 @@ def test_sortie_processeur_enregistree():
     # Le neurone et l'entraînement à la main : ce que le code donne aujourd'hui.
     n, m = lignes_du_neurone(), lignes_a_la_main()
     assert lignes[1 : len(n) + len(m) + 3] == [*n, "", *m, ""]
-    # PyTorch, relevé avec la roue cpu sur le processeur. La durée, provisoire, n'est pas figée.
+    # PyTorch, relevé avec la roue cpu sur le processeur. La durée, qui dépend de la machine, n'est pas figée.
     partie = lignes[len(n) + len(m) + 3 :]
     assert len(partie) == 4
     version = re.fullmatch(r"Le même réseau dans PyTorch (2\.15\.0\+\w+), .*", partie[0])
