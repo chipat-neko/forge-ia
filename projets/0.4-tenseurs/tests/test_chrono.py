@@ -208,7 +208,8 @@ def test_le_format_verifie_la_sorte_des_fils():
         verifier_format({**carte, "mesures": [{**carte["mesures"][0], "fils": 8}]}, "cuda")
 
 
-ESSAI_03 = PROJET.parent / "0.3-poste" / "poste" / "essai.py"
+RACINE = PROJET.parents[1]
+ESSAI_03 = RACINE / "projets" / "0.3-poste" / "poste" / "essai.py"
 
 
 def source_de(chemin: pathlib.Path, nom: str) -> str:
@@ -220,8 +221,10 @@ def source_de(chemin: pathlib.Path, nom: str) -> str:
 
 def test_en_francais_copie_exacte_de_0_3():
     # en_francais vient de projets/0.3-poste/poste/essai.py : la copie reste identique.
-    if not ESSAI_03.exists():
-        pytest.skip("projets/0.3-poste absent : la copie ne peut pas être comparée à l'original")
+    if not (RACINE / "projets" / "forge").exists():
+        pytest.skip("Projet téléchargé seul : projets/0.3-poste n'est pas là pour comparer la copie.")
+    # Dans le dépôt, l'original doit exister : un chemin changé ne doit pas faire passer ce test à vide.
+    assert ESSAI_03.exists(), f"{ESSAI_03} est introuvable : corrige son chemin dans ce test."
     assert source_de(PROJET / "tenseurs" / "chrono.py", "en_francais") == source_de(ESSAI_03, "en_francais"), (
         "en_francais (tenseurs/chrono.py) n'est plus la copie exacte de celle de projets/0.3-poste/poste/essai.py. "
         "Recopie-la : une correction se fait dans 0.3, puis se recopie dans 0.4."

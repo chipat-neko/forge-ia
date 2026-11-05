@@ -15,13 +15,16 @@ import torch
 from tenseurs.appareil import AppareilIndisponible, choisir_appareil
 
 APPAREIL_PY = pathlib.Path(__file__).resolve().parents[1] / "tenseurs" / "appareil.py"
+RACINE = pathlib.Path(__file__).resolve().parents[3]
 # L'original, dans le projet 0.3 du même dépôt. Un lecteur qui n'a téléchargé que ce projet ne l'a pas.
-ORIGINAL = pathlib.Path(__file__).resolve().parents[2] / "0.3-poste" / "poste" / "appareil.py"
+ORIGINAL = RACINE / "projets" / "0.3-poste" / "poste" / "appareil.py"
 
 
 def test_copie_exacte_de_0_3():
-    if not ORIGINAL.exists():
-        pytest.skip("projets/0.3-poste absent : la copie ne peut pas être comparée à l'original")
+    if not (RACINE / "projets" / "forge").exists():
+        pytest.skip("Projet téléchargé seul : projets/0.3-poste n'est pas là pour comparer la copie.")
+    # Dans le dépôt, l'original doit exister : un chemin changé ne doit pas faire passer ce test à vide.
+    assert ORIGINAL.exists(), f"{ORIGINAL} est introuvable : corrige son chemin dans ce test."
     assert APPAREIL_PY.read_bytes() == ORIGINAL.read_bytes(), (
         "tenseurs/appareil.py n'est plus la copie exacte de projets/0.3-poste/poste/appareil.py. "
         "Recopie l'original (cp projets/0.3-poste/poste/appareil.py projets/0.4-tenseurs/tenseurs/appareil.py) : "
