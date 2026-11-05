@@ -13,6 +13,8 @@ import ControleParite from '../components/demos/ControleParite.svelte';
 
 Ton navigateur refait ici les attendus des projets de la Partie 0 dont le jumeau tourne dans la page, pour que les parcours de test les comparent à ceux du Python, à l'identique.
 
+Pour 0.2, softmax et l'erreur −ln p passent par exp et log, dont le dernier chiffre change d'un système à l'autre : la page ne les refait pas, comme la pente approchée et la règle de la chaîne, qui ne servent qu'en Python.
+
 <ControleParite client:load jeu="partie-0" />
 
 </Etape>

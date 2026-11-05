@@ -18,7 +18,7 @@ import {
   premiereReprise,
   suivantsTries,
 } from './mot-suivant';
-import { FICHIERS_PARTIE_0 } from './fichiers';
+import { FICHIERS_PARTIE_0, partieRefaite } from './fichiers';
 import { CALCULS_PARTIE_0, FICHIERS_PARTIE_0 as FICHIERS_DE_PARITE } from './parite';
 import { TEXTE_DE_DEPART } from './texte-0-1';
 
@@ -153,7 +153,8 @@ describe('parite.ts : la page d’essai de la Partie 0 refait les attendus', () 
     it(`${nom} : le calcul refait ${chemin}, par JSON comme la page`, () => {
       // Par JSON, comme la page : ce qui ne s'écrit pas en JSON (undefined, NaN) ne passerait pas.
       const calcule: unknown = JSON.parse(versJson(CALCULS_PARTIE_0[nom]()));
-      expect(calcule).toStrictEqual(JSON.parse(lire(chemin)));
+      // Sans les sections que le site lit sans les refaire (SECTIONS_NON_REFAITES, fichiers.ts).
+      expect(calcule).toStrictEqual(partieRefaite(nom, JSON.parse(lire(chemin)) as Record<string, unknown>));
     });
   }
 });
