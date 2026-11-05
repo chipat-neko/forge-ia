@@ -186,7 +186,9 @@
   </p>
   <p class="lecteur-ecran" aria-live="polite">{annonce}</p>
 
-  <div class="bande" class:numeros={morceauxCaches} data-test="jetons">
+  <!-- Les jetons numérotés d'une phrase tapée : hors de l'index de la recherche, comme les textes de l'atelier
+       de 0.1 (revue finale, m8 ; point mis de côté au plan 3). -->
+  <div class="bande" class:numeros={morceauxCaches} data-test="jetons" data-pagefind-ignore>
     {#each affiches as { jeton, i, nouveau } (i + ':' + jeton.texte)}
       <span class="jeton" class:b={i % 2 === 1} class:nouveau data-jeton={numeroAffiche(jeton)}
         ><span class="morceau"
