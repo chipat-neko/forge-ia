@@ -6,7 +6,16 @@ import { describe, expect, it } from 'vitest';
 import { MESURES_TON_IA } from '../calculateur/ton-ia';
 import type { Choix } from '../choix';
 import { situation } from './poste';
-import { choixCarteTropRecente, choixRouePypi, choixVitesse, rapportDesDebits, TAILLE_DU_PARI } from './paris-0-3';
+import {
+  choixCarteTropRecente,
+  choixRouePypi,
+  choixVitesse,
+  HEURES_D_UNE_NUIT,
+  joursPourUneNuit,
+  JOURS_DE_DEUX_SEMAINES,
+  rapportDesDebits,
+  TAILLE_DU_PARI,
+} from './paris-0-3';
 
 /** Le texte du choix juste (et vérifie qu'il est seul). */
 function juste(choix: Choix[]): string {
@@ -32,6 +41,17 @@ describe('les paris du chapitre 0.3', () => {
     expect(r).toBe(76);
     expect(choixVitesse().map((c) => c.texte)).toEqual(['2 fois', '10 fois', `${r} fois`]);
     expect(juste(choixVitesse())).toBe(`${r} fois`);
+  });
+
+  it('vitesse : « une nuit sur la carte prendrait des semaines sur le processeur » est gardé (revue finale, m5)', () => {
+    expect([HEURES_D_UNE_NUIT, JOURS_DE_DEUX_SEMAINES]).toEqual([8, 14]);
+    // 8 h × 76 = 608 h, soit plus de 25 jours : des semaines.
+    expect(joursPourUneNuit()).toBe((8 * rapportDesDebits()) / 24);
+    expect(joursPourUneNuit()).toBeGreaterThanOrEqual(14);
+    // 42 fois : 14 jours tout juste ; 20 fois : 7 jours, une semaine seulement.
+    expect(joursPourUneNuit(42)).toBe(14);
+    expect(() => joursPourUneNuit(20)).toThrow(/semaines/);
+    expect(() => joursPourUneNuit(41.9)).toThrow(/étape 1/);
   });
 
   it('pypi : la situation de PyPI sous Windows donne la version pour processeur', () => {

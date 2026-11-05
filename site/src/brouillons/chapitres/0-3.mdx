@@ -46,7 +46,7 @@ import {
   VERIFIER_POSTE_GPU,
   VERIFIER_UV,
 } from '../../lib/partie-0/commandes';
-import { choixCarteTropRecente, choixRouePypi, choixVitesse, rapportDesDebits, TAILLE_DU_PARI } from '../../lib/partie-0/paris-0-3';
+import { choixCarteTropRecente, choixRouePypi, choixVitesse, joursPourUneNuit, rapportDesDebits, TAILLE_DU_PARI } from '../../lib/partie-0/paris-0-3';
 import { ATTENDUS_POSTE, constat, situation } from '../../lib/partie-0/poste';
 import {
   architectureQuiSert,
@@ -81,6 +81,8 @@ export const VITESSE = (() => {
   // Le pari « vitesse » : les débits mesurés de la plus grande taille de ton IA, et les fils du
   // processeur de ce PC (les attendus du diagnostic, situation fils_par_defaut).
   const m = MESURES_TON_IA[TAILLE_DU_PARI];
+  // « Un entraînement d'une nuit sur la carte prendrait des semaines sur le processeur » : gardé (revue finale, m5).
+  joursPourUneNuit();
   return {
     taille: NOMS_TAILLES[TAILLE_DU_PARI],
     carte: nombre(m.carte.jetonsParSeconde),

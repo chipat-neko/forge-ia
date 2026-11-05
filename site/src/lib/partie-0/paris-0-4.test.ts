@@ -146,6 +146,13 @@ describe('pari « fils » : tous les fils contre le réglage par défaut', () =>
       'un-peu',
       'pas',
     ]);
+    // Le verdict suit le rapport arrondi à deux décimales, celui que la page écrit.
+    expect([verdictFils(1.796), verdictFils(1.794), verdictFils(1.096), verdictFils(1.094)]).toEqual([
+      'deux-fois',
+      'un-peu',
+      'un-peu',
+      'pas',
+    ]);
   });
 
   it('la question nomme les fils du fichier, et la garde refuse un processeur sans fils en plus', () => {
@@ -180,6 +187,15 @@ describe('pari « fils » : tous les fils contre le réglage par défaut', () =>
     expect(phraseFils(processeur({ [T]: { 1: 1000, 8: 100, 16: 130 } }))).toBe(
       `${avant('130', '100')}1,30 fois plus lent. Ici, les fils en plus ralentissent même le calcul. ${coeurs}`,
     );
+    // 179,6 contre 100 : 1,796 s'écrit « 1,80 », le seuil des deux fois. Le verdict suit le nombre écrit,
+    // jamais « 1,80 fois plus vite » sous « un peu » (point mis de côté à la tâche 11).
+    expect(phraseFils(processeur({ [T]: { 1: 1000, 8: 179.6, 16: 100 } }))).toBe(
+      `${avant('100', '180')}1,80 fois plus vite. Ici, les fils en plus calculent presque autant que les premiers.`,
+    );
+    expect(juste(choixFils(processeur({ [T]: { 1: 1000, 8: 179.6, 16: 100 } })))).toBe('Deux fois plus vite');
+    // 109,6 contre 100 : « 1,10 », au seuil d'« un peu ».
+    expect(phraseFils(processeur({ [T]: { 1: 1000, 8: 109.96, 16: 100 } }))).toContain('1,10 fois plus vite. Les fils en plus aident');
+    expect(juste(choixFils(processeur({ [T]: { 1: 1000, 8: 109.96, 16: 100 } })))).toBe('Un peu plus vite');
     // Égaux à 1 % près : ni plus vite, ni plus lent.
     expect(phraseFils(processeur({ [T]: { 1: 1000, 8: 100, 16: 100.4 } }))).toBe(
       `${avant('100', '100')}pas plus vite. Ici, les fils en plus n’aident presque pas. ${coeurs}`,
@@ -200,7 +216,8 @@ describe('pari « fils » : tous les fils contre le réglage par défaut', () =>
     expect(m).not.toBeNull();
     const r = chrono(m, T, m.fils_par_defaut) / chrono(m, T, m.fils_max);
     expect(rapportFils(m)).toBe(r);
-    const attendu = r >= 1.8 ? 'Deux fois plus vite' : r >= 1.1 ? 'Un peu plus vite' : 'Pas plus vite';
+    const ecrit = Number(r.toFixed(2)); // le rapport tel que la page l'écrit
+    const attendu = ecrit >= 1.8 ? 'Deux fois plus vite' : ecrit >= 1.1 ? 'Un peu plus vite' : 'Pas plus vite';
     expect(juste(choixFils(m))).toBe(attendu);
   });
 });
@@ -306,12 +323,12 @@ describe('ce que montrent les chronos : le processeur, puis la carte', () => {
   it('le plus petit produit au processeur, la carte dès la taille où elle le dépasse, et des dizaines de fois au plus grand', () => {
     expect([SEUIL_BIEN_PLUS_VITE, SEUIL_CENTAINES]).toEqual([20, 100]);
     expect(phraseCarteEtProcesseur(cpu, carte({ 64: 0.019, 256: 0.0216, 1024: 0.0997, 4096: 3.82 }))).toBe(
-      `Le tableau le montre${FINE}: pour le plus petit produit, le processeur va plus vite que la carte${FINE}; ` +
+      `Le tableau le montre${FINE}: pour le plus petit produit, le processeur, au mieux de ses fils, va plus vite que la carte${FINE}; ` +
         `dès ${T(256)}, la carte le dépasse, et pour ${T(4096)}${fin}`,
     );
     // Autant l'un que l'autre au plus petit ; la carte ne dépasse le processeur qu'à 1 024.
     expect(phraseCarteEtProcesseur(cpu, carte({ 64: 0.006, 256: 0.075, 1024: 0.0997, 4096: 3.82 }))).toBe(
-      `Le tableau le montre${FINE}: pour le plus petit produit, le processeur et la carte vont à peu près aussi vite${FINE}; ` +
+      `Le tableau le montre${FINE}: pour le plus petit produit, le processeur, au mieux de ses fils, et la carte vont à peu près aussi vite${FINE}; ` +
         `dès ${T(1024)}, la carte le dépasse, et pour ${T(4096)}${fin}`,
     );
   });

@@ -12,9 +12,10 @@
 //
 // Ce module n'importe ni ?raw, ni .json, ni astro:* (B1) : le parcours du
 // chapitre l'importe. Il prend à paris-0-4.ts l'explication du pari « petite »,
-// à laquelle renvoie la phrase de l'étape 8 ; de mesures.ts, seulement un type. Les fonctions qui lisent les attendus ou la sortie du
-// script les reçoivent en argument : le MDX les importe, les parcours et
-// Vitest les lisent sur le disque.
+// à laquelle renvoie la phrase de l'étape 8 ; de mesures.ts, seulement un
+// type. Les fonctions qui lisent les attendus ou la sortie du script les
+// reçoivent en argument : le MDX les importe, les parcours et Vitest les
+// lisent sur le disque.
 
 import type { Choix } from '../choix';
 import { exigeur } from '../exiger';
@@ -334,7 +335,7 @@ export function phraseDurees(processeur: DureeDeSortie, carte: DureeDeSortie): s
   exiger(
     carte.millisecondes >= processeur.millisecondes * SEUIL_PLUS_LENTE,
     `la carte (${carte.texte} ms) n’est plus plus lente que le processeur (${processeur.texte} ms) d’au moins 10${FINE}% : ` +
-      'la phrase de l’étape 8 (« la carte est la plus lente », le prix fixe) est à revoir',
+      'la phrase de l’étape 8 (« la carte est la plus lente », le prix pour envoyer chaque calcul) est à revoir',
   );
   return (
     `Pour les mêmes ${processeur.pas} pas, la carte a mis ${carte.texte}${INSECABLE}ms, et le processeur ${processeur.texte}${INSECABLE}ms${FINE}: ` +

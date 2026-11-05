@@ -104,11 +104,23 @@ export function verifierMesures(valeur: unknown, fichier: string): MesuresChrono
     if (surLaCarte ? x.fils !== null : !entierPositif(x.fils)) {
       throw faute(surLaCarte ? 'fils vaut null sur la carte' : 'fils est un entier de 1 ou plus sur le processeur');
     }
-    // Les mesures d'une même taille se suivent, et les tailles vont en croissant, sans doublon.
+    // Les mesures d'une même taille se suivent (sur le processeur, une par nombre de fils), et les tailles vont
+    // en croissant. Une même taille, avec les mêmes fils, n'est mesurée qu'une fois.
     const derniere = tailles[tailles.length - 1];
     const couple = `${x.taille}/${String(x.fils)}`;
-    if ((derniere !== undefined && x.taille < derniere) || couples.has(couple)) {
-      throw faute('les mesures doivent être rangées par taille strictement croissante, sans doublon');
+    if (derniere !== undefined && x.taille < derniere) {
+      throw faute(
+        `la taille ${x.taille} vient après ${derniere}${FINE}: range les mesures par taille croissante, ` +
+          (surLaCarte ? 'une par taille' : 'celles d’une même taille à la suite, une par nombre de fils'),
+      );
+    }
+    if (couples.has(couple)) {
+      throw faute(
+        surLaCarte
+          ? `la taille ${x.taille} est mesurée deux fois${FINE}: une seule mesure par taille sur la carte`
+          : `la taille ${x.taille} avec ${String(x.fils)} fils est mesurée deux fois${FINE}: ` +
+              'une seule mesure par taille et par nombre de fils sur le processeur',
+      );
     }
     if (x.taille !== derniere) tailles.push(x.taille);
     couples.add(couple);

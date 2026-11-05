@@ -156,10 +156,20 @@ export function rapportFils(m: MesuresChrono): number {
   return chrono(m, TAILLE_DU_PARI_FILS, m.fils_par_defaut) / chrono(m, TAILLE_DU_PARI_FILS, m.fils_max);
 }
 
-/** Le verdict d'un rapport de chronos. */
+/** Un rapport tel que la page l'écrit, arrondi à deux décimales : 1,796 s'écrit « 1,80 ». */
+function rapportEcrit(rapport: number): number {
+  return Number(rapport.toFixed(2));
+}
+
+/**
+ * Le verdict d'un rapport de chronos, lu sur le rapport écrit : « 1,80 fois
+ * plus vite » compte pour deux fois, comme le nombre que lit le lecteur, même
+ * si le rapport exact vaut 1,796 (point mis de côté à la tâche 11).
+ */
 export function verdictFils(rapport: number): VerdictFils {
-  if (rapport >= SEUIL_DEUX_FOIS) return 'deux-fois';
-  if (rapport >= SEUIL_UN_PEU) return 'un-peu';
+  const ecrit = rapportEcrit(rapport);
+  if (ecrit >= SEUIL_DEUX_FOIS) return 'deux-fois';
+  if (ecrit >= SEUIL_UN_PEU) return 'un-peu';
   return 'pas';
 }
 
@@ -214,9 +224,9 @@ export function phraseFils(m: MesuresChrono): string {
   const defaut = ecrireMillisecondes(chrono(m, TAILLE_DU_PARI_FILS, m.fils_par_defaut));
   const plusVite = r >= 1;
   const facteur = plusVite ? r : 1 / r;
-  // À 1 % près (deux décimales), ni plus vite ni plus lent.
-  const egaux = Number(facteur.toFixed(2)) === 1;
-  const comparaison = egaux ? 'pas plus vite' : `${nombre(facteur, 2)} fois ${plusVite ? 'plus vite' : 'plus lent'}`;
+  // À 1 % près (deux décimales), ni plus vite ni plus lent. Le nombre écrit est celui du verdict.
+  const egaux = rapportEcrit(facteur) === 1;
+  const comparaison = egaux ? 'pas plus vite' : `${nombre(rapportEcrit(facteur), 2)} fois ${plusVite ? 'plus vite' : 'plus lent'}`;
   const debut =
     `Avec ${nombre(m.fils_max)} fils, le produit prend ${tous}${INSECABLE}ms, contre ${defaut}${INSECABLE}ms ` +
     `avec ${nombre(m.fils_par_defaut)}${FINE}: ${comparaison}.`;
@@ -415,8 +425,11 @@ export function phraseCarteEtProcesseur(cpu: MesuresChrono, carte: MesuresChrono
     `au plus grand produit, la carte va ${nombre(g, 1)} fois plus vite que le processeur au mieux de ses fils : ` +
       '« des dizaines de fois » dans la phrase sous le tableau des chronos est à revoir',
   );
+  // « au mieux de ses fils » : le verdict compare le meilleur chrono du processeur, comme explicationPetite (revue finale, m6).
   const auPlusPetit =
-    verdict === 'processeur' ? 'le processeur va plus vite que la carte' : 'le processeur et la carte vont à peu près aussi vite';
+    verdict === 'processeur'
+      ? 'le processeur, au mieux de ses fils, va plus vite que la carte'
+      : 'le processeur, au mieux de ses fils, et la carte vont à peu près aussi vite';
   return (
     `Le tableau le montre${FINE}: pour le plus petit produit, ${auPlusPetit}${FINE}; ` +
     `dès ${ecrireTaille(tailles[depasse])}, la carte le dépasse, et pour ${ecrireTaille(plusGrand)}, ` +

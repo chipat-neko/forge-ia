@@ -189,6 +189,46 @@ describe('lireMesures : un dépôt factice', () => {
     expect(verifierMesures(carte, 'mesures/essai.json')).toStrictEqual(carte);
   });
 
+  it('l’ordre et les doublons ont chacun leur message, qui dit ce qu’attend chaque appareil', () => {
+    const surLeProcesseur = { ...carte, appareil: 'cpu', transfert_ms: null };
+    const message = (valeur: unknown): string => {
+      try {
+        verifierMesures(valeur, 'mesures/essai.json');
+      } catch (e) {
+        return (e as Error).message;
+      }
+      throw new Error('aucune erreur');
+    };
+    const decroissantes = message({
+      ...surLeProcesseur,
+      mesures: [
+        { taille: 128, fils: 1, millisecondes: 0.02 },
+        { taille: 64, fils: 1, millisecondes: 0.01 },
+      ],
+    });
+    expect(decroissantes).toContain('la taille 64 vient après 128');
+    expect(decroissantes).toContain('par taille croissante');
+    // Sur le processeur, une même taille revient une fois par nombre de fils : le doublon nomme les deux.
+    const doublonProcesseur = message({
+      ...surLeProcesseur,
+      mesures: [
+        { taille: 64, fils: 8, millisecondes: 0.01 },
+        { taille: 64, fils: 8, millisecondes: 0.01 },
+      ],
+    });
+    expect(doublonProcesseur).toContain('la taille 64 avec 8 fils est mesurée deux fois');
+    expect(doublonProcesseur).toContain('une seule mesure par taille et par nombre de fils');
+    const doublonCarte = message({
+      ...carte,
+      mesures: [
+        { taille: 64, fils: null, millisecondes: 0.01 },
+        { taille: 64, fils: null, millisecondes: 0.01 },
+      ],
+    });
+    expect(doublonCarte).toContain('la taille 64 est mesurée deux fois');
+    expect(doublonCarte).toContain('une seule mesure par taille sur la carte');
+  });
+
   it('verifierMesures accepte plusieurs fils par taille sur le processeur, rangés par taille', () => {
     const processeur = {
       ...carte,

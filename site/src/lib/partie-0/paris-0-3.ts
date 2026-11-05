@@ -29,6 +29,26 @@ export function rapportDesDebits(): number {
   return carte.jetonsParSeconde / processeur.jetonsParSeconde;
 }
 
+/** Une nuit d'entraînement, en heures, et deux semaines, en jours : les mesures de « des semaines ». */
+export const HEURES_D_UNE_NUIT = 8;
+export const JOURS_DE_DEUX_SEMAINES = 14;
+
+/**
+ * Combien de jours prendrait sur le processeur une nuit d'entraînement sur la
+ * carte : HEURES_D_UNE_NUIT heures fois le rapport des débits. L'étape 1 du
+ * chapitre dit « des semaines » : la garde tombe sous deux semaines (revue
+ * finale, m5 ; à 20 fois, une nuit ne ferait que 7 jours).
+ */
+export function joursPourUneNuit(rapport: number = rapportDesDebits()): number {
+  const jours = (HEURES_D_UNE_NUIT * rapport) / 24;
+  exiger(
+    jours >= JOURS_DE_DEUX_SEMAINES,
+    `une nuit de ${HEURES_D_UNE_NUIT} h sur la carte ne prendrait plus que ${nombre(jours, 1)} jours sur le processeur, ` +
+      `moins de ${JOURS_DE_DEUX_SEMAINES} : « des semaines » (étape 1 du chapitre 0.3) est à revoir`,
+  );
+  return jours;
+}
+
 /** Les clés des constats d'une situation des attendus. */
 function cles(nom: string): string[] {
   return situation(nom).constats.map((c) => c.cle);
