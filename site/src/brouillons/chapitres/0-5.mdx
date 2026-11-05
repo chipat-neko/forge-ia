@@ -242,13 +242,14 @@ export const LABO = (() => {
 })();
 
 export const SUITE = (() => {
-  // L'« À suivre » : le chapitre 1.1, qui ouvre la Partie 1. Tant qu'il n'a pas paru (aucun fichier dans
-  // src/content/chapitres/, comme pour le pied du chapitre), la phrase le dit, et renvoie au premier chapitre paru
-  // de la Partie 1, par un lien : un lien ne vise qu'un chapitre paru (S3).
+  // L'« À suivre » : le chapitre 1.1, qui ouvre la Partie 1. Tant qu'il n'a pas paru (aucun fichier
+  // src/content/chapitres/1-1.mdx), la phrase le dit, et renvoie au premier chapitre paru de la Partie 1, par un
+  // lien : un lien ne vise qu'un chapitre paru (S3). Le pied du chapitre, lui, lit la collection des chapitres ;
+  // il arrive au même résultat, puisqu'un chapitre paru est le fichier src/content/chapitres/<p>-<n>.mdx.
   const paru = (numero) => existsSync(new URL(`src/content/chapitres/${numero.replace('.', '-')}.mdx`, root));
   const { partie, chapitre } = trouverChapitre('1.1');
   const ouvert = paru(chapitre.numero) ? null : partie.chapitres.find((c) => paru(c.numero));
-  const aVenir = paru(chapitre.numero) ? '' : ' Il n\'a pas encore paru';
+  const aVenir = paru(chapitre.numero) ? '' : ' Ce chapitre n\'a pas encore paru';
   return {
     titre: typographier(chapitre.titre),
     avant: typographier(ouvert ? `${aVenir} ; tu peux déjà lire ` : aVenir && `${aVenir}.`),
@@ -537,7 +538,7 @@ SGD, pour stochastic gradient descent : la descente de gradient stochastique. St
 
 Rien à changer pour calculer sur la carte graphique. `entrainer_pytorch` demande l'appareil à `choisir_appareil`, la fonction du chapitre 0.3, copiée telle quelle dans le projet, puis y range les poids avec `.to`, et y crée les points. Le calcul reste le même, en `float64`.
 
-Avec une carte NVIDIA, la version de PyTorch pour la carte lance le même script sur elle. La première fois, uv télécharge cette version, si elle n'est pas déjà dans son cache depuis le chapitre 0.3 : sous Windows, {ROUE_CARTE}.
+Avec une carte NVIDIA, la version de PyTorch pour la carte lance le même script sur elle. La première fois, uv télécharge cette version : sous Windows, {ROUE_CARTE}. S'il l'a déjà téléchargée au chapitre 0.3 ou 0.4, il la reprend dans son cache.
 
 <BlocCommande commandes={[RESEAU_ENTRAINER_GPU]} ou="un terminal, dans le dossier du projet" />
 
