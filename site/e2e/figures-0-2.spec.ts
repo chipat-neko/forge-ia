@@ -79,8 +79,8 @@ test('vecteurs : le produit scalaire et le cosinus suivent les réglages', async
   await regler(page.locator('[data-test="vec-ax"]'), 2);
   await regler(page.locator('[data-test="vec-bx"]'), -1);
   expect(await texteExact(page, 'vec-scalaire')).toBe(`a · b = 2 × (${MOINS}1) + 1 × 2 = 0`);
-  expect(await texteExact(page, 'vec-cosinus')).toContain('= 0');
-  expect(await texteExact(page, 'vec-cosinus')).toContain('presque perpendiculaires');
+  // Le cas exact se décide sur les entiers : « perpendiculaires », pas « presque ».
+  expect(await texteExact(page, 'vec-cosinus')).toBe(`cos = 0 ÷ (2,24 × 2,24) = 0${FINE}: perpendiculaires`);
   await expect(page.locator('[data-test="vec-defi"]')).toBeVisible();
   await expect(page.locator('#recap [data-acquis="perpendiculaires"]')).toHaveAttribute('data-gagne', 'oui');
   await expect(page.locator('[data-test="vec-dessin"]')).toHaveAttribute('aria-label', new RegExp(`b = \\(${MOINS}1,\\s2\\)`));
@@ -89,7 +89,10 @@ test('vecteurs : le produit scalaire et le cosinus suivent les réglages', async
   for (const [test, v] of [['vec-ax', -4], ['vec-ay', -4], ['vec-bx', 4], ['vec-by', 4]] as const) {
     await regler(page.locator(`[data-test="${test}"]`), v);
   }
-  expect(await texteExact(page, 'vec-cosinus')).toContain('des directions opposées');
+  // Sur une même droite, en sens contraires : cos = −1 exactement, décidé sur les entiers.
+  expect(await texteExact(page, 'vec-cosinus')).toBe(
+    `cos = ${MOINS}32 ÷ (5,66 × 5,66) = ${MOINS}1${FINE}: des directions opposées`,
+  );
   // Les bornes : −4 et 4.
   await page.locator('[data-test="vec-by"]').press('End');
   await expect(page.locator('[data-test="vec-by"]')).toHaveAttribute('aria-valuenow', '4');
@@ -138,6 +141,12 @@ test('descente : au taux 0,5, un pas suffit', async ({ page }) => {
   await expect(page.locator('[data-test="desc-annonce"]')).toContainText('Pas 1');
   // Changer le taux repart du pas 0, sans rien annoncer.
   await taux.press('ArrowLeft');
+  await expect(page.locator('[data-test="desc-liste"] li')).toHaveCount(1);
+  expect(await texteExact(page, 'desc-etat')).toContain('En x = 0');
+  await expect(page.locator('[data-test="desc-annonce"]')).toBeEmpty();
+  // Revenir au taux d'avant ne ressuscite pas l'ancienne descente, et ne l'annonce pas.
+  await taux.press('ArrowRight');
+  await expect(taux).toHaveAttribute('aria-valuetext', '0,5');
   await expect(page.locator('[data-test="desc-liste"] li')).toHaveCount(1);
   expect(await texteExact(page, 'desc-etat')).toContain('En x = 0');
   await expect(page.locator('[data-test="desc-annonce"]')).toBeEmpty();
@@ -193,6 +202,20 @@ test('descente : les positions suivent le jumeau', async ({ page }) => {
     `Pas 3${FINE}: x = ${position(x3)}, erreur = ${ecrireNombre((x3 - 3) * (x3 - 3) + 1, 3)}, ` +
       `pente = ${ecrireNombre(2 * (x3 - 3), 3)}.`,
   );
+});
+
+test('descente : la pastille du départ garde sa largeur, de 0,5 en 0,5', async ({ page }) => {
+  // NombreManipulable mesure sa largeur de pas en pas : « −1,5 » compte, pas seulement « −2 » et « 8 ».
+  await ouvrirFigures(page);
+  const x0 = page.locator('[data-test="desc-x0"]');
+  const largeurs: number[] = [];
+  await x0.focus();
+  for (const touche of ['Home', 'ArrowRight', 'ArrowRight', 'End', 'ArrowLeft']) {
+    await x0.press(touche);
+    largeurs.push((await x0.boundingBox())!.width);
+  }
+  await expect(x0).toHaveAttribute('aria-valuetext', '7,5');
+  for (const largeur of largeurs) expect(Math.abs(largeur - largeurs[0]), `largeurs ${largeurs.join(', ')}`).toBeLessThan(0.5);
 });
 
 test('tirage : les comptes suivent le jumeau, même à 100 000', async ({ page }) => {
@@ -287,6 +310,9 @@ test('verrous, clavier, sans JavaScript, axe, débordement, typographie', async 
   await page.locator('[data-test="tir-graine"]').focus();
   await page.keyboard.press('Enter');
   expect(await page.locator('[data-figure="tirage"]').textContent()).toContain(`graine 1${FINE}235`);
+
+  // Les autres paris de ces étapes : leurs explications entrent dans les contrôles de lecture.
+  for (const id of ['taux-moitie', 'taux-grand', 'tirage']) await page.locator(`[data-pari="${id}"] [data-juste]`).click();
 
   await attendreAnimations(page);
   await verifierAxe(page);

@@ -119,18 +119,38 @@ export function messageVecteurNul(a: readonly number[], b: readonly number[]): s
 
 /**
  * Le cosinus et ce qu'il dit : « cos = 5 ÷ (3,16 × 2,24) = 0,71 : à peu près
- * la même direction ». Les longueurs et le cosinus sont arrondis à deux
- * décimales, et la direction se lit sur le cosinus affiché : le texte et le
- * nombre disent toujours la même chose. Un vecteur nul donne son message.
+ * la même direction ». Un vecteur nul donne son message.
+ *
+ * Les cas exacts se décident sur les coordonnées entières, jamais sur le
+ * cosinus calculé (√2 × √8 ne fait pas exactement 4 en flottants) : produit
+ * scalaire nul, les vecteurs sont perpendiculaires (cos = 0) ; produit en croix
+ * nul (a₁ × b₂ − a₂ × b₁), ils sont sur une même droite, dans la même
+ * direction (cos = 1) ou dans des directions opposées (cos = −1). Sinon, les
+ * longueurs et le cosinus sont arrondis à deux décimales, et la direction se
+ * lit sur le cosinus affiché, selon les seuils : le texte et le nombre disent
+ * toujours la même chose.
  */
 export function texteCosinus(a: readonly number[], b: readonly number[]): string {
   const c = cosinus(a, b);
   if (c === null) return messageVecteurNul(a, b)!;
-  const affiche = ecrireArrondi(c);
-  const lu = Number(affiche.replace(MOINS, '-').replace(',', '.'));
+  const scalaire = produitScalaire(a, b);
+  const entiers = [...a, ...b].every(Number.isInteger);
+  const enCroix = a.length === 2 && b.length === 2 ? a[0] * b[1] - a[1] * b[0] : null;
+  let affiche: string;
+  let direction: string;
+  if (entiers && scalaire === 0) {
+    affiche = ecrireNombre(0);
+    direction = 'perpendiculaires';
+  } else if (entiers && enCroix === 0) {
+    affiche = ecrireNombre(Math.sign(scalaire));
+    direction = scalaire > 0 ? 'la même direction' : 'des directions opposées';
+  } else {
+    affiche = ecrireArrondi(c);
+    direction = directionSelonCosinus(Number(affiche.replace(MOINS, '-').replace(',', '.')));
+  }
   return (
-    `cos = ${ecrireNombre(produitScalaire(a, b))} ÷ (${ecrireArrondi(norme(a))} × ${ecrireArrondi(norme(b))}) = ` +
-    `${affiche}${FINE}: ${directionSelonCosinus(lu)}`
+    `cos = ${ecrireNombre(scalaire)} ÷ (${ecrireArrondi(norme(a))} × ${ecrireArrondi(norme(b))}) = ` +
+    `${affiche}${FINE}: ${direction}`
   );
 }
 
@@ -359,25 +379,29 @@ export function faitsTauxGrand(): { positions: number[]; distances: number[] } {
 }
 
 /**
- * Le pari « Au taux 1,05, que fait x pendant 30 pas ? ». Les trois cas
- * s'excluent : x s'éloigne du fond (plus loin au bout qu'au départ), sinon il
- * arrive (l'erreur passe sous le seuil), sinon il oscille autour du fond.
+ * Le pari « Au taux 1,05, que fait x pendant 30 pas ? ». Chaque choix a sa
+ * condition exacte : x arrive (l'erreur passe sous le seuil), x oscille
+ * toujours à la même distance du fond (ce que fait le taux 1,0), ou x
+ * s'éloigne du fond à chaque pas. Au taux 1,05, x change bien de côté à chaque
+ * pas, mais de plus en plus loin : « oscille », seul, aurait été vrai aussi,
+ * d'où « toujours à la même distance ». Une garde exige exactement un choix
+ * juste.
  */
 export function choixTauxGrand(): Choix[] {
   const { distances } = faitsTauxGrand();
-  const eloigne = distances[NB_PAS_DU_PARI] > distances[0];
-  const arrive = !eloigne && pasPourAtteindre(X0_DEPART, TAUX_GRAND, SEUIL_DU_PARI, NB_PAS_DU_PARI) !== null;
-  if (eloigne) {
-    exiger(
-      distances.every((d, n) => n === 0 || d > distances[n - 1]),
-      `au taux ${TAUX_GRAND}, x ne s’éloigne pas du fond à chaque pas`,
-    );
-  }
-  return [
+  const arrive = pasPourAtteindre(X0_DEPART, TAUX_GRAND, SEUIL_DU_PARI, NB_PAS_DU_PARI) !== null;
+  const memeDistance = distances.every((d) => d === distances[0]);
+  const eloigne = distances.every((d, n) => n === 0 || d > distances[n - 1]);
+  const choix = [
     { texte: 'Il arrive plus vite', juste: arrive },
-    { texte: 'Il oscille autour du fond', juste: !eloigne && !arrive },
+    { texte: 'Il oscille autour du fond, toujours à la même distance', juste: memeDistance },
     { texte: "Il s'éloigne du fond à chaque pas", juste: eloigne },
   ];
+  exiger(
+    choix.filter((c) => c.juste).length === 1,
+    `au taux ${TAUX_GRAND}, la descente n’est pas exactement dans un des trois cas du pari`,
+  );
+  return choix;
 }
 
 /** Le nombre de tirages du pari « tirage ». */
@@ -412,7 +436,7 @@ export function choixTirage(): Choix[] {
   );
   return [
     { texte: 'Oui, forcément', juste: false },
-    { texte: `Pas forcément : ${nombre(compte)} fois cette fois-ci`, juste: compte !== attendu },
+    { texte: `Pas forcément : ici, ${nombre(compte)} fois`, juste: compte !== attendu },
     { texte: `Jamais ${nombre(attendu)} fois`, juste: false },
   ];
 }

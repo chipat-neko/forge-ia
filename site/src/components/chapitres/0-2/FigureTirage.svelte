@@ -49,8 +49,9 @@
   function autreGraine(): void {
     if (!$ouvert) return;
     graine += 1;
-    // Lu après le clic : les comptes de la nouvelle graine.
-    const faits = resultatsDesTirages(n, graine)
+    // Lu après le clic : les comptes de la nouvelle graine. `lignes` se recalcule
+    // ici, une seule fois ; l'affichage reprend ce même calcul.
+    const faits = lignes
       .map((l) => `${l.nom} ${nombre(l.compte)}`)
       .join(', ');
     annonce = `Avec la graine ${nombre(graine)}${FINE}: ${faits}, sur ${nombre(n)} tirages.`;

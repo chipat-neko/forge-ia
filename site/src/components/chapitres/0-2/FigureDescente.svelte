@@ -67,6 +67,18 @@
   const nbPas = $derived(aJour ? faite.nbPas : 0);
   const annonce = $derived(aJour ? faite.annonce : '');
 
+  // La descente caduque est effacée avant l'affichage : revenir ensuite au
+  // réglage d'avant (en plein glissé, par exemple) repart bien du pas 0, sans
+  // ressusciter l'ancienne descente ni la réannoncer.
+  $effect.pre(() => {
+    const [depart, rang] = [$x0, $indiceTaux];
+    untrack(() => {
+      if (faite.x0 !== depart || faite.indiceTaux !== rang) {
+        faite = { x0: depart, indiceTaux: rang, nbPas: 0, annonce: '' };
+      }
+    });
+  });
+
   const taux = $derived(TAUX_DESCENTE[$indiceTaux]);
   const positions = $derived(cheminDeDescente($x0, taux, nbPas));
   const n = $derived(positions.length - 1);

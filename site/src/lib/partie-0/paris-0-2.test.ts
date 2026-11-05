@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  cosinus,
   descendre,
   EXEMPLE_COMPTES,
   GRAINE_TIRAGE,
@@ -101,10 +102,13 @@ describe('les bonnes réponses viennent du jumeau', () => {
     expect(Math.abs(positions[30] - FOND)).toBeGreaterThan(Math.abs(positions[0] - FOND));
     expect(choixTauxGrand().map((c) => c.texte)).toEqual([
       'Il arrive plus vite',
-      'Il oscille autour du fond',
+      'Il oscille autour du fond, toujours à la même distance',
       "Il s'éloigne du fond à chaque pas",
     ]);
     expect(choixTauxGrand().find((c) => c.juste)?.texte).toBe("Il s'éloigne du fond à chaque pas");
+    // Le distracteur « toujours à la même distance » est ce que fait le taux 1,0 : x va de 0 à 6, puis revient.
+    expect(descendre(0, 1.0, 4)).toEqual([0, 6, 0, 6, 0]);
+    expect(pasPourAtteindre(0, 1.0, SEUIL_DU_PARI, 30)).toBeNull();
     const faits = faitsTauxGrand();
     expect(faits.distances).toEqual(positions.map((x) => Math.abs(x - FOND)));
     // « À chaque pas » : la distance au fond grandit d'un pas à l'autre, et x change de côté.
@@ -119,10 +123,10 @@ describe('les bonnes réponses viennent du jumeau', () => {
     expect(compte).not.toBe(6);
     expect(choixTirage().map((c) => c.texte)).toEqual([
       'Oui, forcément',
-      `Pas forcément : ${compte} fois cette fois-ci`,
+      `Pas forcément : ici, ${compte} fois`,
       'Jamais 6 fois',
     ]);
-    expect(choixTirage().find((c) => c.juste)?.texte).toBe(`Pas forcément : ${compte} fois cette fois-ci`);
+    expect(choixTirage().find((c) => c.juste)?.texte).toBe(`Pas forcément : ici, ${compte} fois`);
     expect(faitsDuPariTirage()).toEqual({ nom: 'fer', proba: 0.6, n: 10, attendu: 6, compte });
   });
 
@@ -156,8 +160,21 @@ describe('la figure des vecteurs', () => {
 
   it('le cosinus, ses longueurs, et ce qu’il dit de la direction', () => {
     expect(texteCosinus([3, 1], [1, 2])).toBe(`cos = 5 ÷ (3,16 × 2,24) = 0,71${FINE}: à peu près la même direction`);
-    expect(texteCosinus([2, 1], [-1, 2])).toBe(`cos = 0 ÷ (2,24 × 2,24) = 0${FINE}: presque perpendiculaires`);
+    // Presque perpendiculaires, mais pas tout à fait : les seuils.
+    expect(texteCosinus([4, 1], [-1, 3])).toBe(`cos = ${MOINS}1 ÷ (4,12 × 3,16) = ${MOINS}0,08${FINE}: presque perpendiculaires`);
+  });
+
+  it('les cas exacts se décident sur les entiers, pas sur le cosinus calculé', () => {
+    // Produit scalaire nul : perpendiculaires, cos = 0.
+    expect(texteCosinus([2, 1], [-1, 2])).toBe(`cos = 0 ÷ (2,24 × 2,24) = 0${FINE}: perpendiculaires`);
+    // Sur une même droite : √2 × √8 ne fait pas exactement 4 en flottants, le cosinus calculé n'est pas 1.
+    expect(cosinus([1, 1], [2, 2])).not.toBe(1);
+    expect(texteCosinus([1, 1], [2, 2])).toBe(`cos = 4 ÷ (1,41 × 2,83) = 1${FINE}: la même direction`);
+    expect(texteCosinus([3, 1], [3, 1])).toBe(`cos = 10 ÷ (3,16 × 3,16) = 1${FINE}: la même direction`);
     expect(texteCosinus([1, 0], [-3, 0])).toBe(`cos = ${MOINS}3 ÷ (1 × 3) = ${MOINS}1${FINE}: des directions opposées`);
+    expect(texteCosinus([-4, -4], [4, 4])).toBe(`cos = ${MOINS}32 ÷ (5,66 × 5,66) = ${MOINS}1${FINE}: des directions opposées`);
+    // Presque sur la même droite, sans y être : les seuils.
+    expect(texteCosinus([4, 1], [4, 0])).toBe(`cos = 16 ÷ (4,12 × 4) = 0,97${FINE}: presque la même direction`);
   });
 
   it('les seuils du cosinus', () => {

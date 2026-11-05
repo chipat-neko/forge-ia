@@ -9,7 +9,7 @@ acquis:
     texte: "Le produit scalaire dit si deux vecteurs vont dans le même sens."
     ou: "à l'étape 1"
   - cle: perpendiculaires
-    texte: "Deux vecteurs perpendiculaires ont un produit scalaire nul."
+    texte: "Deux vecteurs non nuls sont perpendiculaires quand leur produit scalaire vaut 0."
     ou: "à l'étape 1, en réussissant le défi de la figure"
   - cle: matrices
     texte: "Une matrice fois un vecteur, c'est un produit scalaire par ligne."
@@ -33,10 +33,23 @@ import FigureTirage from '../../components/chapitres/0-2/FigureTirage.svelte';
 import FigureVecteurs from '../../components/chapitres/0-2/FigureVecteurs.svelte';
 import attendus from '../../../../projets/0.2-maths/tests/attendus.json';
 import { PRESETS_FORGE } from '../../lib/calculateur/ton-ia';
-import { descendre, erreur, EXEMPLE_COMPTES, GRAINE_TIRAGE, norme, pasPourAtteindre, pente, probabilites, somme } from '../../lib/partie-0/maths';
+import {
+  descendre,
+  erreur,
+  EXEMPLE_COMPTES,
+  GRAINE_TIRAGE,
+  norme,
+  pasPourAtteindre,
+  pente,
+  probabilites,
+  produitScalaire,
+  somme,
+  TAUX_DESCENTE,
+} from '../../lib/partie-0/maths';
 import {
   A_DEPART,
   B_DEPART,
+  cheminDeDescente,
   choixPente,
   choixProduitScalaire,
   choixTauxGrand,
@@ -45,10 +58,16 @@ import {
   ecrireNombre,
   ecrireReglage,
   ecrireVecteur,
+  ECART_EXPLOSION,
+  explose,
   faitsDuPariTirage,
   faitsTauxGrand,
   FOND,
+  INDICE_TIRAGES_DEPART,
   NB_PAS_DU_PARI,
+  NOMBRES_DE_TIRAGES,
+  PAS_MAX,
+  resultatsDesTirages,
   SEUIL_DU_PARI,
   TAUX_DEPART,
   TAUX_GRAND,
@@ -76,7 +95,7 @@ export const SCALAIRE_DEPART = texteScalaire(A_DEPART, B_DEPART).replace(/^a · 
 
 export const NORME_A = ecrireNombre(norme(A_DEPART), 2);
 
-export const CARRE_A = ecrireNombre(A_DEPART[0] * A_DEPART[0] + A_DEPART[1] * A_DEPART[1]);
+export const CARRE_A = ecrireNombre(produitScalaire(A_DEPART, A_DEPART));
 
 export const [PARI_A, PARI_B] = VECTEURS_DU_PARI.map(ecrireVecteur);
 
@@ -152,6 +171,45 @@ export const TIRAGE = (() => {
 
 export const PARI_TIRAGE = faitsDuPariTirage();
 
+export const OSCILLATION = (() => {
+  // Au taux 1, x oscille toujours à la même distance du fond : le distracteur du pari « taux-grand ».
+  const taux = 1;
+  exiger(TAUX_DESCENTE.includes(taux), `le taux ${taux} n’est plus un réglage de la figure`);
+  const [x0, x1, x2] = descendre(X0_DEPART, taux, 2);
+  exiger(x2 === x0 && x1 !== x0, `au taux ${taux}, x ne fait plus l’aller-retour d’un côté à l’autre du fond`);
+  return { taux: ecrireReglage(taux), de: ecrireNombre(x0), a: ecrireNombre(x1) };
+})();
+
+export const EXPLOSION = (() => {
+  // Au plus grand taux de la figure, le pas où x part à plus de ECART_EXPLOSION du fond.
+  const taux = TAUX_DESCENTE.at(-1);
+  const chemin = cheminDeDescente(X0_DEPART, taux, PAS_MAX);
+  exiger(explose(chemin.at(-1)), `au taux ${taux}, la descente de la figure n’explose pas en ${PAS_MAX} pas`);
+  return { taux: ecrireReglage(taux), ecart: nombre(ECART_EXPLOSION), pas: chemin.length - 1 };
+})();
+
+export const LOI = (() => {
+  // La part de « fer » sur 100 et sur 100 000 tirages (graine de la figure) : elle se rapproche de sa
+  // probabilité, alors que l'écart en nombre de tirages grandit.
+  const [nom, compte] = EXEMPLE_COMPTES[0];
+  let total = 0;
+  for (const [, c] of EXEMPLE_COMPTES) total += c;
+  const faits = [NOMBRES_DE_TIRAGES[INDICE_TIRAGES_DEPART], NOMBRES_DE_TIRAGES.at(-1)].map((n) => {
+    const tire = resultatsDesTirages(n, GRAINE_TIRAGE)[0].compte;
+    const attendu = (compte * n) / total;
+    exiger(Number.isInteger(attendu), `« ${nom} » n’est pas attendu un nombre entier de fois sur ${n} tirages`);
+    return { n, tire, attendu, ecart: Math.abs(tire - attendu) };
+  });
+  const [peu, beaucoup] = faits;
+  exiger(beaucoup.ecart / beaucoup.n < peu.ecart / peu.n, `la part de « ${nom} » ne se rapproche pas de sa probabilité`);
+  exiger(beaucoup.ecart > peu.ecart, `l’écart en nombre de tirages ne grandit pas avec le nombre de tirages`);
+  return faits.map(({ n, tire, ecart }) => ({
+    n: nombre(n),
+    part: pourcent(tire / n, Math.max(0, String(n).length - 3)),
+    ecart: nombre(ecart),
+  }));
+})();
+
 {/* L'ouverture du chapitre, « (3, 1) · (1, 2) = 5 » : tâche 7. */}
 
 <Etape numero={1} titre="Des nombres en colonne : les vecteurs">
@@ -207,7 +265,7 @@ La somme, en pointillé, arrive au même endroit que b posé au bout de a.
 
 Une IA apprend en réglant ses poids, des nombres qu'elle ajuste pour faire baisser son erreur. Prends un seul poids, x, et une erreur toute simple, qui vaut (x − 3)² + 1. Cette erreur est la plus basse en x = {ecrireNombre(FOND)}, où elle vaut {ecrireNombre(erreur(FOND))} : c'est le fond. Mais l'IA ne voit pas la courbe en entier. Elle ne connaît que sa position, et la pente sous ses pieds.
 
-La pente dit de combien l'erreur monte quand x avance d'un tout petit pas vers la droite. Si l'erreur descend, la pente est négative.
+La pente dit à quelle vitesse l'erreur monte quand x avance vers la droite : c'est la montée de l'erreur sur un tout petit pas, divisée par la longueur de ce pas. Si l'erreur descend, la pente est négative.
 
 <Pari
   id="pente"
@@ -281,13 +339,15 @@ Au taux {MOITIE.taux}, x devient {PREMIER_PAS.x0} − {MOITIE.taux} × ({PREMIER
   acquis="taux"
 >
 
-À ce taux, chaque pas saute par-dessus le fond et atterrit de l'autre côté, un peu plus loin qu'avant. Au départ, x est à {GRAND.d0} du fond ; après un pas, à {GRAND.d1}, puis à {GRAND.d2}, soit {GRAND.hausse} de plus à chaque pas ; au bout de {NB_PAS_DU_PARI} pas, à {GRAND.dFin}. L'erreur, au lieu de baisser, grimpe. Dans la figure, au taux le plus grand, la descente explose en quelques pas.
+À ce taux, chaque pas saute par-dessus le fond et atterrit de l'autre côté, un peu plus loin qu'avant : x oscille bien autour du fond, mais jamais à la même distance. Au départ, x est à {GRAND.d0} du fond ; après un pas, à {GRAND.d1}, puis à {GRAND.d2}, soit {GRAND.hausse} de plus à chaque pas ; au bout de {NB_PAS_DU_PARI} pas, à {GRAND.dFin}. L'erreur, au lieu de baisser, grimpe.
+
+C'est au taux {OSCILLATION.taux} que x oscillerait toujours à la même distance, entre {OSCILLATION.de} et {OSCILLATION.a}. Dans la figure, au plus grand taux, {EXPLOSION.taux}, x part à plus de {EXPLOSION.ecart} du fond dès le pas {EXPLOSION.pas}.
 
 </Pari>
 
 <Fragment slot="note">
 
-Ton IA apprend exactement ainsi. À chaque pas d'entraînement, elle calcule la pente de son erreur pour chacun de ses {POIDS} millions de poids, et les déplace tous à la fois. Le chapitre 0.5 montre comment obtenir toutes ces pentes d'un coup.
+Ton IA apprend sur ce principe. À chaque pas d'entraînement, elle calcule la pente de son erreur pour chacun de ses {POIDS} millions de poids, et les déplace tous à la fois. Sa recette, AdamW, règle en plus la longueur du pas de chaque poids. Le chapitre 0.5 montre comment obtenir toutes ces pentes d'un coup.
 
 </Fragment>
 
@@ -326,7 +386,9 @@ Le hasard d'un ordinateur est un calcul : on part d'un nombre, la graine, et cha
   acquis="hasard"
 >
 
-Avec la graine {nombre(GRAINE_TIRAGE)}, « {PARI_TIRAGE.nom} » sort {PARI_TIRAGE.compte} fois sur {PARI_TIRAGE.n}. Une probabilité de {pourcent(PARI_TIRAGE.proba)} dit ce qui arrive en moyenne, pas à chaque fois : sur peu de tirages, les comptes s'en écartent beaucoup ; sur beaucoup de tirages, ils s'en rapprochent. Essaie dans la figure : monte le nombre de tirages, puis change de graine.
+Avec la graine {nombre(GRAINE_TIRAGE)}, « {PARI_TIRAGE.nom} » sort {PARI_TIRAGE.compte} fois sur {PARI_TIRAGE.n}. Une probabilité de {pourcent(PARI_TIRAGE.proba)} dit ce qui arrive en moyenne, pas à chaque fois : sur peu de tirages, la part de « {PARI_TIRAGE.nom} » s'en écarte beaucoup ; sur beaucoup de tirages, elle s'en rapproche.
+
+Dans la figure, avec la même graine, « {PARI_TIRAGE.nom} » fait {LOI[0].part} des tirages sur {LOI[0].n}, et {LOI[1].part} sur {LOI[1].n}. L'écart en nombre de tirages, lui, ne rétrécit pas : {LOI[0].ecart} sur {LOI[0].n}, {LOI[1].ecart} sur {LOI[1].n}. C'est la part qui se rapproche de la probabilité. Essaie : monte le nombre de tirages, puis change de graine.
 
 </Pari>
 

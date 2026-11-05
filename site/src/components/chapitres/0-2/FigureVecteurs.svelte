@@ -84,6 +84,8 @@
   const DEMI_TETE = 5;
   const RAYON_ANGLE = 22;
   const crans = Array.from({ length: 2 * DEMI_GRILLE + 1 }, (_, i) => i - DEMI_GRILLE);
+  /** Les graduations écrites sur les axes : une sur deux, sans le 0 ni les bords. */
+  const graduations = crans.filter((k) => k !== 0 && k % 2 === 0);
 
   const px = (x: number) => CENTRE + UNITE * x;
   const py = (y: number) => CENTRE - UNITE * y;
@@ -247,6 +249,10 @@
       <line class={k === 0 ? 'axe' : 'grille'} x1={px(k)} x2={px(k)} y1={CENTRE - BORD} y2={CENTRE + BORD} />
       <line class={k === 0 ? 'axe' : 'grille'} x1={CENTRE - BORD} x2={CENTRE + BORD} y1={py(k)} y2={py(k)} />
     {/each}
+    {#each graduations as k (k)}
+      <text class="graduation" x={px(k)} y={CENTRE + 14}>{ecrireNombre(k)}</text>
+      <text class="graduation graduation-y" x={CENTRE - 6} y={py(k)}>{ecrireNombre(k)}</text>
+    {/each}
     {#if angle !== null}
       <path class="angle" d={angle.d} />
     {/if}
@@ -308,6 +314,12 @@
   .reglage {
     margin: 0 0 0.4em;
     line-height: 1.9;
+  }
+
+  /* La virgule de « (3, 1) » colle au premier nombre : sa marge de droite, faite
+     pour loger le chevron, est réduite ici (et seulement ici). */
+  .paire > :global(.nombre:first-of-type) {
+    margin-right: 1px;
   }
 
   /* « a = (3, 1) » ne se coupe pas : la phrase passe à la ligne entre les deux vecteurs. */
@@ -390,6 +402,24 @@
 
   .nul-b {
     stroke: var(--indigo-doux);
+  }
+
+  /* Les graduations des axes, discrètes : une sur deux, en encre douce. */
+  .graduation {
+    font-family: var(--titres);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    fill: var(--indigo-doux);
+    text-anchor: middle;
+    dominant-baseline: central;
+    paint-order: stroke;
+    stroke: var(--papier);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+  }
+
+  .graduation-y {
+    text-anchor: end;
   }
 
   .angle {
