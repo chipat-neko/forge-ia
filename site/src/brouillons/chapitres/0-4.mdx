@@ -1,0 +1,547 @@
+---
+partie: 0
+numero: "0.4"
+titre: "Tenseurs et calcul sur GPU"
+chapeau: "Ton IA range tous ses nombres dans des tableaux à plusieurs dimensions, les tenseurs. Tu apprends ici à les créer et à lire leur forme, à prévoir dans un atelier ce qui se multiplie avec quoi, puis à les faire calculer sur la carte graphique, chronomètre en main."
+programme: "8 étapes, 3 paris, environ 30 minutes."
+acquis:
+  - cle: diffusion
+    texte: "Une dimension de taille 1 s'étire pour suivre l'autre."
+    ou: "à l'étape 4"
+  - cle: formes
+    texte: "Pour A @ B, les colonnes de A doivent égaler les lignes de B."
+    ou: "à l'étape 4, en multipliant dans l'atelier un A à 3 dimensions"
+  - cle: memoire
+    texte: "La mémoire d'un tenseur, c'est son nombre de cases fois la taille d'un nombre."
+    ou: "à l'étape 5"
+  - cle: fils
+    texte: "Le processeur aussi calcule en parallèle, sur tous ses fils."
+    ou: "à l'étape 7"
+---
+
+import { root } from 'astro:config/server';
+import AtelierFormes from '../../components/chapitres/0-4/AtelierFormes.svelte';
+import OuvertureTenseurs from '../../components/chapitres/0-4/OuvertureTenseurs.astro';
+import TableauChronos from '../../components/chapitres/0-4/TableauChronos.astro';
+import BlocCommande from '../../components/gabarit/BlocCommande.astro';
+import attendusFormes from '../../../../projets/0.4-tenseurs/tests/attendus-formes.json';
+import { materiel, REPERES_EFFICACITE } from '../../lib/calculateur/donnees';
+import { formaterOctets } from '../../lib/calculateur/formats';
+import { memoirePoidsOctets } from '../../lib/calculateur/formules';
+import { MESURES_TON_IA, PRESETS_FORGE, reperesTonIA } from '../../lib/calculateur/ton-ia';
+import { A_DEPART, B_DEPART, expliquer } from '../../lib/partie-0/atelier-formes';
+import {
+  ALLER_AU_PROJET_0_4,
+  CLONER_DEPOT,
+  FORCER_PROCESSEUR_BASH,
+  FORCER_PROCESSEUR_POWERSHELL,
+  METTRE_A_JOUR_DEPOT,
+  TENSEURS_FORMES,
+  TENSEURS_MESURER_CPU,
+  TENSEURS_MESURER_GPU,
+} from '../../lib/partie-0/commandes';
+import { ecrireForme, formeDiffusee, memoireOctets } from '../../lib/partie-0/formes';
+import { lireMesures } from '../../lib/partie-0/mesures';
+import {
+  choixDiffusion,
+  choixFils,
+  choixMemoire,
+  chrono,
+  ecrireMillisecondes,
+  OCTETS_FLOAT32,
+  OCTETS_PAR_MO,
+  phraseFils,
+  questionFils,
+  rapportFils,
+  TAILLE_DU_PARI_FILS,
+  TAILLE_DU_PARI_MEMOIRE,
+} from '../../lib/partie-0/paris-0-4';
+import { exigeur } from '../../lib/exiger';
+import { nombre, pourcent } from '../../lib/nombres';
+
+export const exiger = exigeur('le texte du chapitre 0.4 (0-4.mdx)');
+
+export const EX = attendusFormes.exemples;
+
+export const pythonFlottant = (x) => (Number.isInteger(x) ? `${x}.0` : String(x));
+
+export const pythonListe = (v) => (Array.isArray(v) ? `[${v.map(pythonListe).join(', ')}]` : pythonFlottant(v));
+
+export const FORMES = (() => {
+  // Les formes de l'étape 1 : celles des tenseurs de exemple_creer, écrites comme Python.
+  const { nombre: seul, vecteur, matrice, lot } = EX.creer;
+  exiger(
+    [seul, vecteur, matrice, lot].map((t) => t.forme.length).join() === '0,1,2,3',
+    'les exemples de exemple_creer n’ont plus 0, 1, 2 et 3 dimensions',
+  );
+  return {
+    nombre: ecrireForme(seul.forme),
+    vecteur: ecrireForme(vecteur.forme),
+    tailleVecteur: vecteur.forme[0],
+    matrice: ecrireForme(matrice.forme),
+    lignes: matrice.forme[0],
+    colonnes: matrice.forme[1],
+    lot: ecrireForme(lot.forme),
+    matricesDuLot: lot.forme[0],
+    lotLignes: lot.forme[1],
+    lotColonnes: lot.forme[2],
+  };
+})();
+
+export const TON_IA = (() => {
+  // Le tenseur qui entre dans ton IA, dans sa plus grande taille (les tailles de forge, dans le calculateur).
+  const f = PRESETS_FORGE.tres_grand;
+  exiger(MESURES_TON_IA.tres_grand.carte.microLot === 1, 'la plus grande taille de ton IA ne va plus le plus vite avec un micro-lot de 1, celui de l’ouverture');
+  return {
+    contexte: nombre(f.contexte),
+    dim: nombre(f.dim),
+    couches: nombre(f.couches),
+  };
+})();
+
+export const CREER = (() => {
+  // La matrice de exemple_creer : torch.arange donne les nombres de 0 à n − 1, que reshape range en lignes.
+  const { nombre: seul, vecteur, matrice, lot, entiers } = EX.creer;
+  const valeurs = matrice.valeurs.flat();
+  exiger(entiers.dtype === 'int64', 'les entiers de exemple_creer ne sont plus des int64');
+  exiger([seul, vecteur, matrice, lot].every((t) => t.dtype === 'float32'), 'les nombres à virgule de exemple_creer ne sont plus des float32');
+  exiger(valeurs.every((x, i) => x === i), 'la matrice de exemple_creer ne compte plus de 0 en 0');
+  return { combien: valeurs.length, debut: valeurs[0], fin: valeurs.at(-1), valeurs: pythonListe(matrice.valeurs) };
+})();
+
+export const LIRE = (() => {
+  // Ce que exemple_lire lit de la même matrice, tel que Python l'écrit.
+  const l = EX.lire;
+  exiger(JSON.stringify(l.forme) === JSON.stringify(EX.creer.matrice.forme), 'exemple_lire ne lit plus la matrice de exemple_creer');
+  exiger(l.nombres === l.forme[0] * l.forme[1], 'le nombre de nombres de exemple_lire n’est plus le produit des tailles');
+  return {
+    forme: ecrireForme(l.forme),
+    dimensions: l.dimensions,
+    nombres: l.nombres,
+    type: l.type,
+    appareil: l.appareil,
+    case: pythonFlottant(l.case),
+    ligne: pythonListe(l.ligne),
+    colonne: pythonListe(l.colonne),
+  };
+})();
+
+export const CALCUL = (() => {
+  // Les deux matrices de exemple_calculer, recopiées ici : leurs sommes et leurs produits, refaits en
+  // JavaScript, doivent être ceux que PyTorch a calculés.
+  const a = [[1, 2], [3, 4]];
+  const b = [[10, 20], [30, 40]];
+  const c = EX.calculer;
+  const memes = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+  const somme = a.map((l, i) => l.map((x, j) => x + b[i][j]));
+  const parCase = a.map((l, i) => l.map((x, j) => x * b[i][j]));
+  const produit = a.map((l) => b[0].map((_, j) => l.reduce((s, x, k) => s + x * b[k][j], 0)));
+  exiger(memes(somme, c.somme) && memes(parCase, c.produit_case_par_case) && memes(produit, c.produit_matriciel), 'les matrices a et b du texte ne sont plus celles de exemple_calculer');
+  exiger(c.total === a.flat().reduce((s, x) => s + x, 0), 'la somme de a n’est plus celle de exemple_calculer');
+  exiger(c.diffusion.length === a.length && c.diffusion[0].length === a[0].length, 'la diffusion de exemple_calculer n’a plus la forme de a');
+  return {
+    lignes: a.length,
+    colonnes: a[0].length,
+    matrice: ecrireForme([a.length, a[0].length]),
+    vecteur: ecrireForme([a[0].length]),
+    somme: pythonListe(c.somme),
+    parCase: pythonListe(c.produit_case_par_case),
+    produit: pythonListe(c.produit_matriciel),
+    premiere: `${a[0][0]} × ${b[0][0]} + ${a[0][1]} × ${b[1][0]} = ${c.produit_matriciel[0][0]}`,
+    total: pythonFlottant(c.total),
+    moyennes: pythonListe(c.moyenne_par_colonne),
+    diffusion: pythonListe(c.diffusion),
+  };
+})();
+
+export const DIFFUSION = (() => {
+  // Le pari : les formes de départ de l'atelier, leur résultat et ce qui s'y étire.
+  const r = formeDiffusee(A_DEPART, B_DEPART);
+  exiger(r !== null, 'les formes de départ de l’atelier ne se diffusent plus');
+  return { a: ecrireForme(A_DEPART), b: ecrireForme(B_DEPART), r: ecrireForme(r), explication: expliquer(A_DEPART, B_DEPART, 'plus') };
+})();
+
+export const PAIRES = nombre(attendusFormes.paires.length);
+
+export const MEMOIRE = (() => {
+  // La place d'un nombre selon son type, telle que PyTorch la donne (attendus du projet), et le pari.
+  const par = (dtype) => {
+    const cas = attendusFormes.memoire.find((c) => c.dtype === dtype);
+    exiger(cas !== undefined, `les attendus du projet n’ont plus de cas en ${dtype}`);
+    return cas.octets_par_nombre;
+  };
+  const t = TAILLE_DU_PARI_MEMOIRE;
+  const cas = attendusFormes.memoire.find((c) => c.dtype === 'float32' && c.forme.length === 2 && c.forme.every((x) => x === t));
+  exiger(cas !== undefined && cas.octets_par_nombre === OCTETS_FLOAT32, 'le cas 4096 × 4096 en float32 manque aux attendus, ou un float32 n’y prend plus 4 octets');
+  exiger(cas.octets === memoireOctets([t, t], OCTETS_FLOAT32), 'la mémoire du pari ne suit plus celle que PyTorch a donnée');
+  return {
+    float32: par('float32'),
+    bfloat16: par('bfloat16'),
+    int64: par('int64'),
+    moitie: nombre(par('float32') / par('bfloat16')),
+    unMo: nombre(OCTETS_PAR_MO),
+    taille: nombre(t),
+    nombres: nombre(t * t),
+    octets: nombre(cas.octets),
+    mo: nombre(cas.octets / OCTETS_PAR_MO),
+    sansType: nombre((t * t) / OCTETS_PAR_MO),
+    bf16Mo: nombre(memoireOctets([t, t], par('bfloat16')) / OCTETS_PAR_MO),
+  };
+})();
+
+export const POIDS = (() => {
+  // Les poids de ton IA dans sa plus grande taille, en bf16 et en float32, et le tenseur de l'ouverture.
+  const f = PRESETS_FORGE.tres_grand;
+  return {
+    nombre: nombre(f.parametres),
+    bf16: formaterOctets(memoirePoidsOctets(f.parametres, MEMOIRE.bfloat16)),
+    float32: formaterOctets(memoirePoidsOctets(f.parametres, MEMOIRE.float32)),
+    ouverture: formaterOctets(memoireOctets([f.contexte, f.dim], MEMOIRE.bfloat16)),
+  };
+})();
+
+export const PROCESSEUR = (() => {
+  // Les chronos du processeur, lus dans projets/0.4-tenseurs/mesures/processeur.json (le site est dans site/).
+  const m = lireMesures('processeur', new URL('../', root));
+  exiger(m !== null, 'le fichier projets/0.4-tenseurs/mesures/processeur.json manque');
+  return m;
+})();
+
+export const FILS = (() => {
+  // Le pari « fils » : 1 fil, le réglage par défaut et tous les fils, au plus gros produit des chronos.
+  const m = PROCESSEUR;
+  const t = TAILLE_DU_PARI_FILS;
+  const un = chrono(m, t, 1);
+  const defaut = chrono(m, t, m.fils_par_defaut);
+  return {
+    taille: nombre(t),
+    defaut: nombre(m.fils_par_defaut),
+    max: nombre(m.fils_max),
+    msUn: ecrireMillisecondes(un),
+    msDefaut: ecrireMillisecondes(defaut),
+    msTous: ecrireMillisecondes(chrono(m, t, m.fils_max)),
+    gainDefaut: nombre(un / defaut, 1),
+    gainTous: nombre(rapportFils(m), 2),
+    question: questionFils(m),
+    phrase: phraseFils(m),
+  };
+})();
+
+export const LABO = (() => {
+  // La crête d'une H100 en bf16 (MATERIELS) et les efficacités publiées de PaLM et de Llama 3
+  // (REPERES_EFFICACITE), comparées à celle de ton IA sur la carte de ce PC (le repère du calculateur).
+  const h100 = materiel('h100-sxm');
+  const rtx = materiel('rtx-5070-ti');
+  const repere = (modele) => {
+    const r = REPERES_EFFICACITE.find((x) => x.modele === modele);
+    exiger(r !== undefined, `les efficacités publiées n’ont plus ${modele}`);
+    return r;
+  };
+  const palm = repere('PaLM 540B');
+  const llama = repere('Llama 3 405B');
+  const tonIA = reperesTonIA().find((r) => r.cle === 'tres_grand').carte.efficaciteAvecAttention;
+  exiger(palm.min === palm.max && llama.min < llama.max, 'PaLM n’a plus une seule efficacité, ou Llama 3 plus une fourchette');
+  exiger(palm.compteAttention && llama.compteAttention, 'PaLM ou Llama 3 ne comptent plus l’attention, comme le repère de ton IA');
+  exiger(tonIA > palm.max && tonIA > llama.max, 'ton IA ne tire plus davantage de sa carte que PaLM et Llama 3 de leurs milliers de puces');
+  const vers = (s) => ({ titre: s.titre, url: s.url, verifieLe: s.releveLe });
+  return {
+    crete: nombre(h100.creteTflops),
+    palm: pourcent(palm.min, 1),
+    palmMateriel: palm.materiel,
+    llamaMin: pourcent(llama.min).replace(/\u202F%$/, ''),
+    llamaMax: pourcent(llama.max),
+    llamaMateriel: llama.materiel,
+    tonIA: pourcent(tonIA),
+    sources: [vers(h100.source), vers(rtx.source), vers(palm.source), vers(llama.source), vers(MESURES_TON_IA.tres_grand.source)],
+  };
+})();
+
+<OuvertureTenseurs />
+
+<Etape numero={1} titre="Des nombres rangés en dimensions">
+
+Un tenseur est un tableau de nombres, rangés selon un certain nombre de dimensions. Un nombre seul, qu'on appelle aussi un scalaire, n'en a aucune. Une liste de nombres, le vecteur du chapitre 0.2, en a une. Une matrice, rangée en lignes et en colonnes, en a deux. Et des matrices de même taille s'empilent : un lot de matrices est un tenseur à 3 dimensions.
+
+La forme d'un tenseur, c'est la liste de ses tailles, une par dimension, écrite comme Python écrit un tuple : {FORMES.matrice} pour une matrice de {FORMES.lignes} lignes et {FORMES.colonnes} colonnes, {FORMES.lot} pour un lot de {FORMES.matricesDuLot} matrices de {FORMES.lotLignes} lignes et {FORMES.lotColonnes} colonnes, et {FORMES.nombre} pour un nombre seul. Une forme à une seule dimension garde une virgule : {FORMES.vecteur} pour un vecteur de {FORMES.tailleVecteur} nombres. Sans elle, Python lirait le nombre {FORMES.tailleVecteur} entre parenthèses. Ce chapitre écrit toutes les formes ainsi.
+
+Ton IA lit des textes découpés en morceaux, et chaque morceau a son numéro. Elle les reçoit par paquets, les micro-lots, de textes de {TON_IA.contexte} morceaux : son entrée est un tenseur d'entiers de forme (micro-lot, {TON_IA.contexte}), un numéro par case. Puis chaque numéro y est remplacé par un vecteur de {TON_IA.dim} nombres, comme au chapitre 0.2 : le tenseur devient (micro-lot, {TON_IA.contexte}, {TON_IA.dim}), celui de l'ouverture. Chacune de ses {TON_IA.couches} couches reçoit un tenseur de cette forme, et en rend un de la même forme.
+
+<Fragment slot="note">
+
+Le mot tenseur vient des maths et de la physique. En IA, il veut seulement dire : un tableau de nombres, avec autant de dimensions qu'il en faut.
+
+Sur la carte de ce PC, la plus grande taille de ton IA va le plus vite avec des micro-lots d'un seul texte, comme celui de l'ouverture.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={2} titre="Créer et lire">
+
+Dans PyTorch, un tenseur se crée à partir d'une liste de Python, ou par une fonction qui le remplit. Voici les sortes de l'étape 1, telles que les crée le projet du chapitre :
+
+<CodeExplique fichier="projets/0.4-tenseurs/tenseurs/exemples.py" region="creer">
+  <li data-lignes="1-2">`exemple_creer` rend ses tenseurs dans un dictionnaire, chacun sous son nom. `torch.Tensor` est le type des tenseurs.</li>
+  <li data-lignes="3">`torch.tensor` reçoit un nombre : un nombre seul, de forme {FORMES.nombre}.</li>
+  <li data-lignes="4">Une liste de {FORMES.tailleVecteur} nombres : un vecteur, de forme {FORMES.vecteur}.</li>
+  <li data-lignes="5">`torch.arange` donne les {CREER.combien} nombres de {CREER.debut} à {CREER.fin} ; `reshape` les range en {FORMES.lignes} lignes de {FORMES.colonnes}, ligne après ligne.</li>
+  <li data-lignes="6">`torch.zeros` remplit de zéros un tenseur de la forme demandée : un lot de {FORMES.matricesDuLot} matrices de {FORMES.lotLignes} lignes et {FORMES.lotColonnes} colonnes.</li>
+  <li data-lignes="7">Des nombres écrits sans `.0` donnent des entiers, de type `int64`. Les autres tenseurs sont des `float32`, des nombres à virgule.</li>
+</CodeExplique>
+
+Une fois créé, un tenseur se lit : sa forme, le type de ses nombres, l'appareil où il est rangé, et ses cases.
+
+<CodeExplique fichier="projets/0.4-tenseurs/tenseurs/exemples.py" region="lire">
+  <li data-lignes="3">La matrice de l'exemple précédent : <code>{CREER.valeurs}</code>.</li>
+  <li data-lignes="5">`m.shape`, sa forme : {LIRE.forme}. `tuple` en fait un tuple de Python.</li>
+  <li data-lignes="6-7">`m.dim()`, son nombre de dimensions : {LIRE.dimensions}. `m.numel()`, son nombre de nombres : {LIRE.nombres}, le produit des tailles.</li>
+  <li data-lignes="8">`m.dtype`, le type de ses nombres : <code>{LIRE.type}</code>, des nombres à virgule sur 32 bits.</li>
+  <li data-lignes="9">`m.device`, l'appareil où il est rangé : <code>{LIRE.appareil}</code>, le processeur. L'étape 6 montre comment le ranger sur la carte.</li>
+  <li data-lignes="10">`m[1, 2]`, la case de la ligne 1 et de la colonne 2, en comptant depuis 0 : <code>{LIRE.case}</code>. `.item()` en fait un nombre de Python.</li>
+  <li data-lignes="11-12">`m[1]` prend toute la ligne 1 : <code>{LIRE.ligne}</code>. `m[:, 0]` prend toute la colonne 0 : <code>{LIRE.colonne}</code>. Les deux-points veulent dire « toutes les lignes ». `.tolist()` en fait une liste de Python.</li>
+</CodeExplique>
+
+<Fragment slot="note">
+
+Le notebook du chapitre, à ouvrir dans Colab (le lien est à l'étape 8), te fait créer et lire ces tenseurs toi-même. Change leurs nombres et leurs formes, puis relance la cellule.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={3} titre="Calculer">
+
+Entre deux tenseurs de même forme, `+`, `-`, `*` et `/` calculent case par case : chaque case du résultat ne regarde que les deux cases à la même place. Une somme peut parcourir tout un tenseur, ou une seule de ses dimensions. Et `@` fait le produit matriciel du chapitre 0.2 : chaque case du résultat est le produit scalaire d'une ligne et d'une colonne.
+
+<CodeExplique fichier="projets/0.4-tenseurs/tenseurs/exemples.py" region="calculer">
+  <li data-lignes="3-4">Deux matrices de forme {CALCUL.matrice}, `a` et `b`.</li>
+  <li data-lignes="6">`a + b`, case par case : <code>{CALCUL.somme}</code>.</li>
+  <li data-lignes="7">`a * b` multiplie aussi case par case : <code>{CALCUL.parCase}</code>. Ce n'est pas le produit matriciel.</li>
+  <li data-lignes="8">`a @ b`, le produit matriciel : <code>{CALCUL.produit}</code>. Sa première case vient de la première ligne de `a` et de la première colonne de `b` : <span class="formule-en-texte">{CALCUL.premiere}</span>.</li>
+  <li data-lignes="9">`a.sum()` additionne tous les nombres de `a` : <code>{CALCUL.total}</code>.</li>
+  <li data-lignes="10">`a.mean(dim=0)` fait la moyenne en descendant chaque colonne : il reste une moyenne par colonne, <code>{CALCUL.moyennes}</code>.</li>
+  <li data-lignes="11">`a` plus un vecteur de {CALCUL.colonnes} nombres : le vecteur s'ajoute à chaque ligne, <code>{CALCUL.diffusion}</code>. C'est la diffusion, l'objet de l'étape suivante.</li>
+</CodeExplique>
+
+Pour `a @ b`, la forme compte. Chaque ligne de `a` rencontre chaque colonne de `b`, et elles doivent avoir autant de nombres : `a` doit avoir autant de colonnes que `b` a de lignes. Une matrice de forme <span class="formule-en-texte">(n, m)</span> se multiplie par une matrice de forme <span class="formule-en-texte">(m, p)</span>, et le résultat a la forme <span class="formule-en-texte">(n, p)</span> : les lignes de `a`, les colonnes de `b`.
+
+<Fragment slot="note">
+
+Dans PyTorch, `dim` désigne une dimension par son numéro, en comptant depuis 0 : `dim=0` pour les lignes d'une matrice, `dim=1` pour ses colonnes. La dimension parcourue disparaît du résultat : `a.mean(dim=1)` donnerait une moyenne par ligne.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={4} titre="La diffusion">
+
+À l'étape 3, un vecteur de forme {CALCUL.vecteur} s'est ajouté à une matrice de forme {CALCUL.matrice} : PyTorch l'a ajouté à chaque ligne, sans qu'on le lui demande. C'est la diffusion. Quand deux formes diffèrent, PyTorch les aligne par la droite, puis étire ce qui a une taille de 1, ou une dimension en moins, pour suivre l'autre. Rien n'est recopié en mémoire : PyTorch fait comme si.
+
+<Pari
+  id="diffusion"
+  question={`A a la forme ${DIFFUSION.a}, B la forme ${DIFFUSION.b}. Quelle forme a A + B ?`}
+  precision="Aligne les deux formes par la droite."
+  choix={choixDiffusion()}
+  acquis="diffusion"
+  ouvre="formes"
+>
+
+{DIFFUSION.explication} A + B a donc la forme {DIFFUSION.r} : chacune de ses cases est la somme d'une case de A et d'une case de B.
+
+La règle complète : alignées par la droite, deux tailles vont ensemble si elles sont égales, ou si l'une vaut 1, qui s'étire alors. Une dimension qui manque compte pour 1. Sinon, PyTorch refuse. L'atelier juste en dessous est ouvert : essaie-la, et essaie aussi A @ B.
+
+</Pari>
+
+<Verrou nom="formes" message="Fais le pari juste au-dessus : l'atelier des formes se débloque juste après.">
+
+<AtelierFormes client:load verrou="formes" acquis="formes" />
+
+</Verrou>
+
+Les deux règles de l'atelier tiennent en quelques lignes de Python, sans PyTorch. Les tests du projet les comparent à PyTorch lui-même, sur {PAIRES} paires de formes ; l'atelier en a une copie exacte, en JavaScript, vérifiée sur les mêmes paires.
+
+<CodeExplique fichier="projets/0.4-tenseurs/tenseurs/formes.py" region="diffusion">
+  <li data-lignes="1-2">`forme_diffusee` reçoit deux formes, des tuples d'entiers, et rend la forme de `a + b`, ou `None` si PyTorch refuserait.</li>
+  <li data-lignes="4-7">L'alignement par la droite : on ajoute des 1 à gauche de la forme la plus courte, jusqu'à la longueur de l'autre. `(1,) * 2` donne `(1, 1)`.</li>
+  <li data-lignes="8-15">Dimension par dimension, avec `zip` : deux tailles égales, ou une taille 1 qui s'étire ; sinon, PyTorch refuserait.</li>
+  <li data-lignes="16">La forme du résultat, en tuple.</li>
+</CodeExplique>
+
+<CodeExplique fichier="projets/0.4-tenseurs/tenseurs/formes.py" region="produit">
+  <li data-lignes="1-5">`forme_produit` rend la forme de `a @ b`. Un nombre seul n'a pas de produit matriciel.</li>
+  <li data-lignes="6-8">Un vecteur compte pour une ligne à gauche, pour une colonne à droite : on lui ajoute un 1.</li>
+  <li data-lignes="9-11">La règle de l'étape 3 : les colonnes de gauche, sa dernière dimension, doivent égaler les lignes de droite, son avant-dernière.</li>
+  <li data-lignes="12-15">Les dimensions de devant, celles du lot, se diffusent comme pour `a + b`.</li>
+  <li data-lignes="16">Le résultat : le lot, les lignes de gauche, les colonnes de droite.</li>
+  <li data-lignes="17-21">On retire le 1 ajouté à un vecteur.</li>
+</CodeExplique>
+
+Le projet du chapitre a aussi un script qui applique ces deux règles aux formes que tu lui donnes. Il est dans le dépôt du site : si tu l'as téléchargé avec git au chapitre 0.1, mets-le à jour, pour recevoir les projets parus depuis. Puis entre dans le projet de ce chapitre :
+
+<BlocCommande commandes={[METTRE_A_JOUR_DEPOT, ALLER_AU_PROJET_0_4]} ou="un terminal, depuis le dossier où tu as téléchargé le dépôt" />
+
+Sinon, télécharge-le, puis entre dans le projet :
+
+<BlocCommande commandes={[CLONER_DEPOT, ALLER_AU_PROJET_0_4]} ou="un terminal, depuis le dossier où tu veux télécharger le dépôt" />
+
+Si tu avais pris le fichier zip au chapitre 0.1, télécharge-le de nouveau : un zip ne se met pas à jour. Son dossier s'appelle `forge-ia-main` : écris ce nom à la place de `forge-ia` dans la commande `cd`. Puis, dans le dossier du projet :
+
+<BlocCommande commandes={[TENSEURS_FORMES]} ou="un terminal, dans le dossier du projet" />
+
+Le script dit ce que donnent A + B et A @ B, ou pourquoi c'est impossible. Écris les formes entre guillemets, comme Python : un vecteur avec sa virgule, `"(4,)"`. La première fois, uv installe la version de PyTorch pour le processeur, comme au chapitre 0.3.
+
+<Fragment slot="note">
+
+Tout ce qui est jaune se manipule. Fais glisser un nombre à la souris ou au doigt ; au clavier, atteins-le avec Tab, puis utilise les flèches.
+
+Dans la grille, un trait en pointillé entoure une taille qui s'étire. Pour A @ B, les deux tailles qui doivent être égales sont soulignées : en vert si elles le sont, en rouge sinon.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={5} titre="Les types de nombres et la mémoire">
+
+Un tenseur range ses nombres les uns à la suite des autres, et chacun y prend la même place, selon son type. `float32`, le type par défaut des nombres à virgule, prend {MEMOIRE.float32} octets par nombre. `bfloat16`, qu'on écrit bf16, n'en prend que {MEMOIRE.bfloat16} : il va des très petits aux très grands nombres comme `float32`, mais avec moins de chiffres significatifs. `int64`, le type des entiers, en prend {MEMOIRE.int64} : c'est celui des numéros des morceaux de texte.
+
+Sur la carte, ton IA calcule en bf16 : {MEMOIRE.moitie} fois moins de mémoire qu'en `float32`. Pour compter en mégaoctets, ce site fait comme le calculateur : 1 Mo vaut 2²⁰ octets, soit {MEMOIRE.unMo}, et 1 Go vaut 2³⁰ octets.
+
+<Pari
+  id="memoire"
+  question={`Une matrice de ${MEMOIRE.taille} × ${MEMOIRE.taille} nombres en float32 : combien de mémoire ?`}
+  precision={`Un float32 prend ${MEMOIRE.float32} octets, et 1 Mo vaut 2²⁰ octets.`}
+  choix={choixMemoire()}
+  acquis="memoire"
+>
+
+{MEMOIRE.taille} × {MEMOIRE.taille} = {MEMOIRE.nombres} nombres, fois {MEMOIRE.float32} octets : {MEMOIRE.octets} octets, soit {MEMOIRE.mo} Mo. {MEMOIRE.sansType} Mo, c'est le nombre de cases seul, sans la place de chaque nombre. La mémoire d'un tenseur, c'est toujours son nombre de cases fois la taille d'un nombre. En bf16, la même matrice prend {MEMOIRE.bf16Mo} Mo.
+
+</Pari>
+
+<CodeExplique fichier="projets/0.4-tenseurs/tenseurs/memoire.py" region="memoire">
+  <li data-lignes="1-2">`octets` reçoit une forme et un type de PyTorch, et rend un nombre d'octets.</li>
+  <li data-lignes="3">`math.prod` multiplie toutes les tailles : le nombre de nombres du tenseur.</li>
+  <li data-lignes="4">`element_size()` donne la place d'un nombre de ce type, d'après PyTorch lui-même. On la demande à un tenseur vide de forme (), créé par `torch.empty`.</li>
+  <li data-lignes="5">Les deux, multipliés.</li>
+</CodeExplique>
+
+Les poids de ton IA, dans sa plus grande taille, sont {POIDS.nombre} nombres. En bf16, ils prennent {POIDS.bf16} ; en `float32`, {POIDS.float32}. Le tenseur de l'ouverture, pour un micro-lot de 1, prend {POIDS.ouverture} en bf16 : à côté des poids, c'est peu. Mais pendant l'entraînement, chaque couche en garde plusieurs de cette taille, pour calculer ses pentes.
+
+<Fragment slot="note">
+
+Un octet vaut 8 bits : `float32` tient sur 32 bits, bf16 sur 16, `int64` sur 64.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={6} titre="Sur la carte">
+
+Un tenseur est rangé sur un appareil : dans la mémoire du processeur, ou dans celle de la carte graphique. `.to(appareil)` le copie de l'un à l'autre, et chaque calcul se fait là où sont ses tenseurs : les tenseurs d'un même calcul doivent être sur le même appareil, sinon PyTorch refuse.
+
+Le projet choisit l'appareil avec la fonction du chapitre 0.3, copiée telle quelle :
+
+<CodeExplique fichier="projets/0.4-tenseurs/tenseurs/appareil.py" region="appareil">
+  <li data-lignes="5-9">`choisir_appareil` prend l'appareil demandé, sinon la variable d'environnement `FORGE_APPAREIL`, sinon « auto ».</li>
+  <li data-lignes="10-13">« auto » prend la carte si PyTorch la voit, sinon le processeur ; « cpu » prend le processeur.</li>
+  <li data-lignes="14-28">« cuda » sans carte visible : un message qui dit quoi faire, plutôt qu'une longue erreur de Python.</li>
+  <li data-lignes="29-33">Toute autre valeur : un message qui donne les trois choix.</li>
+</CodeExplique>
+
+Chronométrer un calcul sur la carte cache un piège : PyTorch ne l'attend pas. Il le range dans la file d'attente de la carte, puis passe aussitôt à la suite. Sans précaution, on chronométrerait le temps de poser la commande, pas celui du calcul.
+
+<CodeExplique fichier="projets/0.4-tenseurs/tenseurs/chrono.py" region="chrono">
+  <li data-lignes="1-4">`attendre` : sur la carte, `torch.cuda.synchronize()` attend la fin de tous les calculs de la file. Sur le processeur, il n'y a rien à attendre.</li>
+  <li data-lignes="7-12">`chronometrer_produit` reçoit la taille des matrices, l'appareil et, sur le processeur, un nombre de fils. Elle retient le réglage des fils d'avant.</li>
+  <li data-lignes="14-15">`torch.set_num_threads` règle le nombre de fils du processeur qui calculent ensemble : l'étape 7 s'en sert.</li>
+  <li data-lignes="16-18">Deux matrices tirées au hasard, toujours les mêmes grâce à la graine 0, puis copiées sur l'appareil avec `.to`.</li>
+  <li data-lignes="20-26">À chaque tour : attendre, déclencher le chronomètre, calculer `a @ b`, attendre la fin, l'arrêter. Les premiers tours préparent le calcul, et ne comptent pas.</li>
+  <li data-lignes="27">La médiane : la durée du milieu, qu'un tour dérangé ne fausse pas.</li>
+  <li data-lignes="28-29">`finally` rend à PyTorch son réglage des fils, même si le calcul a échoué.</li>
+</CodeExplique>
+
+Voici les chronos de ce PC, pour des matrices carrées de plus en plus grandes. Doubler la taille fait 4 fois plus de cases dans le résultat, et chaque case demande 2 fois plus de produits : 8 fois plus de calcul.
+
+<TableauChronos />
+
+Copier vers la carte a aussi un prix :
+
+<CodeExplique fichier="projets/0.4-tenseurs/tenseurs/chrono.py" region="transfert">
+  <li data-lignes="1-4">Une matrice tirée au hasard, rangée sur le processeur.</li>
+  <li data-lignes="6-12">Le même chronomètre, autour de `a.to(carte)` : la copie de la mémoire du processeur à celle de la carte, entre deux attentes.</li>
+  <li data-lignes="13">La médiane, comme pour le produit.</li>
+</CodeExplique>
+
+Pour que la carte vaille le voyage, mieux vaut que les tenseurs y restent. C'est ce que fait ton IA : ses poids y sont rangés une fois pour toutes, et seuls les morceaux de texte y voyagent, micro-lot après micro-lot.
+
+Pour chronométrer ton poste, dans le dossier du projet :
+
+<BlocCommande commandes={[TENSEURS_MESURER_CPU]} ou="un terminal, dans le dossier du projet" />
+
+Avec une carte NVIDIA, la version de PyTorch pour la carte la chronomètre, si PyTorch la voit. La première fois, uv télécharge cette version, plusieurs gigaoctets.
+
+<BlocCommande commandes={[TENSEURS_MESURER_GPU]} ou="un terminal, dans le dossier du projet" />
+
+Pour chronométrer quand même le processeur avec cette version, règle d'abord la variable `FORGE_APPAREIL` du chapitre 0.3, dans le même terminal : <code>{FORCER_PROCESSEUR_POWERSHELL}</code> dans PowerShell, ou <code>{FORCER_PROCESSEUR_BASH}</code> sous Linux ou macOS.
+
+<Fragment slot="note">
+
+Dans PyTorch, l'appareil de la carte s'appelle `cuda`, du nom de la boîte à outils de NVIDIA du chapitre 0.3. Celui du processeur s'appelle `cpu`.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={7} titre="Les fils du processeur">
+
+Le processeur aussi calcule en parallèle : PyTorch partage un produit en morceaux, et chaque fil en calcule un. Le tableau de l'étape 6 le montre. Sur le produit {FILS.taille} × {FILS.taille}, un seul fil prend {FILS.msUn} ms, et les {FILS.defaut} fils du réglage par défaut de PyTorch {FILS.msDefaut} ms : {FILS.gainDefaut} fois moins. Le processeur de ce PC a pourtant {FILS.max} fils en tout.
+
+<Pari
+  id="fils"
+  question={FILS.question}
+  precision={`Le réglage par défaut en prend ${FILS.defaut} ; \`torch.set_num_threads(${FILS.max})\` les prend tous.`}
+  choix={choixFils(PROCESSEUR)}
+  acquis="fils"
+>
+
+Avec {FILS.max} fils, le produit prend {FILS.msTous} ms, contre {FILS.msDefaut} ms avec {FILS.defaut} : {FILS.gainTous} fois plus vite. {FILS.phrase} Un fil n'est pas un cœur : un cœur du processeur peut faire tourner deux fils à la fois, qui se partagent alors ses unités de calcul.
+
+</Pari>
+
+Au chapitre 0.3, le script de vérification le signalait déjà : sans réglage, PyTorch ne prend pas tous les fils du processeur. Pour les prendre tous, `torch.set_num_threads` reçoit leur nombre, que donne `os.cpu_count()`.
+
+<Fragment slot="note">
+
+Un fil se dit thread en anglais : c'est le mot de `set_num_threads`.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={8} titre="À grande échelle">
+
+Ton IA et les plus grands modèles font les mêmes calculs, sur des tenseurs de mêmes sortes. Seule l'échelle change.
+
+<EncadreLabo sources={LABO.sources}>
+
+Les grands labos entraînent leurs modèles en bf16, le type de l'étape 5. En bf16, une carte H100 fait au plus {LABO.crete} milliers de milliards d'opérations par seconde : c'est sa crête, en TFLOPS. Aucun entraînement ne l'atteint : il faut aussi lire la mémoire, et des milliers de cartes doivent s'attendre et s'échanger leurs résultats.
+
+La part de la crête vraiment utilisée s'appelle l'efficacité. PaLM, de Google, en a tiré {LABO.palm}, sur {LABO.palmMateriel} ; Llama 3 405B, de Meta, de {LABO.llamaMin} à {LABO.llamaMax}, sur {LABO.llamaMateriel}. Ton IA, seule sur la carte de ce PC, en tire {LABO.tonIA}, en comptant de la même façon : une seule carte n'attend personne.
+
+</EncadreLabo>
+
+Le projet complet (les exemples, les deux règles de forme, la mémoire, les chronos et leurs tests) est sur GitHub, avec un notebook à ouvrir dans Colab :
+
+<LiensProjet projet="0.4-tenseurs" />
+
+### À suivre
+
+Tu sais créer des tenseurs, prévoir leur forme, compter leur mémoire et les faire calculer où tu veux. Le chapitre 0.5 s'en sert pour un premier réseau de neurones : d'abord à la main, en Python pur, puis avec PyTorch.
+
+<Fragment slot="note">
+
+TFLOPS : des milliers de milliards (téra) d'opérations à virgule par seconde.
+
+</Fragment>
+
+</Etape>

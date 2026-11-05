@@ -1,0 +1,216 @@
+---
+// Le tableau des chronos du chapitre 0.4 : la durée d'un produit de deux
+// matrices taille × taille en float32, sur le processeur (1 fil, le réglage par
+// défaut de PyTorch, tous les fils) et sur la carte. Rien n'est recopié : le
+// tableau lit les fichiers projets/0.4-tenseurs/mesures/*.json à la
+// construction (lireMesures, avec la racine du dépôt), et ses colonnes de fils
+// viennent de fils_par_defaut et fils_max du fichier du processeur.
+//
+// La carte n'est mesurée qu'à la porte de la Partie 0 : tant que son fichier
+// manque, l'en-tête de sa colonne porte data-a-mesurer (un seul marqueur, que
+// parution.spec.ts interdit dans un chapitre paru) et chaque case dit « à
+// mesurer ». La légende nomme les appareils, la version de PyTorch et la date
+// du relevé, lues dans les fichiers.
+//
+// Le tableau est plus large qu'un téléphone : il défile dans sa zone
+// (ZoneDefilable, rendue ici sans îlot), avec une phrase qui le dit sous
+// 600 px de fenêtre.
+import { root } from 'astro:config/server';
+import ZoneDefilable from '../../interactif/ZoneDefilable.svelte';
+import { materiel } from '../../../lib/calculateur/donnees';
+import { formaterDate } from '../../../lib/calculateur/formats';
+import { nombre } from '../../../lib/nombres';
+import { FICHIERS_MESURES, lireMesures, type MesuresChrono } from '../../../lib/partie-0/mesures';
+import { filsDesColonnes, lignesChronos } from '../../../lib/partie-0/paris-0-4';
+import { typographier } from '../../../lib/typo';
+
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const racineDepot = new URL('../', root);
+const processeur = lireMesures('processeur', racineDepot);
+if (processeur === null) {
+  throw new Error(
+    `TableauChronos : ${FICHIERS_MESURES.processeur} manque. Mesure le processeur avec ` +
+      '« uv run --extra cpu python -m tenseurs mesurer --appareil cpu --sortie mesures/processeur.json », ' +
+      'dans projets/0.4-tenseurs (voir son README).',
+  );
+}
+const carte = lireMesures('rtx-5070-ti', racineDepot);
+const fils = filsDesColonnes(processeur);
+const lignes = lignesChronos(processeur, carte);
+
+/** « 1 fil », « 8 fils (réglage par défaut) ». */
+function enTeteFils(f: number): string {
+  return `${f} fil${f > 1 ? 's' : ''}${f === processeur!.fils_par_defaut ? ' (réglage par défaut)' : ''}`;
+}
+
+/** « PyTorch 2.15.0+cpu, relevé le 5 novembre 2026 ». */
+function releve(m: MesuresChrono): string {
+  return `PyTorch ${m.torch}, relevé le ${formaterDate(m.releve_le)}`;
+}
+
+const titre = typographier('La durée d’un produit de deux matrices carrées en float32, en millisecondes, selon leur taille.');
+// Les appareils : le nom tel que le fichier le donne, qui ne se coupe pas, puis PyTorch et la date du relevé.
+const appareils = [
+  { quoi: 'Processeur', nom: processeur.nom, suite: `, avec ${releve(processeur)}.` },
+  carte === null
+    ? { quoi: 'Carte', nom: materiel('rtx-5070-ti').nom, suite: ', à mesurer.' }
+    : { quoi: 'Carte', nom: carte.nom, suite: `, avec ${releve(carte)}.` },
+].map((a) => ({ ...a, quoi: typographier(`${a.quoi} : `), suite: typographier(a.suite) }));
+---
+
+<figure class="tableau-chronos">
+  <figcaption id="legende-chronos" data-test="chronos-legende">
+    <span class="titre">{titre}</span>
+    {
+      appareils.map((a) => (
+        <span class="appareil">
+          {a.quoi}
+          <span class="nom">{a.nom}</span>
+          {a.suite}
+        </span>
+      ))
+    }
+  </figcaption>
+  <ZoneDefilable
+    etiquette="Chronos du produit de matrices, défilable"
+    indice="Fais défiler le tableau vers la droite pour voir les autres colonnes."
+    seuil={600}
+    testId="chronos-zone"
+    testIndice="chronos-indice"
+  >
+    <table data-test="chronos" aria-labelledby="legende-chronos">
+      <thead>
+        <tr>
+          <th scope="col" rowspan="2">Taille</th>
+          <th scope="colgroup" colspan={fils.length} class="groupe">Processeur</th>
+          <th scope="col" rowspan="2" class="nombre" data-a-mesurer={carte === null ? '' : undefined}>Carte</th>
+        </tr>
+        <tr>
+          {fils.map((f) => <th scope="col" class="nombre">{typographier(enTeteFils(f))}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {
+          lignes.map((l) => (
+            <tr>
+              <th scope="row">{`${nombre(l.taille)} × ${nombre(l.taille)}`}</th>
+              {l.processeur.map((ms) => (
+                <td class="nombre">{ms}</td>
+              ))}
+              <td class:list={['nombre', { 'a-mesurer': l.carte === null }]}>{l.carte ?? 'à mesurer'}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </ZoneDefilable>
+</figure>
+
+<style>
+  .tableau-chronos {
+    margin: 1.4em 0 1.2em;
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 16px;
+    line-height: 1.45;
+    color: var(--indigo-doux);
+    margin-bottom: 10px;
+  }
+
+  /* La légende : ce que mesure le tableau, puis un appareil par ligne. */
+  figcaption .titre {
+    display: block;
+    color: var(--indigo);
+    margin-bottom: 4px;
+  }
+
+  figcaption .appareil {
+    display: block;
+    font-size: 15px;
+  }
+
+  /* « AMD Ryzen 7 9800X3D 8-Core Processor » ne se coupe pas à son trait d'union. */
+  figcaption .nom {
+    white-space: nowrap;
+  }
+
+  /* Un tableau typographié, sans cadre : un trait d'encre en haut, des filets brume entre les lignes. */
+  table {
+    border-collapse: collapse;
+    min-width: 100%;
+    font-size: 17px;
+    line-height: 1.35;
+    border-top: 2px solid var(--indigo);
+  }
+
+  thead th {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--indigo-doux);
+    text-align: left;
+    vertical-align: bottom;
+    padding: 6px 0 4px 20px;
+  }
+
+  thead th:first-child {
+    padding-left: 0;
+  }
+
+  thead th.groupe {
+    text-align: center;
+    color: var(--indigo);
+    padding-bottom: 2px;
+    border-bottom: 1px solid var(--brume);
+  }
+
+  thead tr:last-child th,
+  thead th[rowspan] {
+    border-bottom: 2px solid var(--indigo);
+  }
+
+  tbody th {
+    font-family: var(--titres);
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--brume);
+  }
+
+  td {
+    padding: 7px 0 7px 20px;
+    border-bottom: 1px solid var(--brume);
+  }
+
+  thead th.nombre {
+    text-align: right;
+  }
+
+  td.nombre {
+    text-align: right;
+    white-space: nowrap;
+    font-family: var(--titres);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Une durée pas encore mesurée : en encre douce, dans la police du texte. */
+  td.a-mesurer {
+    font-family: var(--texte);
+    font-style: italic;
+    color: var(--indigo-doux);
+  }
+
+  @media (max-width: 720px) {
+    table {
+      font-size: 16px;
+    }
+
+    thead th,
+    td {
+      padding-left: 14px;
+    }
+  }
+</style>

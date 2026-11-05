@@ -53,6 +53,24 @@ export const FORCER_PROCESSEUR_POWERSHELL = '$env:FORGE_APPAREIL = "cpu"';
 /** La même chose dans un terminal Linux ou macOS (bash, zsh). */
 export const FORCER_PROCESSEUR_BASH = 'export FORGE_APPAREIL=cpu';
 
+// ---------- Chapitre 0.4 : les tenseurs ----------
+// Les sous-commandes formes et mesurer sont celles de
+// projets/0.4-tenseurs/tenseurs/__main__.py, et les formes de TENSEURS_FORMES
+// celles du départ de l'atelier : commandes.test.ts le vérifie.
+
+/** Entrer dans le projet du chapitre 0.4, depuis le dossier où le dépôt a été cloné. */
+export const ALLER_AU_PROJET_0_4 = 'cd forge-ia/projets/0.4-tenseurs';
+/** Demander au script la forme de A + B et de A @ B, pour les formes du départ de l'atelier. */
+export const TENSEURS_FORMES = 'uv run --extra cpu python -m tenseurs formes "(3, 1)" "(4,)"';
+/**
+ * Chronométrer un produit de matrices avec la version de PyTorch pour le processeur. Sans
+ * --appareil, le script suit FORGE_APPAREIL, sinon « auto » : la carte si PyTorch la voit (jamais
+ * avec cette version), sinon le processeur.
+ */
+export const TENSEURS_MESURER_CPU = 'uv run --extra cpu python -m tenseurs mesurer';
+/** La même mesure avec la version pour la carte : la carte, si PyTorch la voit. */
+export const TENSEURS_MESURER_GPU = 'uv run --extra gpu python -m tenseurs mesurer';
+
 // Ce que d'anciens tutoriels font taper, et que le chapitre 0.3 cite pour dire
 // pourquoi ne pas le faire. À ne pas taper : ces commandes ne sont pas
 // vérifiées contre le dépôt, seulement citées.

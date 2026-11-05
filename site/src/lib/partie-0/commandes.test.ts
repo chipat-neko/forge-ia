@@ -6,7 +6,9 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DEPOT } from '../depot';
+import { A_DEPART, B_DEPART } from './atelier-formes';
 import * as commandes from './commandes';
+import { ecrireForme } from './formes';
 
 // Vitest est lancé depuis site/ : le dépôt est un dossier plus haut.
 const RACINE = '..';
@@ -104,5 +106,55 @@ describe('commandes du chapitre 0.3', () => {
     const appareil = readFileSync(`${RACINE}/projets/0.3-poste/poste/appareil.py`, 'utf8');
     expect(appareil).toContain('os.environ.get("FORGE_APPAREIL")');
     expect(appareil).toContain('if valeur == "cpu":');
+  });
+});
+
+// Le chapitre 0.4 : le script `python -m tenseurs` et ses deux commandes,
+// formes et mesurer, vérifiées contre le __main__.py et le pyproject.toml du
+// projet, lus en texte (sans PyTorch).
+describe('commandes du chapitre 0.4', () => {
+  const PROJET = `${RACINE}/projets/0.4-tenseurs`;
+  const MAIN = readFileSync(`${PROJET}/tenseurs/__main__.py`, 'utf8').replace(/\r\n?/g, '\n');
+  const PYPROJECT = readFileSync(`${PROJET}/pyproject.toml`, 'utf8').replace(/\r\n?/g, '\n');
+  const DU_CHAPITRE = [commandes.TENSEURS_FORMES, commandes.TENSEURS_MESURER_CPU, commandes.TENSEURS_MESURER_GPU];
+
+  it('les commandes, à l’identique', () => {
+    expect(commandes.ALLER_AU_PROJET_0_4).toBe('cd forge-ia/projets/0.4-tenseurs');
+    expect(commandes.TENSEURS_FORMES).toBe('uv run --extra cpu python -m tenseurs formes "(3, 1)" "(4,)"');
+    expect(commandes.TENSEURS_MESURER_CPU).toBe('uv run --extra cpu python -m tenseurs mesurer');
+    expect(commandes.TENSEURS_MESURER_GPU).toBe('uv run --extra gpu python -m tenseurs mesurer');
+  });
+
+  it('les formes de la commande sont celles du départ de l’atelier, écrites comme Python', () => {
+    expect(commandes.TENSEURS_FORMES.endsWith(` "${ecrireForme(A_DEPART)}" "${ecrireForme(B_DEPART)}"`)).toBe(true);
+  });
+
+  it('formes et mesurer sont des commandes du script, et mesurer suit FORGE_APPAREIL sans --appareil', () => {
+    expect(MAIN).toContain('add_parser("formes"');
+    expect(MAIN).toContain('add_parser("mesurer"');
+    for (const commande of DU_CHAPITRE) {
+      const sous = /python -m tenseurs (\S+)/.exec(commande)![1];
+      expect(['formes', 'mesurer'], commande).toContain(sous);
+    }
+    // Sans --appareil, mesurer passe None à choisir_appareil, qui lit alors FORGE_APPAREIL.
+    expect(MAIN).toMatch(/"--appareil",[^\n]*default=None/);
+    expect(MAIN).toContain('choisir_appareil(options.appareil)');
+    expect(commandes.TENSEURS_MESURER_CPU).not.toContain('--appareil');
+    expect(commandes.TENSEURS_MESURER_GPU).not.toContain('--appareil');
+  });
+
+  it('chaque --extra est un extra du pyproject.toml du projet 0.4', () => {
+    const section = /^\[project\.optional-dependencies\]\n([\s\S]*?)(?=^\[|(?![\s\S]))/m.exec(PYPROJECT);
+    expect(section, 'section [project.optional-dependencies] introuvable dans le pyproject.toml de 0.4-tenseurs').not.toBeNull();
+    const extras = [...section![1].matchAll(/^([A-Za-z0-9_-]+)\s*=/gm)].map(([, nom]) => nom);
+    expect(extras.sort()).toEqual(['cpu', 'gpu']);
+    for (const commande of DU_CHAPITRE) {
+      for (const [, extra] of commande.matchAll(/--extra (\S+)/g)) expect(extras, commande).toContain(extra);
+    }
+  });
+
+  it('la mise à jour du dépôt mène aussi au projet 0.4', () => {
+    const vise = /^git -C (\S+) pull$/.exec(commandes.METTRE_A_JOUR_DEPOT)![1];
+    expect(commandes.ALLER_AU_PROJET_0_4.startsWith(`cd ${vise}/`)).toBe(true);
   });
 });

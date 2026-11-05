@@ -1,0 +1,120 @@
+---
+// L'ouverture du chapitre 0.4 : la forme du tenseur qui entre dans ton IA,
+// dans sa plus grande taille, (micro-lot, contexte, dim), avec le contexte et
+// la dimension lus dans PRESETS_FORGE.tres_grand (le jumeau des tailles de
+// forge, dans le calculateur), et le nombre de nombres que cela fait pour un
+// micro-lot de 1. Rien n'est tapé à la main.
+//
+// La forme en grand est cachée aux lecteurs d'écran (des parenthèses et des
+// virgules isolées s'écoutent mal) : la légende la redit en entier. Sous
+// chaque taille, ce qu'elle compte, écrit par le CSS : ces mots n'entrent pas
+// dans le texte de la forme.
+import { PRESETS_FORGE } from '../../../lib/calculateur/ton-ia';
+import { nombre } from '../../../lib/nombres';
+import { typographier } from '../../../lib/typo';
+
+const { contexte, dim } = PRESETS_FORGE.tres_grand;
+const legende = typographier(
+  `La forme du tenseur qui entre dans ton IA, dans sa plus grande taille : (micro-lot, ${nombre(contexte)}, ` +
+    `${nombre(dim)}). Un micro-lot de textes, chacun de ${nombre(contexte)} morceaux, et chaque morceau changé ` +
+    `en ${nombre(dim)} nombres. Pour un micro-lot de 1 : ${nombre(contexte)} × ${nombre(dim)} = ` +
+    `${nombre(contexte * dim)} nombres.`,
+);
+const constat = typographier(
+  'Tout ce que calcule ton IA, elle le calcule sur des tableaux de nombres comme celui-ci : les tenseurs. ' +
+    'À la fin de ce chapitre, tu sauras lire leur forme, prévoir ce qui se multiplie avec quoi, et les faire ' +
+    'calculer sur la carte graphique.',
+);
+---
+
+<div class="ouverture-tenseurs" data-test="ouverture">
+  <figure>
+    <p class="forme" data-test="ouverture-forme" aria-hidden="true">(<span class="taille lot">micro-lot</span>, <span class="taille contexte">{nombre(contexte)}</span>, <span class="taille dim">{nombre(dim)}</span>)</p>
+    <figcaption>{legende}</figcaption>
+  </figure>
+  <p class="constat">{constat}</p>
+</div>
+
+<style>
+  .ouverture-tenseurs {
+    margin: 40px 0 0;
+  }
+
+  figure {
+    margin: 0;
+  }
+
+  /* La forme en grand, dans la police du texte, comme une formule de livre. */
+  .forme {
+    margin: 0;
+    font-size: 40px;
+    line-height: 1.2;
+    font-variation-settings: 'opsz' 48;
+    font-variant-numeric: lining-nums;
+    padding-bottom: 26px; /* la place des mots sous les tailles */
+  }
+
+  /* Chaque taille soulignée d'une teinte, avec ce qu'elle compte dessous, en italique. */
+  .taille {
+    position: relative;
+    display: inline-block;
+    white-space: nowrap;
+    padding: 0 2px;
+    border-bottom: 3px solid var(--teinte-a-trait);
+    line-height: 1.15;
+  }
+
+  .taille.contexte {
+    border-bottom-color: var(--teinte-b-trait);
+  }
+
+  .taille.lot {
+    font-style: italic;
+  }
+
+  .taille::after {
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    margin-top: 5px;
+    font-size: 17px;
+    font-style: italic;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--indigo-doux);
+  }
+
+  .taille.lot::after {
+    content: 'textes';
+  }
+
+  .taille.contexte::after {
+    content: 'morceaux';
+  }
+
+  .taille.dim::after {
+    content: 'nombres';
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 15px;
+    color: var(--indigo-doux);
+    margin-top: 6px;
+  }
+
+  .constat {
+    margin: 18px 0 0;
+  }
+
+  @media (max-width: 720px) {
+    .forme {
+      font-size: 27px;
+    }
+
+    .taille::after {
+      font-size: 15px;
+    }
+  }
+</style>
