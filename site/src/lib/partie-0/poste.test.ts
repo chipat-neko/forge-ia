@@ -168,7 +168,8 @@ describe('le tableau des situations', () => {
 describe('les constats du diagnostic', () => {
   it('ceux du tableau et ceux hors du tableau font exactement ceux de diagnostic.py', () => {
     const source = readFileSync(`${RACINE}/projets/0.3-poste/poste/diagnostic.py`, 'utf8');
-    const duDiagnostic = [...source.matchAll(/Niveau\.\w+,\s*"(\w+)"/g)].map(([, cle]) => cle);
+    // Les clés de constat_pour, une par « if cle == "…" », dans l'ordre du fichier.
+    const duDiagnostic = [...source.matchAll(/^ {4}if cle == "(\w+)":$/gm)].map(([, cle]) => cle);
     expect(duDiagnostic).toContain('carte_prete');
     expect(new Set(duDiagnostic).size, 'une clé écrite deux fois dans diagnostic.py').toBe(duDiagnostic.length);
     const duTableau = new Set(FICHIER.situations.flatMap(([, s]) => s.constats.map((c) => c.cle)));
