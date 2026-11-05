@@ -214,7 +214,7 @@
   <!-- La légende de la grille est un paragraphe, pas un <caption> : un caption ne passe pas la largeur
        du tableau, et se couperait en trois lignes. -->
   <p class="titre-grille" id="{id}-grille">Les deux formes, alignées par la droite{FINE}:</p>
-  <table class="grille" data-test="formes-grille" aria-labelledby="{id}-grille">
+  <table class="grille" data-test="formes-grille" aria-labelledby="{id}-grille" data-pagefind-ignore>
     <tbody>
       {@render rangee('a', 'A', g.a)}
       {@render rangee('b', 'B', g.b)}

@@ -548,9 +548,11 @@ test('avant-goût : 600 pas, sans réglage de taux, les prénoms du départ et d
 }) => {
   test.setTimeout(90_000);
   // La référence de la colonne de gauche : la même page sans JavaScript, où Astro a écrit les
-  // prénoms du pas 0 (etatInitial, à la construction). Un parcours ne peut pas importer
-  // etatInitial (le moteur lit la liste des prénoms par ?raw) : apercu.test.ts vérifie, lui,
-  // que ces cases sont bien etatInitial('avant-gout').echantillons.
+  // prénoms du pas 0 à la construction. Les deux colonnes viennent du même code (etatInitial) :
+  // cette comparaison vérifie seulement que l'hydratation, puis l'entraînement, ne changent pas la
+  // colonne de gauche. Que ces cases soient bien les prénoms du pas 0 du moteur, c'est apercu.test.ts
+  // qui le vérifie, contre etatInitial('avant-gout').echantillons : un parcours ne peut pas importer
+  // etatInitial, puisque le moteur lit la liste des prénoms par ?raw (B1).
   const sansJs = await browser.newContext({ javaScriptEnabled: false, baseURL });
   const statique = await sansJs.newPage();
   await statique.goto(PAGE);
@@ -787,6 +789,15 @@ test('accessibilité, largeur, typographie', async ({ page }) => {
   await verifierTypographie(demo(page));
   await verifierTypographie(demo(page, 'avant-gout'));
   await verifierTypographie(page.locator('main'));
+  // Le tableau de l'avant-goût : des en-têtes en 16 px, et une largeur bornée à 26 em, qui garde ses deux
+  // colonnes de prénoms rapprochées sur ordinateur (points mis de côté à la tâche 13).
+  const t = avantApres(page);
+  for (const th of await t.locator('thead th').all()) await expect(th).toHaveCSS('font-size', '16px');
+  const { largeur, em } = await t.evaluate((el) => ({
+    largeur: el.getBoundingClientRect().width,
+    em: Number.parseFloat(getComputedStyle(el).fontSize),
+  }));
+  expect(largeur).toBeLessThanOrEqual(26 * em + 0.5);
   // Des cibles d'au moins 24 px sur 24 px.
   for (const bouton of await page.locator('.mini-modele button, .mini-modele summary').all()) {
     if (!(await bouton.isVisible())) continue;

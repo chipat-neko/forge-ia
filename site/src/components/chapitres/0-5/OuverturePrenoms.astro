@@ -36,7 +36,8 @@ const promesse = typographier(
 
 <div class="ouverture-prenoms" data-test="ouverture">
   <figure>
-    <p class="prenoms-depart">
+    {/* Deux prénoms tirés au hasard : hors de l'index de la recherche (revue finale, m8). */}
+    <p class="prenoms-depart" data-pagefind-ignore>
       {prenoms.map((p) => <span class="prenom-depart" data-test="ouverture-prenom">{p}</span>)}
     </p>
     <figcaption>{legende}</figcaption>

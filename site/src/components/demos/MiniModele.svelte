@@ -302,7 +302,8 @@
     <!-- L'avant-goût : les prénoms du départ et ceux du dernier pas, ligne à ligne. Une case pas encore remplie
          montre un tiret, que les lecteurs d'écran lisent « pas encore ». Le tableau change à chaque validation :
          il n'est pas une zone lue d'office (la fin s'annonce par la zone cachée, avec la ligne d'état). -->
-    <table class="avant-apres" data-test="mini-avant-apres">
+    <!-- Des prénoms tirés au hasard : hors de l'index de la recherche (revue finale, m8). -->
+    <table class="avant-apres" data-test="mini-avant-apres" data-pagefind-ignore>
       <caption class="intro-liste">Les prénoms inventés, avant et après l’entraînement</caption>
       <thead>
         <tr>
@@ -493,9 +494,12 @@
 
   /* L'avant-goût : un tableau typographié, sans cadre, comme ceux des chapitres (TableauChronos) :
      un trait d'encre en haut et sous les en-têtes, des filets brume entre les lignes. Deux colonnes
-     égales : un prénom trop long se coupe dans sa case, la page ne s'élargit pas. */
+     égales : un prénom trop long se coupe dans sa case, la page ne s'élargit pas. Sur ordinateur, le
+     tableau ne prend pas toute la largeur de la démo : deux colonnes de prénoms courts se lisent mieux
+     rapprochées (point mis de côté à la tâche 13). */
   .avant-apres {
     width: 100%;
+    max-width: 26em;
     table-layout: fixed;
     border-collapse: collapse;
     border-top: 2px solid var(--indigo);
@@ -509,10 +513,11 @@
     text-align: left;
   }
 
+  /* Les en-têtes, en 16 px : à côté des prénoms en 21 px, ils restent lisibles (point mis de côté à la tâche 13). */
   .avant-apres th {
     font-family: var(--titres);
     font-weight: 600;
-    font-size: 14px;
+    font-size: 16px;
     color: var(--indigo-doux);
     text-align: left;
     vertical-align: bottom;

@@ -220,7 +220,7 @@
 
   <div class="vue-neurone">
     <figure class="figure-neurone">
-      <svg class="dessin-neurone" viewBox="0 0 {LARGEUR} {HAUTEUR}" role="img" aria-label={nomDuDessin} data-test="neu-dessin">
+      <svg class="dessin-neurone" viewBox="0 0 {LARGEUR} {HAUTEUR}" role="img" aria-label={nomDuDessin} data-test="neu-dessin" data-pagefind-ignore>
         <rect class="fond" x={GAUCHE} y={HAUT} width={COTE} height={COTE} />
         {#if pointsRegion !== ''}
           <polygon class="region" points={pointsRegion} data-test="neu-region" />
