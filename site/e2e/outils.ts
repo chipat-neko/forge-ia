@@ -85,7 +85,40 @@ export async function attendreHydratation(page: Page): Promise<void> {
  * des espaces et de l'apostrophe sont ceux du parcours du chapitre 1.3.
  */
 export async function verifierTypographie(zone: Locator): Promise<void> {
-  const texte = await zone.innerText();
+  verifierTexteTypographie(await zone.innerText());
+}
+
+/**
+ * Le texte affiché d'une zone, hors code : sans les scripts, les styles, le
+ * code (`code`, `pre`, où « a: b » et 'x' sont du Python), ni les éléments
+ * qui suivent le sélecteur `exclure` (des morceaux de texte bruts : jetons,
+ * mots d'un atelier, champ de saisie). Les nœuds de texte sont mis bout à bout,
+ * comme dans le parcours du chapitre 1.3.
+ */
+export async function texteHorsCode(zone: Locator, exclure = ''): Promise<string> {
+  return zone.evaluate((racine, autres) => {
+    const ignores = ['script', 'style', 'code', 'pre', autres].filter((s) => s !== '').join(', ');
+    const morceaux: string[] = [];
+    const marcheur = document.createTreeWalker(racine, NodeFilter.SHOW_TEXT);
+    for (let n = marcheur.nextNode(); n; n = marcheur.nextNode()) {
+      if (n.parentElement?.closest(ignores)) continue;
+      morceaux.push(n.textContent ?? '');
+    }
+    return morceaux.join('');
+  }, exclure);
+}
+
+/**
+ * La typographie française du texte d'une zone, hors code (voir texteHorsCode),
+ * avec les règles de verifierTypographie. Sur une page de chapitre, c'est elle
+ * qu'il faut : les commentaires du code Python gardent leurs apostrophes droites.
+ */
+export async function verifierTypographieHorsCode(zone: Locator, exclure = ''): Promise<void> {
+  verifierTexteTypographie(await texteHorsCode(zone, exclure));
+}
+
+/** Les règles de verifierTypographie, sur un texte déjà lu. */
+function verifierTexteTypographie(texte: string): void {
   expect(texte.length, 'la zone à vérifier est vide').toBeGreaterThan(0);
   expect(texte.match(/.{0,30}[ \u00A0][;:!?%].{0,10}/g) ?? []).toEqual([]);
   expect(texte.match(/.{0,10}«[ \u00A0].{0,30}|.{0,30}[ \u00A0]».{0,10}/g) ?? []).toEqual([]);

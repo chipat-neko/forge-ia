@@ -158,6 +158,7 @@ const { numero, titre, chapeau, programme, acquis, indexer = true } = Astro.prop
 
   .chapitre :not(pre) > code {
     font-size: 0.8em;
+    font-variant-ligatures: none; /* « -> » et « == » restent tels qu'on les tape, comme dans CodeExplique */
     background: var(--brume-claire);
     padding: 1px 5px;
     border-radius: 4px;

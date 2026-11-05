@@ -1,0 +1,77 @@
+---
+// L'ouverture du chapitre 0.1 : la première phrase du texte de l'atelier,
+// découpée en mots comme le fait le programme du chapitre (en minuscules, la
+// ponctuation à part), puis le mot qui suit le plus souvent MOT_D_OUVERTURE
+// dans tout le texte. Tout est calculé à la construction par le jumeau du
+// Python (ouvertureDuChapitre, dans paris-0-1.ts) : la page arrive prête, sans
+// script. C'est, en une phrase, ce que le lecteur saura programmer.
+//
+// Les mots découpés sont cachés aux lecteurs d'écran (une suite de mots
+// isolés s'écoute mal) : la légende donne la phrase entière.
+import { ouvertureDuChapitre } from '../../../lib/partie-0/paris-0-1';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  /** Le texte de l'atelier (TEXTE_DE_DEPART). */
+  texte: string;
+}
+
+const { texte } = Astro.props;
+const { phrase, mots, mot, suivant, fois, total } = ouvertureDuChapitre(texte);
+const legende = typographier(`« ${phrase} » : la première phrase du texte, découpée en mots par le programme.`);
+const constat = typographier(
+  `Après « ${mot} », ce texte met le plus souvent « ${suivant} » : ${fois} fois sur ${total}. ` +
+    'À la fin de ce chapitre, tu sauras le faire calculer par un programme, pour n’importe quel mot.',
+);
+---
+
+<figure class="ouverture-mots" data-test="ouverture">
+  <div class="glose" aria-hidden="true">
+    {mots.map((m, i) => <span class:list={['mot', { b: i % 2 === 1 }]} data-mot={m}>{m}</span>)}
+  </div>
+  <figcaption>{legende}</figcaption>
+  <p class="constat">{constat}</p>
+</figure>
+
+<style>
+  .ouverture-mots {
+    margin: 40px 0 0;
+  }
+
+  .glose {
+    font-size: 34px;
+    line-height: 1.5;
+    font-variation-settings: 'opsz' 48;
+    overflow-wrap: anywhere;
+  }
+
+  /* Un simple souligné, en teintes alternées, comme la phrase découpée de 1.3. */
+  .mot {
+    display: inline-block;
+    margin: 0 8px 6px 0;
+    padding: 0 2px;
+    border-bottom: 3px solid var(--teinte-a-trait);
+    line-height: 1.25;
+  }
+
+  .mot.b {
+    border-bottom-color: var(--teinte-b-trait);
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 15px;
+    color: var(--indigo-doux);
+    margin-top: 6px;
+  }
+
+  .constat {
+    margin: 18px 0 0;
+  }
+
+  @media (max-width: 720px) {
+    .glose {
+      font-size: 26px;
+    }
+  }
+</style>

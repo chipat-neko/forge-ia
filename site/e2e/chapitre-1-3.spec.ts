@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { extraireRegion } from '../src/lib/regions';
-import { plusLongueLigne, terminerChapitre13, verifierAxe, verifierSansDebordement } from './outils';
+import { plusLongueLigne, terminerChapitre13, texteHorsCode, verifierAxe, verifierSansDebordement } from './outils';
 
 const PAGE = '/forge-ia/partie-1/1-3/';
 const FINE = '\u202F';
@@ -259,17 +259,9 @@ test('après les paris : accessibilité, largeur et longueur des lignes', async 
 
 test('typographie française dans tout le texte (hors code)', async ({ page }) => {
   await terminerChapitre13(page);
-  const textes = await page.locator('main').evaluate((main) => {
-    // Le texte affiché, sans les scripts ni le code (où « a: b » et 'x' sont
-    // du Python), ni les jetons (des morceaux de texte bruts).
-    const morceaux: string[] = [];
-    const marcheur = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
-    for (let n = marcheur.nextNode(); n; n = marcheur.nextNode()) {
-      if (n.parentElement?.closest('script, style, code, pre, [data-test="jetons"], .glose, [data-jeton]')) continue;
-      morceaux.push(n.textContent ?? '');
-    }
-    return morceaux.join('');
-  });
+  // Le texte affiché, sans les scripts ni le code (où « a: b » et 'x' sont
+  // du Python), ni les jetons (des morceaux de texte bruts).
+  const textes = await texteHorsCode(page.locator('main'), '[data-test="jetons"], .glose, [data-jeton]');
   expect(textes).toContain('Le tokenizer');
   // Une espace ordinaire (ou insécable) devant ; : ! ? ou à l'intérieur des guillemets.
   expect(textes.match(/.{0,30}[ \u00A0][;:!?].{0,10}/g) ?? []).toEqual([]);

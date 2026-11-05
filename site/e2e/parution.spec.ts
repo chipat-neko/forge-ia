@@ -5,9 +5,11 @@
 //   quand une mesure manque) : c'est une des conditions de parution du README.
 // - Chaque brouillon (src/brouillons/chapitres/<p>-<n>.mdx) se construit, avec
 //   FORGE_ESSAIS=1, à son adresse définitive.
+// - Un chapitre paru ne renvoie, par un lien, qu'à des chapitres parus : un
+//   renvoi à un chapitre à venir s'écrit en texte.
 //
-// Les deux tests suivent les fichiers présents sur le disque : le git mv d'une
-// parution ne les oblige pas à changer. Sans aucun brouillon, le second est sauté.
+// Les tests suivent les fichiers présents sur le disque : le git mv d'une
+// parution ne les oblige pas à changer. Sans aucun brouillon, le dernier est sauté.
 import { existsSync, readdirSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 
@@ -30,6 +32,19 @@ test('un chapitre paru n’a plus aucune valeur « à mesurer »', async ({ page
   for (const adresse of PARUS) {
     expect((await page.goto(adresse))?.status(), adresse).toBe(200);
     await expect(page.locator('[data-a-mesurer]'), adresse).toHaveCount(0);
+  }
+});
+
+test('un chapitre paru ne renvoie qu’à des chapitres parus', async ({ page }) => {
+  // Un renvoi vers un chapitre à venir s'écrit en texte, jamais en lien (S3) :
+  // sur le site publié, ce lien mènerait à une page absente.
+  for (const adresse of PARUS) {
+    await page.goto(adresse);
+    const liens = await page.locator('a[href*="/forge-ia/partie-"]').evaluateAll((a) => a.map((e) => e.getAttribute('href') ?? ''));
+    for (const href of liens) {
+      const chapitre = /\/partie-\d+\/(\d+-\d+)\/?/.exec(href);
+      if (chapitre) expect(existsSync(`src/content/chapitres/${chapitre[1]}.mdx`), `${adresse} : ${href}`).toBe(true);
+    }
   }
 });
 
