@@ -306,11 +306,11 @@ Le projet range tout cela dans des fonctions, réparties dans des fichiers. Quel
 
 <CodeExplique fichier="projets/0.1-python/mot_suivant/mots.py" region="predire">
   <li data-lignes="1-4">`predire` reçoit le dictionnaire des suivants et un mot, un paramètre par ligne, et rend un mot ou `None`.</li>
-  <li data-lignes="5-11">La documentation dit la règle, égalités comprises.</li>
+  <li data-lignes="5-12">La documentation dit la règle, égalités comprises.</li>
   <li data-lignes="13">`suivants.get(mot)` lit le `Counter` du mot, ou `None` si le mot n'est pas une clé du dictionnaire : un mot inconnu ne fait pas d'erreur.</li>
   <li data-lignes="14-15">Rien ne suit ce mot : la fonction rend `None`. `None` et un `Counter` vide comptent tous deux pour faux.</li>
-  <li data-lignes="16">`min` garde le suivant qui donne la plus petite valeur. Cette valeur, c'est l'argument `key=` qui la calcule : une petite fonction sans nom, écrite `lambda m: …`, qui reçoit chaque mot `m` et rend ce qu'on compare, le couple `(-compte[m], m)`. Ce `key` n'a rien à voir avec les clés du dictionnaire.</li>
-  <li data-lignes="16">Deux couples se comparent d'abord par leur premier élément. `-compte[m]` est d'autant plus petit que le compte est grand : le plus fréquent passe en tête. À égalité, le mot lui-même départage, dans l'ordre des numéros des caractères, comme au chapitre 1.3.</li>
+  <li data-lignes="16">`min` garde le suivant qui donne la plus petite valeur. Cette valeur, c'est l'argument `key=` qui la calcule : une petite fonction sans nom, écrite `lambda m: …`, qui reçoit chaque mot `m` et rend ce qu'on compare, le couple <code class="insecable">(-compte[m], m)</code>. Ce `key` n'a rien à voir avec les clés du dictionnaire.</li>
+  <li data-lignes="16">Deux couples se comparent d'abord par leur premier élément. <code class="insecable">-compte[m]</code> est d'autant plus petit que le compte est grand : le plus fréquent passe en tête. À égalité, le mot lui-même départage, dans l'ordre des numéros des caractères, comme au chapitre 1.3.</li>
 </CodeExplique>
 
 `generer` s'en sert pour écrire une suite, un mot après l'autre :

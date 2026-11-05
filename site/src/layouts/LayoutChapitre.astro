@@ -164,6 +164,11 @@ const { numero, titre, chapeau, programme, acquis, indexer = true } = Astro.prop
     border-radius: 4px;
   }
 
+  /* Un bout de code court qui ne doit pas se couper, par exemple après le signe moins de « -compte[m] ». */
+  .chapitre :not(pre) > code.insecable {
+    white-space: nowrap;
+  }
+
   /* En dessous de 900 px, les notes passent sous le texte. */
   @media (max-width: 899.98px) {
     .chapitre {
