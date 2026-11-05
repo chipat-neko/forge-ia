@@ -1,0 +1,118 @@
+---
+// Un tableau de calcul du chapitre 0.2 : la matrice de l'étape 2, softmax et
+// −ln p à l'étape 7. Le MDX calcule les cellules (le jumeau, ou les valeurs du
+// Python mises en forme par paris-0-2.ts) et les passe ici, déjà écrites :
+// le composant ne fait que les ranger, sans rien recalculer.
+//
+// La première cellule de chaque ligne est son en-tête (th scope="row") : la
+// ligne de la matrice, la température, la chance. Les colonnes de nombres
+// (`nombres`, leurs rangs à partir de 0) sont alignées à droite, en chiffres de
+// même largeur. Un tableau typographié, pas des tuiles : des filets, rien d'autre.
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  /** La légende, au-dessus du tableau. */
+  legende: string;
+  /** Les en-têtes des colonnes. */
+  colonnes: string[];
+  /** Les cellules, ligne par ligne, déjà écrites. */
+  lignes: string[][];
+  /** Les rangs des colonnes de nombres (à partir de 0), alignés à droite. */
+  nombres?: number[];
+  /** Le nom du tableau pour les parcours de test (data-test). */
+  test: string;
+}
+
+const { legende, colonnes, lignes, nombres = [], test } = Astro.props;
+
+if (lignes.some((l) => l.length !== colonnes.length)) {
+  throw new Error(`Tableau « ${test} » : chaque ligne doit avoir ${colonnes.length} cellules, une par colonne.`);
+}
+
+const classe = (i: number) => (nombres.includes(i) ? 'nombre' : undefined);
+// La légende est celle de la figure, au-dessus du tableau, et nomme aussi le tableau : une
+// <caption> aurait la largeur du tableau, et une légende d'une ligne s'y couperait en trois.
+const idLegende = `legende-${test}`;
+---
+
+<figure class="tableau-calcul">
+<figcaption id={idLegende}>{typographier(legende)}</figcaption>
+<table data-test={test} aria-labelledby={idLegende}>
+  <thead>
+    <tr>{colonnes.map((c, i) => <th scope="col" class={classe(i)}>{typographier(c)}</th>)}</tr>
+  </thead>
+  <tbody>
+    {
+      lignes.map((ligne) => (
+        <tr>{ligne.map((cellule, i) => (i === 0 ? <th scope="row" class={classe(i)}>{cellule}</th> : <td class={classe(i)}>{cellule}</td>))}</tr>
+      ))
+    }
+  </tbody>
+</table>
+</figure>
+
+<style>
+  .tableau-calcul {
+    margin: 1.1em 0 1.2em;
+  }
+
+  figcaption {
+    margin-bottom: 8px;
+  }
+
+  table {
+    border-collapse: collapse;
+    max-width: 100%;
+  }
+
+  thead th {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1.3;
+    color: var(--indigo-doux);
+    text-align: left;
+    vertical-align: bottom;
+    padding: 0 22px 6px 0;
+    border-bottom: 2px solid var(--indigo);
+  }
+
+  tbody th,
+  td {
+    text-align: left;
+    padding: 5px 22px 5px 0;
+    border-bottom: 1px solid var(--brume);
+  }
+
+  tbody th {
+    font-weight: 600;
+  }
+
+  th:last-child,
+  td:last-child {
+    padding-right: 0;
+  }
+
+  .nombre {
+    text-align: right;
+    font-family: var(--titres);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  thead .nombre {
+    white-space: normal;
+  }
+
+  @media (max-width: 720px) {
+    thead th {
+      font-size: 14px;
+      padding-right: 14px;
+    }
+
+    tbody th,
+    td {
+      padding-right: 14px;
+    }
+  }
+</style>

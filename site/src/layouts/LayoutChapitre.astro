@@ -169,6 +169,11 @@ const { numero, titre, chapeau, programme, acquis, indexer = true } = Astro.prop
     white-space: nowrap;
   }
 
+  /* Une courte formule écrite en texte (« f(x) = 2x + 1 ») ne se coupe pas en fin de ligne. */
+  .chapitre .formule {
+    white-space: nowrap;
+  }
+
   /* En dessous de 900 px, les notes passent sous le texte. */
   @media (max-width: 899.98px) {
     .chapitre {

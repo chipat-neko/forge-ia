@@ -9,8 +9,11 @@
 //
 // Ce module n'importe ni ?raw, ni .json, ni astro:* (B1) : les parcours de test
 // l'importent pour calculer ce que les figures doivent afficher. Les fonctions
-// qui liront les attendus du Python (choixErreur, chapitre 0.2, étape 7) les
-// recevront en argument.
+// qui lisent les attendus du Python (la règle de la chaîne, softmax, −ln p et
+// le pari « erreur ») les reçoivent en argument : le MDX les importe, les
+// parcours les lisent sur le disque. Ces valeurs passent par exp et log, dont
+// le dernier chiffre peut changer d'un système à l'autre : elles sont
+// seulement mises en forme, jamais recalculées ici.
 
 import type { Choix } from '../choix';
 import { exigeur } from '../exiger';
@@ -84,10 +87,19 @@ function ecrireArrondi(x: number): string {
   return Number.isInteger(x) ? ecrireNombre(x) : ecrireNombre(x, 2);
 }
 
+/** Les termes d'un produit scalaire : « 3 × 1 + 1 × 2 ». */
+function termesDuProduit(a: readonly number[], b: readonly number[]): string {
+  return a.map((x, i) => `${facteur(x)} × ${facteur(b[i])}`).join(' + ');
+}
+
 /** Le produit scalaire, terme à terme : « a · b = 3 × 1 + 1 × 2 = 5 ». */
 export function texteScalaire(a: readonly number[], b: readonly number[]): string {
-  const termes = a.map((x, i) => `${facteur(x)} × ${facteur(b[i])}`).join(' + ');
-  return `a · b = ${termes} = ${ecrireNombre(produitScalaire(a, b))}`;
+  return `a · b = ${termesDuProduit(a, b)} = ${ecrireNombre(produitScalaire(a, b))}`;
+}
+
+/** L'ouverture du chapitre : « (3, 1) · (1, 2) = 5 », les vecteurs de la figure à l'arrivée. */
+export function texteOuverture(): string {
+  return `${ecrireVecteur(A_DEPART)} · ${ecrireVecteur(B_DEPART)} = ${ecrireNombre(produitScalaire(A_DEPART, B_DEPART))}`;
 }
 
 /**
@@ -438,5 +450,215 @@ export function choixTirage(): Choix[] {
     { texte: 'Oui, forcément', juste: false },
     { texte: `Pas forcément : ici, ${nombre(compte)} fois`, juste: compte !== attendu },
     { texte: `Jamais ${nombre(attendu)} fois`, juste: false },
+  ];
+}
+
+// ---------- La matrice de l'étape 2 ----------
+
+/** L'exemple de l'étape 2 : la matrice [[1, 2, 3], [0, 1, 0]], fois le vecteur [1, 1, 1]. */
+export const MATRICE_EXEMPLE: readonly (readonly number[])[] = Object.freeze([
+  Object.freeze([1, 2, 3]),
+  Object.freeze([0, 1, 0]),
+]);
+export const VECTEUR_EXEMPLE: readonly number[] = Object.freeze([1, 1, 1]);
+
+/**
+ * Le tableau de « matrice fois vecteur », une ligne par ligne de la matrice :
+ * la ligne, son produit scalaire avec le vecteur terme à terme, et la case du
+ * résultat (matriceFoisVecteur, le jumeau). Une ligne qui ne va pas avec le
+ * vecteur arrête tout, avec le message du jumeau.
+ */
+export function tableauMatrice(m: readonly (readonly number[])[], v: readonly number[]): string[][] {
+  const resultat = matriceFoisVecteur(m, v);
+  return m.map((ligne, i) => [ecrireVecteur(ligne), termesDuProduit(ligne, v), ecrireNombre(resultat[i])]);
+}
+
+// ---------- Les valeurs du Python : la pente approchée, la chaîne, softmax et −ln p ----------
+
+/**
+ * Une pente approchée, avec juste assez de décimales pour qu'elle ne se
+ * confonde pas avec la pente exacte : l'écart doit dépasser un demi-chiffre de
+ * la dernière décimale. −6,000000000838… face à −6 s'écrit « −6,000000001 »,
+ * 11,9999999999009… face à 12, « 11,9999999999 ».
+ */
+export function ecrireApprochee(approchee: number, exacte: number): string {
+  const ecart = Math.abs(approchee - exacte);
+  for (let d = 0; d <= 15; d++) {
+    if (ecart > 0.5 * 10 ** -d) {
+      const texte = ecrireNombre(approchee, d);
+      exiger(texte !== ecrireNombre(exacte, d), `la pente approchée ${texte} s’écrit comme la pente exacte`);
+      return texte;
+    }
+  }
+  return ecrireNombre(approchee, decimalesUtiles(approchee));
+}
+
+/** La section « chaine » des attendus : h(x) = (2x + 1)² en x, sa pente exacte et sa pente approchée. */
+export interface ChaineAttendue {
+  x: number;
+  h: number;
+  exacte: number;
+  approchee: number;
+}
+
+/** La pente de f(x) = 2x + 1, l'opération intérieure de la règle de la chaîne. */
+const PENTE_INTERIEURE = 2;
+
+/**
+ * Ce que dit l'étape 5 de h(x) = g(f(x)), avec f(x) = 2x + 1 et g(u) = u² :
+ * u = f(x), h = u², la pente de g en u (2u), celle de f (2), leur produit (la
+ * pente exacte des attendus) et la pente approchée de Python. Des entiers ou
+ * des demi-entiers : ces vérifications tombent juste.
+ */
+export function faitsChaine(c: ChaineAttendue): {
+  x: string;
+  u: string;
+  h: string;
+  penteExterieur: string;
+  penteInterieur: string;
+  exacte: string;
+  approchee: string;
+} {
+  const u = PENTE_INTERIEURE * c.x + 1;
+  const penteExterieur = 2 * u;
+  exiger(c.h === u * u, `h(${c.x}) vaut ${c.h} dans les attendus, et non (2x + 1)² = ${u * u}`);
+  exiger(
+    c.exacte === penteExterieur * PENTE_INTERIEURE,
+    `la pente exacte des attendus (${c.exacte}) n’est plus 2u × 2 = ${penteExterieur * PENTE_INTERIEURE}`,
+  );
+  exiger(Math.abs(c.approchee - c.exacte) < 1e-6, 'la pente approchée de la chaîne s’éloigne de la pente exacte');
+  return {
+    x: ecrireReglage(c.x),
+    u: ecrireNombre(u),
+    h: ecrireNombre(c.h),
+    penteExterieur: ecrireNombre(penteExterieur),
+    penteInterieur: ecrireNombre(PENTE_INTERIEURE),
+    exacte: ecrireNombre(c.exacte),
+    approchee: ecrireApprochee(c.approchee, c.exacte),
+  };
+}
+
+/** Une ligne de la section « softmax » des attendus. */
+export interface SoftmaxAttendu {
+  scores: readonly number[];
+  temperature: number;
+  probabilites: readonly number[];
+}
+
+/** La somme d'une liste, de gauche à droite. */
+function total(valeurs: readonly number[]): number {
+  let s = 0;
+  for (const v of valeurs) s += v;
+  return s;
+}
+
+/**
+ * Le tableau softmax de l'étape 7 : une colonne par mot de l'exemple de
+ * l'étape 6 (« fer », « métal », « feu »), avec son score, et une ligne par
+ * température, les probabilités en pourcentages à une décimale.
+ *
+ * Les gardes vérifient ce que dit le texte : les mêmes scores sur chaque
+ * ligne, rangés du plus grand au plus petit ; des probabilités dans le même
+ * ordre, de somme 1 ; des températures sous 1, à 1 et au-dessus, en ordre
+ * croissant ; et, quand la température monte, le plus grand score perd du
+ * terrain et le plus petit en gagne.
+ */
+export function tableauSoftmax(softmax: readonly SoftmaxAttendu[]): { colonnes: string[]; lignes: string[][] } {
+  exiger(softmax.length >= 2, 'la section « softmax » des attendus a moins de deux températures');
+  const scores = softmax[0].scores;
+  exiger(scores.length === EXEMPLE_COMPTES.length, `il faut un score par mot de l’exemple (${EXEMPLE_COMPTES.length})`);
+  exiger(
+    scores.every((s, i) => i === 0 || s < scores[i - 1]),
+    'les scores de softmax ne sont plus rangés du plus grand au plus petit',
+  );
+  for (const [n, ligne] of softmax.entries()) {
+    const t = ecrireReglage(ligne.temperature);
+    exiger(
+      ligne.scores.length === scores.length && ligne.scores.every((s, i) => s === scores[i]),
+      `à la température ${t}, les scores ne sont plus ceux des autres lignes`,
+    );
+    exiger(ligne.probabilites.length === scores.length, `à la température ${t}, il manque des probabilités`);
+    exiger(Math.abs(total(ligne.probabilites) - 1) < 1e-9, `à la température ${t}, les probabilités ne font plus 1`);
+    // « Chaque ligne fait 100 % » : aussi pour le lecteur qui additionne les pourcentages affichés, à une décimale.
+    exiger(
+      total(ligne.probabilites.map((p) => Math.round(p * 1000))) === 1000,
+      `à la température ${t}, les pourcentages arrondis ne font plus 100,0 %`,
+    );
+    exiger(
+      ligne.probabilites.every((p, i) => p > 0 && (i === 0 || p < ligne.probabilites[i - 1])),
+      `à la température ${t}, les probabilités ne suivent plus l’ordre des scores`,
+    );
+    if (n > 0) {
+      const avant = softmax[n - 1];
+      exiger(ligne.temperature > avant.temperature, 'les températures de softmax ne sont plus en ordre croissant');
+      exiger(
+        ligne.probabilites[0] < avant.probabilites[0] && ligne.probabilites.at(-1)! > avant.probabilites.at(-1)!,
+        `en passant à la température ${t}, les probabilités ne se rapprochent plus`,
+      );
+    }
+  }
+  exiger(
+    softmax[0].temperature < 1 && softmax.some((l) => l.temperature === 1) && softmax.at(-1)!.temperature > 1,
+    'les températures de softmax ne vont plus de moins de 1 à plus de 1, en passant par 1',
+  );
+  return {
+    colonnes: EXEMPLE_COMPTES.map(([nom], i) => `«${FINE}${nom}${FINE}», score ${ecrireReglage(scores[i])}`),
+    lignes: softmax.map((l) => [ecrireReglage(l.temperature), ...l.probabilites.map((p) => pourcent(p, 1))]),
+  };
+}
+
+/** Une ligne de la section « erreur » des attendus : p, et l'erreur −ln p calculée par Python. */
+export interface ErreurAttendue {
+  p: number;
+  erreur: number;
+}
+
+/**
+ * Le tableau −ln p de l'étape 7 : p, « une chance sur » 1 ÷ p, et l'erreur à
+ * trois décimales. −ln 1 vaut −0.0 en Python : nombre() l'écrit « 0,000 »,
+ * jamais « −0 ».
+ *
+ * Les gardes vérifient ce que dit le texte : p = 1 donne une erreur nulle,
+ * chaque p est une chance sur un nombre entier, et quand p baisse, l'erreur
+ * monte. La valeur affichée reste celle de Python.
+ */
+export function tableauErreur(erreurs: readonly ErreurAttendue[]): string[][] {
+  exiger(erreurs.length > 0 && erreurs[0].p === 1 && erreurs[0].erreur === 0, 'p = 1 ne donne plus une erreur nulle');
+  for (const [n, e] of erreurs.entries()) {
+    exiger(e.p > 0 && e.p <= 1 && Number.isInteger(1 / e.p), `p = ${e.p} n’est pas une chance sur un nombre entier`);
+    exiger(Math.abs(e.erreur + Math.log(e.p)) < 1e-12, `l’erreur des attendus pour p = ${e.p} n’est pas −ln p`);
+    if (n > 0) {
+      exiger(e.p < erreurs[n - 1].p && e.erreur > erreurs[n - 1].erreur, 'l’erreur ne grandit plus quand la chance baisse');
+    }
+  }
+  return erreurs.map((e) => [ecrireReglage(e.p), nombre(1 / e.p), ecrireNombre(e.erreur, 3)]);
+}
+
+/**
+ * Le pari « Si le modèle ne donne qu'une chance sur 40 à la bonne lettre, son
+ * erreur vaut… ». V est le vocabulaire du mini-modèle
+ * (etatInitial('complet').tailleVocabulaire, 40) : un modèle qui devine au
+ * hasard donne 1/V à chaque caractère. Le juste est l'erreur des attendus pour
+ * p = 1/V, à trois décimales (ln 40, « 3,689 ») ; les deux autres choix sont la
+ * chance elle-même et V. Si les attendus n'ont plus p = 1/V, la construction
+ * s'arrête : le texte dirait un nombre que le Python n'a pas calculé.
+ */
+export function choixErreur(erreurs: readonly ErreurAttendue[], tailleVocabulaire: number): Choix[] {
+  const v = tailleVocabulaire;
+  exiger(Number.isInteger(v) && v >= 2, `le vocabulaire du mini-modèle a ${v} caractères${FINE}: il en faut au moins 2`);
+  const p = 1 / v;
+  const ligne = erreurs.find((e) => e.p === p);
+  exiger(
+    ligne !== undefined,
+    `la section « erreur » des attendus n’a pas p = 1/${v}, la chance d’un modèle qui devine au hasard parmi les ` +
+      `${v} caractères du mini-modèle${FINE}: mets 1 / ${v} dans PROBAS_ERREUR (projets/0.2-maths/maths_utiles/attendus.py) ` +
+      'et dans le notebook 0.2, puis régénère les attendus',
+  );
+  const valeurs = [ecrireReglage(p), ecrireNombre(ligne!.erreur, 3), nombre(v)];
+  exiger(new Set(valeurs).size === 3, 'deux choix du pari sur l’erreur ont le même texte');
+  return [
+    { texte: valeurs[0], juste: false },
+    { texte: valeurs[1], juste: true },
+    { texte: valeurs[2], juste: false },
   ];
 }

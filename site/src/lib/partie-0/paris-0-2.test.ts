@@ -2,7 +2,10 @@
 // réponses viennent du jumeau des maths utiles (maths.ts), jamais écrites à la
 // main, et les phrases des figures disent exactement ce que la tâche demande.
 
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { etatInitial } from '../mini-modele/apercu';
+import { FICHIERS_PARTIE_0 } from './fichiers';
 import {
   cosinus,
   descendre,
@@ -20,6 +23,7 @@ import {
   A_DEPART,
   B_DEPART,
   cheminDeDescente,
+  choixErreur,
   choixFormeMatrice,
   choixPente,
   choixProduitScalaire,
@@ -27,10 +31,12 @@ import {
   choixTauxMoitie,
   choixTirage,
   directionSelonCosinus,
+  ecrireApprochee,
   ecrireNombre,
   ecrireVecteur,
   ECART_EXPLOSION,
   etatDescente,
+  faitsChaine,
   faitsDuPariTirage,
   faitsTauxGrand,
   FOND,
@@ -38,6 +44,7 @@ import {
   INDICE_TIRAGES_DEPART,
   lignePas,
   MATRICE_DU_PARI,
+  MATRICE_EXEMPLE,
   MESSAGE_EXPLOSION,
   messageVecteurNul,
   NOMBRES_DE_TIRAGES,
@@ -46,17 +53,35 @@ import {
   phrasePente,
   resultatsDesTirages,
   SEUIL_DU_PARI,
+  tableauErreur,
+  tableauMatrice,
+  tableauSoftmax,
   TAUX_DEPART,
   TAUX_GRAND,
   TAUX_MOITIE,
   texteCosinus,
+  texteOuverture,
   texteScalaire,
+  VECTEUR_EXEMPLE,
   VECTEURS_DU_PARI,
   X0_DEPART,
+  type ChaineAttendue,
+  type ErreurAttendue,
+  type SoftmaxAttendu,
 } from './paris-0-2';
 
 const FINE = '\u202F';
 const MOINS = '\u2212';
+const INSECABLE = '\u00A0';
+
+/** Les sections des attendus du Python que lisent l'\u00E9tape 2, l'\u00E9tape 5 et l'\u00E9tape 7 (Vitest tourne dans site/). */
+interface AttendusLus {
+  matrices: { m: number[][]; v: number[]; resultat: number[] | null }[];
+  chaine: ChaineAttendue;
+  softmax: SoftmaxAttendu[];
+  erreur: ErreurAttendue[];
+}
+const ATTENDUS = JSON.parse(readFileSync(`../${FICHIERS_PARTIE_0.maths}`, 'utf8')) as AttendusLus;
 
 describe('les bonnes réponses viennent du jumeau', () => {
   it('produit scalaire : (2, 1) · (−1, 2), calculé', () => {
@@ -278,5 +303,167 @@ describe('la figure des tirages', () => {
     const [fer] = resultatsDesTirages(100000, GRAINE_TIRAGE);
     const pour = (comptes[0] / 1000).toFixed(3).replace('.', ',');
     expect(fer.tires).toBe(`${ecrireNombre(comptes[0])} sur 100${FINE}000 tirés (${pour}${FINE}%)`);
+  });
+});
+
+describe('l’ouverture et la matrice de l’étape 2', () => {
+  it('l’ouverture : (3, 1) · (1, 2) = 5, calculé', () => {
+    expect(texteOuverture()).toBe(`(3,${INSECABLE}1) · (1,${INSECABLE}2) = 5`);
+    expect(produitScalaire(A_DEPART, B_DEPART)).toBe(5);
+  });
+
+  it('[[1, 2, 3], [0, 1, 0]] × [1, 1, 1] : un produit scalaire par ligne, comme les attendus', () => {
+    expect(MATRICE_EXEMPLE).toEqual([
+      [1, 2, 3],
+      [0, 1, 0],
+    ]);
+    expect(VECTEUR_EXEMPLE).toEqual([1, 1, 1]);
+    expect(tableauMatrice(MATRICE_EXEMPLE, VECTEUR_EXEMPLE)).toEqual([
+      [`(1,${INSECABLE}2,${INSECABLE}3)`, '1 × 1 + 2 × 1 + 3 × 1', '6'],
+      [`(0,${INSECABLE}1,${INSECABLE}0)`, '0 × 1 + 1 × 1 + 0 × 1', '1'],
+    ]);
+    // Le premier cas des attendus du Python est cet exemple, et il trouve le même résultat.
+    const [premier] = ATTENDUS.matrices;
+    expect(premier.m).toEqual(MATRICE_EXEMPLE);
+    expect(premier.v).toEqual(VECTEUR_EXEMPLE);
+    expect(premier.resultat).toEqual([6, 1]);
+  });
+
+  it('une ligne qui ne va pas avec le vecteur arrête le tableau, avec le message du jumeau', () => {
+    expect(() => tableauMatrice([[1, 2, 3, 4]], [1, 2, 3])).toThrow(/il en faut autant/);
+  });
+});
+
+describe('la règle de la chaîne et la pente approchée (attendus du Python)', () => {
+  it('écrit la pente approchée avec juste assez de décimales pour qu’elle diffère de l’exacte', () => {
+    expect(ecrireApprochee(-6.000000000838668, -6)).toBe(`${MOINS}6,000000001`);
+    expect(ecrireApprochee(11.999999999900979, 12)).toBe('11,9999999999');
+    expect(ecrireApprochee(2.5, 2)).toBe('2,5');
+  });
+
+  it('h(x) = (2x + 1)² en x = 1 : u = 3, h = 9, pente 6 × 2 = 12, approchée 11,9999999999', () => {
+    expect(ATTENDUS.chaine).toEqual({ x: 1, h: 9, exacte: 12, approchee: 11.999999999900979 });
+    expect(faitsChaine(ATTENDUS.chaine)).toEqual({
+      x: '1',
+      u: '3',
+      h: '9',
+      penteExterieur: '6',
+      penteInterieur: '2',
+      exacte: '12',
+      approchee: '11,9999999999',
+    });
+  });
+
+  it('refuse des attendus qui ne suivent plus la règle', () => {
+    expect(() => faitsChaine({ ...ATTENDUS.chaine, exacte: 13 })).toThrow(/Exemple devenu faux/);
+    expect(() => faitsChaine({ ...ATTENDUS.chaine, h: 10 })).toThrow(/Exemple devenu faux/);
+    expect(() => faitsChaine({ ...ATTENDUS.chaine, approchee: 12.5 })).toThrow(/Exemple devenu faux/);
+  });
+});
+
+describe('les tableaux et le pari de l’étape 7 (valeurs des attendus, jamais recalculées)', () => {
+  it('softmax : une ligne par température, une colonne par mot de l’exemple, en pourcentages', () => {
+    expect(tableauSoftmax(ATTENDUS.softmax)).toEqual({
+      colonnes: [
+        `«${FINE}fer${FINE}», score 2`,
+        `«${FINE}métal${FINE}», score 1`,
+        `«${FINE}feu${FINE}», score 0,1`,
+      ],
+      lignes: [
+        ['0,5', `86,4${FINE}%`, `11,7${FINE}%`, `1,9${FINE}%`],
+        ['1', `65,9${FINE}%`, `24,2${FINE}%`, `9,9${FINE}%`],
+        ['2', `50,2${FINE}%`, `30,4${FINE}%`, `19,4${FINE}%`],
+      ],
+    });
+  });
+
+  it('softmax : refuse des probabilités qui contrediraient le texte', () => {
+    const [basse, moyenne, haute] = ATTENDUS.softmax;
+    // Les températures dans le désordre : le plus grand score ne perdrait plus de terrain en montant.
+    expect(() => tableauSoftmax([haute, moyenne, basse])).toThrow(/Exemple devenu faux/);
+    // Des probabilités dont la somme ne fait pas 1.
+    expect(() => tableauSoftmax([{ ...basse, probabilites: [0.5, 0.3, 0.1] }, moyenne, haute])).toThrow(
+      /Exemple devenu faux/,
+    );
+    // Des scores qui changent d'une ligne à l'autre.
+    expect(() => tableauSoftmax([basse, { ...moyenne, scores: [3, 1, 0.1] }, haute])).toThrow(/Exemple devenu faux/);
+    // Des probabilités de somme 1, mais dont les pourcentages affichés font 99,9 % (50,0 + 30,0 + 19,9).
+    expect(() => tableauSoftmax([basse, moyenne, { ...haute, probabilites: [0.5004, 0.3004, 0.1992] }])).toThrow(
+      /pourcentages arrondis/,
+    );
+  });
+
+  it('−ln p : p, une chance sur…, et l’erreur à trois décimales, jamais « −0 »', () => {
+    // Python écrit −ln 1 comme −0.0 : le tableau doit afficher 0.
+    expect(Object.is(ATTENDUS.erreur[0].erreur, -0)).toBe(true);
+    expect(tableauErreur(ATTENDUS.erreur)).toEqual([
+      ['1', '1', '0,000'],
+      ['0,5', '2', '0,693'],
+      ['0,1', '10', '2,303'],
+      ['0,025', '40', '3,689'],
+    ]);
+  });
+
+  it('−ln p : refuse une erreur qui ne grandit pas quand la chance baisse', () => {
+    const [un, demi, dixieme, petit] = ATTENDUS.erreur;
+    expect(() => tableauErreur([un, dixieme, demi, petit])).toThrow(/Exemple devenu faux/);
+    expect(() => tableauErreur([{ p: 1, erreur: 0.1 }, demi])).toThrow(/Exemple devenu faux/);
+  });
+
+  it('le pari « erreur » : 0,025, 3,689 (juste, la valeur des attendus pour p = 1/40) et 40', () => {
+    const choix = choixErreur(ATTENDUS.erreur, 40);
+    expect(choix.map((c) => c.texte)).toEqual(['0,025', '3,689', '40']);
+    expect(choix.filter((c) => c.juste).map((c) => c.texte)).toEqual(['3,689']);
+    const ligne = ATTENDUS.erreur.find((e) => e.p === 1 / 40);
+    expect(ligne).toBeDefined();
+    expect(choix[1].texte).toBe(ecrireNombre(ligne!.erreur, 3));
+  });
+
+  it('le pari « erreur » refuse un vocabulaire dont la chance 1/V manque aux attendus', () => {
+    expect(() => choixErreur(ATTENDUS.erreur, 39)).toThrow(/Exemple devenu faux/);
+    expect(() => choixErreur(ATTENDUS.erreur, 1)).toThrow(/Exemple devenu faux/);
+  });
+});
+
+describe('le « 40 » du mini-modèle (M7)', { timeout: 60_000 }, () => {
+  it('le vocabulaire du mini-modèle est bien celui de la section « erreur » des attendus', () => {
+    const V = etatInitial('complet').tailleVocabulaire;
+    expect(choixErreur(ATTENDUS.erreur, V).filter((c) => c.juste)).toHaveLength(1);
+    expect(choixErreur(ATTENDUS.erreur, V).at(-1)?.texte).toBe(String(V));
+  });
+
+  it('le notebook de 0.2 et attendus.py disent le même nombre de caractères', () => {
+    const V = etatInitial('complet').tailleVocabulaire;
+    // Les nombres que ces deux textes donnent pour le mini-modèle : tous doivent valoir V.
+    const nombres = (texte: string, motif: RegExp) => [...texte.matchAll(motif)].map((m) => Number(m[1]));
+
+    const notebook = JSON.parse(readFileSync('../notebooks/0.2-maths.ipynb', 'utf8')) as {
+      cells: { cell_type: string; source: string | string[] }[];
+    };
+    const sources = notebook.cells.map((c) => (Array.isArray(c.source) ? c.source.join('') : c.source));
+    const texte = sources.find((s) => s.includes('comme le mini-modèle du site'));
+    expect(texte, 'la cellule du notebook qui parle du mini-modèle').toBeDefined();
+    const dansLeTexte = nombres(texte!, /(?:parmi|sur|ln) (\d+)/g);
+    expect(dansLeTexte.length).toBeGreaterThanOrEqual(3);
+    const code = sources.find((s) => s.includes('erreur_de_prediction(p)'));
+    expect(code, 'la cellule de code de l’erreur d’une prédiction').toBeDefined();
+    const dansLeCode = [
+      ...nombres(code!, /1 \/ (\d+)/g),
+      ...nombres(code!, /math\.log\((\d+)\)/g),
+      ...nombres(code!, /ln (\d+)/g),
+    ];
+    expect(dansLeCode.length).toBeGreaterThanOrEqual(3);
+
+    const attendusPy = readFileSync('../projets/0.2-maths/maths_utiles/attendus.py', 'utf8');
+    const commentaire = attendusPy.split('\n').find((l) => l.includes('comme le mini-modèle'));
+    expect(commentaire, 'le commentaire de PROBAS_ERREUR').toBeDefined();
+    const dansAttendus = [
+      ...nombres(commentaire!, /1\/(\d+)/g),
+      ...nombres(commentaire!, /parmi (\d+)/g),
+      ...nombres(attendusPy, /PROBAS_ERREUR = \[[^\]]*1 \/ (\d+)\]/g),
+    ];
+    expect(dansAttendus).toHaveLength(3);
+
+    for (const n of [...dansLeTexte, ...dansLeCode, ...dansAttendus]) expect(n).toBe(V);
   });
 });

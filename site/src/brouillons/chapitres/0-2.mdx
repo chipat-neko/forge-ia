@@ -31,13 +31,20 @@ acquis:
 import FigureDescente from '../../components/chapitres/0-2/FigureDescente.svelte';
 import FigureTirage from '../../components/chapitres/0-2/FigureTirage.svelte';
 import FigureVecteurs from '../../components/chapitres/0-2/FigureVecteurs.svelte';
+import OuvertureProduitScalaire from '../../components/chapitres/0-2/OuvertureProduitScalaire.astro';
+import TableauCalcul from '../../components/chapitres/0-2/TableauCalcul.astro';
 import attendus from '../../../../projets/0.2-maths/tests/attendus.json';
+import { modelePublic, SOURCES_FORMULES } from '../../lib/calculateur/donnees';
+import { dixPuissance, formaterPuissanceDeDix, formaterQuantite } from '../../lib/calculateur/formats';
 import { PRESETS_FORGE } from '../../lib/calculateur/ton-ia';
+import { etatInitial } from '../../lib/mini-modele/apercu';
+import { ECART_DEPART_MAX } from '../../lib/mini-modele/paris';
 import {
   descendre,
   erreur,
   EXEMPLE_COMPTES,
   GRAINE_TIRAGE,
+  matriceFoisVecteur,
   norme,
   pasPourAtteindre,
   pente,
@@ -50,29 +57,39 @@ import {
   A_DEPART,
   B_DEPART,
   cheminDeDescente,
+  choixErreur,
+  choixFormeMatrice,
   choixPente,
   choixProduitScalaire,
   choixTauxGrand,
   choixTauxMoitie,
   choixTirage,
+  ecrireApprochee,
   ecrireNombre,
   ecrireReglage,
   ecrireVecteur,
   ECART_EXPLOSION,
   explose,
+  faitsChaine,
   faitsDuPariTirage,
   faitsTauxGrand,
   FOND,
   INDICE_TIRAGES_DEPART,
+  MATRICE_DU_PARI,
+  MATRICE_EXEMPLE,
   NB_PAS_DU_PARI,
   NOMBRES_DE_TIRAGES,
   PAS_MAX,
   resultatsDesTirages,
   SEUIL_DU_PARI,
+  tableauErreur,
+  tableauMatrice,
+  tableauSoftmax,
   TAUX_DEPART,
   TAUX_GRAND,
   TAUX_MOITIE,
   texteScalaire,
+  VECTEUR_EXEMPLE,
   VECTEURS_DU_PARI,
   X0_DEPART,
   X_DU_PARI_PENTE,
@@ -81,11 +98,128 @@ import { exigeur } from '../../lib/exiger';
 import { nombre, pourcent } from '../../lib/nombres';
 import { typographier } from '../../lib/typo';
 
-export const exiger = exigeur('src/brouillons/chapitres/0-2.mdx (le texte des étapes 1, 3, 4 et 6)');
+export const exiger = exigeur('le texte du chapitre 0.2 (0-2.mdx)');
+
+export const enumerer = (morceaux) => {
+  // « a, b et c » : une énumération à la française.
+  return morceaux.length < 2 ? morceaux.join('') : `${morceaux.slice(0, -1).join(', ')} et ${morceaux.at(-1)}`;
+};
 
 export const DIM = nombre(PRESETS_FORGE.tres_grand.dim);
 
 export const POIDS = nombre(PRESETS_FORGE.tres_grand.parametres / 1e6, 1);
+
+export const MATRICE = (() => {
+  // L'exemple de l'étape 2 : sa forme, son écriture en Python, son résultat (le jumeau), qui est
+  // aussi le premier cas des attendus du Python.
+  const resultat = matriceFoisVecteur(MATRICE_EXEMPLE, VECTEUR_EXEMPLE);
+  const [premier] = attendus.matrices;
+  exiger(
+    JSON.stringify(premier.m) === JSON.stringify(MATRICE_EXEMPLE) &&
+      JSON.stringify(premier.v) === JSON.stringify(VECTEUR_EXEMPLE) &&
+      JSON.stringify(premier.resultat) === JSON.stringify(resultat),
+    'le premier cas des attendus n’est plus la matrice de l’étape 2, ou ne donne plus le même résultat',
+  );
+  return {
+    lignes: nombre(MATRICE_EXEMPLE.length),
+    colonnes: nombre(MATRICE_EXEMPLE[0].length),
+    enLignes: enumerer(MATRICE_EXEMPLE.map(ecrireVecteur)),
+    python: `[${MATRICE_EXEMPLE.map((l) => `[${l.join(', ')}]`).join(', ')}]`,
+    vecteur: ecrireVecteur(VECTEUR_EXEMPLE),
+    resultat: ecrireVecteur(resultat),
+  };
+})();
+
+export const FORMES = (() => {
+  // Le pari « formes » : la forme de sa matrice, et le message du jumeau quand le vecteur n'a
+  // qu'autant de nombres que la matrice a de lignes.
+  const lignes = MATRICE_DU_PARI.length;
+  const colonnes = MATRICE_DU_PARI[0].length;
+  let message = '';
+  try {
+    matriceFoisVecteur(MATRICE_DU_PARI, new Array(lignes).fill(1));
+  } catch (e) {
+    message = e.message;
+  }
+  exiger(message !== '', `la matrice du pari accepte un vecteur de ${lignes} nombres`);
+  return { lignes: nombre(lignes), colonnes: nombre(colonnes), message: typographier(`« ${message} »`) };
+})();
+
+export const COUCHE = (() => {
+  // Une matrice carrée d'une couche de ton IA : dim lignes et dim colonnes.
+  const dim = PRESETS_FORGE.tres_grand.dim;
+  return { dim: nombre(dim), poids: nombre(dim * dim) };
+})();
+
+export const CHAINE = faitsChaine(attendus.chaine);
+
+export const SOFTMAX = tableauSoftmax(attendus.softmax);
+
+export const SCORES = (() => {
+  // « 2 pour « fer », 1 pour « métal » et 0,1 pour « feu » » : les scores de la section softmax.
+  const scores = attendus.softmax[0].scores;
+  return typographier(enumerer(EXEMPLE_COMPTES.map(([nom], i) => `${ecrireReglage(scores[i])} pour « ${nom} »`)));
+})();
+
+export const [MOT_FORT, MOT_FAIBLE] = [EXEMPLE_COMPTES[0][0], EXEMPLE_COMPTES.at(-1)[0]];
+
+export const MINI = etatInitial('complet');
+
+export const V = MINI.tailleVocabulaire;
+
+export const ERREUR = (() => {
+  // Le pari « erreur » : p = 1/V et son erreur, la valeur du Python à trois décimales. Le texte dit
+  // aussi qu'avant tout entraînement, l'erreur du mini-modèle est proche de ln V.
+  const choix = choixErreur(attendus.erreur, V);
+  exiger(
+    Math.abs(MINI.perteValidation - MINI.perteHasard) < ECART_DEPART_MAX,
+    'l’erreur de départ du mini-modèle n’est plus proche de ln V',
+  );
+  return { p: choix[0].texte, erreur: choix.find((c) => c.juste).texte };
+})();
+
+export const SOURCES_LABO = (() => {
+  // Les sources de l'encadré de l'étape 8, avec la date où chacune a été lue.
+  const vers = (s) => ({ titre: s.titre, url: s.url, verifieLe: s.releveLe });
+  return [
+    ...SOURCES_FORMULES.operations.map(vers),
+    vers(modelePublic('llama-3-405b').source),
+    {
+      titre: 'Meta, llama-models, code de référence de Llama 3 (models/llama3/model.py, classe Attention)',
+      url: 'https://github.com/meta-llama/llama-models/blob/main/models/llama3/model.py',
+      verifieLe: '2026-11-05',
+    },
+  ];
+})();
+
+export const LLAMA = (() => {
+  // Llama 3 405B : 6 × N × D, et ses matrices de dim lignes et dim colonnes (code de référence de
+  // Meta : wq va de dim à têtes × (dim ÷ têtes) = dim nombres).
+  const m = modelePublic('llama-3-405b');
+  const operations = 6 * m.parametres * m.jetonsOrigine;
+  // Ce que Meta annonce pour cet entraînement (article de Llama 3, section 1) : 3,8 × 10²⁵.
+  const annonce = { mantisse: 3.8, exposant: 25 };
+  exiger(
+    Math.abs(operations / (annonce.mantisse * 10 ** annonce.exposant) - 1) < 0.02,
+    '6 × N × D ne tombe plus sur les 3,8 × 10²⁵ opérations annoncées par Meta',
+  );
+  const [mantisse, exposant] = operations.toExponential(2).split('e');
+  const chiffres = mantisse.replace('.', '');
+  const poidsMatrice = m.dim * m.dim;
+  const part = poidsMatrice / PRESETS_FORGE.tres_grand.parametres;
+  exiger(part > 0.5 && part < 1, 'une matrice de Llama 3 405B ne fait plus entre la moitié et la totalité de ton IA');
+  exiger(m.dim % m.tetes === 0, 'la dimension de Llama 3 405B ne se partage plus entre ses têtes');
+  return {
+    parametres: formaterQuantite(m.parametres),
+    jetons: formaterQuantite(m.jetonsOrigine),
+    operations: formaterPuissanceDeDix(operations),
+    enChiffres: `${chiffres} suivi de ${Number(exposant) - (chiffres.length - 1)} zéros`,
+    annonce: `${nombre(annonce.mantisse, 1)}\u202F×\u202F${dixPuissance(annonce.exposant)}`,
+    dim: nombre(m.dim),
+    couches: nombre(m.couches),
+    poidsMatrice: formaterQuantite(poidsMatrice),
+  };
+})();
 
 export const A = ecrireVecteur(A_DEPART);
 
@@ -106,7 +240,7 @@ export const PENTE_ZERO = (() => {
   const { x, exacte, approchee } = attendus.pente;
   exiger(x === X_DU_PARI_PENTE && exacte === pente(x), 'la section « pente » des attendus ne parle plus de la pente en x = 0');
   exiger(Math.abs(approchee - exacte) < 1e-6, 'la pente approchée des attendus s’éloigne de la pente exacte');
-  return { x: ecrireNombre(x), exacte: ecrireNombre(exacte), approchee: ecrireNombre(approchee, 9) };
+  return { x: ecrireNombre(x), exacte: ecrireNombre(exacte), approchee: ecrireApprochee(approchee, exacte) };
 })();
 
 export const PREMIER_PAS = (() => {
@@ -143,11 +277,6 @@ export const GRAND = (() => {
     hausse: pourcent(facteur - 1),
   };
 })();
-
-export const enumerer = (morceaux) => {
-  // « a, b et c » : une énumération à la française.
-  return morceaux.length < 2 ? morceaux.join('') : `${morceaux.slice(0, -1).join(', ')} et ${morceaux.at(-1)}`;
-};
 
 export const TIRAGE = (() => {
   // Les comptes de l'exemple, leurs probabilités, et où chaque mot se range entre 0 et 1.
@@ -201,16 +330,21 @@ export const LOI = (() => {
     return { n, tire, attendu, ecart: Math.abs(tire - attendu) };
   });
   const [peu, beaucoup] = faits;
+  exiger(peu.ecart > 0, `sur ${peu.n} tirages, « ${nom} » sort exactement autant de fois qu’attendu`);
   exiger(beaucoup.ecart / beaucoup.n < peu.ecart / peu.n, `la part de « ${nom} » ne se rapproche pas de sa probabilité`);
+  // « tout près » : à moins d'un point de pourcentage de la probabilité.
+  exiger(beaucoup.ecart / beaucoup.n < 0.01, `sur ${beaucoup.n} tirages, la part de « ${nom} » n’est pas tout près de sa probabilité`);
   exiger(beaucoup.ecart > peu.ecart, `l’écart en nombre de tirages ne grandit pas avec le nombre de tirages`);
-  return faits.map(({ n, tire, ecart }) => ({
+  return faits.map(({ n, tire, attendu, ecart }) => ({
     n: nombre(n),
+    tire: nombre(tire),
+    attendu: nombre(attendu),
     part: pourcent(tire / n, Math.max(0, String(n).length - 3)),
     ecart: nombre(ecart),
   }));
 })();
 
-{/* L'ouverture du chapitre, « (3, 1) · (1, 2) = 5 » : tâche 7. */}
+<OuvertureProduitScalaire />
 
 <Etape numero={1} titre="Des nombres en colonne : les vecteurs">
 
@@ -259,11 +393,55 @@ La somme, en pointillé, arrive au même endroit que b posé au bout de a.
 
 </Etape>
 
-{/* L'étape 2, « Les matrices : beaucoup de produits scalaires », et son pari « formes » : tâche 7. */}
+<Etape numero={2} titre="Les matrices : beaucoup de produits scalaires">
+
+Une matrice est un tableau de nombres, rangés en lignes et en colonnes. Prends celle de {MATRICE.lignes} lignes et {MATRICE.colonnes} colonnes dont les lignes sont {MATRICE.enLignes}. En Python, on l'écrit comme la liste de ses lignes : <code class="insecable">{MATRICE.python}</code>.
+
+Multiplier une matrice par un vecteur, c'est faire un produit scalaire par ligne : chaque ligne de la matrice, fois le vecteur, donne une case du résultat.
+
+<TableauCalcul
+  test="matrice-exemple"
+  legende={`La matrice fois le vecteur ${MATRICE.vecteur}, ligne par ligne :`}
+  colonnes={['Ligne', `Produit scalaire avec ${MATRICE.vecteur}`, 'Case']}
+  lignes={tableauMatrice(MATRICE_EXEMPLE, VECTEUR_EXEMPLE)}
+  nombres={[2]}
+/>
+
+Le résultat est le vecteur {MATRICE.resultat} : autant de cases que la matrice a de lignes.
+
+<Pari
+  id="formes"
+  question={`Une matrice de ${FORMES.lignes} lignes et ${FORMES.colonnes} colonnes multiplie un vecteur. Combien de nombres ce vecteur doit-il avoir ?`}
+  choix={choixFormeMatrice()}
+  acquis="matrices"
+>
+
+Chaque ligne de la matrice fait un produit scalaire avec le vecteur. Une ligne a {FORMES.colonnes} nombres, un par colonne : le vecteur doit en avoir autant, {FORMES.colonnes}. Le résultat, lui, a une case par ligne, donc {FORMES.lignes} nombres. Avec un vecteur de {FORMES.lignes} nombres, le programme refuse : {FORMES.message}
+
+</Pari>
+
+<CodeExplique fichier="projets/0.2-maths/maths_utiles/vecteurs.py" region="matrice">
+  <li data-lignes="1-4">`matrice_fois_vecteur` reçoit une matrice, écrite comme une liste de lignes (`list[list[float]]`), et un vecteur. Elle rend un vecteur.</li>
+  <li data-lignes="10-11">Le résultat part d'une liste vide, et la boucle prend les lignes de la matrice une à une.</li>
+  <li data-lignes="12-17">Une ligne qui n'a pas autant de nombres que le vecteur arrête le calcul, avec un message en français. `quantite`, définie plus haut dans le fichier, met « colonne » et « nombre » au pluriel quand il le faut.</li>
+  <li data-lignes="18">Chaque ligne, fois le vecteur : le `produit_scalaire` de l'étape 1. Il devient la case suivante du résultat.</li>
+</CodeExplique>
+
+Dans chaque couche de ton IA, une matrice de {COUCHE.dim} lignes et {COUCHE.dim} colonnes change un vecteur de {COUCHE.dim} nombres en un autre vecteur de {COUCHE.dim} nombres : {COUCHE.dim} produits scalaires d'un coup. À elle seule, cette matrice compte {COUCHE.poids} poids. Au chapitre 0.4, un atelier te fera manipuler ces formes : ce qui se multiplie avec quoi, et ce qui en sort.
+
+<Fragment slot="note">
+
+Le nombre de lignes, puis le nombre de colonnes : c'est la forme de la matrice. Celle de l'exemple est une matrice <span class="formule">{MATRICE.lignes} × {MATRICE.colonnes}</span>.
+
+Un vecteur peut se voir comme une matrice d'une seule colonne : c'est pour cela qu'on parle de nombres « en colonne ».
+
+</Fragment>
+
+</Etape>
 
 <Etape numero={3} titre="La pente">
 
-Une IA apprend en réglant ses poids, des nombres qu'elle ajuste pour faire baisser son erreur. Prends un seul poids, x, et une erreur toute simple, qui vaut (x − 3)² + 1. Cette erreur est la plus basse en x = {ecrireNombre(FOND)}, où elle vaut {ecrireNombre(erreur(FOND))} : c'est le fond. Mais l'IA ne voit pas la courbe en entier. Elle ne connaît que sa position, et la pente sous ses pieds.
+Une IA apprend en réglant ses poids, des nombres qu'elle ajuste pour faire baisser son erreur. Prends un seul poids, x, et une erreur toute simple, qui vaut <span class="formule">(x − 3)² + 1</span>. Cette erreur est la plus basse en x = {ecrireNombre(FOND)}, où elle vaut {ecrireNombre(erreur(FOND))} : c'est le fond. Mais l'IA ne voit pas la courbe en entier. Elle ne connaît que sa position, et la pente sous ses pieds.
 
 La pente dit à quelle vitesse l'erreur monte quand x avance vers la droite : c'est la montée de l'erreur sur un tout petit pas, divisée par la longueur de ce pas. Si l'erreur descend, la pente est négative.
 
@@ -276,7 +454,7 @@ La pente dit à quelle vitesse l'erreur monte quand x avance vers la droite : c'
   ouvre="descente"
 >
 
-En x = {PENTE_ZERO.x}, on est à gauche du fond : vers la droite, l'erreur descend, et la pente est négative. Pour cette erreur, la pente vaut 2 × (x − 3), soit {PENTE_ZERO.exacte} en x = {PENTE_ZERO.x}. Pour descendre, il faut donc aller du côté opposé au signe de la pente : ici, vers la droite. La figure juste en dessous est ouverte.
+En x = {PENTE_ZERO.x}, on est à gauche du fond : vers la droite, l'erreur descend, et la pente est négative. Pour cette erreur, la pente vaut <span class="formule">2 × (x − 3)</span>, soit {PENTE_ZERO.exacte} en x = {PENTE_ZERO.x}. Pour descendre, il faut donc aller du côté opposé au signe de la pente : ici, vers la droite. La figure juste en dessous est ouverte.
 
 </Pari>
 
@@ -311,14 +489,14 @@ La pente s'appelle aussi la dérivée. Avec plusieurs poids, la liste de toutes 
 
 <Etape numero={4} titre="Descendre la pente">
 
-Voici toute la règle : à chaque pas, x ← x − taux × pente(x). La flèche se lit « devient » : la nouvelle position est l'ancienne, moins le taux fois la pente. Une pente négative fait avancer x vers la droite, une pente positive le fait reculer, et le taux règle la longueur du pas.
+Voici toute la règle : à chaque pas, <span class="formule">x ← x − taux × pente(x)</span>. La flèche se lit « devient » : la nouvelle position est l'ancienne, moins le taux fois la pente. Une pente négative fait avancer x vers la droite, une pente positive le fait reculer, et le taux règle la longueur du pas.
 
-Au taux {PREMIER_PAS.taux}, depuis x = {PREMIER_PAS.x0}, la pente vaut {PREMIER_PAS.pente}, et x devient {PREMIER_PAS.x0} − {PREMIER_PAS.taux} × ({PREMIER_PAS.pente}) = {PREMIER_PAS.x1}. C'est exactement ce que fait le bouton « Un pas » de la figure, à l'étape 3.
+Au taux {PREMIER_PAS.taux}, depuis x = {PREMIER_PAS.x0}, la pente vaut {PREMIER_PAS.pente}, et x devient <span class="formule">{PREMIER_PAS.x0} − {PREMIER_PAS.taux} × ({PREMIER_PAS.pente}) = {PREMIER_PAS.x1}</span>. C'est exactement ce que fait le bouton « Un pas » de la figure, à l'étape 3.
 
 <CodeExplique fichier="projets/0.2-maths/maths_utiles/derivees.py" region="descendre">
   <li data-lignes="1-5">`descendre` reçoit le départ, le taux et un nombre de pas ; elle rend la liste des positions.</li>
   <li data-lignes="12-13">La liste commence par le départ.</li>
-  <li data-lignes="14-16">À chaque pas, la règle x ← x − taux × pente(x), puis la nouvelle position rejoint la liste. La boucle n'a pas besoin du numéro du pas : son nom est `_`.</li>
+  <li data-lignes="14-16">À chaque pas, la règle <span class="formule">x ← x − taux × pente(x)</span>, puis la nouvelle position rejoint la liste. La boucle n'a pas besoin du numéro du pas : son nom est `_`.</li>
 </CodeExplique>
 
 <Pari
@@ -328,7 +506,7 @@ Au taux {PREMIER_PAS.taux}, depuis x = {PREMIER_PAS.x0}, la pente vaut {PREMIER_
   choix={choixTauxMoitie()}
 >
 
-Au taux {MOITIE.taux}, x devient {PREMIER_PAS.x0} − {MOITIE.taux} × ({PREMIER_PAS.pente}) = {MOITIE.x1} : le premier pas tombe pile sur le fond. Un seul pas suffit. Ce taux convient exactement à cette courbe ; pour une vraie IA, personne ne connaît le bon taux à l'avance.
+Au taux {MOITIE.taux}, x devient <span class="formule">{PREMIER_PAS.x0} − {MOITIE.taux} × ({PREMIER_PAS.pente}) = {MOITIE.x1}</span> : le premier pas tombe pile sur le fond. Un seul pas suffit. Ce taux convient exactement à cette courbe ; pour une vraie IA, personne ne connaît le bon taux à l'avance.
 
 </Pari>
 
@@ -353,7 +531,36 @@ Ton IA apprend sur ce principe. À chaque pas d'entraînement, elle calcule la p
 
 </Etape>
 
-{/* L'étape 5, « La règle de la chaîne » : tâche 7. */}
+<Etape numero={5} titre="La règle de la chaîne">
+
+Une IA n'est pas une seule formule : c'est une longue chaîne d'opérations, chacune appliquée au résultat de la précédente. Pour descendre la pente, il lui faut pourtant la pente de toute la chaîne. La règle de la chaîne la donne, maillon par maillon.
+
+Prends <span class="formule">h(x) = (2x + 1)²</span>. Elle enchaîne deux opérations :
+
+- d'abord <span class="formule">f(x) = 2x + 1</span>, dont la pente vaut 2 partout ;
+- puis <span class="formule">g(u) = u²</span>, le carré du résultat u de f, dont la pente vaut 2u.
+
+La règle dit : la pente de h en x, c'est la pente de g en <span class="formule">u = f(x)</span>, multipliée par la pente de f. Quand x avance d'un tout petit pas, u avance 2 fois plus ; et quand u avance d'un tout petit pas, h avance 2u fois plus. Les deux effets se multiplient.
+
+En <span class="formule">x = {CHAINE.x}</span>, <span class="formule">u = 2 × {CHAINE.x} + 1 = {CHAINE.u}</span>, et <span class="formule">h = {CHAINE.u}² = {CHAINE.h}</span>. La pente de g en {CHAINE.u} vaut <span class="formule">2 × {CHAINE.u} = {CHAINE.penteExterieur}</span>, celle de f vaut {CHAINE.penteInterieur} : la pente de h en {CHAINE.x} vaut <span class="formule">{CHAINE.penteExterieur} × {CHAINE.penteInterieur} = {CHAINE.exacte}</span>. Mesurée sans formule, comme à l'étape 3, la pente approchée de Python vaut {CHAINE.approchee} : presque {CHAINE.exacte}.
+
+<CodeExplique fichier="projets/0.2-maths/maths_utiles/derivees.py" region="chaine">
+  <li data-lignes="1-3">`interieur` : f(x) = 2x + 1, l'opération du dedans.</li>
+  <li data-lignes="6-8">`exterieur` : g(u) = u², écrit comme une multiplication, u × u.</li>
+  <li data-lignes="11-13">`composee` : h(x) = g(f(x)). On calcule f d'abord, puis g sur son résultat.</li>
+  <li data-lignes="16-22">`pente_composee`, la règle de la chaîne : la pente de g en u, 2u, fois la pente de f, 2.</li>
+  <li data-lignes="25-35">`exemple_chaine` calcule tout en x = 1, et mesure aussi la pente avec `pente_approchee`, la fonction de l'étape 3, pour vérifier la règle.</li>
+</CodeExplique>
+
+Une IA enchaîne des centaines d'opérations, mais la règle reste la même : on multiplie les pentes, maillon par maillon. Au chapitre 0.5, elle servira à remonter l'erreur d'un petit réseau, de la sortie jusqu'à chacun de ses poids. Cette remontée s'appelle la rétropropagation ; c'est elle qui donne à ton IA la pente de son erreur pour chacun de ses poids.
+
+<Fragment slot="note">
+
+En maths, la pente d'une fonction f s'écrit souvent avec un prime : f′(x). La règle de la chaîne devient <span class="formule">h′(x) = g′(f(x)) × f′(x)</span>.
+
+</Fragment>
+
+</Etape>
 
 <Etape numero={6} titre="Les probabilités">
 
@@ -388,7 +595,9 @@ Le hasard d'un ordinateur est un calcul : on part d'un nombre, la graine, et cha
 
 Avec la graine {nombre(GRAINE_TIRAGE)}, « {PARI_TIRAGE.nom} » sort {PARI_TIRAGE.compte} fois sur {PARI_TIRAGE.n}. Une probabilité de {pourcent(PARI_TIRAGE.proba)} dit ce qui arrive en moyenne, pas à chaque fois : sur peu de tirages, la part de « {PARI_TIRAGE.nom} » s'en écarte beaucoup ; sur beaucoup de tirages, elle s'en rapproche.
 
-Dans la figure, avec la même graine, « {PARI_TIRAGE.nom} » fait {LOI[0].part} des tirages sur {LOI[0].n}, et {LOI[1].part} sur {LOI[1].n}. L'écart en nombre de tirages, lui, ne rétrécit pas : {LOI[0].ecart} sur {LOI[0].n}, {LOI[1].ecart} sur {LOI[1].n}. C'est la part qui se rapproche de la probabilité. Essaie : monte le nombre de tirages, puis change de graine.
+Dans la figure, avec la même graine, « {PARI_TIRAGE.nom} » sort {LOI[0].tire} fois sur {LOI[0].n} tirages, soit {LOI[0].part}, quand on l'attend {LOI[0].attendu} fois en moyenne. Sur {LOI[1].n} tirages, il sort {LOI[1].tire} fois, soit {LOI[1].part} : tout près des {pourcent(PARI_TIRAGE.proba)}. Pourtant, l'écart avec ce qu'on attend en moyenne, {LOI[1].attendu} fois, a grandi : {LOI[1].ecart} fois, contre {LOI[0].ecart} sur {LOI[0].n} tirages. Ce qui se rapproche de la probabilité, c'est la part : le nombre de sorties, divisé par le nombre de tirages.
+
+Essaie dans la figure : monte le nombre de tirages, puis change de graine.
 
 </Pari>
 
@@ -402,4 +611,98 @@ La graine fixe tous les tirages : même graine, mêmes comptes. C'est ce qui per
 
 </Etape>
 
-{/* Les étapes 7, « Des scores aux probabilités, et l'erreur », et 8, « À grande échelle » : tâche 7. */}
+<Etape numero={7} titre="Des scores aux probabilités, et l'erreur">
+
+À l'étape 6, les probabilités venaient de comptes. Un modèle de langage, lui, calcule un score pour chaque mot possible : un nombre quelconque, positif ou négatif, d'autant plus grand que le mot lui semble convenir. Il doit ensuite changer ces scores en probabilités : c'est le rôle de softmax.
+
+Softmax prend l'exponentielle de chaque score, notée exp. Une exponentielle est toujours positive, et grandit avec le score : le plus grand score garde la plus grande part. Softmax divise ensuite chaque exponentielle par leur somme, si bien que les probabilités font 1 ensemble.
+
+Avant l'exponentielle, les scores sont divisés par un réglage, la température. Sous 1, elle creuse les écarts entre les scores, et le meilleur mot sort plus souvent au tirage ; au-dessus de 1, elle les resserre, et le modèle ose des mots moins probables. Voici softmax pour les trois mots de l'étape 6. Leurs scores : {SCORES}.
+
+<TableauCalcul
+  test="softmax"
+  legende="Les probabilités de softmax, calculées par Python, à trois températures :"
+  colonnes={['Température', ...SOFTMAX.colonnes]}
+  lignes={SOFTMAX.lignes}
+  nombres={[0, 1, 2, 3]}
+/>
+
+Chaque ligne fait {pourcent(1)} : ce sont des probabilités. Plus la température monte, plus « {MOT_FORT} », le mot au plus grand score, perd de sa part, et plus « {MOT_FAIBLE} », celui au plus petit, en gagne.
+
+<CodeExplique fichier="projets/0.2-maths/maths_utiles/probabilites.py" region="softmax">
+  <li data-lignes="1-4">`softmax` reçoit les scores et une température, 1 par défaut. Elle rend une probabilité par score.</li>
+  <li data-lignes="11-15">Une température nulle ou négative n'a pas de sens : la fonction s'arrête, et dit quoi essayer.</li>
+  <li data-lignes="16-18">On retire d'abord le plus grand score à chacun. Les probabilités ne changent pas, car toutes les exponentielles sont divisées par le même nombre ; mais `exp` ne reçoit plus jamais de grand nombre, qui la ferait déborder.</li>
+  <li data-lignes="19-22">`math.exp` de chaque score, divisé par la température.</li>
+  <li data-lignes="23-26">Une boucle additionne les exponentielles, de gauche à droite, puis chacune est divisée par ce total.</li>
+</CodeExplique>
+
+Pour apprendre, le modèle mesure son erreur sur chaque prédiction. Si p est la probabilité qu'il donnait à la bonne réponse, son erreur vaut <span class="formule">−ln p</span>. Ici, ln est le logarithme naturel : <span class="formule">ln 1 = 0</span>, et <span class="formule">ln p</span> est négatif quand p est entre 0 et 1 ; le signe moins rend donc l'erreur positive. Sûr de la bonne réponse (<span class="formule">p = 1</span>), le modèle ne fait aucune erreur ; moins il lui donnait de chances, plus l'erreur est grande.
+
+<Pari
+  id="erreur"
+  question={`Si le modèle ne donne qu'une chance sur ${V} à la bonne lettre, son erreur vaut…`}
+  precision="L'erreur vaut −ln p, où p est la chance donnée à la bonne réponse."
+  choix={choixErreur(attendus.erreur, V)}
+  acquis="erreur"
+>
+
+Une chance sur {V}, c'est <span class="formule">p = 1 ÷ {V} = {ERREUR.p}</span>. L'erreur vaut <span class="formule">−ln {ERREUR.p}</span>, c'est-à-dire <span class="formule">ln {V}</span> : environ {ERREUR.erreur}. Ce n'est ni la chance, ni le nombre de caractères. Le logarithme grandit lentement : diviser la chance par {V} ajoute toujours <span class="formule">ln {V}</span> à l'erreur, quelle que soit la chance de départ.
+
+</Pari>
+
+<TableauCalcul
+  test="erreurs"
+  legende="L’erreur −ln p, calculée par Python, selon la chance p donnée à la bonne réponse :"
+  colonnes={['p', 'Une chance sur', 'Erreur −ln p']}
+  lignes={tableauErreur(attendus.erreur)}
+  nombres={[0, 1, 2]}
+/>
+
+La dernière ligne est l'erreur de départ d'un modèle qui devine au hasard parmi {V} caractères, comme le mini-modèle qui invente des prénoms au chapitre 0.5. Avant tout entraînement, il donne à peu près une chance sur {V} à chaque caractère, et son erreur est proche de <span class="formule">ln {V}</span>. Apprendre, pour lui, c'est faire baisser ce nombre.
+
+<CodeExplique fichier="projets/0.2-maths/maths_utiles/probabilites.py" region="erreur-de-prediction">
+  <li data-lignes="1">`erreur_de_prediction` reçoit p, la probabilité donnée à la bonne réponse, et rend l'erreur.</li>
+  <li data-lignes="8-12">p doit être plus grand que 0, et au plus 1 : ln 0 n'existe pas.</li>
+  <li data-lignes="13">`math.log` est le logarithme naturel, ln. Le signe moins rend l'erreur positive.</li>
+</CodeExplique>
+
+<Fragment slot="note">
+
+Cette erreur s'appelle l'entropie croisée. C'est elle que ton IA fait baisser pendant son entraînement : la moyenne de <span class="formule">−ln p</span> sur tous les morceaux de texte qu'elle doit deviner.
+
+Le logarithme et l'exponentielle se défont l'un l'autre : <span class="formule">ln(exp(y)) = y</span>.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={8} titre="À grande échelle">
+
+Pour l'essentiel, ton IA fait les calculs de ce chapitre : des produits scalaires, rangés en matrices ; softmax, pour donner une probabilité à chaque morceau de texte qui pourrait suivre ; puis, pour apprendre, une pente par poids et un pas pour descendre. Les plus grands modèles aussi. Seule l'échelle change.
+
+<EncadreLabo sources={SOURCES_LABO}>
+
+Pour entraîner un modèle de N poids sur D morceaux de texte, il faut environ <span class="formule">6 × N × D</span> opérations. Pour chaque morceau de texte, la prédiction coûte à peu près 2 opérations par poids, une multiplication et une addition, comme dans un produit scalaire ; remonter l'erreur jusqu'aux pentes en coûte environ deux fois plus.
+
+Llama 3 405B, de Meta, a {LLAMA.parametres} de poids, entraînés sur {LLAMA.jetons} de morceaux de texte : <span class="formule">6 × N × D</span> en fait <span class="formule">{LLAMA.operations}</span> opérations, environ un {LLAMA.enChiffres}. Meta annonce <span class="formule">{LLAMA.annonce}</span> dans son article.
+
+Un morceau de texte y est un vecteur de {LLAMA.dim} nombres, et chacune de ses {LLAMA.couches} couches contient des matrices de {LLAMA.dim} lignes et {LLAMA.dim} colonnes : {LLAMA.poidsMatrice} de poids pour une seule d'entre elles, plus de la moitié de ton IA tout entière.
+
+</EncadreLabo>
+
+Le projet complet (les fonctions, leurs tests, et les valeurs de référence calculées par Python) est sur GitHub, avec un notebook à ouvrir dans Colab :
+
+<LiensProjet projet="0.2-maths" />
+
+### À suivre
+
+Tu as les outils : vecteurs, matrices, pentes et probabilités. Pour les faire tourner sur des millions de poids, il faut une bibliothèque faite pour cela, PyTorch, et un ordinateur prêt à s'en servir. Le chapitre 0.3 prépare ton poste : Python, uv, PyTorch, et la carte graphique si tu en as une.
+
+<Fragment slot="note">
+
+Une opération, ici, c'est une addition ou une multiplication de deux nombres à virgule.
+
+</Fragment>
+
+</Etape>

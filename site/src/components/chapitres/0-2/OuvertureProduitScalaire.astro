@@ -1,0 +1,112 @@
+---
+// L'ouverture du chapitre 0.2 : « (3, 1) · (1, 2) = 5 », le produit scalaire
+// des deux vecteurs que la figure de l'étape 1 montre à l'arrivée. Tout est
+// calculé à la construction par le jumeau du Python (maths.ts, paris-0-2.ts) :
+// la page arrive prête, sans script. Puis la phrase du chapitre : ton IA ne
+// fait rien d'autre que ces calculs-là, des milliards de fois.
+//
+// Le calcul en grand est caché aux lecteurs d'écran (des parenthèses et des
+// points isolés s'écoutent mal) : la légende le redit en entier. Sous chaque
+// vecteur, son nom (a, b), comme dans la figure : écrit par le CSS, il n'entre
+// pas dans le texte du calcul.
+import { produitScalaire } from '../../../lib/partie-0/maths';
+import { A_DEPART, B_DEPART, ecrireNombre, ecrireVecteur, texteScalaire } from '../../../lib/partie-0/paris-0-2';
+import { typographier } from '../../../lib/typo';
+
+// Le calcul en grand s'écrit comme texteOuverture() : le parcours du chapitre compare les deux.
+const a = ecrireVecteur(A_DEPART);
+const b = ecrireVecteur(B_DEPART);
+const resultat = ecrireNombre(produitScalaire(A_DEPART, B_DEPART));
+// « 3 × 1 + 1 × 2 = 5 » : le texte de la figure, sans son « a · b = ».
+const termes = texteScalaire(A_DEPART, B_DEPART).replace(/^a · b = /, '');
+const legende = typographier(
+  `${a} · ${b} = ${termes} : le produit scalaire de deux vecteurs, leurs nombres multipliés deux à deux, ` +
+    'puis additionnés.',
+);
+const constat = typographier(
+  'Des vecteurs, des matrices, des pentes et des probabilités : ton IA ne fait rien d’autre, des milliards de fois. ' +
+    'À la fin de ce chapitre, tu sauras faire chacun de ces calculs, et tu sauras à quoi il lui sert.',
+);
+---
+
+<figure class="ouverture-scalaire" data-test="ouverture">
+  <p class="calcul" data-test="ouverture-calcul" aria-hidden="true"><span class="vecteur a">{a}</span> · <span class="vecteur b">{b}</span> = <span class="resultat">{resultat}</span></p>
+  <figcaption>{legende}</figcaption>
+  <p class="constat">{constat}</p>
+</figure>
+
+<style>
+  .ouverture-scalaire {
+    margin: 40px 0 0;
+  }
+
+  /* Le calcul en grand, dans la police du texte, comme une formule de livre. */
+  .calcul {
+    margin: 0;
+    font-size: 40px;
+    line-height: 1.2;
+    font-variation-settings: 'opsz' 48;
+    font-variant-numeric: lining-nums;
+    padding-bottom: 22px; /* la place des noms a et b, sous les vecteurs */
+  }
+
+  /* Chaque vecteur souligné de sa teinte, comme les mots de l'ouverture de 0.1,
+     avec son nom en italique dessous, comme dans la figure. */
+  .vecteur {
+    position: relative;
+    display: inline-block;
+    white-space: nowrap;
+    padding: 0 2px;
+    border-bottom: 3px solid var(--teinte-a-trait);
+    line-height: 1.15;
+  }
+
+  .vecteur.b {
+    border-bottom-color: var(--teinte-b-trait);
+  }
+
+  .vecteur::after {
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    margin-top: 4px;
+    font-size: 20px;
+    font-style: italic;
+    line-height: 1;
+    color: var(--indigo-doux);
+  }
+
+  .vecteur.a::after {
+    content: 'a';
+  }
+
+  .vecteur.b::after {
+    content: 'b';
+  }
+
+  .resultat {
+    font-weight: 600;
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 15px;
+    color: var(--indigo-doux);
+    margin-top: 6px;
+  }
+
+  .constat {
+    margin: 18px 0 0;
+  }
+
+  @media (max-width: 720px) {
+    .calcul {
+      font-size: 30px;
+    }
+
+    .vecteur::after {
+      font-size: 17px;
+    }
+  }
+</style>
