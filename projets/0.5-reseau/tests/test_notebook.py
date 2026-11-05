@@ -31,8 +31,8 @@ from premier_reseau.a_la_main import (
 )
 from premier_reseau.attendus import CHEMIN_ATTENDUS
 from premier_reseau.avec_pytorch import construire, gradients_pytorch, plus_grand_ecart
-from premier_reseau.neurone import POINTS, PORTES, bien_classes, meilleur_reglage, sortie_seuil
-from premier_reseau.nombres import en_francais, en_puissance_de_dix
+from premier_reseau.neurone import GRILLE, POINTS, PORTES, bien_classes, meilleur_reglage, sortie_seuil
+from premier_reseau.nombres import en_francais, en_puissance_de_dix, simple_en_francais
 
 RACINE = pathlib.Path(__file__).resolve().parents[3]
 NOTEBOOK = RACINE / "notebooks" / "0.5-reseau.ipynb"
@@ -73,9 +73,14 @@ def lignes_attendues() -> list[str]:
     """Les lignes que le notebook doit afficher, tirées du paquet."""
     lignes = [f"{x}\u202f: le neurone répond {sortie_seuil((1.0, 1.0), -1.5, x)}\n" for x in POINTS]
     lignes.append(f"Points bien classés pour la porte ET\u202f: {bien_classes((1.0, 1.0), -1.5, 'et')} sur 4\n")
+    # La grille et le meilleur réglage de chaque porte, à la française (virgule décimale, signe moins).
+    debut, fin = simple_en_francais(GRILLE[0]), simple_en_francais(GRILLE[-1])
+    pas = simple_en_francais(GRILLE[1] - GRILLE[0])
+    lignes.append(f"{len(GRILLE) ** 3} réglages essayés, avec w1, w2 et b de {debut} à {fin}, par pas de {pas}\n")
     for porte in PORTES:
-        compte, poids, biais = meilleur_reglage(porte)
-        lignes.append(f"{porte}\u202f: {compte} points sur 4 au mieux, avec les poids {poids} et le biais {biais}\n")
+        compte, (w1, w2), b = meilleur_reglage(porte)
+        reglage = f"w1 = {simple_en_francais(w1)}, w2 = {simple_en_francais(w2)} et b = {simple_en_francais(b)}"
+        lignes.append(f"{porte.replace('_', ' ')}\u202f: {compte} points sur 4 au mieux, avec {reglage}\n")
     depart = initialiser(GRAINE)
     lignes.append(f"{nb_poids(depart)} poids, tirés au hasard avec la graine {GRAINE}\u202f:\n")
     historique = entrainer(depart, DONNEES, TAUX, NB_PAS)
@@ -123,31 +128,35 @@ def test_notebook_s_execute_de_bout_en_bout():
     assert sorties.rstrip("\n").splitlines()[-1] == attendue
 
 
-def test_la_correction_de_l_exercice_reussit_le_defi():
+def sortie_de(cellule) -> str:
+    """Le texte affiché par une seule cellule de code."""
+    return "".join(o.get("text", "") for o in cellule.get("outputs", []))
+
+
+def test_l_exercice_juge_la_correction_et_une_mauvaise_reponse():
     # La correction repliée est du texte : on recopie sa ligne dans la cellule de
     # l'exercice, à la place de celle du lecteur, et on vérifie qu'elle relève le défi.
+    # Une mauvaise réponse, elle, ne le relève pas : la même cellule, avec True, est
+    # ajoutée à la fin du carnet, et passe dans la même exécution (une seule exécution du
+    # carnet pour les deux réponses).
     nb = nbformat.read(NOTEBOOK, as_version=4)
     correction = next(c for c in nb.cells if c.cell_type == "markdown" and "<details>" in c.source)
     reponse = correction.source.split("```python\n", 1)[1].split("```", 1)[0].strip()
     assert reponse == "ma_reponse = False"
     exercice = next(c for c in nb.cells if c.cell_type == "code" and "Défi réussi" in c.source)
     assert exercice.source.count(REPONSE) == 1
+    mauvaise = nbformat.v4.new_code_cell(exercice.source.replace(REPONSE, "ma_reponse = True"))
     exercice.source = exercice.source.replace(REPONSE, reponse)
-    sorties = executer(nb)
+    nb.cells.append(mauvaise)
+    executer(nb)
+    juste, faux = sortie_de(exercice), sortie_de(mauvaise)
     # Un seul neurone caché coupe le plan par une seule droite : 3 points sur 4 au mieux, quelle que soit la graine.
-    assert "Défi réussi\u202f: avec un seul neurone caché, le réseau classe au mieux " in sorties
-    meilleur = int(sorties.split("le réseau classe au mieux ", 1)[1].split(" ", 1)[0])
+    assert "Défi réussi\u202f: avec un seul neurone caché, le réseau classe au mieux " in juste
+    meilleur = int(juste.split("le réseau classe au mieux ", 1)[1].split(" ", 1)[0])
     assert meilleur <= 3
-    assert "Pas encore" not in sorties
-
-
-def test_une_mauvaise_reponse_ne_releve_pas_le_defi():
-    nb = nbformat.read(NOTEBOOK, as_version=4)
-    exercice = next(c for c in nb.cells if c.cell_type == "code" and "Défi réussi" in c.source)
-    exercice.source = exercice.source.replace(REPONSE, "ma_reponse = True")
-    sorties = executer(nb)
-    assert "Pas encore. Avec un seul neurone caché, le réseau classe au mieux " in sorties
-    assert "Défi réussi" not in sorties
+    assert "Pas encore" not in juste
+    assert "Pas encore. Avec un seul neurone caché, le réseau classe au mieux " in faux
+    assert "Défi réussi" not in faux
 
 
 def test_notebook_sans_installation_de_torch_ni_api_recente():
