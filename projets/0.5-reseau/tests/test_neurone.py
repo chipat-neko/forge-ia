@@ -12,7 +12,7 @@ def test_meilleurs_reglages():
 
 def test_sortie_seuil():
     assert sortie_seuil((1.0, 1.0), -1.5, (1, 1)) == 1 and sortie_seuil((1.0, 1.0), -1.5, (1, 0)) == 0
-    # Une somme nulle n'est pas positive : le neurone répond 0.
+    # Une somme nulle ne dépasse pas 0 : le neurone répond 0.
     assert sortie_seuil((1.0, 1.0), -1.0, (1, 0)) == 0
 
 

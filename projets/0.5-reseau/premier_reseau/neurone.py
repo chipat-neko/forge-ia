@@ -1,7 +1,7 @@
 """Un neurone à seuil, et les portes logiques ET, OU et OU exclusif.
 
 Le neurone reçoit deux entrées, x1 et x2, qui valent 0 ou 1. Il fait la somme
-pondérée w1 × x1 + w2 × x2 + b, et répond 1 si elle est positive, 0 sinon.
+pondérée w1 × x1 + w2 × x2 + b, et répond 1 si elle dépasse 0, 0 sinon.
 Ses trois réglages, les poids w1 et w2 et le biais b, sont cherchés ici sur
 une grille de −2 à 2, par pas de 0,5 : 9 × 9 × 9 = 729 réglages.
 
@@ -26,7 +26,7 @@ GRILLE = [-2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0]
 
 
 def sortie_seuil(poids: tuple[float, float], biais: float, x: tuple[int, int]) -> int:
-    """La réponse du neurone : 1 si la somme pondérée est positive, 0 sinon."""
+    """La réponse du neurone : 1 si la somme pondérée dépasse 0, 0 sinon."""
     return 1 if poids[0] * x[0] + poids[1] * x[1] + biais > 0 else 0
 
 
