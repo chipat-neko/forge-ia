@@ -6,8 +6,11 @@
 // font tomber chaque garde.
 
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Choix } from '../choix';
+import { extraireRegion } from '../regions';
+import { lireMesures, type MesuresChrono } from './mesures';
 import { bienClasses, GRILLE, meilleurReglage, POINTS, PORTES } from './neurone';
 import {
   bornesPredictions,
@@ -23,6 +26,7 @@ import {
   nbCoinces,
   P_DU_PARI,
   phraseDurees,
+  renvoiAuxPetitesMatrices,
   questionCoince,
   questionExact,
   questionGradient,
@@ -206,8 +210,10 @@ ${ligne(TROIS_MILLE, 'le processeur', 'cpu', '439')}après
     expect(SEUIL_PLUS_LENTE).toBe(1.1);
     expect(phraseDurees(processeur, carte)).toBe(
       `Pour les mêmes ${TROIS_MILLE} pas, la carte a mis 2${FINE}307${INSECABLE}ms, et le processeur 439${INSECABLE}ms${FINE}: ici, la carte est la plus lente. ` +
-        `Ce petit réseau ne fait que de tout petits calculs${FINE}: comme pour les petites matrices du chapitre 0.4, ` +
-        'le prix fixe de chacun sur la carte dépasse le calcul lui-même.',
+        'Comme sur les petites matrices du chapitre 0.4, c’est surtout que ce petit réseau ne fait que de tout petits calculs' +
+        `${FINE}: le prix pour envoyer chacun à la carte dépasse le calcul lui-même. ` +
+        'Les deux chronos comptent aussi le premier pas, qui prépare le calcul, alors que le chronomètre du chapitre 0.4 ' +
+        'écarte ses premiers tours.',
     );
   });
 
@@ -219,6 +225,38 @@ ${ligne(TROIS_MILLE, 'le processeur', 'cpu', '439')}après
     expect(() => phraseDurees(carte, processeur)).toThrow(/processeur.*carte/);
     const moinsDePas = dureeDeLaSortie(ligne(`2${FINE}000`, 'la carte graphique', 'cuda', '900'));
     expect(() => phraseDurees(processeur, moinsDePas)).toThrow(/mêmes pas/);
+  });
+
+  it('« les deux chronos comptent le premier pas » suit le code : 0.5 sans tour d’échauffement, 0.4 avec', () => {
+    const region = (fichier: string, nom: string) => extraireRegion(readFileSync(`../${fichier}`, 'utf8'), nom, fichier);
+    const boucle = region('projets/0.5-reseau/premier_reseau/avec_pytorch.py', 'entrainer-pytorch');
+    // Le chronomètre part juste avant la boucle des pas : le premier pas est chronométré, sur les deux appareils.
+    expect(boucle).toMatch(/debut = time\.perf_counter\(\)\n\s+for _ in range\(nb_pas\):/);
+    expect(boucle).not.toMatch(/chauffement/);
+    const chrono = region('projets/0.4-tenseurs/tenseurs/chrono.py', 'chrono');
+    expect(chrono).toContain('if tour >= echauffement:');
+  });
+
+  it('le renvoi aux petites matrices du chapitre 0.4 : son message nomme la phrase de l’étape 8', () => {
+    const mesures = (appareil: 'cpu' | 'cuda', ms: Record<number, number>): MesuresChrono => ({
+      version: 1,
+      releve_le: '2026-11-05',
+      appareil,
+      nom: appareil === 'cpu' ? 'Processeur d’essai' : 'Carte d’essai',
+      torch: '2.15.0+cu132',
+      fils_par_defaut: 8,
+      fils_max: 16,
+      mesures: Object.entries(ms).map(([t, millisecondes]) => ({ taille: Number(t), fils: appareil === 'cpu' ? 8 : null, millisecondes })),
+      transfert_ms: appareil === 'cpu' ? null : Object.fromEntries(Object.keys(ms).map((t) => [t, 1])),
+    });
+    const cpu = mesures('cpu', { 64: 0.0058, 256: 0.07 });
+    expect(() => renvoiAuxPetitesMatrices(cpu, mesures('cuda', { 64: 0.019, 256: 0.0216 }))).not.toThrow();
+    // La carte gagne au plus petit produit : l'explication de 0.4 tombe, et le message dit aussi ce qu'il faut revoir en 0.5.
+    expect(() => renvoiAuxPetitesMatrices(cpu, mesures('cuda', { 64: 0.004, 256: 0.005 }))).toThrow(
+      /phrase des durées de l’étape 8.*petites matrices du chapitre 0\.4.*acquis « petite »/,
+    );
+    // Les vrais fichiers de 0.4 : le renvoi tient.
+    expect(() => renvoiAuxPetitesMatrices(lireMesures('processeur', resolve('..'))!, lireMesures('rtx-5070-ti', resolve('..'))!)).not.toThrow();
   });
 
   it('les vraies sorties : celle du processeur, puis celle de la carte, relevées carte au repos', () => {

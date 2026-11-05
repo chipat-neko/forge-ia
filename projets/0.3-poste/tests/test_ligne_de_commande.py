@@ -11,7 +11,7 @@ from dataclasses import replace
 import pytest
 
 from poste import __main__ as ligne_de_commande
-from poste.diagnostic import SITUATIONS
+from poste.diagnostic import SITUATIONS, decrire_constat, diagnostiquer
 
 PROJET = pathlib.Path(__file__).resolve().parents[1]
 DERNIERE_LIGNE = re.compile(r"^Diagnostic terminé\u202f: (\d+) problème\(s\)\.$")
@@ -43,6 +43,32 @@ def test_sortie_processeur_enregistree_en_detail():
     assert "attention\u202f: Une carte NVIDIA est là" in texte
     assert "PyTorch\u202f: 2.15.0+cpu" in texte
     assert "processeur (cpu)\u202f:" in texte
+    assert lignes[-1] == "Diagnostic terminé\u202f: 0 problème(s)."
+
+
+def test_sortie_carte_enregistree():
+    """La sortie relevée sur la RTX 5070 Ti, avec la roue gpu, à la porte de la Partie 0 : le test ne fait
+    que lire le fichier, et tourne donc sans carte. Si le texte du diagnostic change, il échoue : la
+    sortie est à relever de nouveau, carte au repos."""
+    octets = (PROJET / "sorties" / "rtx-5070-ti.txt").read_bytes()
+    assert b"\r" not in octets and octets.endswith(b".\n")
+    lignes = octets.decode("utf-8").splitlines()
+    assert re.fullmatch(r"# relevé le \d{4}-\d{2}-\d{2}", lignes[0])
+    datetime.date.fromisoformat(lignes[0].removeprefix("# relevé le "))
+    texte = "\n".join(lignes)
+    assert "PyTorch\u202f: 2.15.0+cu132" in texte
+    # La carte est prête, et seuls les fils restent en « attention » : les constats d'aujourd'hui, mot pour mot.
+    prete = diagnostiquer(SITUATIONS["windows_cu132_rtx5070ti"])
+    assert [c.cle for c in prete] == ["carte_prete"]
+    fils = [c for c in diagnostiquer(SITUATIONS["fils_par_defaut"]) if c.cle == "fils"]
+    assert len(fils) == 1
+    for constat in (*prete, *fils):
+        for ligne in decrire_constat(constat):
+            assert ligne in lignes, ligne
+    assert "Une carte NVIDIA est là" not in texte
+    # L'essai de calcul a tourné sur le processeur, puis sur la carte.
+    assert any(ligne.startswith("  processeur (cpu)\u202f: ") for ligne in lignes)
+    assert any(ligne.startswith("  carte graphique (cuda)\u202f: ") for ligne in lignes)
     assert lignes[-1] == "Diagnostic terminé\u202f: 0 problème(s)."
 
 

@@ -17,6 +17,7 @@ from premier_reseau.nombres import EXPOSANTS, en_francais, simple_en_francais
 
 PROJET = pathlib.Path(__file__).resolve().parents[1]
 SORTIE_PROCESSEUR = PROJET / "sorties" / "processeur.txt"
+SORTIE_CARTE = PROJET / "sorties" / "rtx-5070-ti.txt"
 NOMBRE = r"[0-9\u202f]+(?:,[0-9]+)?"
 PUISSANCE = r"(?:0|[0-9],[0-9] × 10[⁻⁰¹²³⁴⁵⁶⁷⁸⁹]+)"
 
@@ -191,3 +192,23 @@ def test_sortie_processeur_enregistree():
     version = re.fullmatch(r"Le même réseau dans PyTorch (2\.15\.0\+\w+), .*", partie[0])
     assert version, partie[0]
     verifier_partie_pytorch(partie, "cpu", "le processeur", version.group(1))
+
+
+def test_sortie_carte_enregistree():
+    """La sortie relevée sur la RTX 5070 Ti, avec la roue gpu, à la porte de la Partie 0 : le test ne fait
+    que lire le fichier, et tourne donc sans carte. Si le neurone ou l'entraînement à la main changent,
+    il échoue : la sortie est à relever de nouveau, carte au repos."""
+    octets = SORTIE_CARTE.read_bytes()
+    assert b"\r" not in octets and octets.endswith(b".\n")
+    lignes = octets.decode("utf-8").splitlines()
+    assert re.fullmatch(r"# relevé le \d{4}-\d{2}-\d{2}", lignes[0])
+    datetime.date.fromisoformat(lignes[0].removeprefix("# relevé le "))
+    # Le neurone et l'entraînement à la main : ce que le code donne aujourd'hui.
+    n, m = lignes_du_neurone(), lignes_a_la_main()
+    assert lignes[1 : len(n) + len(m) + 3] == [*n, "", *m, ""]
+    # PyTorch, relevé avec la roue gpu sur la carte. La durée, qui dépend de la machine, n'est pas figée.
+    partie = lignes[len(n) + len(m) + 3 :]
+    assert len(partie) == 4
+    version = re.fullmatch(r"Le même réseau dans PyTorch (2\.15\.0\+cu\d+), .*", partie[0])
+    assert version, partie[0]
+    verifier_partie_pytorch(partie, "cuda", re.escape("la carte graphique, NVIDIA GeForce RTX 5070 Ti"), version.group(1))

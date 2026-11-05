@@ -218,7 +218,7 @@ export function phraseFils(m: MesuresChrono): string {
   const egaux = Number(facteur.toFixed(2)) === 1;
   const comparaison = egaux ? 'pas plus vite' : `${nombre(facteur, 2)} fois ${plusVite ? 'plus vite' : 'plus lent'}`;
   const debut =
-    `Avec ${nombre(m.fils_max)} fils, le produit prend ${tous} ms, contre ${defaut} ms ` +
+    `Avec ${nombre(m.fils_max)} fils, le produit prend ${tous}${INSECABLE}ms, contre ${defaut}${INSECABLE}ms ` +
     `avec ${nombre(m.fils_par_defaut)}${FINE}: ${comparaison}.`;
   const coeurs =
     `Un fil n’est pas un cœur${FINE}: un cœur du processeur peut faire tourner deux fils à la fois, ` +
@@ -243,16 +243,23 @@ export const TAILLE_PETITE = 64;
 export const SEUIL_AUTANT = 1.1;
 
 /**
- * Le prix fixe de la carte. Une durée sur la carte, c'est un prix fixe P
- * (envoyer le calcul, attendre qu'elle ait fini) plus le calcul C. Le produit
+ * Le prix fixe de la carte. Un chrono sur la carte, c'est un prix fixe P
+ * (PyTorch lui envoie le produit, puis le chronomètre attend qu'elle ait
+ * fini : torch.cuda.synchronize dans chrono.py) plus le calcul C. Le produit
  * de la taille suivante demande bien plus d'opérations (64 fois plus de 64 à
- * 256) : on admet seulement, très prudemment, que son calcul prend au moins
- * 2 fois celui du petit. Si la carte n'y met que r fois plus de temps, alors
- * C(petit) ≤ (r − 1) × t et P ≥ (2 − r) × t, où t est la durée du petit
- * produit : P dépasse C dès que r < 1,5. Au-delà, l'explication du pari ne
- * serait plus démontrée par le tableau.
+ * 256, au moins SEUIL_OPERATIONS fois) : on admet seulement, très prudemment,
+ * que son calcul prend au moins 2 fois celui du petit. Si la carte n'y met que
+ * r fois plus de temps, alors C(petit) ≤ (r − 1) × t et P ≥ (2 − r) × t, où t
+ * est la durée du petit produit : P dépasse C dès que r < 1,5. Au-delà,
+ * l'explication du pari ne serait plus démontrée par le tableau.
  */
 export const SEUIL_PRIX_FIXE = 1.5;
+/**
+ * L'hypothèse « au moins 2 fois le calcul » n'est prudente que si la taille
+ * suivante a bien plus d'opérations : au moins 8 fois, une taille doublée. Avec
+ * 80 après 64, il n'y en aurait que 1,95 fois plus.
+ */
+export const SEUIL_OPERATIONS = 8;
 /** Au plus grand produit, la carte va « des dizaines de fois plus vite » que le processeur : de 20 fois à 100 fois. */
 export const SEUIL_BIEN_PLUS_VITE = 20;
 export const SEUIL_CENTAINES = 100;
@@ -320,6 +327,13 @@ function preuveDuPrixFixe(carte: MesuresChrono): string {
     tailles.includes(TAILLE_PETITE) && suivante !== undefined,
     `la carte n’a pas de mesure après ${TAILLE_PETITE} : l’explication du pari « petite » n’a plus la preuve de son prix fixe`,
   );
+  const calcul = (suivante / TAILLE_PETITE) ** 3;
+  exiger(
+    calcul >= SEUIL_OPERATIONS,
+    `le produit ${suivante} × ${suivante} ne demande que ${nombre(calcul, 2)} fois les opérations du ` +
+      `${TAILLE_PETITE} × ${TAILLE_PETITE}, moins de ${SEUIL_OPERATIONS} fois : il ne prouve plus le prix fixe ` +
+      '(explication du pari « petite », SEUIL_PRIX_FIXE)',
+  );
   const r = chrono(carte, suivante, null) / chrono(carte, TAILLE_PETITE, null);
   exiger(
     r < SEUIL_PRIX_FIXE,
@@ -327,7 +341,6 @@ function preuveDuPrixFixe(carte: MesuresChrono): string {
       `pas moins de ${nombre(SEUIL_PRIX_FIXE, 1)} : le tableau ne montre plus que le prix fixe dépasse le calcul ` +
       '(explication du pari « petite »)',
   );
-  const calcul = (suivante / TAILLE_PETITE) ** 3;
   // À deux décimales, 1,00 ou moins ne s'écrit pas « 1,00 fois plus de temps ».
   const temps = Number(r.toFixed(2)) > 1 ? `n’y met que ${nombre(r, 2)} fois plus de temps` : 'n’y met pas plus de temps';
   return (
@@ -338,9 +351,11 @@ function preuveDuPrixFixe(carte: MesuresChrono): string {
 
 /**
  * L'explication du pari « petite », juste pour n'importe quel fichier valide :
- * les deux chronos ; le prix fixe de la carte, qui dépasse le calcul d'un si
- * petit produit ; et sa preuve dans le tableau. Si la carte gagne, la garde
- * tombe : l'acquis « petite » ne serait plus montré.
+ * les deux chronos ; le prix fixe de chaque produit chronométré sur la carte
+ * (l'envoyer, puis l'attente du chronomètre : PyTorch, lui, n'attend pas la
+ * carte, l'étape 6 le dit), qui dépasse le calcul d'un si petit produit ; et sa
+ * preuve dans le tableau. Si la carte gagne, la garde tombe : l'acquis
+ * « petite » ne serait plus montré.
  */
 export function explicationPetite(cpu: MesuresChrono, carte: MesuresChrono): string {
   const { verdict, p, c } = verdictPetite(cpu, carte);
@@ -352,7 +367,7 @@ export function explicationPetite(cpu: MesuresChrono, carte: MesuresChrono): str
       : `Autant l’un que l’autre${FINE}: ${tp}${INSECABLE}ms au mieux pour le processeur, ${tc}${INSECABLE}ms pour la carte, ` +
         `moins de ${pourcent(SEUIL_AUTANT - 1)} d’écart.`;
   const prix =
-    `Sur la carte, chaque calcul a un prix fixe${FINE}: PyTorch doit le lui envoyer, puis attendre qu’elle ait fini. ` +
+    `Sur la carte, chaque produit chronométré a un prix fixe${FINE}: PyTorch doit le lui envoyer, puis le chronomètre attend qu’elle ait fini. ` +
     'Pour un si petit produit, ce prix dépasse le calcul lui-même.';
   return `${debut} ${prix} ${preuveDuPrixFixe(carte)}`;
 }
@@ -367,6 +382,11 @@ export function phraseCarteEtProcesseur(cpu: MesuresChrono, carte: MesuresChrono
   const { verdict, p, c } = verdictPetite(cpu, carte);
   exigerPasLaCarte(verdict, c, p);
   const tailles = taillesDe(cpu);
+  exiger(
+    tailles[0] === TAILLE_PETITE,
+    `le tableau commence à ${tailles[0]} × ${tailles[0]}, et non au ${TAILLE_PETITE} × ${TAILLE_PETITE} du pari : ` +
+      '« pour le plus petit produit » dans la phrase sous le tableau des chronos est à revoir',
+  );
   // Combien de fois la carte va plus vite que le processeur au mieux de ses fils.
   const gain = (t: number) => meilleurChrono(cpu, t) / chrono(carte, t, null);
   const depasse = tailles.findIndex((t) => gain(t) >= SEUIL_AUTANT);
@@ -381,9 +401,17 @@ export function phraseCarteEtProcesseur(cpu: MesuresChrono, carte: MesuresChrono
     `la carte dépasse le processeur dès ${tailles[depasse]} × ${tailles[depasse]}, puis plus à une taille au-dessus : ` +
       '« dès … » dans la phrase sous le tableau des chronos est à revoir',
   );
+  // « Des dizaines de fois plus vite que lui, même avec tous ses fils » : contre tous les fils, et contre son meilleur réglage.
+  const dizaines = (g: number) => g >= SEUIL_BIEN_PLUS_VITE && g < SEUIL_CENTAINES;
+  const contreTous = chrono(cpu, plusGrand, cpu.fils_max) / chrono(carte, plusGrand, null);
+  exiger(
+    dizaines(contreTous),
+    `au plus grand produit, la carte va ${nombre(contreTous, 1)} fois plus vite que le processeur avec tous ses fils : ` +
+      '« des dizaines de fois » dans la phrase sous le tableau des chronos est à revoir',
+  );
   const g = gain(plusGrand);
   exiger(
-    g >= SEUIL_BIEN_PLUS_VITE && g < SEUIL_CENTAINES,
+    dizaines(g),
     `au plus grand produit, la carte va ${nombre(g, 1)} fois plus vite que le processeur au mieux de ses fils : ` +
       '« des dizaines de fois » dans la phrase sous le tableau des chronos est à revoir',
   );

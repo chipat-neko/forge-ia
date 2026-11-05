@@ -56,7 +56,6 @@ import {
 } from '../../lib/partie-0/commandes';
 import { lireMesures } from '../../lib/partie-0/mesures';
 import { GRILLE, meilleurReglage, POINTS, PORTES } from '../../lib/partie-0/neurone';
-import { explicationPetite } from '../../lib/partie-0/paris-0-4';
 import {
   bornesPredictions,
   choixCoince,
@@ -71,6 +70,7 @@ import {
   nbCoinces,
   P_DU_PARI,
   phraseDurees,
+  renvoiAuxPetitesMatrices,
   questionCoince,
   questionExact,
   questionGradient,
@@ -194,13 +194,13 @@ export const ECARTS = (() => {
 export const DUREES = (() => {
   // La phrase de l'étape 8 : les durées de PyTorch dans les deux sorties (sorties/processeur.txt et
   // sorties/rtx-5070-ti.txt, relevées à la porte de la Partie 0, carte au repos), gardée par phraseDurees. Elle
-  // renvoie aux petites matrices du chapitre 0.4 : leur explication, tirée des mesures de 0.4, doit tenir encore
-  // (le processeur au moins aussi rapide au plus petit produit, et le prix fixe de la carte montré par le tableau).
+  // renvoie aux petites matrices du chapitre 0.4 : renvoiAuxPetitesMatrices vérifie que leur explication, tirée des
+  // mesures de 0.4, tient encore, et son message nomme alors aussi cette phrase.
   const racine = new URL('../', root);
   const cpu = lireMesures('processeur', racine);
   const carte = lireMesures('rtx-5070-ti', racine);
   exiger(cpu !== null && carte !== null, 'les chronos du chapitre 0.4 manquent : la phrase de l’étape 8 y renvoie');
-  explicationPetite(cpu, carte);
+  renvoiAuxPetitesMatrices(cpu, carte);
   return phraseDurees(dureeDeLaSortie(sortieProcesseur), dureeDeLaSortie(sortieCarte));
 })();
 
@@ -530,6 +530,8 @@ Avec une carte NVIDIA, la version de PyTorch pour la carte lance le même script
 Si PyTorch ne voit pas la carte, le script ne plante pas : il dit quoi faire, et s'arrête. Sans <code class="insecable">{'--appareil'}</code>, il suit la variable `FORGE_APPAREIL` du chapitre 0.3, et sans elle, il prend la carte si PyTorch la voit. Pour qu'il calcule sur le processeur, règle-la dans le même terminal, puis lance-le sans <code class="insecable">{'--appareil'}</code> : <code>{FORCER_PROCESSEUR_POWERSHELL}</code> dans PowerShell, ou <code>{FORCER_PROCESSEUR_BASH}</code> sous Linux ou macOS.
 
 Voici la sortie du script sur la carte de ce PC :
+
+{/* Les deux sorties sont aussi importées par ?raw, plus haut (ECARTS, DUREES) : si un fichier manquait, la construction s'arrêterait là. Le texte absent, que SortieCommande exige, ne peut donc plus s'afficher. */}
 
 <SortieCommande
   fichier="projets/0.5-reseau/sorties/rtx-5070-ti.txt"

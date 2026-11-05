@@ -11,7 +11,8 @@
 // revoir (« Exemple devenu faux : … »).
 //
 // Ce module n'importe ni ?raw, ni .json, ni astro:* (B1) : le parcours du
-// chapitre l'importe. Les fonctions qui lisent les attendus ou la sortie du
+// chapitre l'importe. Il prend à paris-0-4.ts l'explication du pari « petite »,
+// à laquelle renvoie la phrase de l'étape 8 ; de mesures.ts, seulement un type. Les fonctions qui lisent les attendus ou la sortie du
 // script les reçoivent en argument : le MDX les importe, les parcours et
 // Vitest les lisent sur le disque.
 
@@ -19,7 +20,9 @@ import type { Choix } from '../choix';
 import { exigeur } from '../exiger';
 import { decimalesUtiles, nombre } from '../nombres';
 import { ecrirePoint } from './atelier-neurone';
+import type { MesuresChrono } from './mesures';
 import { meilleurReglage, POINTS, PORTES } from './neurone';
+import { explicationPetite } from './paris-0-4';
 
 const FINE = '\u202F';
 /** L'espace insécable ordinaire, dans un point du tableau (« (0, 1) ») : la case ne s'y coupe pas. */
@@ -312,6 +315,12 @@ export function dureeDeLaSortie(texte: string): DureeDeSortie {
  * au moins 10 % de temps de plus, pour les mêmes pas : sinon la garde tombe,
  * et la phrase est à revoir. Le renvoi aux petites matrices du chapitre 0.4
  * est gardé par le chapitre 0.5 lui-même (explicationPetite des mesures de 0.4).
+ *
+ * La boucle de entrainer_pytorch n'attend pas la carte à chaque pas (la perte
+ * reste sur l'appareil) : la phrase ne parle donc que du prix pour envoyer
+ * chaque calcul. Ce prix n'est pas mesuré à part, et le chrono compte aussi le
+ * premier pas, sans tour d'échauffement (paris-0-5.test.ts le vérifie dans le
+ * code) : d'où « surtout ».
  */
 export function phraseDurees(processeur: DureeDeSortie, carte: DureeDeSortie): string {
   exiger(
@@ -330,7 +339,28 @@ export function phraseDurees(processeur: DureeDeSortie, carte: DureeDeSortie): s
   return (
     `Pour les mêmes ${processeur.pas} pas, la carte a mis ${carte.texte}${INSECABLE}ms, et le processeur ${processeur.texte}${INSECABLE}ms${FINE}: ` +
     'ici, la carte est la plus lente. ' +
-    `Ce petit réseau ne fait que de tout petits calculs${FINE}: comme pour les petites matrices du chapitre 0.4, ` +
-    'le prix fixe de chacun sur la carte dépasse le calcul lui-même.'
+    'Comme sur les petites matrices du chapitre 0.4, c’est surtout que ce petit réseau ne fait que de tout petits calculs' +
+    `${FINE}: le prix pour envoyer chacun à la carte dépasse le calcul lui-même. ` +
+    'Les deux chronos comptent aussi le premier pas, qui prépare le calcul, alors que le chronomètre du chapitre 0.4 ' +
+    'écarte ses premiers tours.'
   );
+}
+
+/**
+ * La phrase de l'étape 8 renvoie aux « petites matrices du chapitre 0.4 » : leur
+ * explication, tirée des mesures de 0.4, doit tenir encore (le processeur au
+ * moins aussi rapide au plus petit produit, et le prix fixe de la carte montré
+ * par le tableau). Si elle tombe, le message nomme aussi la phrase de 0.5.
+ */
+export function renvoiAuxPetitesMatrices(cpu: MesuresChrono, carte: MesuresChrono): void {
+  try {
+    explicationPetite(cpu, carte);
+  } catch (erreur) {
+    const raison = erreur instanceof Error ? erreur.message : String(erreur);
+    exiger(
+      false,
+      'la phrase des durées de l’étape 8 renvoie aux petites matrices du chapitre 0.4, dont l’explication ne tient ' +
+        `plus : revois-la avec elles (${raison})`,
+    );
+  }
 }

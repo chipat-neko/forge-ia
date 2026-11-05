@@ -30,6 +30,7 @@ import {
   phraseTransfert,
   gainDuReglageParDefaut,
   SEUIL_A_PEU_PRES,
+  SEUIL_OPERATIONS,
   SEUIL_BIEN_PLUS_VITE,
   SEUIL_CENTAINES,
   SEUIL_PARALLELE,
@@ -161,7 +162,8 @@ describe('pari « fils » : tous les fils contre le réglage par défaut', () =>
 
   it('l’explication suit le verdict : la comparaison entière, et les cœurs seulement quand les fils en plus aident peu', () => {
     const coeurs = `Un fil n’est pas un cœur${FINE}: un cœur du processeur peut faire tourner deux fils à la fois, qui se partagent alors ses unités de calcul.`;
-    const avant = (tous: string, defaut: string) => `Avec 16 fils, le produit prend ${tous} ms, contre ${defaut} ms avec 8${FINE}: `;
+    const avant = (tous: string, defaut: string) =>
+      `Avec 16 fils, le produit prend ${tous}${INSECABLE}ms, contre ${defaut}${INSECABLE}ms avec 8${FINE}: `;
     // Deux fois plus vite : pas de phrase sur les cœurs, qui la contredirait.
     expect(phraseFils(processeur({ [T]: { 1: 1000, 8: 200, 16: 100 } }))).toBe(
       `${avant('100', '200')}2,00 fois plus vite. Ici, les fils en plus calculent presque autant que les premiers.`,
@@ -211,7 +213,7 @@ describe('pari « petite matrice » : le processeur contre la carte', () => {
   });
   /** Le prix fixe de la carte, dit de la même façon quel que soit le verdict. */
   const PRIX =
-    `Sur la carte, chaque calcul a un prix fixe${FINE}: PyTorch doit le lui envoyer, puis attendre qu’elle ait fini. ` +
+    `Sur la carte, chaque produit chronométré a un prix fixe${FINE}: PyTorch doit le lui envoyer, puis le chronomètre attend qu’elle ait fini. ` +
     'Pour un si petit produit, ce prix dépasse le calcul lui-même. ';
   /** La preuve, lue dans les chronos de la carte : la taille suivante, 64 fois plus de calcul. */
   const preuve = (fois: string) =>
@@ -249,6 +251,11 @@ describe('pari « petite matrice » : le processeur contre la carte', () => {
     expect(() => explicationPetite(cpu, carte({ 64: 0.02, 256: 0.0299 }))).not.toThrow();
     // Sans taille après 64 sur la carte, pas de preuve.
     expect(() => explicationPetite(cpu, carte({ 64: 0.02 }))).toThrow(/après 64/);
+    // Une taille suivante trop proche (80 : 1,95 fois plus d'opérations) ne prouve rien : « au moins 2 fois » ne tiendrait pas.
+    expect(() => explicationPetite(cpu, carte({ 64: 0.019, 80: 0.02 }))).toThrow(/8 fois/);
+    // 128 en fait 8 fois plus : la garde passe.
+    expect(explicationPetite(cpu, carte({ 64: 0.019, 128: 0.02 }))).toContain('le produit 128');
+    expect(SEUIL_OPERATIONS).toBe(8);
     expect(SEUIL_PRIX_FIXE).toBe(1.5);
   });
 
@@ -287,12 +294,13 @@ describe('ce que montrent les chronos : le processeur, puis la carte', () => {
   /** « 1 024 × 1 024 » : les milliers séparés par une espace fine, le × entre deux insécables. */
   const milliers = (t: number) => String(t).replace(/\B(?=(\d{3})+(?!\d))/g, FINE);
   const T = (t: number) => `${milliers(t)}${INSECABLE}×${INSECABLE}${milliers(t)}`;
-  const cpu = processeur({
+  const MESURES_CPU = {
     64: { 1: 0.0078, 8: 0.0058, 16: 0.0194 },
     256: { 1: 0.26, 8: 0.11, 16: 0.071 },
     1024: { 1: 16, 8: 3.5, 16: 3 },
     4096: { 1: 1047, 8: 194, 16: 150 },
-  });
+  };
+  const cpu = processeur(MESURES_CPU);
   const fin = `, elle va des dizaines de fois plus vite que lui, même avec tous ses fils.`;
 
   it('le plus petit produit au processeur, la carte dès la taille où elle le dépasse, et des dizaines de fois au plus grand', () => {
@@ -321,6 +329,18 @@ describe('ce que montrent les chronos : le processeur, puis la carte', () => {
     expect(() => phraseCarteEtProcesseur(cpu, carte({ 64: 0.019, 256: 0.02, 1024: 0.1, 4096: 1.5 }))).toThrow(/dizaines/);
     // Une taille du processeur absente de la carte.
     expect(() => phraseCarteEtProcesseur(cpu, carte({ 64: 0.019, 256: 0.02, 4096: 3.8 }))).toThrow(/1024/);
+    const ordinaire = carte({ 64: 0.019, 256: 0.0216, 1024: 0.0997, 4096: 3.8 });
+    // (a) « même avec tous ses fils » : au mieux 39 fois (8 fils), mais 105 fois contre les 16 fils.
+    const lents = processeur({ ...MESURES_CPU, 4096: { 1: 1047, 8: 150, 16: 400 } });
+    expect(() => phraseCarteEtProcesseur(lents, ordinaire)).toThrow(/tous ses fils/);
+    // (a) 39 fois contre les 16 fils, mais seulement 13 fois contre le meilleur réglage (8 fils).
+    const rapides = processeur({ ...MESURES_CPU, 4096: { 1: 1047, 8: 50, 16: 150 } });
+    expect(() => phraseCarteEtProcesseur(rapides, ordinaire)).toThrow(/au mieux de ses fils/);
+    // (b) « le plus petit produit » est celui du pari : un tableau qui commence à 32 ne le dit plus.
+    const des32 = processeur({ 32: { 1: 0.001, 8: 0.001, 16: 0.002 }, ...MESURES_CPU });
+    expect(() => phraseCarteEtProcesseur(des32, carte({ 32: 0.018, 64: 0.019, 256: 0.0216, 1024: 0.0997, 4096: 3.8 }))).toThrow(
+      /plus petit produit/,
+    );
   });
 
   it('les vrais fichiers : la phrase tient, et la carte dépasse le processeur à la taille qu’elle nomme', () => {

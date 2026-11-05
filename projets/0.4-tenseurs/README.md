@@ -106,7 +106,7 @@ Le format (version 1) :
  "releve_le": "2026-11-05",
  "appareil": "cpu",
  "nom": "AMD Ryzen 7 9800X3D 8-Core Processor",
- "torch": "2.15.0+cpu",
+ "torch": "2.15.0+cu132",
  "fils_par_defaut": 8,
  "fils_max": 16,
  "mesures": [{"taille": 64, "fils": 1, "millisecondes": 0.01}],
