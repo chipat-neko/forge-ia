@@ -95,7 +95,8 @@ test('accueil : le pari d’ouverture se joue une fois et reste répondu au rech
 test('accueil : le bouton de lecture suit la progression du chapitre 1.3', async ({ page }) => {
   await page.goto('/forge-ia/');
   const bouton = page.locator('[data-suite] a');
-  await expect(bouton).toHaveText(/Ouvrir le chapitre 1\.3/);
+  // Sans progression, le bouton ouvre le premier chapitre paru du parcours : 0.1 depuis sa parution.
+  await expect(bouton).toHaveText(/Ouvrir le chapitre 0\.1/);
   await page.goto('/forge-ia/partie-1/1-3/');
   await page.locator('[data-pari="nombres"] [data-juste]').click();
   await page.goto('/forge-ia/');
