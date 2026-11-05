@@ -67,6 +67,8 @@
   // premier mot du nouveau texte (voir l'effet plus bas).
   let choisi = $state(untrack(() => motInitial));
   let annonce = $state('');
+  // Le mot que l'annonce dit disparu du texte : s'il y revient, l'annonce est périmée.
+  let perdu: string | null = $state(null);
 
   const pluriel = (n: number, un: string, plusieurs: string) => (n > 1 ? plusieurs : un);
 
@@ -104,7 +106,16 @@
     const ancien = untrack(() => choisi);
     if (nouveau === '' || nouveau === ancien) return;
     choisi = nouveau;
+    perdu = ancien;
     annonce = `«${FINE}${ancien}${FINE}» n’est plus dans le texte${FINE}: la suite part maintenant de «${FINE}${nouveau}${FINE}».`;
+  });
+
+  // Le mot disparu revient dans le texte : l'annonce ne dit plus vrai, on l'efface.
+  $effect(() => {
+    if (perdu !== null && departs.includes(perdu)) {
+      perdu = null;
+      annonce = '';
+    }
   });
 
   // Les lecteurs d'écran entendent la réussite du défi au moment où elle
@@ -120,6 +131,7 @@
 
   function choisir(evenement: Event): void {
     choisi = (evenement.currentTarget as HTMLSelectElement).value;
+    perdu = null;
     annonce = '';
     if (cleAcquis !== undefined && !acquisAnnonce) {
       acquisAnnonce = true;
@@ -205,7 +217,7 @@
   {/if}
   {#if reprise !== null}
     <p class="reprise" data-test="ms-reprise">
-      La suite revient sur «{FINE}<span data-mot={suite[reprise]}>{suite[reprise]}</span>{FINE}» au mot {rangReprise}{FINE}: à partir de là, elle tourne en rond.
+      La suite revient sur «{FINE}<span class="pastille" data-mot={suite[reprise]}>{suite[reprise]}</span>{FINE}» au mot {rangReprise}{FINE}: à partir de là, elle tourne en rond.
     </p>
   {/if}
   {#if mots.length === 0}
@@ -315,7 +327,7 @@
 
   /* La flèche de la liste, dessinée par la police : aucune image. */
   .choix-mot::after {
-    content: '\25BE';
+    content: '\25BE' / '';
     position: absolute;
     right: 8px;
     top: 50%;
@@ -459,6 +471,15 @@
 
   .reprise {
     margin: 0.4em 0 0;
+  }
+
+  /* Le mot repris, dans la phrase : la même pastille cerclée que dans la bande,
+     pour qu'un mot court (« . ») se voie. Le texte lu ne change pas. */
+  .pastille {
+    padding: 0 5px;
+    background: var(--teinte-a);
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 2px var(--indigo);
   }
 
   .message {

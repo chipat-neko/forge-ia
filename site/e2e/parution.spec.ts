@@ -12,6 +12,7 @@
 // parution ne les oblige pas à changer. Sans aucun brouillon, le dernier est sauté.
 import { existsSync, readdirSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
+import { verifierLiensVersParus } from './outils';
 
 /** Les adresses des chapitres d'un dossier de MDX (Playwright tourne dans site/). */
 function adresses(dossier: string): string[] {
@@ -36,15 +37,9 @@ test('un chapitre paru n’a plus aucune valeur « à mesurer »', async ({ page
 });
 
 test('un chapitre paru ne renvoie qu’à des chapitres parus', async ({ page }) => {
-  // Un renvoi vers un chapitre à venir s'écrit en texte, jamais en lien (S3) :
-  // sur le site publié, ce lien mènerait à une page absente.
   for (const adresse of PARUS) {
     await page.goto(adresse);
-    const liens = await page.locator('a[href*="/forge-ia/partie-"]').evaluateAll((a) => a.map((e) => e.getAttribute('href') ?? ''));
-    for (const href of liens) {
-      const chapitre = /\/partie-\d+\/(\d+-\d+)\/?/.exec(href);
-      if (chapitre) expect(existsSync(`src/content/chapitres/${chapitre[1]}.mdx`), `${adresse} : ${href}`).toBe(true);
-    }
+    await verifierLiensVersParus(page.locator('body'), adresse);
   }
 });
 

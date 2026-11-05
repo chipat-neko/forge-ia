@@ -16,6 +16,7 @@ import {
   choixMotSuivant,
   choixTranche,
   DEFI_REUSSI,
+  LONGUEUR_DU_PARI,
   LONGUEUR_INITIALE,
   MOT_DU_PARI,
   motDuPari,
@@ -28,6 +29,7 @@ import {
   attendreHydratation,
   plusLongueLigne,
   verifierAxe,
+  verifierLiensVersParus,
   verifierSansDebordement,
   verifierTypographieHorsCode,
 } from './outils';
@@ -107,11 +109,7 @@ test('chapitre 0.1 complet', async ({ page }) => {
     await expect(page.locator('footer a.voisin')).toHaveCount(0);
   }
   // Aucun lien vers un chapitre qui n'a pas paru (S3) : les renvois à 0.2, 0.3 ou 1.1 sont du texte.
-  const liens = await page.locator('main a[href*="/forge-ia/partie-"]').evaluateAll((a) => a.map((e) => e.getAttribute('href') ?? ''));
-  for (const href of liens) {
-    const chapitre = /\/partie-\d+\/(\d+-\d+)\/?/.exec(href);
-    if (chapitre) expect(existsSync(`src/content/chapitres/${chapitre[1]}.mdx`), href).toBe(true);
-  }
+  await verifierLiensVersParus(page.locator('main'), PAGE);
   await attendreAnimations(page);
   await verifierAxe(page);
   await verifierSansDebordement(page);
@@ -274,16 +272,24 @@ test('atelier : la suite et sa reprise suivent le jumeau', async ({ page }) => {
     }
   }
 
+  // À l'arrivée, la suite qui part de « le » ne boucle pas encore : le lecteur parie avant de voir la boucle.
+  expect(premiereReprise(generer(SUIVANTS, MOT_DU_PARI, LONGUEUR_INITIALE))).toBeNull();
   await verifier(MOT_DU_PARI, LONGUEUR_INITIALE);
-  // Un autre départ : tout change.
-  await depart.selectOption(AUTRE_MOT);
-  await verifier(AUTRE_MOT, LONGUEUR_INITIALE);
-  // Une autre longueur, au clavier.
+  // Le nombre monté au clavier jusqu'à la longueur du pari : la boucle apparaît.
   const longueur = page.locator('[data-test="ms-longueur"]');
   await longueur.focus();
+  for (let i = LONGUEUR_INITIALE; i < LONGUEUR_DU_PARI; i++) await page.keyboard.press('ArrowRight');
+  await expect(longueur).toHaveAttribute('aria-valuenow', String(LONGUEUR_DU_PARI));
+  expect(premiereReprise(generer(SUIVANTS, MOT_DU_PARI, LONGUEUR_DU_PARI))).not.toBeNull();
+  await verifier(MOT_DU_PARI, LONGUEUR_DU_PARI);
+  // Un autre départ : tout change.
+  await depart.selectOption(AUTRE_MOT);
+  await verifier(AUTRE_MOT, LONGUEUR_DU_PARI);
+  // Une autre longueur, au clavier.
+  await longueur.focus();
   for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowLeft');
-  await expect(longueur).toHaveAttribute('aria-valuenow', String(LONGUEUR_INITIALE - 6));
-  await verifier(AUTRE_MOT, LONGUEUR_INITIALE - 6);
+  await expect(longueur).toHaveAttribute('aria-valuenow', String(LONGUEUR_DU_PARI - 6));
+  await verifier(AUTRE_MOT, LONGUEUR_DU_PARI - 6);
   await page.keyboard.press('End');
   await verifier(AUTRE_MOT, Number(await longueur.getAttribute('aria-valuemax')));
   // Le point a plus de dix suivants : le tableau n'en montre que les dix premiers.
@@ -295,9 +301,17 @@ test('atelier : la suite et sa reprise suivent le jumeau', async ({ page }) => {
 test('défi réussi sur un texte sans boucle', async ({ page }) => {
   await ouvrirAtelier(page);
   const defi = page.locator('[data-test="ms-defi"]');
-  // Au départ (« le », 20 mots), la suite tourne en rond : le défi n'est pas réussi.
+  // Au départ (« le », 12 mots), la suite est trop courte : le défi n'est pas réussi.
   await expect(defi).toHaveCount(0);
   await expect(page.locator('[data-defi]')).not.toHaveClass(/\breussi\b/);
+  await expect(page.locator('[data-test="ms-defi-etat"]')).toContainText(`au moins ${SEUIL_DU_DEFI} mots`);
+  // La longueur montée au maximum (15 ou plus) : depuis « le », la suite tourne en rond, toujours pas de défi.
+  const longueur = page.locator('[data-test="ms-longueur"]');
+  await longueur.focus();
+  await page.keyboard.press('End');
+  expect(Number(await longueur.getAttribute('aria-valuenow'))).toBeGreaterThanOrEqual(SEUIL_DU_DEFI);
+  await expect(page.locator('[data-test="ms-defi-etat"]')).toContainText('tourne en rond');
+  await expect(defi).toHaveCount(0);
   const nombres = ['un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze'];
   expect(nombres).toHaveLength(SEUIL_DU_DEFI);
   await ecrire(page, nombres.join(' '));
@@ -315,6 +329,10 @@ test('défi réussi sur un texte sans boucle', async ({ page }) => {
   // Une ligne de plus qui revient sur « un » : la boucle fait tomber le défi.
   await ecrire(page, `${nombres.join(' ')} un`);
   await expect(defi).toHaveCount(0);
+  // « le » revient dans le texte : l'annonce qui le disait disparu s'efface, le départ reste « un ».
+  await ecrire(page, `le ${nombres.join(' ')}`);
+  await expect(page.locator('[data-test="ms-annonce"]')).toBeEmpty();
+  await expect(page.locator('[data-test="ms-depart"]')).toHaveValue('un');
 });
 
 test('avant le pari, l’atelier est verrouillé ; sans JavaScript, tout se lit', async ({ page, browser, baseURL }) => {
@@ -340,7 +358,9 @@ test('avant le pari, l’atelier est verrouillé ; sans JavaScript, tout se lit'
     'data-mot',
     suivantsTries(SUIVANTS.get(MOT_DU_PARI)!)[0][0],
   );
-  await expect(sansJs.locator('[data-test="ms-reprise"]')).toBeVisible();
+  // À l'arrivée, la suite ne boucle pas encore : pas de phrase de reprise.
+  if (premiereReprise(suite) === null) await expect(sansJs.locator('[data-test="ms-reprise"]')).toHaveCount(0);
+  else await expect(sansJs.locator('[data-test="ms-reprise"]')).toBeVisible();
   // Les explications des paris sont données d'emblée.
   for (const id of ['flottants', 'tranche', 'suivant', 'boucle']) {
     await expect(sansJs.locator(`[data-pari="${id}"] .verdict`)).toBeVisible();

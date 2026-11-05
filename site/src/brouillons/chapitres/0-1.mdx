@@ -49,6 +49,7 @@ import {
   reprListePython,
   SEUIL_DU_DEFI,
   SOMME_DES_FLOTTANTS,
+  suiteDeDepart,
 } from '../../lib/partie-0/paris-0-1';
 import { TEXTE_DE_DEPART } from '../../lib/partie-0/texte-0-1';
 import { nombre } from '../../lib/nombres';
@@ -67,6 +68,19 @@ export const PAIRES = (() => {
 })();
 
 export const NB_MOTS = nombre(decouperMots(TEXTE_DE_DEPART).length);
+
+export const DEPART = suiteDeDepart(TEXTE_DE_DEPART);
+
+export const A_COMPTER = ['fer', 'feu', 'fer'];
+
+export const COMPTE = (() => {
+  // Ce qu'affiche Python pour Counter(A_COMPTER) : du plus fréquent au moins
+  // fréquent, à égalité dans l'ordre d'apparition (comme most_common).
+  const comptes = new Map();
+  for (const mot of A_COMPTER) comptes.set(mot, (comptes.get(mot) ?? 0) + 1);
+  const tries = [...comptes].sort(([, a], [, b]) => b - a);
+  return `Counter({${tries.map(([mot, n]) => `${reprListePython([mot]).slice(1, -1)}: ${n}`).join(', ')}})`;
+})();
 
 export const explicationSuivant = (() => {
   // Ce que le texte met après le mot du pari : le premier suivant, puis les autres.
@@ -87,7 +101,7 @@ export const explicationBoucle = (() => {
   const { suite, reprise, cycle } = boucleDuPari(TEXTE_DE_DEPART);
   return typographier(
     `La suite revient sur « ${suite[reprise]} » au mot ${reprise + 1}. Après un mot donné, c'est toujours ` +
-      `le même mot qui vient : dès qu'un mot revient, les mêmes ${cycle.length} mots se répètent sans fin, ` +
+      `le même mot qui vient : dès qu'un mot revient, les ${cycle.length} mêmes mots se répètent sans fin, ` +
       `de « ${cycle[0]} » à « ${cycle.at(-1)} ».`,
   );
 })();
@@ -110,7 +124,7 @@ La seconde commande affiche la version d'uv : s'il répond, il est installé. Si
 
 Le chapitre 0.3 reviendra en détail sur l'installation de ton poste, carte graphique comprise. Pour l'instant, télécharge le dépôt du site avec git, entre dans le projet de ce chapitre et lance son programme :
 
-<BlocCommande commandes={[CLONER_DEPOT, ALLER_AU_PROJET_0_1, LANCER_MOT_SUIVANT]} />
+<BlocCommande commandes={[CLONER_DEPOT, ALLER_AU_PROJET_0_1, LANCER_MOT_SUIVANT]} ou="un terminal (PowerShell sous Windows)" />
 
 La première fois, uv installe si besoin une version de Python qui convient au projet. Le programme lit ensuite son texte, affiche les mots qui suivent « le », le plus probable d'entre eux, puis une suite de mots. Tout ce chapitre explique ce programme.
 
@@ -118,7 +132,7 @@ La première fois, uv installe si besoin une version de Python qui convient au p
 
 `python -m mot_suivant` lance le module `mot_suivant` : le dossier du même nom, dans le projet. `uv run` le fait tourner dans l'environnement du projet, préparé à la première commande.
 
-Sans git, le bouton « Code » de la page GitHub du dépôt propose aussi un fichier zip.
+Sans git, le bouton « Code » de la page GitHub du dépôt propose aussi un fichier zip. Une fois décompressé, son dossier s'appelle `forge-ia-main` : écris ce nom à la place de `forge-ia` dans la commande `cd`.
 
 </Fragment>
 
@@ -126,7 +140,7 @@ Sans git, le bouton « Code » de la page GitHub du dépôt propose aussi un fic
 
 <Etape numero={2} titre="Des nombres et du texte">
 
-En Python, chaque valeur a un type. `12` est un nombre entier, de type `int`. `2.5` est un nombre à virgule, de type `float` : il s'écrit avec un point, jamais avec une virgule. <code>"{EXEMPLE}"</code> est du texte, de type `str`, toujours entre guillemets.
+En Python, chaque valeur a un type. `12` est un nombre entier, de type `int`. `2.5` est un nombre à virgule, de type `float` : il s'écrit avec un point, jamais avec une virgule. <code>"{EXEMPLE}"</code> est du texte, de type `str`, toujours entre guillemets : simples ou doubles, c'est pareil, <code>'{EXEMPLE}'</code> est le même texte.
 
 Une variable est un nom posé sur une valeur, avec `=` : après <code>mot = "{EXEMPLE}"</code>, le nom `mot` désigne ce texte. Une f-string, un texte précédé de la lettre `f`, remplace chaque morceau entre accolades par sa valeur : `f"{mot} a {len(mot)} lettres"` donne <code>{`${EXEMPLE} a ${EXEMPLE.length} lettres`}</code>. La fonction `len` donne la longueur d'un texte.
 
@@ -140,7 +154,7 @@ Les nombres entiers sont exacts. Les nombres à virgule, eux, réservent une sur
   acquis="flottants"
 >
 
-Un nombre à virgule est rangé en binaire, avec un nombre fixe de chiffres. `0.1` et `0.2` n'y tombent pas juste : ils sont arrondis au plus proche. Leur somme vaut <code>{SOMME_DES_FLOTTANTS}</code>, pas tout à fait `0.3`, et `==` répond `False`. Comparer ne lève jamais d'erreur.
+Un nombre à virgule est rangé en binaire, avec un nombre fixe de chiffres. `0.1` et `0.2` n'y tombent pas juste : ils sont arrondis au plus proche. Leur somme vaut <code>{SOMME_DES_FLOTTANTS}</code>, pas tout à fait `0.3`, et `==` répond `False`. Comparer deux nombres avec `==` ne lève pas d'erreur : au pire, la réponse est `False`.
 
 Pour comparer deux nombres à virgule, on accepte un tout petit écart : `math.isclose(0.1 + 0.2, 0.3)` répond `True`.
 
@@ -148,7 +162,7 @@ Pour comparer deux nombres à virgule, on accepte un tout petit écart : `math.i
 
 <Fragment slot="note">
 
-Ton navigateur fait le même calcul que Python, avec les mêmes arrondis : la réponse de ce pari est calculée par la page elle-même.
+JavaScript fait le même calcul que Python, avec les mêmes arrondis : la réponse de ce pari est calculée par JavaScript, pas recopiée.
 
 </Fragment>
 
@@ -164,8 +178,8 @@ Le programme du chapitre commence par découper le texte en une liste de mots :
 
 <CodeExplique fichier="projets/0.1-python/mot_suivant/mots.py" region="decouper">
   <li data-lignes="1">`def` définit une fonction, `decouper_mots`. Elle reçoit un texte (`str`) et rend une liste de textes (`list[str]`) : ce sont des annotations, l'étape 7 y revient.</li>
-  <li data-lignes="2">Entre triples guillemets, la documentation de la fonction : ce qu'elle fait, avec un exemple.</li>
-  <li data-lignes="3">`texte.lower()` met le texte en minuscules, et `MOTIF.findall` y trouve tous les mots. `MOTIF`, défini plus haut dans le fichier, reconnaît les suites de lettres, d'apostrophes et de traits d'union, et prend à part le point, le point d'exclamation et le point d'interrogation.</li>
+  <li data-lignes="2-5">Entre triples guillemets, la documentation de la fonction : ce qu'elle fait, avec un exemple.</li>
+  <li data-lignes="6">`texte.lower()` met le texte en minuscules, et `MOTIF.findall` y trouve tous les mots. `MOTIF`, défini plus haut dans le fichier, reconnaît les suites de lettres, d'apostrophes et de traits d'union, et prend à part le point, le point d'exclamation et le point d'interrogation.</li>
 </CodeExplique>
 
 <Pari
@@ -194,19 +208,19 @@ Le chapitre 1.3 se sert du même `zip` pour compter les paires de lettres voisin
 
 <Etape numero={4} titre="Compter avec un dictionnaire">
 
-Un dictionnaire associe des clés à des valeurs, entre accolades : `{'fer': 2, 'feu': 1}` associe deux mots à deux nombres. `d['fer']` lit la valeur de la clé `'fer'`, et `d['fer'] += 1` l'augmente de 1.
+Un dictionnaire associe des clés à des valeurs, entre accolades : après `d = {'fer': 2, 'feu': 1}`, le dictionnaire `d` associe deux mots à deux nombres. `d['fer']` lit la valeur de la clé `'fer'`, et `d['fer'] += 1` l'augmente de 1.
 
-`Counter`, du module `collections`, est un dictionnaire fait pour compter : une clé encore jamais vue y vaut 0. `Counter(['fer', 'feu', 'fer'])` compte toute une liste en une ligne, et donne `Counter({'fer': 2, 'feu': 1})`.
+`Counter`, du module `collections`, est un dictionnaire fait pour compter : une clé encore jamais vue y vaut 0. <code>{`Counter(${reprListePython(A_COMPTER)})`}</code> compte toute une liste en une ligne, et donne <code>{COMPTE}</code>.
 
 Le programme donne à chaque mot du texte son propre `Counter` : celui des mots qui le suivent.
 
 <CodeExplique fichier="projets/0.1-python/mot_suivant/mots.py" region="compter">
-  <li data-lignes="1">La fonction reçoit la liste des mots et rend un dictionnaire : à chaque mot, un `Counter` de ses suivants.</li>
-  <li data-lignes="6">On part d'un dictionnaire vide. L'annotation dit ce qu'il contiendra.</li>
-  <li data-lignes="7-8">`zip(mots, mots[1:])` donne chaque mot avec son voisin de droite, comme à l'étape 3. La boucle `for` prend ces couples un par un, dans `mot` et `suivant`.</li>
-  <li data-lignes="9-10">La première fois qu'on rencontre un mot, on lui donne un `Counter` vide.</li>
-  <li data-lignes="11">On ajoute 1 au compte de ce suivant. Un `Counter` part de zéro : pas besoin de vérifier si ce suivant a déjà été vu.</li>
-  <li data-lignes="12">Le dictionnaire est rendu. Ses clés restent dans l'ordre où les mots sont apparus.</li>
+  <li data-lignes="1-3">La fonction reçoit la liste des mots et rend un dictionnaire : à chaque mot, un `Counter` de ses suivants.</li>
+  <li data-lignes="9">On part d'un dictionnaire vide. L'annotation dit ce qu'il contiendra.</li>
+  <li data-lignes="10-12">`zip(mots, mots[1:])` donne chaque mot avec son voisin de droite, comme à l'étape 3. La boucle `for` prend ces couples un par un, dans `mot` et `suivant`.</li>
+  <li data-lignes="13-14">La première fois qu'on rencontre un mot, on lui donne un `Counter` vide.</li>
+  <li data-lignes="15">On ajoute 1 au compte de ce suivant. Un `Counter` part de zéro : pas besoin de vérifier si ce suivant a déjà été vu.</li>
+  <li data-lignes="16">Le dictionnaire est rendu. Ses clés restent dans l'ordre où les mots sont apparus.</li>
 </CodeExplique>
 
 <Fragment slot="note">
@@ -250,7 +264,7 @@ Se tromper ici n'a aucune importance : un pari, même faux, fait mieux retenir l
 
 <Verrou nom="atelier" message="Fais ton pari à l'étape 5 : le texte, le mot de départ et le nombre jaune se débloquent juste après.">
 
-Choisis un mot de départ et le nombre de mots à écrire. Le tableau montre ce qui suit ce mot dans le texte ; le programme prend le plus fréquent, puis recommence à partir de lui.
+Choisis un mot de départ et le nombre de mots à écrire. Le tableau montre ce qui suit ce mot dans le texte ; le programme prend le plus fréquent, puis recommence à partir de lui. À l'arrivée, il écrit {DEPART.longueur} mots à partir de « {DEPART.mot} ».
 
 <AtelierMotSuivant client:load texteInitial={TEXTE_DE_DEPART} motInitial={MOT} verrou="atelier" acquis="atelier">
 
@@ -263,6 +277,7 @@ Change le mot de départ : toute la suite change avec lui. Tu peux aussi réécr
 <Pari
   id="boucle"
   question={`Le programme prend toujours le suivant le plus fréquent. En partant de « ${MOT} », que donne une suite de ${LONGUEUR_DU_PARI} mots ?`}
+  precision={`Dans l'atelier, la suite qui part de « ${DEPART.mot} » fait ${DEPART.suite.length} mots. Parie, puis monte le nombre jaune jusqu'à ${LONGUEUR_DU_PARI} pour vérifier.`}
   choix={choixBoucle(TEXTE_DE_DEPART)}
   acquis="boucle"
 >
@@ -277,7 +292,7 @@ Pour en sortir, un vrai modèle de langage ne prend pas toujours le mot le plus 
 
 Tout ce qui est jaune se manipule. Le nombre se fait glisser à la souris ou au doigt ; au clavier, atteins-le avec Tab, puis utilise les flèches.
 
-Le chapitre 1.1 dira pourquoi ce petit programme est déjà, en tout petit, un modèle de langage.
+Le chapitre 1.1 dira pourquoi ce petit programme est déjà, en miniature, un modèle de langage.
 
 </Fragment>
 
@@ -290,31 +305,32 @@ Le projet range tout cela dans des fonctions, réparties dans des fichiers. Quel
 **Des fonctions annotées.** Chaque fonction annonce ce qu'elle reçoit et ce qu'elle rend : `mot: str` dit que `mot` est un texte, et `-> str | None`, que la fonction rend un texte ou `None`, la valeur de Python qui veut dire « rien ». Python ne vérifie pas ces annotations pendant que le programme tourne : elles aident à lire le code, et des outils s'en servent pour le contrôler.
 
 <CodeExplique fichier="projets/0.1-python/mot_suivant/mots.py" region="predire">
-  <li data-lignes="1">`predire` reçoit le dictionnaire des suivants et un mot, et rend un mot ou `None`.</li>
-  <li data-lignes="2-7">La documentation dit la règle, égalités comprises.</li>
-  <li data-lignes="8">`suivants.get(mot)` lit le `Counter` du mot, ou `None` si le mot n'est pas une clé : un mot inconnu ne fait pas d'erreur.</li>
-  <li data-lignes="9-10">Rien ne suit ce mot : la fonction rend `None`. `None` et un `Counter` vide comptent tous deux pour faux.</li>
-  <li data-lignes="11">`min` cherche le suivant dont la clé est la plus petite. La clé est un couple : d'abord `-compte[m]`, si bien que le plus fréquent passe en tête, puis le mot lui-même, qui départage une égalité dans l'ordre des numéros des caractères, comme au chapitre 1.3.</li>
+  <li data-lignes="1-4">`predire` reçoit le dictionnaire des suivants et un mot, un paramètre par ligne, et rend un mot ou `None`.</li>
+  <li data-lignes="5-11">La documentation dit la règle, égalités comprises.</li>
+  <li data-lignes="13">`suivants.get(mot)` lit le `Counter` du mot, ou `None` si le mot n'est pas une clé du dictionnaire : un mot inconnu ne fait pas d'erreur.</li>
+  <li data-lignes="14-15">Rien ne suit ce mot : la fonction rend `None`. `None` et un `Counter` vide comptent tous deux pour faux.</li>
+  <li data-lignes="16">`min` garde le suivant qui donne la plus petite valeur. Cette valeur, c'est l'argument `key=` qui la calcule : une petite fonction sans nom, écrite `lambda m: …`, qui reçoit chaque mot `m` et rend ce qu'on compare, le couple `(-compte[m], m)`. Ce `key` n'a rien à voir avec les clés du dictionnaire.</li>
+  <li data-lignes="16">Deux couples se comparent d'abord par leur premier élément. `-compte[m]` est d'autant plus petit que le compte est grand : le plus fréquent passe en tête. À égalité, le mot lui-même départage, dans l'ordre des numéros des caractères, comme au chapitre 1.3.</li>
 </CodeExplique>
 
 `generer` s'en sert pour écrire une suite, un mot après l'autre :
 
 <CodeExplique fichier="projets/0.1-python/mot_suivant/mots.py" region="generer">
-  <li data-lignes="1">`generer` reçoit les suivants, un mot de départ et une longueur ; elle rend une liste de mots.</li>
-  <li data-lignes="7-8">Une longueur nulle ou négative donne une liste vide.</li>
-  <li data-lignes="9">La suite commence par le mot de départ.</li>
-  <li data-lignes="10-11">Tant que la suite est plus courte que demandé, on prédit le suivant de son dernier mot, `suite[-1]`.</li>
-  <li data-lignes="12-13">Si rien ne le suit, `break` sort de la boucle : la suite s'arrête là.</li>
-  <li data-lignes="14">Sinon, `append` ajoute le mot prédit au bout de la liste.</li>
+  <li data-lignes="1-5">`generer` reçoit les suivants, un mot de départ et une longueur ; elle rend une liste de mots.</li>
+  <li data-lignes="13-14">Une longueur nulle ou négative donne une liste vide.</li>
+  <li data-lignes="15">La suite commence par le mot de départ.</li>
+  <li data-lignes="16-17">Tant que la suite est plus courte que demandé, on prédit le suivant de son dernier mot, `suite[-1]`.</li>
+  <li data-lignes="18-19">Si rien ne le suit, `break` sort de la boucle : la suite s'arrête là.</li>
+  <li data-lignes="20">Sinon, `append` ajoute le mot prédit au bout de la liste.</li>
 </CodeExplique>
 
 **Un NamedTuple.** Une suite, c'est deux informations : ses mots, et l'endroit où elle se met à tourner en rond. `Suite` les range ensemble. Un `NamedTuple` est un tuple, une suite de valeurs qui ne change plus, dont chaque case porte un nom : on écrit `suite.mots` et `suite.reprise`, plutôt que `suite[0]` et `suite[1]`.
 
 <CodeExplique fichier="projets/0.1-python/mot_suivant/mots.py" region="suivre">
   <li data-lignes="1">`class Suite(NamedTuple)` crée un nouveau type, `Suite`, à partir de `NamedTuple`.</li>
-  <li data-lignes="4-5">Ses deux champs, avec leur type : `mots`, une liste de textes, et `reprise`, un entier ou `None`.</li>
-  <li data-lignes="8">`suivre` rend une `Suite`, comme l'annonce `-> Suite`.</li>
-  <li data-lignes="10-11">Les mots viennent de `generer`. `premiere_reprise`, définie plus haut dans le fichier, cherche le premier mot déjà vu, et `Suite(…)` remplit les deux champs.</li>
+  <li data-lignes="6-10">Ses deux champs, avec leur type : `mots`, une liste de textes, et `reprise`, un entier ou `None`.</li>
+  <li data-lignes="13-17">`suivre` rend une `Suite`, comme l'annonce `-> Suite`.</li>
+  <li data-lignes="21-22">Les mots viennent de `generer`. `premiere_reprise`, définie plus haut dans le fichier, cherche le premier mot déjà vu, et `Suite(…)` remplit les deux champs.</li>
 </CodeExplique>
 
 Un `NamedTuple` reste un tuple : `mots, reprise = suivre(suivants, "le", 20)` le découpe en ses deux champs.
@@ -337,7 +353,7 @@ Depuis Python 3.15, l'UTF-8 est le choix par défaut partout ([PEP 686](https://
 
 Un test est une fonction dont le nom commence par `test_`, et qui vérifie un résultat avec `assert` : si la condition est fausse, le test échoue. pytest trouve tous ces tests et les lance. Dans le dossier du projet :
 
-<BlocCommande commandes={[LANCER_TESTS]} />
+<BlocCommande commandes={[LANCER_TESTS]} ou="un terminal, dans le dossier du projet" />
 
 pytest affiche un point par test réussi, puis le nombre de tests passés. Voici l'un d'eux :
 
@@ -364,7 +380,7 @@ Ton programme tient en quelques fonctions, et Python les fait tourner seul. Pour
 
 <EncadreLabo
   sources={[
-    { titre: 'Llama 3 (Meta), article de présentation, sections 3.3.1, 3.3.4 et 6.2', url: 'https://arxiv.org/abs/2407.21783', verifieLe: '2026-11-05' },
+    { titre: 'Llama 3 (Meta), article de présentation, sections 3.3.1, 3.3.4 et 6.2, tableau 4', url: 'https://arxiv.org/abs/2407.21783', verifieLe: '2026-11-05' },
     { titre: 'Gemma 3 (Google), fiche du modèle, logiciel et matériel d’entraînement', url: 'https://ai.google.dev/gemma/docs/core/model_card_3', verifieLe: '2026-11-05' },
     { titre: 'PyTorch, présentation du dépôt, « Fast and Lean »', url: 'https://github.com/pytorch/pytorch', verifieLe: '2026-11-05' },
     { titre: 'PyTorch, documentation de l’API C++ (ATen)', url: 'https://docs.pytorch.org/cppdocs/', verifieLe: '2026-11-05' },
@@ -372,7 +388,7 @@ Ton programme tient en quelques fonctions, et Python les fait tourner seul. Pour
   ]}
 >
 
-Chez eux aussi, on écrit en Python. Meta s'appuie sur PyTorch pour entraîner Llama 3, sur jusqu'à 16&#8239;000 cartes graphiques H100. Google a entraîné Gemma 3 avec JAX, sur ses propres puces, les TPU.
+Chez eux aussi, on écrit en Python. Meta s'appuie sur PyTorch pour entraîner Llama 3, sur jusqu'à 16&#8239;384 cartes graphiques H100. Google a entraîné Gemma 3 avec JAX, sur ses propres puces, les TPU.
 
 Mais Python ne fait que piloter. Sous PyTorch, les calculs partent dans ATen, une bibliothèque écrite en C++ sur laquelle reposent presque toutes les fonctions de PyTorch ; sur la carte graphique, elle lance des programmes CUDA et des bibliothèques de NVIDIA comme cuDNN. Sous JAX, chaque opération est confiée à XLA, un compilateur qui produit le code de la carte ou du TPU. Meta va jusqu'à écrire ses propres programmes CUDA pour aller plus vite. Python décide quoi calculer ; le C++ et CUDA calculent.
 

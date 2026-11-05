@@ -1,4 +1,5 @@
 // Aides communes aux parcours de test.
+import { existsSync } from 'node:fs';
 import { expect, type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -170,4 +171,20 @@ export async function terminerChapitre13(page: Page): Promise<void> {
   await page.locator('[data-pari="rare"] [data-juste]').click();
   await page.locator('[data-pari="zip"] [data-juste]').click();
   await expect(page.locator('#recap [data-total]')).toContainText('5 sur 5');
+}
+
+/**
+ * Vérifie que les liens d'une zone vers un chapitre ne visent que des chapitres
+ * parus, ceux qui ont leur fichier dans src/content/chapitres/ (Playwright tourne
+ * dans site/). Un renvoi vers un chapitre à venir s'écrit en texte, jamais en
+ * lien : sur le site publié, ce lien mènerait à une page absente.
+ */
+export async function verifierLiensVersParus(zone: Locator, lieu = ''): Promise<void> {
+  const liens = await zone
+    .locator('a[href*="/forge-ia/partie-"]')
+    .evaluateAll((a) => a.map((e) => e.getAttribute('href') ?? ''));
+  for (const href of liens) {
+    const chapitre = /\/partie-\d+\/(\d+-\d+)\/?/.exec(href);
+    if (chapitre) expect(existsSync(`src/content/chapitres/${chapitre[1]}.mdx`), `${lieu} : ${href}`).toBe(true);
+  }
 }

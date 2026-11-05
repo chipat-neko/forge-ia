@@ -34,19 +34,26 @@ def charger_texte() -> str:
 
 # region: decouper
 def decouper_mots(texte: str) -> list[str]:
-    """Découpe un texte en mots, en minuscules : « Le fer ! » donne ["le", "fer", "!"]."""
+    """Découpe un texte en mots, en minuscules.
+
+    « Le fer ! » donne ["le", "fer", "!"].
+    """
     return MOTIF.findall(texte.lower())
 # fin: decouper
 
 
 # region: compter
-def compter_suivants(mots: list[str]) -> dict[str, Counter[str]]:
+def compter_suivants(
+    mots: list[str],
+) -> dict[str, Counter[str]]:
     """Pour chaque mot, compte les mots qui le suivent.
 
-    Les clés sont dans l'ordre où les mots apparaissent pour la première fois.
+    Les clés sont dans l'ordre où les mots apparaissent
+    pour la première fois.
     """
     suivants: dict[str, Counter[str]] = {}
-    # zip associe chaque mot à son voisin de droite : (mots[0], mots[1]), (mots[1], mots[2])…
+    # zip associe chaque mot à son voisin de droite :
+    # (mots[0], mots[1]), (mots[1], mots[2])…
     for mot, suivant in zip(mots, mots[1:]):
         if mot not in suivants:
             suivants[mot] = Counter()
@@ -56,21 +63,30 @@ def compter_suivants(mots: list[str]) -> dict[str, Counter[str]]:
 
 
 # region: trier
-def suivants_tries(compte: Counter[str]) -> list[tuple[str, int]]:
-    """Les suivants d'un mot et leurs comptes, du plus fréquent au moins fréquent.
+def suivants_tries(
+    compte: Counter[str],
+) -> list[tuple[str, int]]:
+    """Les suivants d'un mot et leurs comptes, du plus
+    fréquent au moins fréquent.
 
-    À compte égal, dans l'ordre des points de code, comme pour predire.
+    À compte égal, dans l'ordre des points de code, comme
+    pour predire.
     """
     return sorted(compte.items(), key=lambda paire: (-paire[1], paire[0]))
 # fin: trier
 
 
 # region: predire
-def predire(suivants: dict[str, Counter[str]], mot: str) -> str | None:
-    """Le mot qui suit le plus souvent `mot`, ou None si rien ne le suit.
+def predire(
+    suivants: dict[str, Counter[str]],
+    mot: str,
+) -> str | None:
+    """Le mot qui suit le plus souvent `mot`, ou None si
+    rien ne le suit.
 
-    En cas d'égalité, on prend le plus petit dans l'ordre des points de code :
-    « le plus petit » de (-compte, mot), c'est le plus grand compte, puis le
+    En cas d'égalité, on prend le plus petit dans l'ordre
+    des points de code : « le plus petit » de
+    (-compte, mot), c'est le plus grand compte, puis le
     premier mot dans cet ordre.
     """
     compte = suivants.get(mot)
@@ -81,11 +97,17 @@ def predire(suivants: dict[str, Counter[str]], mot: str) -> str | None:
 
 
 # region: generer
-def generer(suivants: dict[str, Counter[str]], depart: str, longueur: int) -> list[str]:
-    """La suite qui commence par `depart`, de `longueur` mots au plus.
+def generer(
+    suivants: dict[str, Counter[str]],
+    depart: str,
+    longueur: int,
+) -> list[str]:
+    """La suite qui commence par `depart`, de `longueur`
+    mots au plus.
 
-    Elle s'arrête plus tôt quand rien ne suit le dernier mot. Si `depart` n'est
-    pas dans le texte, rien ne le suit : la suite vaut [depart].
+    Elle s'arrête plus tôt quand rien ne suit le dernier
+    mot. Si `depart` n'est pas dans le texte, rien ne le
+    suit : la suite vaut [depart].
     """
     if longueur <= 0:
         return []
@@ -115,14 +137,25 @@ def premiere_reprise(suite: list[str]) -> int | None:
 
 # region: suivre
 class Suite(NamedTuple):
-    """Une suite de mots, et l'endroit où elle se met à tourner en rond."""
+    """Une suite de mots, et l'endroit où elle se met à
+    tourner en rond.
+    """
 
-    mots: list[str]  # les mots de la suite, en commençant par le mot de départ
-    reprise: int | None  # l'indice du premier mot qui revient, ou None si aucun ne revient
+    # les mots, en commençant par le mot de départ
+    mots: list[str]
+    # l'indice du premier mot qui revient,
+    # ou None si aucun ne revient
+    reprise: int | None
 
 
-def suivre(suivants: dict[str, Counter[str]], depart: str, longueur: int) -> Suite:
-    """La suite de `longueur` mots au plus qui part de `depart`, avec sa première reprise."""
+def suivre(
+    suivants: dict[str, Counter[str]],
+    depart: str,
+    longueur: int,
+) -> Suite:
+    """La suite de `longueur` mots au plus qui part de
+    `depart`, avec sa première reprise.
+    """
     mots = generer(suivants, depart, longueur)
     return Suite(mots, premiere_reprise(mots))
 # fin: suivre

@@ -26,10 +26,14 @@ export const MOT_DU_PARI = 'le';
 /** La longueur de la suite du pari « boucle ». */
 export const LONGUEUR_DU_PARI = 20;
 
-/** Les réglages de la longueur de l'atelier : de 1 à 30 mots, 20 à l'arrivée. */
+/**
+ * Les réglages de la longueur de l'atelier : de 1 à 30 mots, 12 à l'arrivée.
+ * À 12 mots, la suite qui part de « le » ne boucle pas encore : le lecteur
+ * parie sur 20 mots avant de voir la boucle, puis monte le réglage pour vérifier.
+ */
 export const LONGUEUR_MIN = 1;
 export const LONGUEUR_MAX = 30;
-export const LONGUEUR_INITIALE = 20;
+export const LONGUEUR_INITIALE = 12;
 
 /** Le défi de l'atelier : une suite d'au moins SEUIL_DU_DEFI mots, sans reprise. */
 export const SEUIL_DU_DEFI = 15;
@@ -207,6 +211,22 @@ export function boucleDuPari(texte: string): { mot: string; suite: string[]; rep
   // Le mot repris est apparu une première fois plus tôt : de là à la reprise, les mêmes mots se répètent.
   const debut = suite.indexOf(suite[reprise!]);
   return { mot, suite, reprise: reprise!, cycle: suite.slice(debut, reprise!) };
+}
+
+/**
+ * La suite que l'atelier montre à l'arrivée : LONGUEUR_INITIALE mots depuis
+ * le mot du pari. Elle ne doit pas encore boucler, sinon l'atelier, posé avant
+ * le pari « boucle », en donnerait la réponse.
+ */
+export function suiteDeDepart(texte: string): { mot: string; longueur: number; suite: string[] } {
+  const mot = motDuPari(texte);
+  const suite = generer(compterSuivants(decouperMots(texte)), mot, LONGUEUR_INITIALE);
+  exiger(
+    premiereReprise(suite) === null,
+    `la suite de ${LONGUEUR_INITIALE} mots qui part de « ${mot} » boucle déjà : l’atelier, à l’arrivée, ` +
+      'donnerait la réponse du pari « boucle »',
+  );
+  return { mot, longueur: LONGUEUR_INITIALE, suite };
 }
 
 /** Le pari « Que donne une suite de 20 mots qui part de « le » ? ». */

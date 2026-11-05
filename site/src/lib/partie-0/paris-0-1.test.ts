@@ -28,6 +28,7 @@ import {
   reprListePython,
   SEUIL_DU_DEFI,
   SOMME_DES_FLOTTANTS,
+  suiteDeDepart,
 } from './paris-0-1';
 import { TEXTE_DE_DEPART } from './texte-0-1';
 
@@ -141,12 +142,29 @@ describe('ce que la page enseigne, prouvé sur le texte de l’atelier', () => {
     expect(premiereReprise(generer(suivants, MOT_DU_PARI, LONGUEUR_DU_PARI))).not.toBeNull();
   });
 
+  it('à l’arrivée (« le », 12 mots), l’atelier ne montre pas encore la boucle du pari', () => {
+    expect(LONGUEUR_INITIALE).toBeLessThan(LONGUEUR_DU_PARI);
+    expect(premiereReprise(generer(suivants, MOT_DU_PARI, LONGUEUR_INITIALE))).toBeNull();
+    expect(suiteDeDepart(TEXTE_DE_DEPART)).toEqual({
+      mot: MOT_DU_PARI,
+      longueur: LONGUEUR_INITIALE,
+      suite: generer(suivants, MOT_DU_PARI, LONGUEUR_INITIALE),
+    });
+  });
+
   it('le défi n’est pas réussi dans l’état de départ de l’atelier', () => {
     expect(defiReussi(generer(suivants, MOT_DU_PARI, LONGUEUR_INITIALE))).toBe(false);
   });
 
-  it('au moins un mot de départ du texte réussit le défi, sans toucher à la longueur', () => {
-    expect(departs.filter((mot) => defiReussi(generer(suivants, mot, LONGUEUR_INITIALE))).length).toBeGreaterThan(0);
+  it('au moins un mot de départ du texte atteint 15 mots sans reprise, la longueur réglée à 15 ou plus', () => {
+    const reussis = departs.filter((mot) => {
+      for (let longueur = SEUIL_DU_DEFI; longueur <= LONGUEUR_MAX; longueur++) {
+        if (defiReussi(generer(suivants, mot, longueur))) return true;
+      }
+      return false;
+    });
+    expect(reussis.length).toBeGreaterThan(0);
+    expect(reussis).not.toContain(MOT_DU_PARI);
   });
 
   it('« le » ne peut pas réussir le défi, quelle que soit la longueur', () => {
