@@ -11,6 +11,7 @@ import math
 import pytest
 
 from maths_utiles.attendus import (
+    CAS_MESSAGES,
     CAS_TIRER,
     CHEMIN_ATTENDUS,
     DEPARTS_DESCENTE,
@@ -28,6 +29,7 @@ from maths_utiles.attendus import (
     TEMPERATURES,
     VECTEURS_DE_REFERENCE,
     calculer_attendus,
+    vers_json,
 )
 from maths_utiles.derivees import TAUX_DESCENTE
 from maths_utiles.tirage import EXEMPLE_COMPTES, GRAINE_TIRAGE
@@ -72,26 +74,32 @@ def comparer_a_peu_pres(calcule, lu, chemin: str, tolerant: bool = False) -> Non
             f"{chemin} : {calcule!r} au lieu de {lu!r}"
         )
     else:
-        assert type(calcule) is type(lu) and calcule == lu, f"{chemin} : {calcule!r} au lieu de {lu!r}"
+        # Par le texte JSON : -0.0 et 0.0, ou 6 et 6.0, ne passent pas l'un pour l'autre.
+        assert type(calcule) is type(lu) and vers_json(calcule) == vers_json(lu), (
+            f"{chemin} : {calcule!r} au lieu de {lu!r}"
+        )
 
 
 def test_attendus_a_jour():
     assert CHEMIN_ATTENDUS.exists(), f"tests/attendus.json est introuvable. {REGENERER}"
-    # Aller-retour par JSON : les tuples deviennent des listes, comme à la relecture.
-    calcule = json.loads(json.dumps(calculer_attendus()))
+    calcule = calculer_attendus()
     lu = lire()
     assert list(calcule) == list(lu), f"tests/attendus.json n'a plus les mêmes sections. {REGENERER}"
     for nom in SECTIONS_EXACTES:
-        assert calcule[nom] == lu[nom], f"La section « {nom} » de tests/attendus.json n'est plus à jour. {REGENERER}"
+        # Le texte JSON, écrit comme le fichier : « == » prendrait -0.0 pour 0.0, et 6 pour 6.0.
+        assert vers_json(calcule[nom]) == vers_json(lu[nom]), (
+            f"La section « {nom} » de tests/attendus.json n'est plus à jour. {REGENERER}"
+        )
     for nom in SECTIONS_LIBM:
         try:
-            comparer_a_peu_pres(calcule[nom], lu[nom], nom)
+            # Aller-retour par JSON : les tuples deviennent des listes, comme à la relecture.
+            comparer_a_peu_pres(json.loads(vers_json(calcule[nom])), lu[nom], nom)
         except AssertionError as ecart:
             raise AssertionError(f"La section « {nom} » n'est plus à jour ({ecart}). {REGENERER}") from None
 
 
 def test_sections_exactes_et_libm():
-    assert SECTIONS_EXACTES == ("vecteurs", "matrices", "descente", "tirage", "pente", "chaine")
+    assert SECTIONS_EXACTES == ("vecteurs", "matrices", "descente", "tirage", "messages", "pente", "chaine")
     assert SECTIONS_LIBM == ("softmax", "erreur")
     # Chaque section du fichier est dans l'une des deux listes, et une seule.
     assert sorted(lire()) == sorted(SECTIONS_EXACTES + SECTIONS_LIBM)
@@ -131,6 +139,14 @@ def test_la_tolerance_ne_cache_pas_une_vraie_difference():
     comparer_a_peu_pres(ln_a_un_bit, erreurs, "erreur")
 
 
+def test_le_texte_json_distingue_ce_que_egal_confond():
+    # « == » confond -0.0 et 0.0, 6 et 6.0 : le texte JSON du fichier, non.
+    assert -0.0 == 0.0 and vers_json(-0.0) != vers_json(0.0)
+    assert 6 == 6.0 and vers_json([6]) != vers_json([6.0])
+    with pytest.raises(AssertionError):
+        comparer_a_peu_pres({"p": -0.0, "erreur": 1.0}, {"p": 0.0, "erreur": 1.0}, "erreur")
+
+
 def test_fichier_en_utf8_et_lf():
     octets = CHEMIN_ATTENDUS.read_bytes()
     assert b"\r" not in octets, f"tests/attendus.json contient des fins de ligne Windows. {REGENERER}"
@@ -156,7 +172,7 @@ def test_entrees_de_reference():
 
 def test_forme_des_attendus():
     a = lire()
-    assert list(a) == ["vecteurs", "matrices", "descente", "tirage", "pente", "chaine", "softmax", "erreur"]
+    assert list(a) == ["vecteurs", "matrices", "descente", "tirage", "messages", "pente", "chaine", "softmax", "erreur"]
 
     # Toutes les paires ordonnées de vecteurs de référence.
     assert [(v["a"], v["b"]) for v in a["vecteurs"]] == [
@@ -193,6 +209,9 @@ def test_forme_des_attendus():
     for c in t["tirages"]:
         assert sum(c["comptes"]) == c["n"] and len(c["comptes"]) == len(EXEMPLE_COMPTES)
 
+    assert [(m["fonction"], m["arguments"]) for m in a["messages"]] == [(f, args) for f, args in CAS_MESSAGES]
+    for m in a["messages"]:
+        assert list(m) == ["fonction", "arguments", "message"] and m["message"]
     assert list(a["pente"]) == ["x", "exacte", "approchee"]
     assert list(a["chaine"]) == ["x", "h", "exacte", "approchee"]
     assert [(s["scores"], s["temperature"]) for s in a["softmax"]] == [(SCORES_SOFTMAX, t) for t in TEMPERATURES]
@@ -216,6 +235,12 @@ def test_quelques_valeurs_connues():
     assert abs(cas[(0.0, 1.2)]["positions"][-1] - 3.0) > 1000
     assert a["pente"]["exacte"] == -6.0 and abs(a["pente"]["approchee"] + 6.0) < 1e-6
     assert a["chaine"]["exacte"] == 12.0 and abs(a["chaine"]["approchee"] - 12.0) < 1e-5
+    messages = {(m["fonction"], json.dumps(m["arguments"])): m["message"] for m in a["messages"]}
+    assert messages[("produit_scalaire", "[[1, 2, 3], [1, 2]]")] == (
+        "Les deux vecteurs n’ont pas la même taille (3 et 2 nombres)\u202f: il en faut autant."
+    )
+    assert messages[("probabilites", "[[]]")].startswith("Aucun compte positif (le total vaut 0)")
+    assert messages[("tirages", "[[], 0, 1234]")] == "Aucune issue à tirer\u202f: donne au moins une probabilité."
     for s in a["softmax"]:
         assert math.isclose(math.fsum(s["probabilites"]), 1.0)
     assert a["erreur"][-1]["p"] == 1 / 40 and abs(a["erreur"][-1]["erreur"] - math.log(40)) < 1e-12

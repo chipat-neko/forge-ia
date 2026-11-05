@@ -137,11 +137,21 @@ export const EXEMPLE_COMPTES: readonly (readonly [string, number])[] = Object.fr
 /** La graine de départ de la figure des tirages et du pari. */
 export const GRAINE_TIRAGE = 1234;
 
-/** Chaque compte divisé par le total : fer 6, métal 3, feu 1 donnent [0.6, 0.3, 0.1]. */
+/**
+ * Chaque compte divisé par le total : fer 6, métal 3, feu 1 donnent [0.6, 0.3, 0.1].
+ * Sans aucun compte, ou avec des comptes tous nuls, le total vaut 0 : le calcul
+ * s'arrête, avec le message du Python, au lieu de rendre NaN.
+ */
 export function probabilites(comptes: readonly (readonly [string, number])[]): number[] {
   // Des entiers : la somme est exacte, dans n'importe quel ordre.
   let total = 0;
   for (const [, c] of comptes) total += c;
+  if (total === 0) {
+    throw new RangeError(
+      `Aucun compte positif (le total vaut 0)${FINE}: ` +
+        'il faut au moins un compte plus grand que 0 pour calculer des probabilités.',
+    );
+  }
   return comptes.map(([, c]) => c / total);
 }
 
@@ -159,8 +169,12 @@ export function tirer(probas: readonly number[], u: number): number {
   return probas.length - 1;
 }
 
-/** n tirages au sort, avec un Hasard neuf de cette graine : combien de fois chaque issue est sortie. */
+/**
+ * n tirages au sort, avec un Hasard neuf de cette graine : combien de fois chaque
+ * issue est sortie. Sans aucune issue, le calcul s'arrête avec le message du Python.
+ */
 export function tirages(probas: readonly number[], n: number, graine: number): number[] {
+  if (probas.length === 0) throw new RangeError(`Aucune issue à tirer${FINE}: donne au moins une probabilité.`);
   const hasard = new Hasard(graine);
   const comptes: number[] = probas.map(() => 0);
   for (let k = 0; k < n; k++) {

@@ -54,10 +54,10 @@ dépôt, un test vérifie que la copie reste identique à l'original.
 
 Le fichier `tests/attendus.json` contient les résultats du Python sur des
 entrées fixées : des paires de vecteurs, des matrices, des descentes à chaque
-taux de la figure, des tirages, la pente approchée, la règle de la chaîne,
-softmax et l'erreur `−ln p`. Le jumeau TypeScript doit retrouver à
-l'identique les vecteurs, les matrices, les descentes et les tirages. Pour le
-régénérer :
+taux de la figure, des tirages, des messages d'erreur, la pente approchée, la
+règle de la chaîne, softmax et l'erreur `−ln p`. Le jumeau TypeScript doit
+retrouver à l'identique les vecteurs, les matrices, les descentes, les tirages
+et les messages d'erreur, mot pour mot. Pour le régénérer :
 
 ```powershell
 cd projets/0.2-maths

@@ -33,6 +33,17 @@ def test_probabilites():
     assert probabilites({"a": 1, "b": 3}) == [0.25, 0.75]
 
 
+def test_probabilites_sans_compte_positif():
+    message = (
+        "Aucun compte positif (le total vaut 0)\u202f: "
+        "il faut au moins un compte plus grand que 0 pour calculer des probabilités."
+    )
+    for comptes in ({}, {"fer": 0, "feu": 0}):
+        with pytest.raises(ValueError) as erreur:
+            probabilites(comptes)
+        assert str(erreur.value) == message
+
+
 def test_tirer():
     probas = [0.6, 0.3, 0.1]
     assert tirer(probas, 0.0) == 0 and tirer(probas, 0.59) == 0
@@ -55,6 +66,14 @@ def test_tirages():
     assert tirages(probas, 100, 7) != tirages(probas, 100, 8)
     # Une issue certaine sort à chaque fois.
     assert tirages([0.0, 1.0, 0.0], 50, 3) == [0, 50, 0]
+
+
+def test_tirages_sans_issue():
+    # Même sans tirage (n = 0) : une liste vide de probabilités n'a aucun sens.
+    for n in (10, 0):
+        with pytest.raises(ValueError) as erreur:
+            tirages([], n, 1234)
+        assert str(erreur.value) == "Aucune issue à tirer\u202f: donne au moins une probabilité."
 
 
 def test_hasard_reproductible():

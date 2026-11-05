@@ -69,6 +69,7 @@ interface AttendusMaths {
     tirer: { probas: number[]; u: number; indice: number }[];
     tirages: { n: number; graine: number; comptes: number[] }[];
   };
+  messages: { fonction: string; arguments: unknown[]; message: string }[];
   pente: { x: number; exacte: number; approchee: number };
   chaine: { x: number; h: number; exacte: number; approchee: number };
   softmax: { scores: number[]; temperature: number; probabilites: number[] }[];
@@ -164,6 +165,42 @@ describe('jumeau du Python : les attendus partagés de 0.2', () => {
   });
 });
 
+describe('les messages d’erreur, mot pour mot ceux du Python', () => {
+  it('chaque appel refusé de la section messages lève le même message', () => {
+    const appels: Record<string, (args: unknown[]) => unknown> = {
+      produit_scalaire: ([a, b]) => produitScalaire(a as number[], b as number[]),
+      somme: ([a, b]) => somme(a as number[], b as number[]),
+      probabilites: ([comptes]) => probabilites(comptes as [string, number][]),
+      tirages: ([probas, n, graine]) => tirages(probas as number[], n as number, graine as number),
+    };
+    expect(ATTENDUS.messages.map((m) => m.fonction)).toStrictEqual([
+      'produit_scalaire',
+      'produit_scalaire',
+      'somme',
+      'probabilites',
+      'probabilites',
+      'tirages',
+      'tirages',
+    ]);
+    for (const m of ATTENDUS.messages) {
+      expect(messageDErreur(() => appels[m.fonction](m.arguments)), `${m.fonction}${JSON.stringify(m.arguments)}`).toBe(
+        m.message,
+      );
+    }
+  });
+
+  it('des comptes vides ou nuls et une liste d’issues vide s’arrêtent, sans NaN ni case parasite', () => {
+    const comptesNuls = 'Aucun compte positif (le total vaut 0)\u202F: il faut au moins un compte plus grand que 0 pour calculer des probabilités.';
+    expect(messageDErreur(() => probabilites([]))).toBe(comptesNuls);
+    expect(messageDErreur(() => probabilites([['fer', 0], ['feu', 0]]))).toBe(comptesNuls);
+    for (const n of [10, 0]) {
+      expect(messageDErreur(() => tirages([], n, GRAINE_TIRAGE))).toBe(
+        'Aucune issue à tirer\u202F: donne au moins une probabilité.',
+      );
+    }
+  });
+});
+
 describe('cas limites du jumeau', () => {
   it('un vecteur nul n’a pas de cosinus, et deux tailles différentes s’arrêtent sur un message', () => {
     expect(cosinus([0, 0], [1, 2])).toBeNull();
@@ -212,7 +249,7 @@ describe('parite.ts : la page d’essai refait les sections exactes de 0.2', () 
     expect(SECTIONS_NON_REFAITES.maths).toStrictEqual(['pente', 'chaine', 'softmax', 'erreur']);
     // Les sections refaites par la page, plus celles qu'elle ne refait pas, font tout le fichier.
     const refaites = Object.keys(CALCULS_PARTIE_0.maths());
-    expect(refaites).toStrictEqual(['vecteurs', 'matrices', 'descente', 'tirage']);
+    expect(refaites).toStrictEqual(['vecteurs', 'matrices', 'descente', 'tirage', 'messages']);
     expect([...refaites, ...SECTIONS_NON_REFAITES.maths]).toStrictEqual(Object.keys(ATTENDUS));
   });
 
@@ -233,6 +270,7 @@ describe('parite.ts : la page d’essai refait les sections exactes de 0.2', () 
         tirer: a.tirage.tirer.map(({ probas, u }) => ({ probas, u })),
         tirages: a.tirage.tirages.map(({ n, graine }) => ({ n, graine })),
       },
+      messages: a.messages.map(({ fonction, arguments: args }) => ({ fonction, arguments: args })),
     };
     const refait: unknown = JSON.parse(versJson(refaireMaths(entrees)));
     expect(refait).toStrictEqual(partieRefaite('maths', a as unknown as Record<string, unknown>));

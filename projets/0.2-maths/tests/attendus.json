@@ -7858,6 +7858,87 @@
    }
   ]
  },
+ "messages": [
+  {
+   "fonction": "produit_scalaire",
+   "arguments": [
+    [
+     1,
+     2,
+     3
+    ],
+    [
+     1,
+     2
+    ]
+   ],
+   "message": "Les deux vecteurs n’ont pas la même taille (3 et 2 nombres) : il en faut autant."
+  },
+  {
+   "fonction": "produit_scalaire",
+   "arguments": [
+    [],
+    [
+     4
+    ]
+   ],
+   "message": "Les deux vecteurs n’ont pas la même taille (0 et 1 nombres) : il en faut autant."
+  },
+  {
+   "fonction": "somme",
+   "arguments": [
+    [
+     1
+    ],
+    [
+     1,
+     2
+    ]
+   ],
+   "message": "Les deux vecteurs n’ont pas la même taille (1 et 2 nombres) : il en faut autant."
+  },
+  {
+   "fonction": "probabilites",
+   "arguments": [
+    []
+   ],
+   "message": "Aucun compte positif (le total vaut 0) : il faut au moins un compte plus grand que 0 pour calculer des probabilités."
+  },
+  {
+   "fonction": "probabilites",
+   "arguments": [
+    [
+     [
+      "fer",
+      0
+     ],
+     [
+      "feu",
+      0
+     ]
+    ]
+   ],
+   "message": "Aucun compte positif (le total vaut 0) : il faut au moins un compte plus grand que 0 pour calculer des probabilités."
+  },
+  {
+   "fonction": "tirages",
+   "arguments": [
+    [],
+    10,
+    1234
+   ],
+   "message": "Aucune issue à tirer : donne au moins une probabilité."
+  },
+  {
+   "fonction": "tirages",
+   "arguments": [
+    [],
+    0,
+    1234
+   ],
+   "message": "Aucune issue à tirer : donne au moins une probabilité."
+  }
+ ],
  "pente": {
   "x": 0.0,
   "exacte": -6.0,

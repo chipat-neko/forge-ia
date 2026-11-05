@@ -16,9 +16,13 @@ def test_produit_scalaire():
 
 
 def test_produit_scalaire_refuse_deux_tailles_differentes():
-    # zip(…, strict=True) : une erreur, au lieu d'oublier la fin du plus long.
-    with pytest.raises(ValueError):
+    # Un message en français, le même que le site (la section messages des attendus le vérifie),
+    # au lieu de l'erreur anglaise de zip ou d'oublier la fin du plus long.
+    with pytest.raises(ValueError) as erreur:
         produit_scalaire([1, 2, 3], [1, 2])
+    assert str(erreur.value) == "Les deux vecteurs n’ont pas la même taille (3 et 2 nombres)\u202f: il en faut autant."
+    with pytest.raises(ValueError, match="0 et 1 nombres"):
+        produit_scalaire([], [4])
 
 
 def test_norme_et_cosinus():
@@ -38,8 +42,9 @@ def test_norme_et_cosinus():
 def test_somme():
     assert somme([3, 1], [1, 2]) == [4, 3]
     assert somme([], []) == []
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as erreur:
         somme([1], [1, 2])
+    assert str(erreur.value) == "Les deux vecteurs n’ont pas la même taille (1 et 2 nombres)\u202f: il en faut autant."
 
 
 def test_matrice_fois_vecteur():

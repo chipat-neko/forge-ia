@@ -60,8 +60,17 @@ GRAINE_TIRAGE = 1234
 
 
 def probabilites(comptes: dict[str, int]) -> list[float]:
-    """Chaque compte divisé par le total : {fer: 6, métal: 3, feu: 1} donne [0.6, 0.3, 0.1]."""
+    """Chaque compte divisé par le total : {fer: 6, métal: 3, feu: 1} donne [0.6, 0.3, 0.1].
+
+    Sans aucun compte, ou avec des comptes tous nuls, le total vaut 0 : un message
+    dit quoi faire, le même que le site (maths.ts), mot pour mot.
+    """
     total = sum(comptes.values())  # des entiers : la somme est exacte
+    if total == 0:
+        raise ValueError(
+            "Aucun compte positif (le total vaut 0)\u202f: "
+            "il faut au moins un compte plus grand que 0 pour calculer des probabilités."
+        )
     return [c / total for c in comptes.values()]
 
 
@@ -90,6 +99,11 @@ def tirages(
 ) -> list[int]:
     """n tirages au sort : combien de fois chaque issue
     est sortie."""
+    if not probas:
+        raise ValueError(
+            "Aucune issue à tirer\u202f: donne au moins"
+            " une probabilité."
+        )
     hasard = Hasard(graine)
     comptes = [0] * len(probas)
     for _ in range(n):

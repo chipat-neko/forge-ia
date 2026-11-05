@@ -90,16 +90,42 @@ export interface EntreesMaths {
     tirer: { probas: number[]; u: number }[];
     tirages: { n: number; graine: number }[];
   };
+  messages: { fonction: string; arguments: unknown[] }[];
+}
+
+/** Les fonctions du jumeau qu'appelle la section messages, sous leur nom Python, avec leurs arguments JSON. */
+const APPELS: Readonly<Record<string, (args: readonly unknown[]) => unknown>> = {
+  produit_scalaire: ([a, b]) => produitScalaire(a as number[], b as number[]),
+  somme: ([a, b]) => somme(a as number[], b as number[]),
+  // Les comptes s'écrivent en paires [mot, compte], comme EXEMPLE_COMPTES.
+  probabilites: ([comptes]) => probabilites(comptes as [string, number][]),
+  tirages: ([probas, n, graine]) => tirages(probas as number[], n as number, graine as number),
+};
+
+/** Le message de l'erreur que lève l'appel, ou null s'il n'en lève pas (la comparaison le verra). */
+function messageDe(fonction: string, args: readonly unknown[]): string | null {
+  const appel = APPELS[fonction];
+  if (appel === undefined) {
+    throw new Error(
+      `La section messages appelle « ${fonction} », que la page ne connaît pas : ajoute-la à APPELS (parite.ts).`,
+    );
+  }
+  try {
+    appel(args);
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
 }
 
 /**
- * Les sections vecteurs, matrices, descente et tirage du fichier des maths
- * utiles, refaites à partir de ses seules entrées. Les constantes du jumeau
+ * Les sections vecteurs, matrices, descente, tirage et messages du fichier des
+ * maths utiles, refaites à partir de ses seules entrées. Les constantes du jumeau
  * (TAUX_DESCENTE, GRAINE_TIRAGE, EXEMPLE_COMPTES) sont écrites telles que le
  * site les connaît : la comparaison vérifie qu'elles sont celles du Python.
  */
 export function refaireMaths(entrees: EntreesMaths): Attendus {
-  const { vecteurs, matrices, descente, tirage } = entrees;
+  const { vecteurs, matrices, descente, tirage, messages } = entrees;
   const probas = probabilites(EXEMPLE_COMPTES);
   const hasard = new Hasard(tirage.uniformes.graine);
   return {
@@ -144,6 +170,12 @@ export function refaireMaths(entrees: EntreesMaths): Attendus {
       tirer: tirage.tirer.map(({ probas: p, u }) => ({ probas: p, u, indice: tirer(p, u) })),
       tirages: tirage.tirages.map(({ n, graine }) => ({ n, graine, comptes: tirages(probas, n, graine) })),
     },
+    // Les mêmes messages d'erreur que le Python, mot pour mot.
+    messages: messages.map(({ fonction, arguments: args }) => ({
+      fonction,
+      arguments: args,
+      message: messageDe(fonction, args),
+    })),
   };
 }
 

@@ -15,10 +15,13 @@ export const FICHIERS_PARTIE_0: Readonly<Record<string, string>> = Object.freeze
 
 /**
  * Les sections d'un fichier d'attendus que le site ne refait pas : il les lit
- * telles quelles. Pour 0.2 : la pente approchée et la règle de la chaîne, qui
- * ne servent qu'en Python, puis softmax et −ln p, qui passent par exp et log,
- * dont le dernier chiffre change d'un système à l'autre. La page de parité ne
- * les écrit pas ; les comparaisons les retirent du fichier (partieRefaite).
+ * telles quelles. Pour 0.2 : la pente approchée (section pente) et la règle de
+ * la chaîne (section chaine), qui ne servent qu'en Python, puis softmax (section
+ * softmax) et −ln p, l'erreur d'une prédiction (section erreur : rien à voir
+ * avec la fonction erreur(x) de maths.ts, qui est refaite dans la section
+ * descente). Ces deux dernières passent par exp et log, dont le dernier chiffre
+ * change d'un système à l'autre. La page de parité ne les écrit pas ; les
+ * comparaisons les retirent du fichier (partieRefaite).
  */
 export const SECTIONS_NON_REFAITES: Readonly<Record<string, readonly string[]>> = Object.freeze({
   maths: Object.freeze(['pente', 'chaine', 'softmax', 'erreur']),

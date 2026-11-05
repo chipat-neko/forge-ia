@@ -5,6 +5,9 @@ tirages (site/src/lib/partie-0/maths.ts). Ce fichier produit
 `tests/attendus.json` : des entrées fixées, et ce que le Python en tire. Le
 jumeau TypeScript doit retrouver exactement les mêmes valeurs.
 
+Les messages d'erreur que le site affiche aussi y sont, pour qu'ils restent les
+mêmes mot pour mot dans les deux langages (section messages).
+
 Le fichier contient aussi ce que le site ne recalcule pas, et qu'il lit tel
 quel : la pente approchée, l'exemple de la règle de la chaîne, softmax et
 l'erreur −ln p.
@@ -32,7 +35,7 @@ from maths_utiles.vecteurs import cosinus, matrice_fois_vecteur, norme, produit_
 
 # Les sections qui n'utilisent que + − × ÷ et la racine carrée : le même résultat
 # au bit près sur toutes les machines, et dans le navigateur.
-SECTIONS_EXACTES = ("vecteurs", "matrices", "descente", "tirage", "pente", "chaine")
+SECTIONS_EXACTES = ("vecteurs", "matrices", "descente", "tirage", "messages", "pente", "chaine")
 # Les sections qui passent par math.exp et math.log : leur dernier chiffre peut
 # changer d'un système à l'autre (voir tests/test_attendus.py).
 SECTIONS_LIBM = ("softmax", "erreur")
@@ -107,7 +110,36 @@ TEMPERATURES = [0.5, 1.0, 2.0]
 # 1/40 : un modèle qui devine au hasard parmi 40 caractères, comme le mini-modèle.
 PROBAS_ERREUR = [1.0, 0.5, 0.1, 1 / 40]
 
+# (fonction, arguments) : des appels refusés, chacun avec son message. Les comptes
+# de probabilites s'écrivent en paires [mot, compte], comme dans le site.
+CAS_MESSAGES: list[tuple[str, list]] = [
+    ("produit_scalaire", [[1, 2, 3], [1, 2]]),
+    ("produit_scalaire", [[], [4]]),
+    ("somme", [[1], [1, 2]]),
+    ("probabilites", [[]]),
+    ("probabilites", [[["fer", 0], ["feu", 0]]]),
+    ("tirages", [[], 10, GRAINE_TIRAGE]),
+    ("tirages", [[], 0, GRAINE_TIRAGE]),
+]
+
+# Les fonctions de CAS_MESSAGES, appelées avec leurs arguments tels qu'ils s'écrivent en JSON.
+FONCTIONS_DES_MESSAGES = {
+    "produit_scalaire": produit_scalaire,
+    "somme": somme,
+    "probabilites": lambda paires: probabilites(dict(paires)),
+    "tirages": tirages,
+}
+
 CHEMIN_ATTENDUS = Path(__file__).resolve().parent.parent / "tests" / "attendus.json"
+
+
+def vers_json(valeur) -> str:
+    """La valeur en JSON, comme dans le fichier : UTF-8, sans NaN, indentée d'une espace.
+
+    Deux flottants égaux mais écrits différemment (-0.0 et 0.0, 6.0 et 6) ne
+    donnent pas le même texte : c'est ainsi qu'on compare les sections exactes.
+    """
+    return json.dumps(valeur, ensure_ascii=False, allow_nan=False, indent=1)
 
 
 def calculer_vecteurs() -> list[dict]:
@@ -171,6 +203,18 @@ def calculer_tirage() -> dict:
     }
 
 
+def calculer_messages() -> list[dict]:
+    cas = []
+    for fonction, arguments in CAS_MESSAGES:
+        try:
+            FONCTIONS_DES_MESSAGES[fonction](*arguments)
+        except ValueError as e:
+            cas.append({"fonction": fonction, "arguments": arguments, "message": str(e)})
+        else:
+            raise AssertionError(f"{fonction}{tuple(arguments)} devait être refusé : corrige CAS_MESSAGES.")
+    return cas
+
+
 def calculer_pente() -> dict:
     """La pente de l'erreur en x = 0 : exacte, et approchée."""
     return {"x": 0.0, "exacte": pente(0.0), "approchee": pente_approchee(erreur, 0.0)}
@@ -191,6 +235,7 @@ def calculer_attendus() -> dict:
         "matrices": calculer_matrices(),
         "descente": calculer_descente(),
         "tirage": calculer_tirage(),
+        "messages": calculer_messages(),
         "pente": calculer_pente(),
         "chaine": exemple_chaine(),
         "softmax": calculer_softmax(),
@@ -200,7 +245,7 @@ def calculer_attendus() -> dict:
 
 def ecrire_attendus() -> None:
     """Écrit tests/attendus.json (UTF-8, fins de ligne LF)."""
-    texte = json.dumps(calculer_attendus(), ensure_ascii=False, allow_nan=False, indent=1)
+    texte = vers_json(calculer_attendus())
     with open(CHEMIN_ATTENDUS, "w", encoding="utf-8", newline="\n") as fichier:
         fichier.write(texte + "\n")
 

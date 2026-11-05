@@ -14,6 +14,16 @@ import math
 from collections.abc import Sequence
 
 
+def verifier_tailles(a: Sequence[float], b: Sequence[float]) -> None:
+    """Arrête le calcul, avec un message qui dit quoi faire, si a et b n'ont pas
+    la même taille. Le même message que le site (maths.ts), mot pour mot."""
+    if len(a) != len(b):
+        raise ValueError(
+            f"Les deux vecteurs n’ont pas la même taille ({len(a)} et {len(b)} nombres)"
+            "\u202f: il en faut autant."
+        )
+
+
 # region: scalaire
 def produit_scalaire(
     a: Sequence[float],
@@ -23,10 +33,13 @@ def produit_scalaire(
 
     (3, 1) · (1, 2) = 3 × 1 + 1 × 2 = 5.
     """
+    # Deux tailles différentes : un message clair, en
+    # français, plutôt que l'erreur anglaise de zip.
+    verifier_tailles(a, b)
     s = 0.0
-    # strict=True : si les deux vecteurs n'ont pas la même
-    # taille, zip s'arrête sur une erreur, au lieu
-    # d'oublier la fin du plus long.
+    # strict=True : zip vérifie lui aussi que les deux
+    # vecteurs vont ensemble, au lieu d'oublier la fin
+    # du plus long.
     for x, y in zip(a, b, strict=True):
         s += x * y
     return s
@@ -57,6 +70,7 @@ def cosinus(
 
 def somme(a: Sequence[float], b: Sequence[float]) -> list[float]:
     """La somme case par case : (3, 1) + (1, 2) = (4, 3)."""
+    verifier_tailles(a, b)
     return [x + y for x, y in zip(a, b, strict=True)]
 
 
