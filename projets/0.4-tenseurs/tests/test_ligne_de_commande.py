@@ -125,8 +125,9 @@ def test_mesurer_sans_fichier(capsys):
 
 def test_carte_absente_dans_un_vrai_processus(tmp_path):
     # Le lecteur sans carte qui demande `--appareil cuda` : un vrai processus, une console
-    # Windows en cp1252, et pas de trace Python. CUDA_VISIBLE_DEVICES vide cache la carte
-    # quand il y en a une (à la porte, avec la roue gpu).
+    # Windows en cp1252, et pas de trace Python. CUDA_VISIBLE_DEVICES=-1 cache la carte
+    # quand il y en a une (à la porte, avec la roue gpu). Une valeur vide ne suffit pas :
+    # sous Windows, une variable vide compte comme absente, et PyTorch voit encore la carte.
     sortie = tmp_path / "carte.json"
     resultat = subprocess.run(
         [sys.executable, "-m", "tenseurs", "mesurer", "--appareil", "cuda", "--sortie", str(sortie)],
@@ -134,7 +135,7 @@ def test_carte_absente_dans_un_vrai_processus(tmp_path):
         encoding="utf-8",
         errors="replace",
         cwd=PROJET,
-        env={**os.environ, "PYTHONIOENCODING": "cp1252", "CUDA_VISIBLE_DEVICES": "", "FORGE_APPAREIL": ""},
+        env={**os.environ, "PYTHONIOENCODING": "cp1252", "CUDA_VISIBLE_DEVICES": "-1", "FORGE_APPAREIL": ""},
         timeout=120,
     )
     assert resultat.returncode == 2
