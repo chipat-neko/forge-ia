@@ -3,9 +3,11 @@
 //
 // Le texte n'est jamais recopié : à la construction, le composant lit le
 // fichier enregistré dans le dépôt (chemin depuis la racine du dépôt) et le
-// montre après l'invite « PS> » et la commande, dans une zone qui défile en
-// largeur. Une première ligne `# relevé le AAAA-MM-JJ` ne s'affiche pas : sa
-// date passe dans la légende (voir lib/sorties.ts).
+// montre après l'invite « PS> » et la commande. Les lignes longues passent à
+// la ligne, comme dans RapportDuScript : une phrase du diagnostic de 0.3 se
+// lit en entier sur un téléphone, sans défiler (point mis de côté à la tâche
+// 15). Une première ligne `# relevé le AAAA-MM-JJ` ne s'affiche pas : sa date
+// passe dans la légende (voir lib/sorties.ts).
 //
 // Si le fichier manque, par exemple une mesure pas encore faite sur la carte
 // graphique, le composant affiche le texte `absent`, marqué data-a-mesurer.
@@ -51,8 +53,8 @@ const sortie = existsSync(chemin) ? lireSortie(readFileSync(chemin, 'utf8'), fic
   ) : (
     <figure class="bloc-terminal sortie" data-sortie={fichier}>
       <figcaption>{typographier(legendeSortie(legende, sortie.releveLe))}</figcaption>
-      {/* Une zone qui défile doit prendre le focus pour se parcourir au clavier (WCAG 2.1.1). */}
-      <div class="zone-defilable" role="region" aria-label="Sortie de la commande, défilable" tabindex="0">
+      {/* Le texte passe à la ligne : la zone ne défile jamais, et n'a donc pas à prendre le focus. */}
+      <div class="zone-sortie">
         <pre><span class="invite">PS&gt;</span> <span class="commande">{commande}</span>{'\n'}<span data-contenu>{sortie.contenu}</span></pre>
       </div>
     </figure>
@@ -60,7 +62,14 @@ const sortie = existsSync(chemin) ? lireSortie(readFileSync(chemin, 'utf8'), fic
 }
 
 <style>
-  /* Le bloc lui-même (légende, fond, marges) : .bloc-terminal, dans src/styles/commandes.css. */
+  /* Le bloc lui-même (légende, fond, marges) : .bloc-terminal, dans src/styles/commandes.css. Les lignes
+     passent à la ligne, et un mot trop long pour la colonne se coupe : rien ne déborde. */
+  .sortie pre {
+    width: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
   .sortie .invite {
     color: var(--indigo-doux);
     user-select: none;

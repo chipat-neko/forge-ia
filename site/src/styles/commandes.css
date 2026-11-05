@@ -125,8 +125,9 @@
 /* ---------- Les blocs de terminal (BlocCommande.astro, SortieCommande.astro) ---------- */
 
 /* Des commandes à taper, ou ce qu'une commande a affiché : une légende en
-   encre douce, puis le texte dans une zone qui défile, sur le fond brume
-   claire du code. Chaque composant ajoute sa propre classe pour le reste. */
+   encre douce, puis le texte sur le fond brume claire du code. Les commandes
+   défilent dans leur zone (.zone-defilable) ; les sorties passent à la ligne
+   (.zone-sortie). Chaque composant ajoute sa propre classe pour le reste. */
 .bloc-terminal {
   margin: 1.2em 0;
 }
@@ -139,7 +140,8 @@
   margin-bottom: 8px;
 }
 
-.bloc-terminal .zone-defilable {
+.bloc-terminal .zone-defilable,
+.bloc-terminal .zone-sortie {
   background: var(--brume-claire);
   border-radius: 10px;
 }

@@ -49,7 +49,9 @@ function chiffreEtUnite(texte: string): { chiffre: string; unite: string } | nul
 }
 
 const avecCode = choix.some((c) => c.texte.includes('`'));
-const longs = choix.some((c) => c.texte.length > 16);
+// Un choix long, ou fait d'un mot long comme « Impossible », passe sur toute la largeur sur un téléphone :
+// à trois par ligne, son texte toucherait les bords du bouton (point mis de côté à la tâche 15).
+const longs = choix.some((c) => c.texte.length > 16 || c.texte.split(/\s+/).some((mot) => mot.length > 8));
 const classeChoix = ['choix', avecCode ? 'choix-code' : longs ? 'choix-longs' : ''].join(' ').trim();
 const idQuestion = `question-${id}`;
 const bonne = choix.find((c) => c.juste === true)!;

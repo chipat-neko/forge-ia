@@ -269,7 +269,7 @@ test('accessibilité après les paris (verdicts, choix marqués)', async ({ page
 // du dépôt, ou « à mesurer » quand il manque.
 const SORTIE = 'projets/1.3-tokenizer/donnees/corpus.txt';
 
-test('sortie de commande : le contenu du fichier, sans retour chariot, dans une zone défilable', async ({ page }) => {
+test('sortie de commande : le contenu du fichier, sans retour chariot, qui passe à la ligne', async ({ page }) => {
   await page.goto(PAGE);
   // Playwright tourne dans site/ : le dépôt est un dossier plus haut.
   const attendu = readFileSync(`../${SORTIE}`, 'utf8').replace(/\r/g, '').replace(/\n+$/, '');
@@ -280,10 +280,15 @@ test('sortie de commande : le contenu du fichier, sans retour chariot, dans une 
   const contenu = await sortie.locator('[data-contenu]').evaluate((el) => el.textContent);
   expect(contenu).toBe(attendu);
   expect(contenu).not.toContain('\r');
-  const zone = sortie.locator('.zone-defilable');
-  await expect(zone).toHaveAttribute('role', 'region');
-  await expect(zone).toHaveAttribute('aria-label', 'Sortie de la commande, défilable');
-  await expect(zone).toHaveAttribute('tabindex', '0');
+  // Les lignes passent à la ligne (point mis de côté à la tâche 15) : la zone ne défile pas, et ne prend donc
+  // pas le focus.
+  const zone = sortie.locator('.zone-sortie');
+  await expect(zone).toHaveCount(1);
+  await expect(sortie.locator('.zone-defilable')).toHaveCount(0);
+  await expect(zone).not.toHaveAttribute('tabindex', /.*/);
+  await expect(zone.locator('pre')).toHaveCSS('white-space', 'pre-wrap');
+  const { large, visible } = await zone.evaluate((z) => ({ large: z.scrollWidth, visible: z.clientWidth }));
+  expect(large).toBeLessThanOrEqual(visible);
   // Sans ligne « # relevé le », la légende n'a pas de date.
   await expect(sortie.locator('figcaption')).not.toContainText('relevée le');
   await expect(sortie.locator('[data-a-mesurer]')).toHaveCount(0);
