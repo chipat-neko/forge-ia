@@ -33,6 +33,11 @@ export const LANCER_TESTS = 'uv run pytest';
 
 /** Voir le pilote NVIDIA, sa version, et la plus haute version de CUDA qu'il accepte. */
 export const NVIDIA_SMI = 'nvidia-smi';
+/**
+ * Mettre à jour le dépôt déjà cloné (au chapitre 0.1, par exemple), depuis le dossier où il a été
+ * cloné : il reçoit les projets parus depuis. Le dossier visé par -C est celui que crée CLONER_DEPOT.
+ */
+export const METTRE_A_JOUR_DEPOT = 'git -C forge-ia pull';
 /** Entrer dans le projet du chapitre 0.3, depuis le dossier où le dépôt a été cloné. */
 export const ALLER_AU_PROJET_0_3 = 'cd forge-ia/projets/0.3-poste';
 /** Installer la version de PyTorch pour la carte NVIDIA (CUDA 13.2), sans rien lancer. */
@@ -43,6 +48,10 @@ export const SYNC_CPU = 'uv sync --extra cpu';
 export const VERIFIER_POSTE_GPU = 'uv run --extra gpu python -m poste';
 /** Vérifier son poste avec la version de PyTorch pour le processeur seul. */
 export const VERIFIER_POSTE_CPU = 'uv run --extra cpu python -m poste';
+/** Faire calculer les projets sur le processeur (FORGE_APPAREIL, lue par poste/appareil.py), dans PowerShell. */
+export const FORCER_PROCESSEUR_POWERSHELL = '$env:FORGE_APPAREIL = "cpu"';
+/** La même chose dans un terminal Linux ou macOS (bash, zsh). */
+export const FORCER_PROCESSEUR_BASH = 'export FORGE_APPAREIL=cpu';
 
 // Ce que d'anciens tutoriels font taper, et que le chapitre 0.3 cite pour dire
 // pourquoi ne pas le faire. À ne pas taper : ces commandes ne sont pas

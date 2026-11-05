@@ -20,7 +20,7 @@ import OuverturePoste from '../../components/chapitres/0-3/OuverturePoste.astro'
 import SourcesNote from '../../components/chapitres/0-3/SourcesNote.astro';
 import TableauCartes from '../../components/chapitres/0-3/TableauCartes.astro';
 import TableauSituations from '../../components/chapitres/0-3/TableauSituations.astro';
-import TexteDuScript from '../../components/chapitres/0-3/TexteDuScript.astro';
+import RapportDuScript from '../../components/chapitres/0-3/RapportDuScript.astro';
 import BlocCommande from '../../components/gabarit/BlocCommande.astro';
 import SortieCommande from '../../components/gabarit/SortieCommande.astro';
 import { materiel } from '../../lib/calculateur/donnees';
@@ -30,9 +30,12 @@ import {
   ALLER_AU_PROJET_0_3,
   CLONER_DEPOT,
   CONDA_INSTALL_PYTORCH,
+  FORCER_PROCESSEUR_BASH,
+  FORCER_PROCESSEUR_POWERSHELL,
   INSTALLER_UV_LINUX_MAC,
   INSTALLER_UV_WINDOWS,
   INSTALLER_UV_WINGET,
+  METTRE_A_JOUR_DEPOT,
   NVIDIA_SMI,
   PIP_INSTALL_TORCH,
   SYNC_CPU,
@@ -46,6 +49,7 @@ import { ATTENDUS_POSTE, constat, situation } from '../../lib/partie-0/poste';
 import {
   architectureQuiSert,
   capaciteArchitecture,
+  CONSTATS_HORS_TABLEAU,
   lignesDesSituations,
   nomArchitecture,
 } from '../../lib/partie-0/situations-0-3';
@@ -144,6 +148,13 @@ export const RECENTE = (() => {
 
 export const SITUATIONS = lignesDesSituations(ATTENDUS_POSTE);
 
+export const HORS_TABLEAU = (() => {
+  // Les constats du diagnostic qu'aucune situation du tableau ne montre (Vitest vérifie la liste).
+  const descriptions = CONSTATS_HORS_TABLEAU.map((c) => c.description);
+  exiger(descriptions.length >= 2, 'il reste moins de deux constats hors du tableau : revois la note de l’étape 6');
+  return typographier(`${descriptions.slice(0, -1).join(', ')} et ${descriptions.at(-1)}`);
+})();
+
 export const COLAB_T4 = (() => {
   // Colab : la situation colab_t4 ne montre que des valeurs sourcées (Python, PyTorch, la T4 et sa capacité).
   const { faits } = situation('colab_t4');
@@ -214,11 +225,11 @@ Pour voir ton pilote, tape :
 
 <BlocCommande commandes={[NVIDIA_SMI]} />
 
-`nvidia-smi` est livré avec le pilote. En haut, il affiche la version du pilote, et la version de CUDA la plus haute que ce pilote accepte. En dessous : ta carte, sa mémoire, et les programmes qui s'en servent. Si la commande est introuvable, le pilote n'est pas installé.
+`nvidia-smi` est livré avec le pilote. En haut, il affiche la version du pilote, sous le nom « Driver Version », ou « KMD Version » avec les pilotes récents. À côté, la version de CUDA la plus haute que ce pilote accepte : « CUDA Version », ou « CUDA UMD Version ». En dessous : ta carte, sa mémoire, et les programmes qui s'en servent. Si la commande est introuvable, le pilote n'est pas installé.
 
 Le projet de ce chapitre utilise PyTorch {PC.torch}, fait pour CUDA {PC.cuda}. Un pilote de la série {PILOTE_MINIMUM_CUDA_13} ou plus récent accepte toutes les versions {PC.majeure} de CUDA. Sur ce PC, le pilote {PC.pilote} va jusqu'à CUDA {PC.cudaMax} : c'est largement assez.
 
-Reste la carte elle-même. NVIDIA donne à chacune une capacité de calcul, le numéro de sa génération : {PC.capacite} pour la RTX 5070 Ti, {GENERATION.t4} pour la T4. Une version de PyTorch est compilée pour une liste de générations, ses architectures, écrites comme <code>{PC.architecture}</code> pour la capacité {PC.capacite}. Elle reconnaît une carte si la liste a sa génération, le premier nombre, avec un second nombre plus petit ou égal. La liste du projet n'a pas <code>{GENERATION.nom}</code>, mais <code>{GENERATION.sert}</code> sert une RTX 4070, de capacité {GENERATION.capacite}.
+Reste la carte elle-même. NVIDIA donne à chacune une capacité de calcul, en deux nombres : la génération, puis une mineure. {PC.capacite} pour la RTX 5070 Ti, {GENERATION.t4} pour la T4. Une version de PyTorch est compilée pour une liste d'architectures, écrites comme <code>{PC.architecture}</code> pour la capacité {PC.capacite}. Elle reconnaît une carte si la liste a une architecture de la même génération, avec une mineure plus petite ou égale. La liste du projet n'a pas <code>{GENERATION.nom}</code>, mais <code>{GENERATION.sert}</code> sert une RTX 4070, de capacité {GENERATION.capacite}.
 
 <Fragment slot="note">
 
@@ -260,9 +271,15 @@ Tu n'as pas besoin d'installer Python toi-même : uv télécharge la version que
 
 <Etape numero={4} titre="Le projet et sa version de PyTorch">
 
-Télécharge le dépôt du site, si ce n'est pas déjà fait, et entre dans le projet de ce chapitre :
+Le projet de ce chapitre est dans le dépôt du site. Si tu l'as déjà téléchargé avec git au chapitre 0.1, mets-le à jour : il reçoit ainsi les projets parus depuis. Puis entre dans le projet de ce chapitre :
 
-<BlocCommande commandes={[CLONER_DEPOT, ALLER_AU_PROJET_0_3]} ou="un terminal (PowerShell sous Windows)" />
+<BlocCommande commandes={[METTRE_A_JOUR_DEPOT, ALLER_AU_PROJET_0_3]} ou="un terminal, depuis le dossier où tu as téléchargé le dépôt" />
+
+Sinon, télécharge-le, puis entre dans le projet :
+
+<BlocCommande commandes={[CLONER_DEPOT, ALLER_AU_PROJET_0_3]} ou="un terminal, depuis le dossier où tu veux télécharger le dépôt" />
+
+Si tu avais pris le fichier zip au chapitre 0.1, télécharge-le de nouveau : un zip ne se met pas à jour. Son dossier s'appelle `forge-ia-main` : écris ce nom à la place de `forge-ia` dans la commande `cd`.
 
 PyTorch n'est pas une bibliothèque comme les autres : il en existe une version pour la carte, et une pour le processeur seul. Le fichier `pyproject.toml` du projet décrit les deux :
 
@@ -286,9 +303,7 @@ Pourquoi tout ce réglage, plutôt qu'une simple ligne qui demande PyTorch ?
 
 Sous Windows, PyPI ne sert que la version de PyTorch pour le processeur : {ROUES.pypi}, contre {ROUES.carte} pour celle de la carte, qui embarque CUDA. PyTorch s'importe, et calcule, mais sur le processeur seul. Le script de l'étape 5 le voit, et dit quoi faire :
 
-> <TexteDuScript texte={PYPI.roue.message} />
->
-> À faire : <TexteDuScript texte={PYPI.roue.a_faire} />
+<RapportDuScript constats={[PYPI.roue]} />
 
 </Pari>
 
@@ -310,7 +325,7 @@ Le projet contient un script qui regarde ton poste comme le verront les projets 
 
 <BlocCommande commandes={[VERIFIER_POSTE_GPU]} ou="un terminal, dans le dossier du projet" />
 
-La première fois, uv télécharge la version de PyTorch pour la carte : {ROUES.carte}. Sans carte NVIDIA, ou sur un Mac :
+La première fois, uv télécharge la version de PyTorch pour la carte : sous Windows, {ROUES.carte}. Sans carte NVIDIA, ou sur un Mac :
 
 <BlocCommande commandes={[VERIFIER_POSTE_CPU]} ou="un terminal, dans le dossier du projet" />
 
@@ -332,25 +347,23 @@ Voici ce qu'il affiche sur ce PC, avec la version pour le processeur. La carte e
 
 Chaque constat a un niveau : « bon », « attention » si ça marche moins bien que ça pourrait, « problème » s'il faut agir. Ici, le script met au niveau « attention » la carte laissée de côté, et les fils du processeur que PyTorch n'utilise pas. La dernière ligne compte les problèmes ; s'il y en a, le script rend un code d'erreur.
 
-Le diagnostic est une seule fonction, `diagnostiquer`. Elle ne lance rien : elle lit des faits et rend des constats. On peut donc la tester sur les postes d'autres lecteurs, décrits à la main, sans leur ordinateur.
+Le diagnostic est une seule fonction, `diagnostiquer`. Elle ne lance rien : elle lit des faits et rend des constats. On peut donc la tester sur les postes d'autres lecteurs, décrits à la main, sans leur ordinateur. Voici la règle des générations, puis la chaîne de décision ; le texte de chaque constat est plus bas dans le fichier.
 
 <CodeExplique fichier="projets/0.3-poste/poste/diagnostic.py" region="diagnostiquer">
-  <li data-lignes="1-8">Deux petites aides : `majeure` lit la version majeure, 13 pour « 13.2 », et `fils` accorde « fil » au pluriel.</li>
-  <li data-lignes="11-19">`architecture` lit un nom comme « sm_86 » : la génération 8 et la mineure 6.</li>
-  <li data-lignes="22-37">`carte_connue`, la règle des générations : un « sm » de la même génération que la carte, de mineure plus petite ou égale ; ou un « compute », du code que le pilote recompile pour les cartes plus récentes.</li>
-  <li data-lignes="40-47">`plus_ancienne` trouve la plus ancienne architecture de la liste : une carte plus ancienne encore est trop ancienne.</li>
-  <li data-lignes="53-54">`diagnostiquer` reçoit les faits et rend la liste des constats.</li>
-  <li data-lignes="55-67">Sans PyTorch, un seul constat, et on s'arrête là.</li>
-  <li data-lignes="69-86">`torch.version.cuda` vaut `None` : c'est la version pour le processeur. Sans pilote, tout va bien ; avec un pilote, la carte est laissée de côté.</li>
-  <li data-lignes="87-95">Une version pour la carte, mais aucun pilote ne répond.</li>
-  <li data-lignes="96-111">PyTorch ne voit pas la carte, et le pilote ne va pas jusqu'à la version majeure de CUDA de PyTorch : il est trop ancien.</li>
-  <li data-lignes="112-135">PyTorch voit la carte, mais aucune architecture de sa liste ne la sert : elle est trop ancienne, ou trop récente, pour cette version.</li>
-  <li data-lignes="136-145">Le pilote et la bonne version sont là, mais PyTorch ne voit aucune carte.</li>
-  <li data-lignes="146-153">Sinon, tout est prêt : c'est la ligne du haut de ce chapitre.</li>
-  <li data-lignes="155-166">En plus, un constat « attention » quand PyTorch n'utilise pas tous les fils du processeur.</li>
+  <li data-lignes="1-9">`architecture` lit un nom comme « sm_86 » : la génération 8 et la mineure 6.</li>
+  <li data-lignes="12-27">`carte_connue`, la règle des générations : un « sm » de la même génération que la carte, de mineure plus petite ou égale ; ou un « compute », du code que le pilote recompile pour les cartes plus récentes.</li>
+  <li data-lignes="30-32">`diagnostiquer` reçoit les faits et rend la liste des constats. Elle ne fait que choisir la clé de chaque constat : `constat_pour`, plus bas dans le fichier, en écrit le texte, celui du tableau de l'étape 6.</li>
+  <li data-lignes="33-35">Sans PyTorch, un seul constat, et on s'arrête là.</li>
+  <li data-lignes="36-38">`torch.version.cuda` vaut `None` : c'est la version pour le processeur. Sans pilote, tout va bien ; avec un pilote, la carte est laissée de côté.</li>
+  <li data-lignes="39-40">Une version pour la carte, mais aucun pilote ne répond.</li>
+  <li data-lignes="41-49">PyTorch ne voit pas la carte, et le pilote ne va pas jusqu'à la version de CUDA de PyTorch (`majeure` en garde le premier nombre) : il est trop ancien. Si PyTorch voit la carte, le pilote suffit.</li>
+  <li data-lignes="50-54">PyTorch voit la carte, mais aucune architecture de sa liste ne la sert : la carte est trop ancienne si elle précède la plus ancienne de la liste (`plus_ancienne`, plus bas dans le fichier), sinon trop récente.</li>
+  <li data-lignes="55-56">Le pilote et la bonne version sont là, mais PyTorch ne voit aucune carte.</li>
+  <li data-lignes="57-58">Sinon, tout est prêt : c'est la ligne du haut de ce chapitre.</li>
+  <li data-lignes="60-63">Le constat choisi, puis, en plus, un constat « attention » quand PyTorch n'utilise pas tous les fils du processeur.</li>
 </CodeExplique>
 
-Les projets suivants calculent sur la carte quand elle est prête, sinon sur le processeur. Une petite fonction choisit pour eux :
+Les projets suivants calculent sur la carte quand PyTorch la voit, sinon sur le processeur. Une petite fonction choisit pour eux :
 
 <CodeExplique fichier="projets/0.3-poste/poste/appareil.py" region="appareil">
   <li data-lignes="1-2">`AppareilIndisponible`, une erreur à part : l'appareil demandé existe, mais PyTorch ne peut pas s'en servir ici.</li>
@@ -383,9 +396,7 @@ Le diagnostic est testé sur {nombre(SITUATIONS.length)} situations, des postes 
   ouvre="situations"
 >
 
-> <TexteDuScript texte={RECENTE.constat.message} />
->
-> À faire : <TexteDuScript texte={RECENTE.constat.a_faire} />
+<RapportDuScript constats={[RECENTE.constat]} />
 
 Cette version pour CUDA {RECENTE.cuda} s'arrête à <code>{RECENTE.derniere}</code> : rien pour la génération de la carte. PyTorch voit bien la carte, mais ne sait pas calculer dessus. Le pilote, lui, suffit : il va jusqu'à CUDA {RECENTE.cudaMax}. Une carte plus récente que sa version de PyTorch reste donc inutilisable : seule une version de PyTorch qui connaît sa génération la débloque.
 
@@ -397,11 +408,11 @@ Cette version pour CUDA {RECENTE.cuda} s'arrête à <code>{RECENTE.derniere}</co
 
 </Verrou>
 
-Ces lignes sont celles du script, mot pour mot : la page les lit dans le fichier de référence que le diagnostic écrit, `tests/attendus.json`. La situation de Colab n'en montre que ce que Google publie : sa version de PyTorch, et la T4, de capacité {GENERATION.t4}, que <code>{COLAB_T4.sert}</code> sert.
+Ces lignes sont celles du script, mot pour mot : la page les lit dans le fichier de référence que le diagnostic écrit, `tests/attendus.json`. La situation de Colab ne montre que des valeurs sourcées : la version de PyTorch de son image, publiée par Google, et la T4 que ses utilisateurs rapportent le plus souvent, de capacité {GENERATION.t4}, que <code>{COLAB_T4.sert}</code> sert.
 
 <Fragment slot="note">
 
-Le projet connaît deux autres cas, sans situation au tableau : un PyTorch qui ne s'importe pas, et une carte trop ancienne pour la version du projet. Le script nomme alors la cause, et dit quoi faire.
+Le script connaît aussi d'autres cas, sans situation au tableau : {HORS_TABLEAU}. Il nomme alors la cause, et dit quoi faire.
 
 </Fragment>
 
@@ -411,9 +422,7 @@ Le projet connaît deux autres cas, sans situation au tableau : un PyTorch qui n
 
 **Le processeur.** Sans carte NVIDIA, les projets du site marchent aussi sur le processeur, en plus lent pour entraîner ton IA. Mais PyTorch n'y prend pas tous les fils : sur ce PC, il en prend {FILS.torch} sur {FILS.processeur} quand on ne règle rien. Le diagnostic le signale :
 
-> <TexteDuScript texte={FILS.constat.message} />
->
-> À faire : <TexteDuScript texte={FILS.constat.a_faire} />
+<RapportDuScript constats={[FILS.constat]} />
 
 La mesure de l'étape 1 a été faite ainsi, avec les {FILS.processeur} fils du processeur.
 
@@ -429,7 +438,7 @@ La mesure de l'étape 1 a été faite ainsi, avec les {FILS.processeur} fils du 
 
 <Fragment slot="note">
 
-La variable d'environnement `FORGE_APPAREIL` force le choix de l'appareil dans les projets suivants : `cpu` pour le processeur, `cuda` pour la carte, `auto` par défaut.
+La variable d'environnement `FORGE_APPAREIL` force le choix de l'appareil dans les projets suivants : `cpu` pour le processeur, `cuda` pour la carte, `auto` par défaut. Pour calculer sur le processeur, tape dans PowerShell <code>{FORCER_PROCESSEUR_POWERSHELL}</code>, ou dans un terminal Linux ou macOS <code>{FORCER_PROCESSEUR_BASH}</code>, puis lance le projet depuis le même terminal.
 
 <SourcesNote sources={[...SOURCES_0_3.colab, SOURCES_0_3.pypi[0], ...SOURCES_0_3.mac]} />
 
@@ -447,7 +456,8 @@ Meta a entraîné Llama 3 405B sur jusqu'à {LABO.cartes} cartes H100 à la fois
 
 <TableauCartes
   cartes={['t4', 'rtx-5070-ti', 'h100-sxm']}
-  legende="La carte gratuite de Colab, celle de ce PC, et celle de Llama 3 : leur mémoire, et leur calcul au plus, en milliers de milliards d'opérations par seconde (TFLOPS), en bf16. La T4 n'a pas de bf16 : son chiffre est celui du FP16."
+  noms={{ t4: 'T4' }}
+  legende="La T4, que les utilisateurs de Colab gratuit rapportent le plus souvent, la carte de ce PC, et celle de Llama 3 : leur mémoire, et leur calcul au plus, en milliers de milliards d'opérations par seconde (TFLOPS), en bf16. La T4 n'a pas de bf16 : son chiffre est celui du FP16."
 />
 
 </EncadreLabo>

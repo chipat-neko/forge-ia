@@ -47,6 +47,4 @@ def choisir_appareil(demande: str | None = None) -> torch.device:
         f"Appareil inconnu{origine}\u202f: «\u202f{valeur}\u202f». "
         "Choisis auto (la carte si PyTorch la voit, sinon le processeur), cpu ou cuda."
     )
-
-
 # fin: appareil

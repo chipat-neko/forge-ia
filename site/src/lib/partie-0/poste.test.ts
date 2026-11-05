@@ -17,8 +17,10 @@ import { ATTENDUS_POSTE, constat, situation } from './poste';
 import {
   architectureQuiSert,
   capaciteArchitecture,
+  CONSTATS_HORS_TABLEAU,
   decrireSituation,
   ligneDuRapport,
+  lignesDuRapport,
   lignesDesSituations,
   morceaux,
   NOMS_DES_SITUATIONS,
@@ -86,6 +88,19 @@ describe('le rapport du script', () => {
     expect(ligneDuRapport(constat('pilote_ancien', 'pilote_trop_ancien'))).toMatch(/^ {2}problème\u202F: /);
   });
 
+  it('lignesDuRapport : le constat et son « À faire », lignes consécutives de la sortie de ce PC', () => {
+    const sortie = SORTIE_PROCESSEUR.split('\n');
+    for (const c of [constat('windows_pypi_rtx5070ti', 'roue_processeur'), constat('fils_par_defaut', 'fils')]) {
+      const lignes = lignesDuRapport(c);
+      expect(lignes).toHaveLength(2);
+      const i = sortie.indexOf(lignes[0]);
+      expect(i, c.cle).toBeGreaterThanOrEqual(0);
+      expect(sortie.slice(i, i + 2), c.cle).toEqual(lignes);
+    }
+    // Un constat sans rien à faire n'a qu'une ligne.
+    expect(lignesDuRapport(constat('windows_cu132_rtx5070ti', 'carte_prete'))).toHaveLength(1);
+  });
+
   it('l’ouverture : le constat « carte_prete » de la RTX 5070 Ti, avec la version du projet', () => {
     const prete = constat('windows_cu132_rtx5070ti', 'carte_prete');
     expect(prete.message).toBe(
@@ -147,6 +162,21 @@ describe('le tableau des situations', () => {
       { texte: 'uv sync --extra gpu', code: true },
       { texte: `${FINE}: c’est tout`, code: false },
     ]);
+  });
+});
+
+describe('les constats du diagnostic', () => {
+  it('ceux du tableau et ceux hors du tableau font exactement ceux de diagnostic.py', () => {
+    const source = readFileSync(`${RACINE}/projets/0.3-poste/poste/diagnostic.py`, 'utf8');
+    const duDiagnostic = [...source.matchAll(/Niveau\.\w+,\s*"(\w+)"/g)].map(([, cle]) => cle);
+    expect(duDiagnostic).toContain('carte_prete');
+    expect(new Set(duDiagnostic).size, 'une clé écrite deux fois dans diagnostic.py').toBe(duDiagnostic.length);
+    const duTableau = new Set(FICHIER.situations.flatMap(([, s]) => s.constats.map((c) => c.cle)));
+    const horsTableau = CONSTATS_HORS_TABLEAU.map((c) => c.cle);
+    for (const cle of horsTableau) expect(duTableau.has(cle), `${cle} est aussi au tableau`).toBe(false);
+    expect([...duTableau, ...horsTableau].sort()).toEqual([...duDiagnostic].sort());
+    // Dans l'ordre où diagnostiquer les rencontre.
+    expect(horsTableau).toEqual(duDiagnostic.filter((cle) => !duTableau.has(cle)));
   });
 });
 

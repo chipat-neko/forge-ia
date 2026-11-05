@@ -14,6 +14,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { materiel } from '../src/lib/calculateur/donnees';
+import { formaterDate } from '../src/lib/calculateur/formats';
 import { MESURES_TON_IA } from '../src/lib/calculateur/ton-ia';
 import { nombre } from '../src/lib/nombres';
 import { trouverChapitre } from '../src/lib/parcours';
@@ -22,8 +23,10 @@ import { lireSortie } from '../src/lib/sorties';
 import { typographier } from '../src/lib/typo';
 import * as commandes from '../src/lib/partie-0/commandes';
 import {
+  CONSTATS_HORS_TABLEAU,
   ligneDuRapport,
   lignesDesSituations,
+  lignesDuRapport,
   NOMS_DES_SITUATIONS,
   texteDesMorceaux,
   trouverSituation,
@@ -73,6 +76,8 @@ const COMMANDES_DES_BLOCS = [
   [commandes.NVIDIA_SMI],
   [commandes.INSTALLER_UV_WINDOWS, commandes.VERIFIER_UV],
   [commandes.INSTALLER_UV_LINUX_MAC],
+  // Le dépôt déjà téléchargé au chapitre 0.1 se met à jour ; sinon, on le télécharge.
+  [commandes.METTRE_A_JOUR_DEPOT, commandes.ALLER_AU_PROJET_0_3],
   [commandes.CLONER_DEPOT, commandes.ALLER_AU_PROJET_0_3],
   [commandes.VERIFIER_POSTE_GPU],
   [commandes.VERIFIER_POSTE_CPU],
@@ -199,11 +204,11 @@ test('les sorties : celle du processeur est le fichier, celle de la carte reste 
   const sortie = page.locator(`[data-sortie="${FICHIER_PROCESSEUR}"]`);
   await expect(sortie).toHaveCount(1);
   const lue = lireSortie(SORTIE_PROCESSEUR, FICHIER_PROCESSEUR)!;
-  // Le fichier sans sa première ligne « # relevé le … », caractère pour caractère.
-  expect(SORTIE_PROCESSEUR.split('\n')[0]).toBe('# relevé le 2026-11-05');
+  // Le fichier sans sa première ligne « # relevé le … », caractère pour caractère ; la date est celle du fichier.
+  expect(SORTIE_PROCESSEUR.split('\n')[0]).toMatch(/^# relevé le \d{4}-\d{2}-\d{2}$/);
   expect(await texteExact(sortie.locator('[data-contenu]'))).toBe(SORTIE_PROCESSEUR.replace(/^[^\n]*\n/, '').replace(/\n+$/, ''));
   expect(await texteExact(sortie.locator('[data-contenu]'))).toBe(lue.contenu);
-  await expect(sortie.locator('figcaption')).toContainText('relevée le 5');
+  expect(await texteExact(sortie.locator('figcaption'))).toContain(`relevée le ${formaterDate(lue.releveLe!)}`);
   await expect(sortie.locator('.commande')).toHaveText(commandes.VERIFIER_POSTE_CPU);
   // Une seule valeur à mesurer : la sortie de la carte, relevée à la porte (tâche 16).
   const aMesurer = page.locator('[data-a-mesurer]');
@@ -229,10 +234,40 @@ test('les commandes affichées sont celles de commandes.ts', async ({ page }) =>
   for (const commande of await page.locator('.sortie .commande, [data-test="ouverture"] .commande').allTextContents()) {
     expect(connues, commande).toContain(commande);
   }
-  for (const code of await page.locator('.etape .texte p code').allTextContents()) {
-    if (/^(uv (sync|run) |pip |conda |winget |git clone |cd )/.test(code)) expect(connues, code).toContain(code);
+  // Dans le texte et dans les notes : toute commande citée en entier.
+  const citees = await page.locator('.etape p code').allTextContents();
+  for (const code of citees) {
+    if (/^(uv (sync|run) |pip |conda |winget |git |cd |\$env:|export )/.test(code)) expect(connues, code).toContain(code);
   }
-  await expect(page.locator('.etape .texte p code', { hasText: commandes.SYNC_CPU })).not.toHaveCount(0);
+  for (const commande of [commandes.SYNC_CPU, commandes.FORCER_PROCESSEUR_POWERSHELL, commandes.FORCER_PROCESSEUR_BASH]) {
+    expect(citees, commande).toContain(commande);
+  }
+});
+
+test('les messages du script sont montrés comme dans le terminal', async ({ page }) => {
+  await page.goto(PAGE);
+  // Les lignes exactes du rapport, accents graves compris : PyPI (étape 4), l'ancien tutoriel (étape 6), les fils (étape 7).
+  const attendus = [
+    trouverSituation(ATTENDUS, 'windows_pypi_rtx5070ti').constats[0],
+    trouverSituation(ATTENDUS, 'windows_cu126_rtx5070ti').constats[0],
+    trouverSituation(ATTENDUS, 'fils_par_defaut').constats[1],
+  ];
+  expect(attendus.map((c) => c.cle)).toEqual(['roue_processeur', 'carte_trop_recente', 'fils']);
+  const rapports = page.locator('[data-test="rapport-du-script"] pre');
+  await expect(rapports).toHaveCount(attendus.length);
+  for (const [i, c] of attendus.entries()) {
+    expect(await texteExact(rapports.nth(i)), c.cle).toBe(lignesDuRapport(c).join('\n'));
+    expect(await texteExact(rapports.nth(i))).toContain(`À faire${FINE}: `);
+  }
+  // Ces lignes sont celles de la sortie enregistrée sur ce PC, pour les constats qu'elle contient.
+  for (const ligne of [...lignesDuRapport(attendus[0]), ...lignesDuRapport(attendus[2])]) {
+    expect(SORTIE_PROCESSEUR.split('\n')).toContain(ligne);
+  }
+  // Aucune citation : pas de blockquote dans le chapitre.
+  await expect(page.locator('main blockquote')).toHaveCount(0);
+  // La note de l'étape 6 énumère les constats sans situation au tableau.
+  const note = await texteExact(page.locator('#etape-6 .note'));
+  for (const { description } of CONSTATS_HORS_TABLEAU) expect(note).toContain(typographier(description));
 });
 
 test('le code affiché est celui des régions testées', async ({ page }) => {
@@ -244,13 +279,11 @@ test('le code affiché est celui des régions testées', async ({ page }) => {
   ];
   const blocs = page.locator('.code-explique');
   await expect(blocs).toHaveCount(regions.length);
-  // La région « diagnostiquer » finit par deux lignes vides (avant « # fin: diagnostiquer »), que la
-  // coloration ne garde pas toutes : on compare sans les lignes vides de la fin.
-  const sansLignesVidesALaFin = (code: string | null) => (code ?? '').replace(/\n+$/, '');
   for (const [i, [fichier, region]] of regions.entries()) {
     const attendu = extraireRegion(readFileSync(`../${fichier}`, 'utf8'), region, fichier);
-    const affiche = await blocs.nth(i).locator('pre').evaluate((pre) => pre.textContent);
-    expect(sansLignesVidesALaFin(affiche), region).toBe(sansLignesVidesALaFin(attendu));
+    // Chaque région finit sur sa dernière ligne de code : aucune ligne vide numérotée sous l'extrait.
+    expect(attendu.endsWith('\n'), `${region} finit par une ligne vide`).toBe(false);
+    expect(await blocs.nth(i).locator('pre').evaluate((pre) => pre.textContent), region).toBe(attendu);
     await expect(blocs.nth(i).locator('figcaption a')).toHaveAttribute(
       'href',
       `https://github.com/chipat-neko/forge-ia/blob/main/${fichier}`,
@@ -279,13 +312,20 @@ test('les faits de la recherche portent leur source, et l’encadré vient des d
   const labo = page.locator('#etape-8 .labo');
   expect(await texteExact(labo)).toContain(`${nombre(CARTES_LLAMA_3_405B)} cartes H100`);
   const cartes = labo.locator('[data-test="cartes"] tbody tr');
-  const ids = ['t4', 'rtx-5070-ti', 'h100-sxm'];
+  // La T4 s'affiche « T4 » : Google ne la nomme pas, ses utilisateurs la rapportent.
+  const noms: Record<string, string> = { t4: 'T4', 'rtx-5070-ti': 'RTX 5070 Ti', 'h100-sxm': 'H100 SXM' };
+  const ids = Object.keys(noms);
   await expect(cartes).toHaveCount(ids.length);
   for (const [i, id] of ids.entries()) {
     const m = materiel(id);
     const cellules = await cartes.nth(i).locator('th, td').evaluateAll((c) => c.map((e) => e.textContent ?? ''));
-    expect(cellules, id).toEqual([m.nom, `${nombre(m.memoireGo)} Go`, nombre(m.creteTflops, Number.isInteger(m.creteTflops) ? 0 : 1)]);
+    expect(cellules, id).toEqual([noms[id], `${nombre(m.memoireGo)} Go`, nombre(m.creteTflops, Number.isInteger(m.creteTflops) ? 0 : 1)]);
   }
+  expect(await texteExact(labo)).not.toMatch(/Colab gratuit\)|carte gratuite de Colab/);
+  expect(await texteExact(labo)).toContain(typographier('La T4, que les utilisateurs de Colab gratuit rapportent le plus souvent'));
+  // L'étape 6 ne prête pas la T4 à Google.
+  expect(await texteExact(page.locator('#etape-6 .texte'))).not.toContain('Google publie : sa version');
+  expect(await texteExact(page.locator('#etape-6 .texte'))).toContain('que ses utilisateurs rapportent le plus souvent');
 });
 
 test('les zones de terminal défilent dans leur zone, sans faire déborder la page', async ({ page }) => {

@@ -99,6 +99,28 @@ export function ligneDuRapport(c: Constat): string {
   return `  ${LIBELLES_NIVEAUX[c.niveau]}${FINE}: ${c.message}`;
 }
 
+/**
+ * Toutes les lignes du rapport pour un constat, comme decrire_constat : la
+ * ligne du constat, puis « À faire : … » quand il y a quelque chose à faire.
+ * Les commandes gardent leurs accents graves, comme dans le terminal.
+ */
+export function lignesDuRapport(c: Constat): string[] {
+  return c.a_faire ? [ligneDuRapport(c), `    À faire${FINE}: ${c.a_faire}`] : [ligneDuRapport(c)];
+}
+
+/**
+ * Les constats du diagnostic qu'aucune situation du tableau ne montre, dans
+ * l'ordre de diagnostiquer, avec ce que la note de l'étape 6 en dit. Vitest
+ * vérifie qu'avec les constats du tableau, ils font exactement ceux de
+ * diagnostic.py.
+ */
+export const CONSTATS_HORS_TABLEAU: readonly { cle: string; description: string }[] = Object.freeze([
+  { cle: 'torch_absent', description: "un PyTorch qui ne s'importe pas" },
+  { cle: 'pilote_absent', description: 'une version pour la carte sans pilote' },
+  { cle: 'carte_trop_ancienne', description: 'une carte trop ancienne pour la version du projet' },
+  { cle: 'carte_invisible', description: 'une carte que PyTorch ne voit pas' },
+]);
+
 // ---------- Le texte et le code ----------
 
 /** Un morceau de texte : du code (entre accents graves dans la source), ou du texte typographié. */

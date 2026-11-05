@@ -26,16 +26,6 @@ class Constat:
 
 
 # region: diagnostiquer
-def majeure(version: str) -> int:
-    """La version majeure : 13 pour « 13.2 »."""
-    return int(version.split(".")[0])
-
-
-def fils(n: int) -> str:
-    """« 1 fil », « 8 fils »."""
-    return f"{n} fil" if n == 1 else f"{n} fils"
-
-
 def architecture(nom: str) -> tuple[str, tuple[int, int]] | None:
     """« sm_86 » donne ("sm", (8, 6)), « sm_90a » donne ("sm", (9, 0)), « compute_120 » donne
     ("compute", (12, 0)). None pour un nom qu'on ne sait pas lire."""
@@ -65,6 +55,57 @@ def carte_connue(capacite: tuple[int, int], architectures: tuple[str, ...]) -> b
     return False
 
 
+def diagnostiquer(f: Faits) -> list[Constat]:
+    """Les constats sur le poste : d'abord celui de PyTorch et de la carte, puis celui des fils.
+    Elle ne fait que choisir la clé de chaque constat ; constat_pour en écrit le texte."""
+    if f.torch is None:
+        # Sans PyTorch, rien d'autre ne compte : on s'arrête là.
+        return [constat_pour("torch_absent", f)]
+    if f.cuda_compilee is None:
+        # La version de PyTorch pour le processeur seul (torch.version.cuda vaut None).
+        cle = "processeur_seul" if f.pilote is None else "roue_processeur"
+    elif f.pilote is None:
+        cle = "pilote_absent"
+    elif (
+        not f.cuda_disponible
+        and f.cuda_max_pilote is not None
+        and majeure(f.cuda_max_pilote) < majeure(f.cuda_compilee)
+    ):
+        # Seulement si PyTorch ne voit pas la carte : s'il la voit, le pilote suffit. Le paquet
+        # cuda-compat (Colab, cartes de centre de calcul) fait tourner un CUDA plus récent que
+        # celui qu'annonce nvidia-smi.
+        cle = "pilote_trop_ancien"
+    elif f.cuda_disponible and f.capacite is not None and not carte_connue(f.capacite, f.architectures):
+        # Aucune architecture de la liste ne sert la carte : elle est trop ancienne, ou trop récente.
+        ancienne = plus_ancienne(f.architectures)
+        trop_ancienne = ancienne is not None and f.capacite < ancienne[0]
+        cle = "carte_trop_ancienne" if trop_ancienne else "carte_trop_recente"
+    elif not f.cuda_disponible:
+        cle = "carte_invisible"
+    else:
+        cle = "carte_prete"
+
+    constats = [constat_pour(cle, f)]
+    if f.fils_torch < f.fils_processeur:
+        constats.append(constat_pour("fils", f))
+    return constats
+# fin: diagnostiquer
+
+
+# Les petites aides du diagnostic, et le texte de chaque constat : hors de l'extrait que montre le
+# chapitre 0.3, qui s'arrête à la règle des générations et à la chaîne de décision.
+
+
+def majeure(version: str) -> int:
+    """La version majeure : 13 pour « 13.2 »."""
+    return int(version.split(".")[0])
+
+
+def fils(n: int) -> str:
+    """« 1 fil », « 8 fils »."""
+    return f"{n} fil" if n == 1 else f"{n} fils"
+
+
 def plus_ancienne(architectures: tuple[str, ...]) -> tuple[tuple[int, int], str] | None:
     """La capacité et le nom de la plus ancienne architecture de la liste, ou None."""
     lues = []
@@ -78,42 +119,37 @@ def plus_ancienne(architectures: tuple[str, ...]) -> tuple[tuple[int, int], str]
 RELANCER = "relance `uv run --extra gpu python -m poste`"
 
 
-def diagnostiquer(f: Faits) -> list[Constat]:
-    """Les constats sur le poste : d'abord celui de PyTorch et de la carte, puis celui des fils."""
-    if f.torch is None:
-        # Sans PyTorch, rien d'autre ne compte : on s'arrête là.
-        return [
-            Constat(
-                Niveau.PROBLEME,
-                "torch_absent",
-                "PyTorch ne s’importe pas\u202f: il n’est pas installé dans cet environnement, ou il ne se charge pas.",
-                "Lance `uv run --extra gpu python -m poste` si tu as une carte NVIDIA, sinon "
-                "`uv run --extra cpu python -m poste`\u202f: uv installe PyTorch avant de lancer le script. "
-                "S’il est installé mais ne se charge pas, remplace `python -m poste` par "
-                "`python -c \"import torch\"` dans la même commande\u202f: l’erreur s’affichera.",
-            )
-        ]
-
-    if f.cuda_compilee is None:
-        # La version de PyTorch pour le processeur seul (torch.version.cuda vaut None).
-        if f.pilote is None:
-            constat = Constat(
-                Niveau.BON,
-                "processeur_seul",
-                "Pas de carte NVIDIA ici (aucun pilote trouvé)\u202f: PyTorch calcule sur le processeur. "
-                "Tout marche ainsi, en plus lent pour entraîner ton IA.",
-                None,
-            )
-        else:
-            constat = Constat(
-                Niveau.ATTENTION,
-                "roue_processeur",
-                f"Une carte NVIDIA est là (pilote {f.pilote}), mais cette version de PyTorch ({f.torch}) "
-                "ne sait calculer que sur le processeur\u202f: elle laisse la carte de côté.",
-                f"Lance `uv sync --extra gpu`, puis {RELANCER}.",
-            )
-    elif f.pilote is None:
-        constat = Constat(
+def constat_pour(cle: str, f: Faits) -> Constat:
+    """Le constat `cle` pour ces faits : son niveau, ce que le script a vu, et ce qu'il faut faire.
+    diagnostiquer choisit la clé ; les textes sont ici."""
+    if cle == "torch_absent":
+        return Constat(
+            Niveau.PROBLEME,
+            "torch_absent",
+            "PyTorch ne s’importe pas\u202f: il n’est pas installé dans cet environnement, ou il ne se charge pas.",
+            "Lance `uv run --extra gpu python -m poste` si tu as une carte NVIDIA, sinon "
+            "`uv run --extra cpu python -m poste`\u202f: uv installe PyTorch avant de lancer le script. "
+            "S’il est installé mais ne se charge pas, remplace `python -m poste` par "
+            "`python -c \"import torch\"` dans la même commande\u202f: l’erreur s’affichera.",
+        )
+    if cle == "processeur_seul":
+        return Constat(
+            Niveau.BON,
+            "processeur_seul",
+            "Pas de carte NVIDIA ici (aucun pilote trouvé)\u202f: PyTorch calcule sur le processeur. "
+            "Tout marche ainsi, en plus lent pour entraîner ton IA.",
+            None,
+        )
+    if cle == "roue_processeur":
+        return Constat(
+            Niveau.ATTENTION,
+            "roue_processeur",
+            f"Une carte NVIDIA est là (pilote {f.pilote}), mais cette version de PyTorch ({f.torch}) "
+            "ne sait calculer que sur le processeur\u202f: elle laisse la carte de côté.",
+            f"Lance `uv sync --extra gpu`, puis {RELANCER}.",
+        )
+    if cle == "pilote_absent":
+        return Constat(
             Niveau.PROBLEME,
             "pilote_absent",
             f"Cette version de PyTorch ({f.torch}) est faite pour une carte NVIDIA, avec CUDA {f.cuda_compilee}, "
@@ -121,15 +157,8 @@ def diagnostiquer(f: Faits) -> list[Constat]:
             "Si tu as une carte NVIDIA, installe son pilote depuis le site de NVIDIA, redémarre, puis "
             f"{RELANCER}. Sinon, lance `uv run --extra cpu python -m poste`\u202f: tout tournera sur le processeur.",
         )
-    elif (
-        not f.cuda_disponible
-        and f.cuda_max_pilote is not None
-        and majeure(f.cuda_max_pilote) < majeure(f.cuda_compilee)
-    ):
-        # Seulement si PyTorch ne voit pas la carte : s'il la voit, le pilote suffit. Le paquet
-        # cuda-compat (Colab, cartes de centre de calcul) fait tourner un CUDA plus récent que
-        # celui qu'annonce nvidia-smi.
-        constat = Constat(
+    if cle == "pilote_trop_ancien":
+        return Constat(
             Niveau.PROBLEME,
             "pilote_trop_ancien",
             f"Ton pilote NVIDIA ({f.pilote}) va jusqu’à CUDA {f.cuda_max_pilote}, mais cette version de PyTorch "
@@ -137,32 +166,29 @@ def diagnostiquer(f: Faits) -> list[Constat]:
             f"Mets à jour le pilote de ta carte (site ou application de NVIDIA) pour qu’il aille au moins jusqu’à "
             f"CUDA {majeure(f.cuda_compilee)}.0, redémarre, puis {RELANCER}.",
         )
-    elif f.cuda_disponible and f.capacite is not None and not carte_connue(f.capacite, f.architectures):
-        # Aucune architecture de la liste ne sert la carte : elle est plus ancienne que la première,
-        # ou d'une génération que la liste n'a pas.
+    if cle == "carte_trop_ancienne":
         ancienne = plus_ancienne(f.architectures)
-        if ancienne is not None and f.capacite < ancienne[0]:
-            constat = Constat(
-                Niveau.PROBLEME,
-                "carte_trop_ancienne",
-                f"Ta carte ({f.carte}, capacité {f.capacite[0]}.{f.capacite[1]}) est trop ancienne pour cette "
-                f"version de PyTorch ({f.torch}), qui commence à {ancienne[1]}.",
-                "Calcule sur le processeur\u202f: lance `uv run --extra cpu python -m poste`. Le "
-                "diagnostic dira alors que cette version laisse la carte de côté, et c’est voulu, puisque la "
-                "carte est trop ancienne. Dans les projets suivants, mets la variable d’environnement "
-                "FORGE_APPAREIL=cpu.",
-            )
-        else:
-            constat = Constat(
-                Niveau.PROBLEME,
-                "carte_trop_recente",
-                f"Ta carte ({f.carte}, capacité {f.capacite[0]}.{f.capacite[1]}) est plus récente que cette version "
-                f"de PyTorch ({f.torch}), qui n’a pas été compilée pour sm_{f.capacite[0]}{f.capacite[1]}.",
-                "Lance `uv sync --extra gpu` pour installer la version de PyTorch du projet, qui connaît les cartes "
-                f"récentes, puis {RELANCER}.",
-            )
-    elif not f.cuda_disponible:
-        constat = Constat(
+        return Constat(
+            Niveau.PROBLEME,
+            "carte_trop_ancienne",
+            f"Ta carte ({f.carte}, capacité {f.capacite[0]}.{f.capacite[1]}) est trop ancienne pour cette "
+            f"version de PyTorch ({f.torch}), qui commence à {ancienne[1]}.",
+            "Calcule sur le processeur\u202f: lance `uv run --extra cpu python -m poste`. Le "
+            "diagnostic dira alors que cette version laisse la carte de côté, et c’est voulu, puisque la "
+            "carte est trop ancienne. Dans les projets suivants, mets la variable d’environnement "
+            "FORGE_APPAREIL=cpu.",
+        )
+    if cle == "carte_trop_recente":
+        return Constat(
+            Niveau.PROBLEME,
+            "carte_trop_recente",
+            f"Ta carte ({f.carte}, capacité {f.capacite[0]}.{f.capacite[1]}) est plus récente que cette version "
+            f"de PyTorch ({f.torch}), qui n’a pas été compilée pour sm_{f.capacite[0]}{f.capacite[1]}.",
+            "Lance `uv sync --extra gpu` pour installer la version de PyTorch du projet, qui connaît les cartes "
+            f"récentes, puis {RELANCER}.",
+        )
+    if cle == "carte_invisible":
+        return Constat(
             Niveau.PROBLEME,
             "carte_invisible",
             f"Le pilote NVIDIA ({f.pilote}) est là, et cette version de PyTorch ({f.torch}) est faite pour la "
@@ -171,30 +197,23 @@ def diagnostiquer(f: Faits) -> list[Constat]:
             "pilote. S’il la montre, vérifie que la variable CUDA_VISIBLE_DEVICES n’est pas réglée. "
             f"Puis {RELANCER}.",
         )
-    else:
+    if cle == "carte_prete":
         capacite = "capacité inconnue" if f.capacite is None else f"capacité {f.capacite[0]}.{f.capacite[1]}"
-        constat = Constat(
+        return Constat(
             Niveau.BON,
             "carte_prete",
             f"PyTorch {f.torch} voit ta carte, {f.carte} ({capacite}), et sait calculer dessus.",
             None,
         )
-
-    constats = [constat]
-    if f.fils_torch < f.fils_processeur:
-        constats.append(
-            Constat(
-                Niveau.ATTENTION,
-                "fils",
-                f"PyTorch n’utilise que {fils(f.fils_torch)} de calcul sur les {f.fils_processeur} de ton processeur.",
-                "Au début d’un programme qui calcule sur le processeur, écris "
-                "`torch.set_num_threads(os.cpu_count())` (avec `import os`)\u202f: PyTorch prendra tous les fils.",
-            )
+    if cle == "fils":
+        return Constat(
+            Niveau.ATTENTION,
+            "fils",
+            f"PyTorch n’utilise que {fils(f.fils_torch)} de calcul sur les {f.fils_processeur} de ton processeur.",
+            "Au début d’un programme qui calcule sur le processeur, écris "
+            "`torch.set_num_threads(os.cpu_count())` (avec `import os`)\u202f: PyTorch prendra tous les fils.",
         )
-    return constats
-
-
-# fin: diagnostiquer
+    raise ValueError(f"Constat inconnu\u202f: «\u202f{cle}\u202f». Ajoute son texte dans constat_pour (poste/diagnostic.py).")
 
 
 # Le niveau tel que le rapport l'affiche.

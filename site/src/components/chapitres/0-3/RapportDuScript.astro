@@ -1,0 +1,52 @@
+---
+// Ce que le script du projet 0.3 écrit pour des constats, montré comme dans un
+// petit terminal, avec l'habillage de l'ouverture (OuverturePoste) : les
+// lignes exactes du rapport (lignesDuRapport, comme decrire_constat dans
+// diagnostic.py), le constat puis « À faire : … », commandes entre accents
+// graves comprises. Les constats viennent des attendus du projet, jamais d'un
+// texte recopié. Les lignes longues passent à la ligne au lieu de défiler.
+//
+//   <RapportDuScript constats={[constat('windows_pypi_rtx5070ti', 'roue_processeur')]} />
+import { lignesDuRapport, type Constat } from '../../../lib/partie-0/situations-0-3';
+
+interface Props {
+  constats: Constat[];
+}
+
+const { constats } = Astro.props;
+if (constats.length === 0) {
+  throw new Error('RapportDuScript sans constat : passe au moins un constat dans la prop constats.');
+}
+const texte = constats.flatMap(lignesDuRapport).join('\n');
+---
+
+<div class="rapport-du-script" data-test="rapport-du-script" role="group" aria-label="Ce qu’écrit le script">
+  <pre>{texte}</pre>
+</div>
+
+<style>
+  .rapport-du-script {
+    background: var(--brume-claire);
+    border-radius: 10px;
+    margin: 0.8em 0 1em;
+  }
+
+  pre {
+    margin: 0;
+    padding: 14px 18px;
+    font-family: var(--mono);
+    font-size: 15px;
+    line-height: 1.55;
+    font-variant-ligatures: none;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--indigo);
+  }
+
+  @media (max-width: 720px) {
+    pre {
+      font-size: 14px;
+      padding: 12px 14px;
+    }
+  }
+</style>

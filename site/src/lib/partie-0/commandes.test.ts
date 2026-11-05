@@ -88,4 +88,21 @@ describe('commandes du chapitre 0.3', () => {
   it('python -m poste lance le __main__.py du projet 0.3-poste', () => {
     expect(existsSync(`${RACINE}/projets/0.3-poste/poste/__main__.py`)).toBe(true);
   });
+
+  it('la mise à jour vise le dossier que crée le clonage', () => {
+    expect(commandes.METTRE_A_JOUR_DEPOT).toBe('git -C forge-ia pull');
+    const vise = /^git -C (\S+) pull$/.exec(commandes.METTRE_A_JOUR_DEPOT);
+    expect(vise, 'METTRE_A_JOUR_DEPOT doit être « git -C <dossier> pull »').not.toBeNull();
+    // git clone <adresse> crée un dossier du nom du dépôt : le dernier morceau de l'adresse.
+    expect(vise![1]).toBe(commandes.CLONER_DEPOT.split('/').at(-1));
+    expect(commandes.ALLER_AU_PROJET_0_3.startsWith(`cd ${vise![1]}/`)).toBe(true);
+  });
+
+  it('forcer le processeur : la variable que lit appareil.py, à la valeur cpu', () => {
+    expect(commandes.FORCER_PROCESSEUR_POWERSHELL).toBe('$env:FORGE_APPAREIL = "cpu"');
+    expect(commandes.FORCER_PROCESSEUR_BASH).toBe('export FORGE_APPAREIL=cpu');
+    const appareil = readFileSync(`${RACINE}/projets/0.3-poste/poste/appareil.py`, 'utf8');
+    expect(appareil).toContain('os.environ.get("FORGE_APPAREIL")');
+    expect(appareil).toContain('if valeur == "cpu":');
+  });
 });

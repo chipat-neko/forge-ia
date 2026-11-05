@@ -13,14 +13,22 @@ import { typographier } from '../../../lib/typo';
 interface Props {
   /** Les identifiants des cartes dans MATERIELS, dans l'ordre du tableau. */
   cartes: string[];
+  /**
+   * Le nom à afficher pour une carte, quand celui de MATERIELS ne convient pas
+   * ici : « T4 » plutôt que « T4 (Colab gratuit) », que Google n'annonce pas.
+   */
+  noms?: Readonly<Record<string, string>>;
   /** La légende, au-dessus du tableau. */
   legende: string;
 }
 
-const { cartes, legende } = Astro.props;
+const { cartes, noms = {}, legende } = Astro.props;
+for (const id of Object.keys(noms)) {
+  if (!cartes.includes(id)) throw new Error(`TableauCartes : « ${id} » a un nom, mais n'est pas dans cartes.`);
+}
 const lignes = cartes.map((id) => {
   const m = materiel(id);
-  return [m.nom, `${nombre(m.memoireGo)} Go`, nombre(m.creteTflops, decimalesUtiles(m.creteTflops))];
+  return [noms[id] ?? m.nom, `${nombre(m.memoireGo)} Go`, nombre(m.creteTflops, decimalesUtiles(m.creteTflops))];
 });
 ---
 
