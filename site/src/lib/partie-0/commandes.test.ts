@@ -158,3 +158,54 @@ describe('commandes du chapitre 0.4', () => {
     expect(commandes.ALLER_AU_PROJET_0_4.startsWith(`cd ${vise}/`)).toBe(true);
   });
 });
+
+// Le chapitre 0.5 : le script `python -m premier_reseau entrainer`, vérifié
+// contre le __main__.py, l'appareil.py, le pyproject.toml et le README du
+// projet, lus en texte (sans PyTorch).
+describe('commandes du chapitre 0.5', () => {
+  const PROJET = `${RACINE}/projets/0.5-reseau`;
+  const MAIN = readFileSync(`${PROJET}/premier_reseau/__main__.py`, 'utf8').replace(/\r\n?/g, '\n');
+  const APPAREIL = readFileSync(`${PROJET}/premier_reseau/appareil.py`, 'utf8').replace(/\r\n?/g, '\n');
+  const PYPROJECT = readFileSync(`${PROJET}/pyproject.toml`, 'utf8').replace(/\r\n?/g, '\n');
+  const README = readFileSync(`${PROJET}/README.md`, 'utf8').replace(/\r\n?/g, '\n');
+  const DU_CHAPITRE = [commandes.RESEAU_ENTRAINER_CPU, commandes.RESEAU_ENTRAINER_GPU];
+
+  it('les commandes, à l’identique', () => {
+    expect(commandes.ALLER_AU_PROJET_0_5).toBe('cd forge-ia/projets/0.5-reseau');
+    expect(commandes.RESEAU_ENTRAINER_CPU).toBe('uv run --extra cpu python -m premier_reseau entrainer --appareil cpu');
+    expect(commandes.RESEAU_ENTRAINER_GPU).toBe('uv run --extra gpu python -m premier_reseau entrainer --appareil cuda');
+  });
+
+  it('entrainer est une commande du script, et --appareil reçoit un choix de choisir_appareil', () => {
+    expect(MAIN).toContain('add_parser("entrainer"');
+    expect(MAIN).toMatch(/"--appareil",[^\n]*default=None/);
+    expect(MAIN).toContain('choisir_appareil(options.appareil)');
+    for (const commande of DU_CHAPITRE) {
+      expect(/python -m premier_reseau (\S+)/.exec(commande)![1], commande).toBe('entrainer');
+      const appareil = /--appareil (\S+)$/.exec(commande)![1];
+      expect(APPAREIL, commande).toContain(`if valeur == "${appareil}":`);
+    }
+  });
+
+  it('chaque --extra est un extra du pyproject.toml du projet 0.5', () => {
+    const section = /^\[project\.optional-dependencies\]\n([\s\S]*?)(?=^\[|(?![\s\S]))/m.exec(PYPROJECT);
+    expect(section, 'section [project.optional-dependencies] introuvable dans le pyproject.toml de 0.5-reseau').not.toBeNull();
+    const extras = [...section![1].matchAll(/^([A-Za-z0-9_-]+)\s*=/gm)].map(([, nom]) => nom);
+    expect(extras.sort()).toEqual(['cpu', 'gpu']);
+    for (const commande of DU_CHAPITRE) {
+      for (const [, extra] of commande.matchAll(/--extra (\S+)/g)) expect(extras, commande).toContain(extra);
+    }
+  });
+
+  it('ce sont les commandes du README, celles qui ont écrit les sorties du chapitre', () => {
+    for (const commande of DU_CHAPITRE) {
+      expect(README, commande).toContain(`${commande}\n`);
+      expect(README, commande).toContain(`${commande} --enregistrer sorties/`);
+    }
+  });
+
+  it('la mise à jour du dépôt mène aussi au projet 0.5', () => {
+    const vise = /^git -C (\S+) pull$/.exec(commandes.METTRE_A_JOUR_DEPOT)![1];
+    expect(commandes.ALLER_AU_PROJET_0_5.startsWith(`cd ${vise}/`)).toBe(true);
+  });
+});

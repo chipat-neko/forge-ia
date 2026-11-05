@@ -1,0 +1,185 @@
+---
+// La courbe de l'entraînement à la main du chapitre 0.5 : la perte du réseau
+// 2-2-1 sur le OU exclusif, avant le premier pas puis après chacun, telle que
+// le Python l'a calculée (la section « entrainement » des attendus, que le MDX
+// passe en `pertes`). Rien n'est recalculé ici : la page ne refait pas
+// l'entraînement, qui passe par exp et log.
+//
+// Un SVG statique, dessiné à la main (aucune bibliothèque de graphiques), en
+// viewBox 640 × 240 : l'échelle va du pas 0 au dernier, et de 0 à 1,1 fois la
+// plus grande perte. Le pas 0 est posé tel quel ; les pertes après chaque pas
+// sont réduites à 600 points par reduirePoints, qui place la perte d'indice i au
+// pas i + 1. Les textes (graduations, noms des axes, en Gabarito 13 px et encre
+// douce) sont du HTML posé autour du SVG : ils gardent leur taille quelle que
+// soit la largeur de la courbe. Le SVG a un nom accessible qui donne la perte
+// au départ et à la fin, aux valeurs des attendus (etiquetteCourbe).
+import { cheminCourbe, graduations, reduirePoints, type Echelle, type Point } from '../../../lib/courbe';
+import { decimalesUtiles, nombre } from '../../../lib/nombres';
+import { etiquetteCourbe } from '../../../lib/partie-0/paris-0-5';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  /** La perte avant le premier pas, puis après chaque pas. */
+  pertes: number[];
+  /** La légende, sous la courbe. */
+  legende: string;
+}
+
+const { pertes, legende } = Astro.props;
+
+// Vérifie aussi les pertes : au moins deux, finies et positives.
+const etiquette = etiquetteCourbe(pertes);
+let plusGrande = 0;
+for (const p of pertes) if (p > plusGrande) plusGrande = p;
+const e: Echelle = { largeur: 640, hauteur: 240, xMax: pertes.length - 1, yMin: 0, yMax: 1.1 * plusGrande };
+const points: Point[] = [{ pas: 0, perte: pertes[0] }, ...reduirePoints(pertes.slice(1), 600)];
+const { d, horsEchelle } = cheminCourbe(points, e);
+if (horsEchelle || d === '' || /NaN|Infinity/.test(d)) {
+  throw new Error('CourbeXor : la courbe sort de son échelle ou contient une valeur non finie. Vérifie les pertes des attendus de 0.5.');
+}
+
+const gradX = graduations(e.xMax, 3);
+const gradY = graduations(e.yMax, 4).filter((v) => v < e.yMax);
+/** Les positions en pourcentage du cadre, pour les textes posés autour. */
+const enX = (pas: number) => (pas / e.xMax) * 100;
+const enY = (v: number) => 100 - ((v - e.yMin) / (e.yMax - e.yMin)) * 100;
+const ecrire = (v: number) => nombre(v, decimalesUtiles(v));
+---
+
+<figure class="courbe-xor" data-test="courbe-xor-figure">
+  <div class="cadre-courbe">
+    <span class="titre-axe titre-y" data-axe="erreur" aria-hidden="true">erreur</span>
+    <div class="graduations-y" aria-hidden="true">
+      {gradY.map((v) => <span style={`top: ${enY(v)}%`}>{ecrire(v)}</span>)}
+    </div>
+    <div class="trace-courbe">
+      <svg viewBox="0 0 640 240" preserveAspectRatio="none" role="img" aria-label={etiquette} data-test="courbe-xor">
+        {
+          gradY
+            .filter((v) => v > 0)
+            .map((v) => <line class="grille" x1="0" x2="640" y1={(e.hauteur * enY(v)) / 100} y2={(e.hauteur * enY(v)) / 100} />)
+        }
+        <path class="perte" d={d} />
+      </svg>
+    </div>
+  </div>
+  <div class="graduations-x" aria-hidden="true">
+    {gradX.map((v) => <span style={`left: ${enX(v)}%`}>{nombre(v)}</span>)}
+  </div>
+  <span class="titre-axe titre-x" data-axe="pas" aria-hidden="true">pas</span>
+  <figcaption>{typographier(legende)}</figcaption>
+</figure>
+
+<style>
+  .courbe-xor {
+    margin: 0.8em 0 1.2em;
+    font-family: var(--titres);
+    font-size: 13px;
+    line-height: 1.2;
+    color: var(--indigo-doux);
+    /* La place des graduations de l'erreur, à gauche de la courbe. */
+    --gauche: 2.4em;
+  }
+
+  .cadre-courbe {
+    position: relative;
+    padding: 1.6em 0 0 var(--gauche);
+  }
+
+  .titre-axe {
+    font-weight: 600;
+  }
+
+  .titre-y {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .titre-x {
+    display: block;
+    text-align: right;
+    margin-top: 2px;
+  }
+
+  .graduations-y {
+    position: absolute;
+    top: 1.6em;
+    bottom: 0;
+    left: 0;
+    width: var(--gauche);
+  }
+
+  .graduations-y span,
+  .graduations-x span {
+    position: absolute;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .graduations-y span {
+    right: 0.7em;
+    transform: translateY(-50%);
+  }
+
+  .graduations-x {
+    position: relative;
+    height: 1.4em;
+    margin: 4px 0 0 var(--gauche);
+  }
+
+  .graduations-x span {
+    top: 0;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+
+  /* Les graduations des bords restent dans le cadre. */
+  .graduations-x span:first-child {
+    transform: none;
+  }
+
+  .graduations-x span:last-child {
+    transform: translateX(-100%);
+  }
+
+  .trace-courbe svg {
+    display: block;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    aspect-ratio: 640 / 240;
+    overflow: visible;
+    border-bottom: 1px solid var(--indigo-doux);
+  }
+
+  line,
+  path {
+    vector-effect: non-scaling-stroke;
+    fill: none;
+  }
+
+  .grille {
+    stroke: var(--brume);
+    stroke-width: 1;
+  }
+
+  .perte {
+    stroke: var(--indigo);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  figcaption {
+    margin-top: 8px;
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  @media (max-width: 720px) {
+    /* Sur un téléphone, la courbe gagne en hauteur ce qu'elle perd en largeur. */
+    .trace-courbe svg {
+      aspect-ratio: 640 / 360;
+    }
+  }
+</style>

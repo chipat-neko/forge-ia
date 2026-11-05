@@ -571,9 +571,12 @@
     padding: 2px 0;
   }
 
+  /* Comme la source, plus bas : en 17 px, une ligne de prénoms dépasserait 80 signes dans la colonne
+     d'un chapitre (0.5). */
   .avant p {
     margin: 0.4em 0 0;
     overflow-wrap: anywhere;
+    max-width: 29em;
   }
 
   .pas-groupe {
@@ -584,12 +587,15 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* En petits caractères, la ligne de la source dépasserait 80 signes dans la colonne d'un chapitre (0.5) :
+     sa largeur est bornée. */
   .credit {
     font-family: var(--titres);
     font-size: 14px;
     line-height: 1.45;
     color: var(--indigo-doux);
     margin: 0;
+    max-width: 34em;
   }
 
   .suite {

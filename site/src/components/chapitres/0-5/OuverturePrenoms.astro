@@ -1,0 +1,94 @@
+---
+// L'ouverture du chapitre 0.5 : deux prénoms que le mini-modèle de l'avant-goût
+// invente avant tout entraînement, et la promesse du chapitre. Rien n'est tapé à
+// la main : le MDX passe les prénoms (etatInitial('avant-gout'), le pas 0, écrits
+// par prenomAffiche) et les nombres de poids (celui du mini-modèle, celui du
+// réseau du projet, compté par le Python). Aucun résultat de pari n'est dévoilé.
+//
+// Les prénoms en grand restent du texte : un lecteur d'écran les lit, puis la
+// légende dit d'où ils viennent.
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  /** Les deux prénoms du départ, déjà écrits (« Xèhàlàhuïfîadâu »). */
+  prenoms: string[];
+  /** Le nombre de poids du mini-modèle, déjà écrit (« 4 608 »). */
+  poidsMini: string;
+  /** Le nombre de poids du réseau du chapitre, déjà écrit (« 9 »). */
+  poidsReseau: string;
+}
+
+const { prenoms, poidsMini, poidsReseau } = Astro.props;
+if (prenoms.length !== 2) {
+  throw new Error(`OuverturePrenoms : il faut deux prénoms (reçu ${prenoms.length}). Vérifie DEPART dans 0-5.mdx.`);
+}
+
+const legende = typographier(
+  `Deux prénoms inventés par le mini-modèle du chapitre 1.5, avant tout entraînement : ses ${poidsMini} poids ` +
+    'sont encore tirés au hasard.',
+);
+const promesse = typographier(
+  `Dans ce chapitre, tu écris à la main la boucle qui fait apprendre un réseau de ${poidsReseau} poids : propager, ` +
+    `mesurer l'erreur, la remonter, corriger. À la fin, la même boucle, sur ses ${poidsMini} poids, lui apprendra ` +
+    'à faire mieux, sous tes yeux.',
+);
+---
+
+<div class="ouverture-prenoms" data-test="ouverture">
+  <figure>
+    <p class="prenoms-depart">
+      {prenoms.map((p) => <span class="prenom-depart" data-test="ouverture-prenom">{p}</span>)}
+    </p>
+    <figcaption>{legende}</figcaption>
+  </figure>
+  <p class="promesse">{promesse}</p>
+</div>
+
+<style>
+  .ouverture-prenoms {
+    margin: 40px 0 0;
+  }
+
+  figure {
+    margin: 0;
+  }
+
+  /* Les deux prénoms en grand, dans la police du texte, en italique : des mots inventés, cités. */
+  .prenoms-depart {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 28px;
+    margin: 0;
+    font-size: 40px;
+    font-style: italic;
+    line-height: 1.25;
+    font-variation-settings: 'opsz' 48;
+  }
+
+  /* Chaque prénom souligné d'une teinte, comme les morceaux de texte découpés du site. */
+  .prenom-depart {
+    border-bottom: 3px solid var(--teinte-a-trait);
+    overflow-wrap: anywhere;
+  }
+
+  .prenom-depart:nth-child(2) {
+    border-bottom-color: var(--teinte-b-trait);
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 15px;
+    color: var(--indigo-doux);
+    margin-top: 10px;
+  }
+
+  .promesse {
+    margin: 18px 0 0;
+  }
+
+  @media (max-width: 720px) {
+    .prenoms-depart {
+      font-size: 30px;
+    }
+  }
+</style>

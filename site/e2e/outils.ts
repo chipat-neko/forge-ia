@@ -188,3 +188,31 @@ export async function verifierLiensVersParus(zone: Locator, lieu = ''): Promise<
     if (chapitre) expect(existsSync(`src/content/chapitres/${chapitre[1]}.mdx`), `${lieu} : ${href}`).toBe(true);
   }
 }
+
+// ---------- Le tableau de l'avant-goût du mini-modèle ----------
+// Partagé par e2e/mini-modele.spec.ts (page d'essai) et e2e/chapitre-0-5.spec.ts
+// (le chapitre qui l'accueille) : `t` est le tableau [data-test="mini-avant-apres"].
+
+/** Les textes d'une colonne du tableau de l'avant-goût (1 : le départ, 2 : la fin), blancs resserrés. */
+export async function colonneAvantApres(t: Locator, n: 1 | 2): Promise<string[]> {
+  const textes = await t.locator(`tbody tr td:nth-child(${n})`).allInnerTexts();
+  return textes.map((s) => s.replace(/\s+/g, ' ').trim());
+}
+
+/** La colonne de droite n'a encore aucun prénom : un tiret par ligne, lu « pas encore » par les lecteurs d'écran. */
+export async function verifierDroiteEnTirets(t: Locator, nbLignes: number): Promise<void> {
+  const droite = t.locator('tbody tr td:nth-child(2)');
+  await expect(droite).toHaveCount(nbLignes);
+  await expect(droite.locator('[aria-hidden="true"]')).toHaveText(Array<string>(nbLignes).fill('—'));
+  for (const td of await droite.all()) await expect(td).toHaveAccessibleName('pas encore');
+}
+
+/** Le tableau : une légende, deux en-têtes de colonne, nbLignes lignes de deux cases, sans en-tête de ligne. */
+export async function verifierStructureAvantApres(t: Locator, nbLignes: number): Promise<void> {
+  expect(((await t.locator('caption').textContent()) ?? '').trim()).toBe('Les prénoms inventés, avant et après l’entraînement');
+  await expect(t.locator('thead th[scope="col"]')).toHaveCount(2);
+  await expect(t.locator('thead th')).toHaveCount(2);
+  await expect(t.locator('tbody tr')).toHaveCount(nbLignes);
+  await expect(t.locator('tbody th')).toHaveCount(0);
+  for (const ligne of await t.locator('tbody tr').all()) await expect(ligne.locator('td')).toHaveCount(2);
+}

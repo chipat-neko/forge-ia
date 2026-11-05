@@ -12,7 +12,15 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 import { decimalesUtiles, nombre } from '../src/lib/nombres';
 import { MESSAGE_DIVERGENCE, MESSAGE_NOUVEAU_TAUX, MESSAGE_ONGLET, prenomAffiche } from '../src/lib/mini-modele/pilote';
 import { PRESETS_MINI, TAUX_PROPOSES } from '../src/lib/mini-modele/reglages';
-import { attendreHydratation, verifierAxe, verifierSansDebordement, verifierTypographie } from './outils';
+import {
+  attendreHydratation,
+  colonneAvantApres,
+  verifierAxe,
+  verifierDroiteEnTirets as droiteEnTirets,
+  verifierSansDebordement,
+  verifierStructureAvantApres,
+  verifierTypographie,
+} from './outils';
 
 const PAGE = '/forge-ia/essais/mini-modele/';
 const FINE = '\u202F';
@@ -39,11 +47,8 @@ const NB_LIGNES = AVANT_GOUT.nbEchantillons;
 const EN_TETE_DEPART = 'Au départ, pas 0';
 const EN_TETE_AVANT_LA_FIN = 'Après l’entraînement';
 
-/** Les textes d'une colonne du tableau de l'avant-goût (1 : le départ, 2 : la fin), blancs resserrés. */
-async function colonne(p: Page, n: 1 | 2): Promise<string[]> {
-  const textes = await avantApres(p).locator(`tbody tr td:nth-child(${n})`).allInnerTexts();
-  return textes.map((s) => s.replace(/\s+/g, ' ').trim());
-}
+/** Les textes d'une colonne du tableau de l'avant-goût (1 : le départ, 2 : la fin), blancs resserrés (e2e/outils.ts). */
+const colonne = (p: Page, n: 1 | 2): Promise<string[]> => colonneAvantApres(avantApres(p), n);
 
 /** Les en-têtes des deux colonnes, en texte brut (U+202F gardée). */
 const enTetes = async (p: Page) => (await avantApres(p).locator('thead th').allTextContents()).map((s) => s.trim());
@@ -51,23 +56,11 @@ const enTetes = async (p: Page) => (await avantApres(p).locator('thead th').allT
 /** Un prénom tel que le tableau l'écrit : « Léa (existe déjà) », « (aucune lettre) ». */
 const caseAttendue = (p: { texte: string; existe: boolean }) => prenomAffiche(p.texte) + (p.existe ? ' (existe déjà)' : '');
 
-/** La colonne de droite n'a encore aucun prénom : un tiret par ligne, lu « pas encore » par les lecteurs d'écran. */
-async function verifierDroiteEnTirets(t: Locator): Promise<void> {
-  const droite = t.locator('tbody tr td:nth-child(2)');
-  await expect(droite).toHaveCount(NB_LIGNES);
-  await expect(droite.locator('[aria-hidden="true"]')).toHaveText(Array<string>(NB_LIGNES).fill('—'));
-  for (const td of await droite.all()) await expect(td).toHaveAccessibleName('pas encore');
-}
+/** La colonne de droite n'a encore aucun prénom : un tiret par ligne, lu « pas encore » (e2e/outils.ts). */
+const verifierDroiteEnTirets = (t: Locator): Promise<void> => droiteEnTirets(t, NB_LIGNES);
 
-/** Le tableau : une légende, deux en-têtes de colonne, NB_LIGNES lignes de deux cases, sans en-tête de ligne. */
-async function verifierStructure(t: Locator): Promise<void> {
-  expect(((await t.locator('caption').textContent()) ?? '').trim()).toBe('Les prénoms inventés, avant et après l’entraînement');
-  await expect(t.locator('thead th[scope="col"]')).toHaveCount(2);
-  await expect(t.locator('thead th')).toHaveCount(2);
-  await expect(t.locator('tbody tr')).toHaveCount(NB_LIGNES);
-  await expect(t.locator('tbody th')).toHaveCount(0);
-  for (const ligne of await t.locator('tbody tr').all()) await expect(ligne.locator('td')).toHaveCount(2);
-}
+/** Le tableau : une légende, deux en-têtes de colonne, NB_LIGNES lignes de deux cases, sans en-tête de ligne (e2e/outils.ts). */
+const verifierStructure = (t: Locator): Promise<void> => verifierStructureAvantApres(t, NB_LIGNES);
 
 /** Aucune case ne déborde de sa colonne, et le tableau tient dans la largeur de la démo. */
 async function verifierTableauSansDebordement(t: Locator): Promise<void> {

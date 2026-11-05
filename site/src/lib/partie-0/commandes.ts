@@ -71,6 +71,19 @@ export const TENSEURS_MESURER_CPU = 'uv run --extra cpu python -m tenseurs mesur
 /** La même mesure avec la version pour la carte : la carte, si PyTorch la voit. */
 export const TENSEURS_MESURER_GPU = 'uv run --extra gpu python -m tenseurs mesurer';
 
+// ---------- Chapitre 0.5 : le premier réseau ----------
+// La sous-commande entrainer est celle de projets/0.5-reseau/premier_reseau/__main__.py,
+// et ces deux commandes sont celles du README du projet, qui ont écrit ses
+// sorties (sorties/processeur.txt, puis sorties/rtx-5070-ti.txt à la porte) :
+// commandes.test.ts le vérifie.
+
+/** Entrer dans le projet du chapitre 0.5, depuis le dossier où le dépôt a été cloné. */
+export const ALLER_AU_PROJET_0_5 = 'cd forge-ia/projets/0.5-reseau';
+/** Le neurone, puis le réseau entraîné à la main et avec PyTorch, sur le processeur. */
+export const RESEAU_ENTRAINER_CPU = 'uv run --extra cpu python -m premier_reseau entrainer --appareil cpu';
+/** La même chose avec la version de PyTorch pour la carte, sur la carte (un message dit quoi faire si PyTorch ne la voit pas). */
+export const RESEAU_ENTRAINER_GPU = 'uv run --extra gpu python -m premier_reseau entrainer --appareil cuda';
+
 // Ce que d'anciens tutoriels font taper, et que le chapitre 0.3 cite pour dire
 // pourquoi ne pas le faire. À ne pas taper : ces commandes ne sont pas
 // vérifiées contre le dépôt, seulement citées.

@@ -1,0 +1,556 @@
+---
+partie: 0
+numero: "0.5"
+titre: "Premier réseau de neurones"
+chapeau: "Un neurone fait une somme, puis décide. Tu en règles un à la main, tu vois ce qu'il ne sait pas faire, puis tu entraînes un petit réseau qui y arrive : d'abord en Python pur, en écrivant toi-même la remontée de l'erreur, puis avec PyTorch."
+programme: "10 étapes, 4 paris, environ 45 minutes."
+acquis:
+  - cle: neurone
+    texte: "Un neurone fait une somme pondérée, puis décide."
+    ou: "à l'étape 1, en classant dans l'atelier les 4 points de ET ou de OU"
+  - cle: xor
+    texte: "Un seul neurone ne sait pas tout séparer : il faut une couche de plus."
+    ou: "à l'étape 2"
+  - cle: gradient
+    texte: "L'erreur remonte couche par couche, par la règle de la chaîne."
+    ou: "à l'étape 5"
+  - cle: entraine
+    texte: "Entraîner, c'est répéter : propager, mesurer l'erreur, remonter, corriger."
+    ou: "à l'étape 6"
+  - cle: coince
+    texte: "Selon son départ, un réseau peut rester coincé."
+    ou: "à l'étape 6"
+  - cle: avant-gout
+    texte: "La même boucle fait apprendre un vrai petit modèle."
+    ou: "à l'étape 9, en menant l'entraînement du mini-modèle jusqu'au bout"
+---
+
+import AtelierNeurone from '../../components/chapitres/0-5/AtelierNeurone.svelte';
+import CourbeXor from '../../components/chapitres/0-5/CourbeXor.astro';
+import OuverturePrenoms from '../../components/chapitres/0-5/OuverturePrenoms.astro';
+import TableauCalcul from '../../components/chapitres/0-2/TableauCalcul.astro';
+import DemoMiniModele from '../../components/demos/DemoMiniModele.astro';
+import BlocCommande from '../../components/gabarit/BlocCommande.astro';
+import SortieCommande from '../../components/gabarit/SortieCommande.astro';
+import attendus from '../../../../projets/0.5-reseau/tests/attendus.json';
+import sortieProcesseur from '../../../../projets/0.5-reseau/sorties/processeur.txt?raw';
+import { modelePublic } from '../../lib/calculateur/donnees';
+import { formaterOctets, formaterQuantite } from '../../lib/calculateur/formats';
+import { PRESETS_FORGE } from '../../lib/calculateur/ton-ia';
+import { DEPOT } from '../../lib/depot';
+import { etatInitial } from '../../lib/mini-modele/apercu';
+import { prenomAffiche } from '../../lib/mini-modele/pilote';
+import { PRESETS_MINI } from '../../lib/mini-modele/reglages';
+import { trouverChapitre } from '../../lib/parcours';
+import { ecrirePoint, ecrireReglage, REGLAGE_MAX, REGLAGE_MIN, REGLAGE_PAS } from '../../lib/partie-0/atelier-neurone';
+import {
+  ALLER_AU_PROJET_0_5,
+  CLONER_DEPOT,
+  FORCER_PROCESSEUR_BASH,
+  FORCER_PROCESSEUR_POWERSHELL,
+  METTRE_A_JOUR_DEPOT,
+  RESEAU_ENTRAINER_CPU,
+  RESEAU_ENTRAINER_GPU,
+} from '../../lib/partie-0/commandes';
+import { GRILLE, meilleurReglage, POINTS, PORTES } from '../../lib/partie-0/neurone';
+import {
+  bornesPredictions,
+  choixCoince,
+  choixExact,
+  choixGradientSortie,
+  choixXor,
+  ecartsDeLaSortie,
+  ecrireNombre,
+  ecrireValeur,
+  lignesPredictions,
+  nbCoinces,
+  P_DU_PARI,
+  questionCoince,
+  questionExact,
+  questionGradient,
+  Y_DU_PARI,
+} from '../../lib/partie-0/paris-0-5';
+import { OCTETS_ROUE_CU132_WINDOWS } from '../../lib/partie-0/sources-0-3';
+import { exigeur } from '../../lib/exiger';
+import { decimalesUtiles, nombre } from '../../lib/nombres';
+import { typographier } from '../../lib/typo';
+
+export const exiger = exigeur('le texte du chapitre 0.5 (0-5.mdx)');
+
+export const E = attendus.entrainement;
+
+export const GRAINES = attendus.graines;
+
+export const N = POINTS.length;
+
+export const NEURONE = (() => {
+  // La grille du neurone à seuil (étape 1), et son meilleur réglage pour le OU exclusif (étape 2).
+  const [meilleur, [w1, w2], b] = meilleurReglage('ou_exclusif');
+  exiger(meilleur < N, 'un neurone seul classe maintenant tous les points du OU exclusif : l’explication du pari « xor » est à revoir');
+  const tous = POINTS.map(ecrirePoint);
+  return {
+    points: `${tous.slice(0, -1).join(', ')} et ${tous.at(-1)}`,
+    min: ecrireReglage(REGLAGE_MIN),
+    max: ecrireReglage(REGLAGE_MAX),
+    pas: ecrireReglage(REGLAGE_PAS),
+    valeurs: nombre(GRILLE.length),
+    reglages: nombre(GRILLE.length ** 3),
+    xor: nombre(meilleur),
+    xorW1: ecrireReglage(w1),
+    xorW2: ecrireReglage(w2),
+    xorB: ecrireReglage(b),
+    // Les points à 1 et à 0 du OU exclusif, pour la diagonale de l'étape 2.
+    uns: POINTS.filter((_, i) => PORTES.ou_exclusif[i] === 1).map(ecrirePoint),
+    zeros: POINTS.filter((_, i) => PORTES.ou_exclusif[i] === 0).map(ecrirePoint),
+  };
+})();
+
+export const RESEAU = (() => {
+  // Le réseau 2-2-1 : ses couches et ses poids, comptés sur les poids de départ des attendus.
+  const { w1, b1, w2 } = E.depart;
+  const entrees = POINTS[0].length;
+  const caches = w1.length;
+  exiger(
+    w1.every((ligne) => ligne.length === entrees) && b1.length === caches && w2.length === caches,
+    'les poids de départ des attendus n’ont plus la forme d’un réseau à une couche cachée et une sortie',
+  );
+  const parNeurone = entrees + 1; // un poids par entrée, et un biais
+  exiger(caches * parNeurone + (caches + 1) === E.nb_poids, `les ${E.nb_poids} poids des attendus ne sont plus ceux du réseau ${entrees}-${caches}-1`);
+  exiger(E.pertes.at(-1) < E.seuil_perte, 'avec la graine du projet, la perte finale ne passe plus sous le seuil : le réseau n’apprend plus');
+  return {
+    nom: `${entrees}-${caches}-1`,
+    entrees: nombre(entrees),
+    caches: nombre(caches),
+    parNeurone: nombre(parNeurone),
+    sortie: nombre(caches + 1),
+    poids: nombre(E.nb_poids),
+    graine: String(E.graine),
+    taux: ecrireNombre(E.taux, decimalesUtiles(E.taux)),
+    pas: nombre(E.nb_pas),
+    pertes: nombre(E.pertes.length),
+    depart: ecrireValeur(E.pertes[0]),
+    fin: ecrireValeur(E.pertes.at(-1)),
+    // Les formes des tenseurs des points et des réponses, dans PyTorch (étape 7).
+    formePoints: `(${N}, ${entrees})`,
+    formeReponses: `(${N}, 1)`,
+    // Une réponse de 0,5 partout : l'erreur de chaque point vaut ln 2.
+    ln2: ecrireValeur(Math.LN2),
+    readme: `${DEPOT}/blob/main/projets/0.5-reseau/README.md`,
+  };
+})();
+
+export const GRADIENT = (() => {
+  // Le pari « gradient » : p − y, écrit avec les décimales de p.
+  const d = decimalesUtiles(P_DU_PARI);
+  return { p: ecrireNombre(P_DU_PARI, d), y: ecrireNombre(Y_DU_PARI), resultat: ecrireNombre(P_DU_PARI - Y_DU_PARI, d) };
+})();
+
+export const PREDICTIONS = (() => {
+  // Le pari « exact » : les réponses du réseau entraîné, jamais exactement 0 ou 1, mais justes une fois arrondies.
+  exiger(E.predictions.every((p) => p !== 0 && p !== 1), 'une prédiction des attendus vaut exactement 0 ou 1 : l’explication du pari « exact » est à revoir');
+  exiger(
+    E.predictions.every((p, i) => Math.round(p) === PORTES.ou_exclusif[i]),
+    'arrondies, les prédictions des attendus ne donnent plus le OU exclusif',
+  );
+  const { texteMin, texteMax } = bornesPredictions(E);
+  return { min: texteMin, max: texteMax, lignes: lignesPredictions(E) };
+})();
+
+export const COINCE = (() => {
+  // Le pari « coince » : les départs qui n'apprennent pas, comptés dans la section « graines » des attendus.
+  const k = nbCoinces(GRAINES);
+  const n = GRAINES.length;
+  return {
+    k: nombre(k),
+    n: nombre(n),
+    apprennent: nombre(n - k),
+    premiere: String(GRAINES[0].graine),
+    derniere: String(GRAINES.at(-1).graine),
+    seuil: ecrireNombre(E.seuil_perte, decimalesUtiles(E.seuil_perte)),
+  };
+})();
+
+export const ECARTS = (() => {
+  // Les écarts entre la main et PyTorch, tels que le script les a écrits dans sorties/processeur.txt.
+  const e = ecartsDeLaSortie(sortieProcesseur);
+  exiger(e.valeurGradients < 1e-12, `les dérivées de la main et d’autograd diffèrent de ${e.gradients} : « aux arrondis près » n’est plus vrai`);
+  exiger(e.valeurPoids < 1e-9, `les poids finaux de la main et de PyTorch diffèrent de ${e.poids} : « le même réseau » n’est plus vrai`);
+  return e;
+})();
+
+export const DEPART = (() => {
+  // Le mini-modèle de l'avant-goût au pas 0 : ses deux premiers prénoms (un prénom vide, « (aucune lettre) », est
+  // sauté), son nombre de poids, ses pas, son vocabulaire et son lot (préréglage avant-gout).
+  const etat = etatInitial('avant-gout');
+  const prenoms = etat.echantillons.filter((p) => p.texte !== '').slice(0, 2).map((p) => prenomAffiche(p.texte));
+  exiger(prenoms.length === 2, 'l’avant-goût n’invente plus deux prénoms non vides au pas 0');
+  return {
+    prenoms,
+    cites: prenoms.map((p) => `«\u202F${p}\u202F»`),
+    poids: nombre(etat.nbParametres),
+    pas: nombre(etat.pasTotal),
+    vocabulaire: nombre(etat.tailleVocabulaire),
+    lot: nombre(PRESETS_MINI['avant-gout'].lot),
+  };
+})();
+
+export const ROUE_CARTE = formaterOctets(OCTETS_ROUE_CU132_WINDOWS);
+
+export const LABO = (() => {
+  // Ton IA dans sa plus grande taille (le calculateur), GPT-3 et Llama 3 405B (modèles publics, sourcés).
+  const gpt3 = modelePublic('gpt-3-175b');
+  const llama = modelePublic('llama-3-405b');
+  const vers = (s) => ({ titre: s.titre, url: s.url, verifieLe: s.releveLe });
+  return {
+    tonIA: formaterQuantite(PRESETS_FORGE.tres_grand.parametres),
+    gpt3: formaterQuantite(gpt3.parametres),
+    llama: formaterQuantite(llama.parametres),
+    sources: [vers(gpt3.source), vers(llama.source)],
+  };
+})();
+
+export const SUITE = typographier(trouverChapitre('1.1').chapitre.titre);
+
+<OuverturePrenoms prenoms={DEPART.prenoms} poidsMini={DEPART.poids} poidsReseau={RESEAU.poids} />
+
+<Etape numero={1} titre="Un neurone">
+
+Un neurone artificiel reçoit des nombres, ses entrées. Il multiplie chacune par un poids, additionne le tout, ajoute un dernier nombre, le biais, puis décide. Avec deux entrées, x1 et x2, sa somme pondérée vaut <span class="formule-en-texte">w1 × x1 + w2 × x2 + b</span>. Le neurone le plus simple répond 1 si cette somme est positive, 0 sinon : c'est un neurone à seuil.
+
+Prends les portes logiques de l'électronique : deux entrées qui valent 0 ou 1, et une réponse. ET répond 1 seulement si ses deux entrées valent 1 ; OU, si au moins l'une des deux vaut 1. Il n'y a que {N} cas, les {N} points du carré : {NEURONE.points}.
+
+Le neurone sépare ces points par une droite : celle où sa somme vaut 0. D'un côté, la somme est positive, et il répond 1 ; de l'autre, il répond 0. Règle w1, w2 et b pour que ses réponses soient celles de ET.
+
+<AtelierNeurone client:load acquis="neurone" />
+
+L'atelier cherche à la main ce que le projet du chapitre cherche partout : il essaie tous les réglages d'une grille, et garde le meilleur pour chaque porte.
+
+<CodeExplique fichier="projets/0.5-reseau/premier_reseau/neurone.py" region="neurone">
+  <li data-lignes="1-7">`POINTS`, les {N} points (x1, x2), et `PORTES`, la réponse attendue de chaque porte, point par point. Le OU exclusif est l'objet de l'étape suivante.</li>
+  <li data-lignes="8-9">`GRILLE`, les valeurs essayées pour w1, w2 et b : de {NEURONE.min} à {NEURONE.max}, par pas de {NEURONE.pas}, comme les nombres de l'atelier.</li>
+  <li data-lignes="12-14">`sortie_seuil`, le neurone : la somme pondérée, puis la décision. Une somme nulle n'est pas positive : elle donne 0.</li>
+  <li data-lignes="17-23">`bien_classes` compte les points où le neurone donne la réponse de la porte. `zip`, du chapitre 0.1, parcourt les points et les réponses ensemble.</li>
+  <li data-lignes="26-35">`meilleur_reglage` essaie les {NEURONE.reglages} réglages de la grille, {NEURONE.valeurs} valeurs pour chacun des trois nombres, et garde le premier qui classe le plus de points.</li>
+</CodeExplique>
+
+<Fragment slot="note">
+
+Tout ce qui est jaune se manipule. Fais glisser un nombre à la souris ou au doigt ; au clavier, atteins-le avec Tab, puis utilise les flèches.
+
+Changer b déplace la droite sans la tourner : seuls w1 et w2 décident de sa pente.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={2} titre="Le OU exclusif">
+
+Le OU exclusif répond 1 quand une seule de ses deux entrées vaut 1. Il répond donc 1 pour {NEURONE.uns[0]} et pour {NEURONE.uns[1]}, mais 0 pour {NEURONE.zeros[0]} et pour {NEURONE.zeros[1]}. Sur le carré, ses deux points à 1 sont sur une diagonale, ses deux points à 0 sur l'autre.
+
+<Pari
+  id="xor"
+  question={`Un seul neurone peut-il classer les ${N} points du OU exclusif ?`}
+  precision="Une seule droite doit séparer les points à 1 des points à 0."
+  choix={choixXor()}
+  acquis="xor"
+>
+
+Non : au mieux {NEURONE.xor} points sur {N}. Sur toute la grille du projet, le meilleur réglage en classe {NEURONE.xor}, par exemple <span class="formule-en-texte">w1 = {NEURONE.xorW1}</span>, <span class="formule-en-texte">w2 = {NEURONE.xorW2}</span> et <span class="formule-en-texte">b = {NEURONE.xorB}</span>.
+
+Et aucun réglage ne fait mieux, même hors de la grille. Additionne les sommes pondérées de {NEURONE.uns[0]} et de {NEURONE.uns[1]} : <span class="formule-en-texte">w1 + w2 + 2b</span>. Celles de {NEURONE.zeros[0]} et de {NEURONE.zeros[1]} font exactement le même total. Pour répondre 1 aux deux premiers points, ce total doit être positif ; pour répondre 0 aux deux autres, il doit être négatif ou nul. C'est impossible à la fois.
+
+Essaie-le dans l'atelier de l'étape 1, sur « OU exclusif » : tu n'y dépasseras pas {NEURONE.xor} points sur {N}. Il faut une couche de plus : deux neurones qui tracent chacun leur droite, puis un troisième qui combine leurs réponses.
+
+</Pari>
+
+</Etape>
+
+<Etape numero={3} titre="Deux couches">
+
+Le réseau du projet a {RESEAU.entrees} entrées, une couche cachée de {RESEAU.caches} neurones, et un neurone de sortie : c'est un réseau {RESEAU.nom}. Chaque neurone caché fait sa somme pondérée des entrées ; le neurone de sortie, celle des neurones cachés. Chacun a un poids par entrée, et un biais : <span class="formule-en-texte">{RESEAU.caches} × {RESEAU.parNeurone} + {RESEAU.sortie} = {RESEAU.poids}</span> poids en tout, tirés au hasard au départ.
+
+Un neurone caché peut, par exemple, répondre comme OU, l'autre comme ET, et la sortie, « le premier, mais pas le second » : c'est exactement le OU exclusif. Personne ne dicte ce partage au réseau : l'entraînement trouve le sien.
+
+Mais le seuil a un défaut. Sa réponse saute de 0 à 1 d'un coup ; ailleurs, elle ne bouge pas. Sa pente est nulle, et la descente du chapitre 0.2 n'aurait rien à suivre. Le réseau remplace donc le seuil par la sigmoïde, qui monte en douceur : 0,5 pour une somme nulle, presque 1 pour une grande somme positive, presque 0 pour une grande somme négative. Elle a une pente partout.
+
+<CodeExplique fichier="projets/0.5-reseau/premier_reseau/a_la_main.py" region="sigmoide">
+  <li data-lignes="1-3">`sigmoide` calcule <span class="formule-en-texte">1 ÷ (1 + exp(−z))</span> : `math.exp` est l'exponentielle du chapitre 0.2. Pour <span class="formule-en-texte">z = 0</span>, exp(0) vaut 1, et la sigmoïde <span class="formule-en-texte">1 ÷ 2</span>.</li>
+</CodeExplique>
+
+La sortie du réseau, p, est donc un nombre entre 0 et 1 : la probabilité, selon lui, que la réponse soit 1. Faire traverser le réseau à un point, de l'entrée vers la sortie, s'appelle propager :
+
+<CodeExplique fichier="projets/0.5-reseau/premier_reseau/a_la_main.py" region="propager">
+  <li data-lignes="1-8">`Passage` range tout ce que calcule un point en traversant le réseau : la somme `z1` et la sortie `h` de chaque neurone caché, puis la somme `z2` et la sortie `p` du neurone de sortie. `@dataclass` fait de la classe une simple boîte à valeurs nommées. L'étape 5 se servira de chacune.</li>
+  <li data-lignes="11-12">`propager` fait traverser le réseau au point x. `r` contient les {RESEAU.poids} poids : `r.w1[j][i]` est le poids de l'entrée i vers le neurone caché j.</li>
+  <li data-lignes="13">La couche cachée : pour chaque neurone j, la somme pondérée des deux entrées, plus son biais `r.b1[j]`.</li>
+  <li data-lignes="14">Leur sortie, après la sigmoïde.</li>
+  <li data-lignes="15-16">Le neurone de sortie : la somme pondérée des sorties cachées, plus son biais, puis la sigmoïde. `p` est la réponse du réseau.</li>
+  <li data-lignes="17">Tout est rendu, pas seulement p.</li>
+</CodeExplique>
+
+<Fragment slot="note">
+
+Dans ce chapitre, comme pour ton IA, « poids » désigne tous les nombres que l'entraînement règle, biais compris.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={4} titre="L'erreur">
+
+Pour corriger les poids, il faut d'abord mesurer l'erreur du réseau. C'est celle du chapitre 0.2 : −ln de la chance donnée à la bonne réponse. Le réseau donne la chance p à la réponse 1, et donc 1 − p à la réponse 0. Si la bonne réponse y vaut 1, l'erreur vaut −ln p ; si elle vaut 0, −ln(1 − p). En une seule formule : <span class="formule-en-texte">−[y ln p + (1 − y) ln(1 − p)]</span>. On l'appelle l'entropie croisée binaire.
+
+<CodeExplique fichier="projets/0.5-reseau/premier_reseau/a_la_main.py" region="erreur">
+  <li data-lignes="1">`erreur` reçoit la sortie p du réseau et la bonne réponse y, 0 ou 1.</li>
+  <li data-lignes="2-3">La formule, dans la description de la fonction. Avec <span class="formule-en-texte">y = 1</span>, il n'en reste que −ln p ; avec <span class="formule-en-texte">y = 0</span>, il n'en reste que <span class="formule-en-texte">−ln(1 − p)</span>.</li>
+  <li data-lignes="4">Le calcul, un cas ou l'autre : `math.log` est ln, le logarithme naturel du chapitre 0.2.</li>
+</CodeExplique>
+
+La perte du réseau, c'est la moyenne de ces erreurs sur les {N} points. C'est elle que l'entraînement fera baisser. Avec les poids tirés au hasard, elle vaut {RESEAU.depart} au départ.
+
+<Fragment slot="note">
+
+Un réseau qui répondrait 0,5 partout, sans rien savoir, aurait une erreur de ln 2 sur chaque point, environ {RESEAU.ln2}.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={5} titre="Remonter l'erreur">
+
+Pour descendre, il faut la pente de la perte pour chacun des {RESEAU.poids} poids : sa dérivée. Or le réseau est une chaîne de calculs : des sommes, des sigmoïdes, puis l'erreur. La règle de la chaîne du chapitre 0.2 donne ces pentes maillon par maillon, en multipliant les pentes, de la sortie vers l'entrée : l'erreur remonte le réseau. C'est la rétropropagation.
+
+Au bout de la chaîne, un calcul se simplifie. La pente de l'erreur par rapport à z2, la somme du neurone de sortie avant sa sigmoïde, vaut simplement <span class="formule-en-texte">p − y</span> : la sortie, moins la bonne réponse.
+
+<Pari
+  id="gradient"
+  question={questionGradient()}
+  precision="p est la sortie du réseau, y la bonne réponse."
+  choix={choixGradientSortie()}
+  acquis="gradient"
+>
+
+<span class="formule-en-texte">p − y = {GRADIENT.p} − {GRADIENT.y} = {GRADIENT.resultat}</span>. La pente est positive : la sortie est trop haute. La descente retire à chaque poids le taux fois sa pente. Le biais de la sortie, dont la pente est ici p − y elle-même, recule donc ; z2 baisse, et p avec elle, vers la bonne réponse. Plus le réseau se trompe, plus la pente est grande ; s'il avait répondu exactement {GRADIENT.y}, elle serait nulle.
+
+</Pari>
+
+Puis l'erreur continue de remonter, maillon par maillon :
+
+<CodeExplique fichier="projets/0.5-reseau/premier_reseau/a_la_main.py" region="retropropager">
+  <li data-lignes="1-2">`retropropager` reçoit le réseau, le passage d'un point, le point et sa bonne réponse. Elle rend les dérivées de l'erreur par rapport aux {RESEAU.poids} poids.</li>
+  <li data-lignes="3">Le premier maillon : la pente de l'erreur par rapport à z2, <span class="formule-en-texte">p − y</span>.</li>
+  <li data-lignes="4-5">Les poids de la sortie. Dans <span class="formule-en-texte">z2 = w2[0] × h[0] + w2[1] × h[1] + b2</span>, la pente de z2 par rapport à `w2[j]` est `h[j]`, et par rapport à `b2`, 1. La règle de la chaîne les multiplie par `d_z2`.</li>
+  <li data-lignes="6">Un maillon de plus, vers les neurones cachés : la pente de z2 par rapport à `h[j]` est `w2[j]`. Chaque neurone caché reçoit sa part de l'erreur, selon son poids vers la sortie.</li>
+  <li data-lignes="7">Le maillon de la sigmoïde : sa pente vaut <span class="formule-en-texte">h × (1 − h)</span>.</li>
+  <li data-lignes="8-9">Les poids de la couche cachée, comme ceux de la sortie : la pente de `z1[j]` par rapport à `w1[j][i]` est l'entrée `x[i]`, et par rapport au biais, 1.</li>
+  <li data-lignes="10">Les {RESEAU.poids} dérivées, rangées comme les poids.</li>
+  <li data-lignes="13-30">`gradient_moyen` fait la moyenne des dérivées des {N} points : c'est la pente de la perte moyenne. Les boucles additionnent, puis on divise par le nombre de points.</li>
+</CodeExplique>
+
+<Fragment slot="note">
+
+Pourquoi p − y ? Avec <span class="formule-en-texte">y = 1</span>, l'erreur −ln p a pour pente <span class="formule-en-texte">−1 ÷ p</span>, et la sigmoïde, <span class="formule-en-texte">p × (1 − p)</span>. Multipliées, elles donnent −(1 − p), soit p − 1. Avec <span class="formule-en-texte">y = 0</span>, la même règle donne p. Les deux cas s'écrivent p − y.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={6} titre="Entraîner à la main">
+
+Il ne reste qu'à répéter. À chaque pas, le réseau propage les {N} points, mesure leur erreur, la remonte jusqu'au gradient moyen, puis recule chaque poids du taux fois sa dérivée : la descente du chapitre 0.2. Le projet fait {RESEAU.pas} pas, au taux de {RESEAU.taux}, depuis {RESEAU.poids} poids tirés au hasard avec la graine {RESEAU.graine}.
+
+<CodeExplique fichier="projets/0.5-reseau/premier_reseau/a_la_main.py" region="pas">
+  <li data-lignes="1-2">`pas` reçoit le réseau, ses dérivées et le taux.</li>
+  <li data-lignes="3-8">Chaque poids recule du taux fois sa dérivée : le pas de descente du chapitre 0.2, pour {RESEAU.poids} poids à la fois. Un nouveau réseau est rendu ; l'ancien ne change pas.</li>
+</CodeExplique>
+
+<CodeExplique fichier="projets/0.5-reseau/premier_reseau/a_la_main.py" region="entrainer">
+  <li data-lignes="1-4">`Historique` garde les pertes, et le réseau après le dernier pas.</li>
+  <li data-lignes="7-12">`perte_moyenne` : la moyenne des erreurs des {N} points, le nombre que l'entraînement fait baisser.</li>
+  <li data-lignes="15-21">`entrainer` note la perte au départ ; puis, à chaque pas, calcule le gradient moyen, fait le pas, et note la nouvelle perte. {RESEAU.pas} pas donnent {RESEAU.pertes} pertes.</li>
+  <li data-lignes="24-26">`predictions` donne la réponse du réseau pour chaque point.</li>
+</CodeExplique>
+
+Voici la perte du projet, pas après pas. Elle part de {RESEAU.depart} et finit à {RESEAU.fin}.
+
+<CourbeXor
+  pertes={E.pertes}
+  legende="L'erreur moyenne du réseau sur les points, avant le premier pas puis après chacun, calculée par le projet."
+/>
+
+<Pari
+  id="exact"
+  question={questionExact(E)}
+  precision="Sa sortie passe par une sigmoïde."
+  choix={choixExact(E)}
+  acquis="entraine"
+>
+
+Non : ses réponses vont de {PREDICTIONS.min} à {PREDICTIONS.max}. La sigmoïde s'approche de 0 et de 1 sans jamais les atteindre : il lui faudrait des sommes infiniment grandes. Arrondies, en revanche, ses réponses sont justes : le réseau a appris le OU exclusif.
+
+<TableauCalcul
+  test="predictions"
+  legende="Les réponses du réseau entraîné, calculées par le projet :"
+  colonnes={['Point', 'Bonne réponse', 'Réponse du réseau', 'Arrondie']}
+  lignes={PREDICTIONS.lignes}
+  nombres={[1, 2, 3]}
+/>
+
+</Pari>
+
+Entraîner, c'est cela : propager, mesurer l'erreur, remonter, corriger, et recommencer. Mais le départ compte.
+
+<Pari
+  id="coince"
+  question={questionCoince(GRAINES)}
+  precision={`Les mêmes ${RESEAU.pas} pas, depuis ${COINCE.n} tirages des poids de départ : les graines ${COINCE.premiere} à ${COINCE.derniere}.`}
+  choix={choixCoince(GRAINES)}
+  acquis="coince"
+>
+
+{COINCE.k} fois sur {COINCE.n}. Coincé, le réseau finit ses {RESEAU.pas} pas sans avoir appris : sa perte reste au-dessus de {COINCE.seuil}, ou l'une de ses réponses arrondies est fausse. La descente ne voit que la pente sous ses pieds. Selon le départ, elle peut s'enliser dans une région où cette pente ne la mène plus vers le fond, ou trop lentement pour {RESEAU.pas} pas.
+
+Changer de départ suffit souvent : ici, {COINCE.apprennent} graines sur {COINCE.n} apprennent. Le projet part de la graine {RESEAU.graine}, avec laquelle il apprend ; <a href={RESEAU.readme}>son README</a> raconte les graines essayées avant elle.
+
+</Pari>
+
+<Fragment slot="note">
+
+Le notebook du chapitre, à ouvrir dans Colab (le lien est à l'étape 10), refait cet entraînement, puis en montre un qui reste coincé.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={7} titre="Le même, avec PyTorch">
+
+PyTorch fait tout cela pour toi. `nn.Linear` fait les sommes pondérées d'une couche, `nn.Sigmoid` ses sigmoïdes, et `nn.BCELoss` l'erreur de l'étape 4, en moyenne sur les points. Surtout, autograd, son calcul automatique des dérivées, fait seul la rétropropagation de l'étape 5. Le projet construit le même réseau, avec les mêmes poids de départ, en `float64` : les nombres à virgule de Python.
+
+<CodeExplique fichier="projets/0.5-reseau/premier_reseau/avec_pytorch.py" region="modele">
+  <li data-lignes="1-2">`construire` reçoit les poids d'un réseau de l'étape 3, et rend le même réseau dans PyTorch.</li>
+  <li data-lignes="3-8">`nn.Sequential` enchaîne quatre couches, dans l'ordre : `nn.Linear(2, 2)`, deux entrées vers deux neurones, leurs sigmoïdes, puis `nn.Linear(2, 1)` et la sigmoïde de la sortie. `dtype=torch.float64` : des nombres sur 64 bits.</li>
+  <li data-lignes="9-13">On y recopie les poids de départ. `torch.no_grad()` dit à autograd de ne pas suivre ce calcul : recopier n'est pas à dériver. Les poids d'une couche forment un tenseur, rangé comme `w1[j][i]` : une ligne par neurone, une colonne par entrée.</li>
+  <li data-lignes="14">Le modèle est prêt.</li>
+</CodeExplique>
+
+<CodeExplique fichier="projets/0.5-reseau/premier_reseau/avec_pytorch.py" region="autograd">
+  <li data-lignes="1-2">`gradients_pytorch` rend les dérivées de la perte moyenne par rapport aux {RESEAU.poids} poids, calculées par autograd.</li>
+  <li data-lignes="3">Les points, dans un tenseur de forme {RESEAU.formePoints}, et leurs bonnes réponses, de forme {RESEAU.formeReponses}, sur l'appareil des poids.</li>
+  <li data-lignes="4">`zero_grad` efface les dérivées d'un calcul précédent : sinon, PyTorch les ajouterait aux nouvelles.</li>
+  <li data-lignes="5">Le modèle propage les {N} points d'un coup, et `nn.BCELoss` fait la moyenne de leurs erreurs.</li>
+  <li data-lignes="6">`backward` : autograd remonte la chaîne des calculs, comme `retropropager`, et range la dérivée de chaque poids dans son `.grad`.</li>
+  <li data-lignes="7-12">Les dérivées, rangées comme celles de la main, pour les comparer.</li>
+</CodeExplique>
+
+Sur ce PC, les dérivées de départ d'autograd et celles de la main diffèrent au plus de <span class="formule-en-texte">{ECARTS.gradients}</span> : ce sont les mêmes nombres, aux arrondis près. Les deux calculs ne s'y prennent pas exactement de la même façon, et chaque opération arrondit son résultat.
+
+<CodeExplique fichier="projets/0.5-reseau/premier_reseau/avec_pytorch.py" region="entrainer-pytorch">
+  <li data-lignes="1-4">`entrainer_pytorch` fait la descente de l'étape 6 avec PyTorch, sur l'appareil demandé, et la chronomètre.</li>
+  <li data-lignes="5-7">L'appareil, choisi par la fonction du chapitre 0.3 ; `.to` y range les poids, et les points y sont créés. L'étape 8 y revient.</li>
+  <li data-lignes="8-9">L'erreur de l'étape 4, et `torch.optim.SGD`, la descente de gradient : à chaque `step`, chaque poids recule du taux fois sa dérivée, comme dans `pas`.</li>
+  <li data-lignes="11-12">Le chronomètre part, après avoir attendu la fin des calculs en cours : le piège du chapitre 0.4.</li>
+  <li data-lignes="13-18">La boucle : effacer les dérivées, propager et mesurer l'erreur, la remonter avec `backward`, corriger avec `step`.</li>
+  <li data-lignes="16">La perte est gardée sur l'appareil : la lire à chaque pas ferait attendre la carte.</li>
+  <li data-lignes="19-20">La perte après le dernier pas, sans suivre le calcul.</li>
+  <li data-lignes="21-23">Attendre la fin des calculs, arrêter le chronomètre, puis rendre les pertes, les poids et la durée.</li>
+</CodeExplique>
+
+Le script du projet fait tout ce chapitre d'un coup : le neurone de l'étape 1, l'entraînement à la main, puis celui de PyTorch, qu'il compare. Il est dans le dépôt du site : si tu l'as téléchargé avec git au chapitre 0.1, mets-le à jour, pour recevoir les projets parus depuis. Puis entre dans le projet de ce chapitre :
+
+<BlocCommande commandes={[METTRE_A_JOUR_DEPOT, ALLER_AU_PROJET_0_5]} ou="un terminal, depuis le dossier où tu as téléchargé le dépôt" />
+
+Sinon, télécharge-le, puis entre dans le projet :
+
+<BlocCommande commandes={[CLONER_DEPOT, ALLER_AU_PROJET_0_5]} ou="un terminal, depuis le dossier où tu veux télécharger le dépôt" />
+
+Si tu avais pris le fichier zip au chapitre 0.1, télécharge-le de nouveau : un zip ne se met pas à jour. Son dossier s'appelle `forge-ia-main` : écris ce nom à la place de `forge-ia` dans la commande `cd`. Puis, dans le dossier du projet :
+
+<BlocCommande commandes={[RESEAU_ENTRAINER_CPU]} ou="un terminal, dans le dossier du projet" />
+
+La première fois, uv installe la version de PyTorch pour le processeur, comme au chapitre 0.3. Voici ce que le script affiche sur ce PC :
+
+<SortieCommande
+  fichier="projets/0.5-reseau/sorties/processeur.txt"
+  commande={RESEAU_ENTRAINER_CPU}
+  legende="Sur ce PC, sur le processeur"
+  absent="La sortie sur ce PC, sur le processeur, s'affichera ici."
+/>
+
+Après ses {RESEAU.pas} pas, PyTorch arrive au même réseau que la main : leurs poids finaux diffèrent au plus de <span class="formule-en-texte">{ECARTS.poids}</span>.
+
+<Fragment slot="note">
+
+BCE, pour binary cross-entropy en anglais : l'entropie croisée binaire de l'étape 4.
+
+SGD, pour stochastic gradient descent : la descente de gradient stochastique. Stochastique, parce que d'habitude chaque pas ne voit qu'un lot des données, tiré au hasard ; ici, chaque pas voit les {N} points.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={8} titre="Sur la carte">
+
+Rien à changer pour calculer sur la carte graphique. `entrainer_pytorch` demande l'appareil à `choisir_appareil`, la fonction du chapitre 0.3, copiée telle quelle dans le projet, puis y range les poids avec `.to`, et y crée les points. Le calcul reste le même, en `float64`.
+
+Avec une carte NVIDIA, la version de PyTorch pour la carte lance le même script sur elle. La première fois, uv télécharge cette version, si elle n'est pas déjà dans son cache depuis le chapitre 0.3 : sous Windows, {ROUE_CARTE}.
+
+<BlocCommande commandes={[RESEAU_ENTRAINER_GPU]} ou="un terminal, dans le dossier du projet" />
+
+Si PyTorch ne voit pas la carte, le script ne plante pas : il dit quoi faire, et s'arrête. Sans `--appareil`, il suit la variable `FORGE_APPAREIL` du chapitre 0.3, et sans elle, il prend la carte si PyTorch la voit. Pour qu'il calcule sur le processeur, règle-la dans le même terminal, puis lance-le sans `--appareil` : <code>{FORCER_PROCESSEUR_POWERSHELL}</code> dans PowerShell, ou <code>{FORCER_PROCESSEUR_BASH}</code> sous Linux ou macOS.
+
+Voici la sortie du script sur la carte de ce PC :
+
+<SortieCommande
+  fichier="projets/0.5-reseau/sorties/rtx-5070-ti.txt"
+  commande={RESEAU_ENTRAINER_GPU}
+  legende="Sur ce PC, sur la carte"
+  absent="La sortie sur la RTX 5070 Ti s'affichera ici : on la relève quand la carte sera libre."
+/>
+
+<Fragment slot="note">
+
+Les tests du projet le vérifient : sur la carte, les poids finaux restent tout près de ceux du processeur.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={9} titre="La même boucle, en plus grand">
+
+Le mini-modèle de l'ouverture apprend de la même façon. Ses {DEPART.poids} poids partent du hasard. À chaque pas, il propage un lot de {DEPART.lot} prénoms, et mesure son erreur : −ln de la chance donnée à chaque bonne lettre, comme à l'étape 4, mais parmi {DEPART.vocabulaire} caractères au lieu de deux réponses. Il la remonte jusqu'à chaque poids par une rétropropagation écrite à la main, comme à l'étape 5, puis corrige ses poids.
+
+Seule la correction est plus fine que la nôtre. Au lieu de reculer chaque poids du taux fois sa dérivée, il suit AdamW, la recette de ton IA, qui règle la longueur du pas de chaque poids d'après ses dérivées passées.
+
+Avant tout entraînement, il invente des prénoms comme {DEPART.cites[0]} et {DEPART.cites[1]}. Lance ses {DEPART.pas} pas, et regarde ses nouveaux prénoms se ranger à droite.
+
+<DemoMiniModele preset="avant-gout" nom="avant-gout" acquis="avant-gout" />
+
+<Fragment slot="note">
+
+Le mini-modèle est un tout petit transformer : ses pièces sont celles des grands modèles, en tout petit. Il tourne dans ton navigateur, sur le processeur.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={10} titre="À grande échelle">
+
+La boucle ne change pas quand le réseau grandit : seule l'échelle change.
+
+<EncadreLabo sources={LABO.sources}>
+
+Ton réseau du OU exclusif a {RESEAU.poids} poids, et le mini-modèle {DEPART.poids}. Ton IA, dans sa plus grande taille, en a {LABO.tonIA}. GPT-3, d'OpenAI, en a {LABO.gpt3}, et Llama 3 405B, de Meta, {LABO.llama}.
+
+Tous apprennent par la boucle de ce chapitre : propager un lot d'exemples, mesurer l'erreur, la remonter jusqu'à chaque poids, puis corriger. À chaque pas, Llama 3 405B corrige ainsi ses {LABO.llama} de poids à la fois.
+
+</EncadreLabo>
+
+Le projet complet (le neurone, le réseau à la main, le même avec PyTorch, et leurs tests) est sur GitHub, avec un notebook à ouvrir dans Colab :
+
+<LiensProjet projet="0.5-reseau" />
+
+### À suivre
+
+Tu sais ce que fait un neurone, pourquoi il en faut plusieurs, et comment un réseau apprend : propager, mesurer l'erreur, la remonter, corriger. La Partie 1 commence au chapitre 1.1, « {SUITE} », et s'en sert pour fabriquer ton IA.
+
+</Etape>
