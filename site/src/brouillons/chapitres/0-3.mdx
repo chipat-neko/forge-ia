@@ -244,7 +244,7 @@ Une carte graphique s'appelle aussi un GPU, et le processeur un CPU. Ce sont les
 
 Pour que PyTorch calcule sur ta carte NVIDIA, il faut trois pièces : la carte, son pilote, et une version de PyTorch faite pour elle. Le pilote est le programme qui fait parler le système à la carte. Il s'installe avec la carte, ou depuis le site ou l'application de NVIDIA.
 
-Et CUDA ? C'est la boîte à outils de NVIDIA pour calculer sur ses cartes. Les versions de PyTorch pour la carte embarquent leur propre CUDA : tu n'as pas besoin d'installer le « CUDA Toolkit ». Il ne sert qu'à compiler PyTorch lui-même, ou des extensions écrites pour CUDA. Il ne te faut que le pilote.
+Et CUDA ? C'est la boîte à outils de NVIDIA pour calculer sur ses cartes. Les versions de PyTorch pour la carte embarquent leur propre CUDA : tu n'as pas besoin d'installer le « CUDA Toolkit ». Il ne sert qu'à compiler, c'est-à-dire à traduire en programme pour la machine, le code de PyTorch lui-même ou celui d'extensions écrites pour CUDA. Il ne te faut que le pilote.
 
 Pour voir ton pilote, tape :
 
@@ -309,10 +309,10 @@ Si tu avais pris le fichier zip au chapitre 0.1, télécharge-le de nouveau : un
 PyTorch n'est pas une bibliothèque comme les autres : il en existe une version pour la carte, et une pour le processeur seul. Le fichier `pyproject.toml` du projet décrit les deux :
 
 <CodeExplique fichier="projets/0.3-poste/pyproject.toml" region="pytorch" langue="toml">
-  <li data-lignes="1-5">Un commentaire : les deux façons de lancer le projet, avec la carte ou sans.</li>
+  <li data-lignes="1-5">Un commentaire : les deux façons de lancer le projet, avec la carte ou sans. Une roue, c'est le fichier tout prêt qui installe une bibliothèque de Python.</li>
   <li data-lignes="6-8">Deux extras, des options du projet : `gpu` et `cpu`. Chacun demande PyTorch, dans la même version.</li>
   <li data-lignes="10-16">Les deux extras sont en conflit : uv n'installe jamais les deux ensemble.</li>
-  <li data-lignes="18-22">D'où vient PyTorch : de l'index `pytorch-cu132` avec l'extra `gpu`, de l'index `pytorch-cpu` avec l'extra `cpu`.</li>
+  <li data-lignes="18-22">D'où vient PyTorch : de l'index `pytorch-cu132` avec l'extra `gpu`, de l'index `pytorch-cpu` avec l'extra `cpu`. Un index est un site d'où uv télécharge les bibliothèques.</li>
   <li data-lignes="24-32">Les deux index, sur le site de PyTorch : celui des versions pour CUDA {PC.cuda}, et celui des versions pour le processeur. Avec `explicit = true`, uv n'y cherche que PyTorch.</li>
 </CodeExplique>
 
@@ -321,7 +321,7 @@ Pourquoi tout ce réglage, plutôt qu'une simple ligne qui demande PyTorch ?
 <Pari
   id="pypi"
   question={`Sous Windows, avec une RTX 5070 Ti, tu tapes \`${PIP_INSTALL_TORCH}\`. PyTorch calcule-t-il sur la carte ?`}
-  precision="pip cherche par défaut sur PyPI, le grand dépôt des bibliothèques de Python."
+  precision="pip cherche par défaut sur PyPI, le grand index public des bibliothèques de Python."
   choix={choixRouePypi()}
   acquis="roue"
 >
@@ -396,7 +396,7 @@ Les projets suivants calculent sur la carte quand PyTorch la voit, sinon sur le 
 
 <CodeExplique fichier="projets/0.3-poste/poste/appareil.py" region="appareil">
   <li data-lignes="1-2">`AppareilIndisponible`, une erreur à part : l'appareil demandé existe, mais PyTorch ne peut pas s'en servir ici.</li>
-  <li data-lignes="5-9">`choisir_appareil` prend l'appareil demandé, sinon la variable d'environnement `FORGE_APPAREIL`, sinon « auto ». `variable` retient d'où vient la valeur.</li>
+  <li data-lignes="5-9">`choisir_appareil` prend l'appareil demandé, sinon la variable d'environnement `FORGE_APPAREIL`, un réglage que le terminal passe aux programmes qu'il lance (l'étape 7 dit comment la régler), sinon « auto ». `variable` retient d'où vient la valeur.</li>
   <li data-lignes="10-13">« auto » prend la carte si PyTorch la voit, sinon le processeur ; « cpu » prend le processeur.</li>
   <li data-lignes="14-28">« cuda » sans carte visible : un message qui dit quoi faire, selon d'où vient la demande, plutôt qu'une longue erreur de Python.</li>
   <li data-lignes="29-33">Toute autre valeur : un message qui donne les trois choix.</li>
@@ -486,7 +486,7 @@ Meta a entraîné Llama 3 405B sur jusqu'à {LABO.cartes} cartes H100 à la fois
 <TableauCartes
   cartes={['t4', 'rtx-5070-ti', 'h100-sxm']}
   noms={{ t4: 'T4' }}
-  legende="La T4, que les utilisateurs de Colab gratuit rapportent le plus souvent, la carte de ce PC, et celle de Llama 3 : leur mémoire, et leur calcul au plus, en milliers de milliards d'opérations par seconde (TFLOPS), en bf16. La T4 n'a pas de bf16 : son chiffre est celui du FP16."
+  legende="La T4, que les utilisateurs de Colab gratuit rapportent le plus souvent, la carte de ce PC, et celle de Llama 3 : leur mémoire, et leur calcul au plus, en milliers de milliards d'opérations par seconde (TFLOPS), en bf16 : un format de nombres à virgule plus court que celui de Python, que présente le chapitre 0.4. La T4 n'a pas de bf16 : son chiffre est celui du FP16, un autre format aussi court."
 />
 
 </EncadreLabo>
