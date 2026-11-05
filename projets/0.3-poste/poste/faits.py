@@ -128,7 +128,7 @@ def decrire_faits(f: Faits) -> list[str]:
         else:
             lignes.append(f"  Carte vue par PyTorch\u202f: {f.carte}, capacité {f.capacite[0]}.{f.capacite[1]}")
         if f.architectures:
-            lignes.append(f"  Cartes connues de ce PyTorch\u202f: {', '.join(f.architectures)}")
+            lignes.append(f"  Architectures de ce PyTorch\u202f: {', '.join(f.architectures)}")
     if f.pilote is None:
         lignes.append("  Pilote NVIDIA\u202f: aucun (nvidia-smi est introuvable ou ne répond pas)")
     elif f.cuda_max_pilote is None:

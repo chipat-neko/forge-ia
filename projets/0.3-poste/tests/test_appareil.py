@@ -26,14 +26,40 @@ def test_cuda_demande_sans_carte(monkeypatch):
         choisir_appareil("cuda")
 
 
+POUR_SAVOIR = "Pour savoir pourquoi, lance `uv run --extra cpu python -m poste` dans le dossier projets/0.3-poste."
+
+
 def test_message_sans_carte_dit_quoi_faire(monkeypatch):
+    # Demande par l'argument (comme `--appareil cuda` dans les projets 0.4 et 0.5) : la variable
+    # n'y changerait rien, puisque l'argument passe avant elle. Il faut demander autre chose.
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
     with pytest.raises(AppareilIndisponible) as erreur:
         choisir_appareil("cuda")
     assert str(erreur.value) == (
-        "Tu as demandé la carte graphique (cuda), mais PyTorch ne la voit pas. "
-        "Lance `uv run --extra gpu python -m poste` pour savoir pourquoi, ou mets FORGE_APPAREIL=cpu."
+        "Tu as demandé la carte graphique (cuda), mais PyTorch ne la voit pas. Pour calculer sur le "
+        "processeur, demande cpu (ou auto) à la place, ou, sans rien demander, mets FORGE_APPAREIL=cpu. "
+        + POUR_SAVOIR
     )
+
+
+def test_message_sans_carte_par_la_variable(monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setenv("FORGE_APPAREIL", "cuda")
+    with pytest.raises(AppareilIndisponible) as erreur:
+        choisir_appareil()
+    assert str(erreur.value) == (
+        "Tu as demandé la carte graphique (FORGE_APPAREIL=cuda), mais PyTorch ne la voit pas. "
+        "Pour calculer sur le processeur, mets FORGE_APPAREIL=cpu (ou auto). " + POUR_SAVOIR
+    )
+
+
+def test_les_deux_messages_nomment_forge_appareil_cpu(monkeypatch):
+    # Les projets 0.4 et 0.5 cherchent cette sous-chaîne, quelle que soit l'origine de la demande.
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    for appel in [lambda: choisir_appareil("cuda"), lambda: choisir_appareil(None)]:
+        monkeypatch.setenv("FORGE_APPAREIL", "cuda")
+        with pytest.raises(AppareilIndisponible, match="FORGE_APPAREIL=cpu"):
+            appel()
 
 
 def test_auto_et_variable(monkeypatch):

@@ -163,7 +163,7 @@
     "faits": {
      "systeme": "Linux",
      "python": "3.13.16",
-     "torch": "2.11.0+cu130",
+     "torch": "2.14.1+cu130",
      "cuda_compilee": "13.0",
      "cuda_disponible": true,
      "carte": "Tesla T4",
@@ -188,7 +188,7 @@
      {
       "niveau": "bon",
       "cle": "carte_prete",
-      "message": "PyTorch 2.11.0+cu130 voit ta carte, Tesla T4 (capacité 7.5), et sait calculer dessus.",
+      "message": "PyTorch 2.14.1+cu130 voit ta carte, Tesla T4 (capacité 7.5), et sait calculer dessus.",
       "a_faire": null
      }
     ]

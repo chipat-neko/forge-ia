@@ -36,6 +36,45 @@ def fils(n: int) -> str:
     return f"{n} fil" if n == 1 else f"{n} fils"
 
 
+def architecture(nom: str) -> tuple[str, tuple[int, int]] | None:
+    """« sm_86 » donne ("sm", (8, 6)), « sm_90a » donne ("sm", (9, 0)), « compute_120 » donne
+    ("compute", (12, 0)). None pour un nom qu'on ne sait pas lire."""
+    genre, _, chiffres = nom.partition("_")
+    chiffres = chiffres.removesuffix("a").removesuffix("f")
+    if genre not in ("sm", "compute") or not chiffres.isdigit():
+        return None
+    n = int(chiffres)
+    return genre, (n // 10, n % 10)
+
+
+def carte_connue(capacite: tuple[int, int], architectures: tuple[str, ...]) -> bool:
+    """PyTorch sait calculer sur la carte si une de ses architectures lui va :
+    - un « sm_XY » de la même génération X, et de mineure Y plus petite ou égale :
+      « sm_86 » sert aussi une RTX 4070, de capacité 8.9 ;
+    - ou un « compute_XY », du code que le pilote recompile pour toute carte
+      de capacité plus grande ou égale."""
+    for nom in architectures:
+        lue = architecture(nom)
+        if lue is None:
+            continue
+        genre, (generation, mineure) = lue
+        if genre == "sm" and generation == capacite[0] and mineure <= capacite[1]:
+            return True
+        if genre == "compute" and (generation, mineure) <= capacite:
+            return True
+    return False
+
+
+def plus_ancienne(architectures: tuple[str, ...]) -> tuple[tuple[int, int], str] | None:
+    """La capacité et le nom de la plus ancienne architecture de la liste, ou None."""
+    lues = []
+    for nom in architectures:
+        lue = architecture(nom)
+        if lue is not None:
+            lues.append((lue[1], nom))
+    return min(lues, default=None)
+
+
 RELANCER = "relance `uv run --extra gpu python -m poste`"
 
 
@@ -49,7 +88,9 @@ def diagnostiquer(f: Faits) -> list[Constat]:
                 "torch_absent",
                 "PyTorch ne s’importe pas\u202f: il n’est pas installé dans cet environnement, ou il ne se charge pas.",
                 "Lance `uv run --extra gpu python -m poste` si tu as une carte NVIDIA, sinon "
-                "`uv run --extra cpu python -m poste`\u202f: uv installe PyTorch avant de lancer le script.",
+                "`uv run --extra cpu python -m poste`\u202f: uv installe PyTorch avant de lancer le script. "
+                "S’il est installé mais ne se charge pas, remplace `python -m poste` par "
+                "`python -c \"import torch\"` dans la même commande\u202f: l’erreur s’affichera.",
             )
         ]
 
@@ -80,7 +121,14 @@ def diagnostiquer(f: Faits) -> list[Constat]:
             "Si tu as une carte NVIDIA, installe son pilote depuis le site de NVIDIA, redémarre, puis "
             f"{RELANCER}. Sinon, lance `uv run --extra cpu python -m poste`\u202f: tout tournera sur le processeur.",
         )
-    elif f.cuda_max_pilote is not None and majeure(f.cuda_max_pilote) < majeure(f.cuda_compilee):
+    elif (
+        not f.cuda_disponible
+        and f.cuda_max_pilote is not None
+        and majeure(f.cuda_max_pilote) < majeure(f.cuda_compilee)
+    ):
+        # Seulement si PyTorch ne voit pas la carte : s'il la voit, le pilote suffit. Le paquet
+        # cuda-compat (Colab, cartes de centre de calcul) fait tourner un CUDA plus récent que
+        # celui qu'annonce nvidia-smi.
         constat = Constat(
             Niveau.PROBLEME,
             "pilote_trop_ancien",
@@ -89,16 +137,28 @@ def diagnostiquer(f: Faits) -> list[Constat]:
             f"Mets à jour le pilote de ta carte (site ou application de NVIDIA) pour qu’il aille au moins jusqu’à "
             f"CUDA {majeure(f.cuda_compilee)}.0, redémarre, puis {RELANCER}.",
         )
-    elif f.cuda_disponible and f.capacite is not None and f"sm_{f.capacite[0]}{f.capacite[1]}" not in f.architectures:
-        # La capacité (12, 0) se dit « sm_120 » dans la liste des architectures de PyTorch.
-        constat = Constat(
-            Niveau.PROBLEME,
-            "carte_trop_recente",
-            f"Ta carte ({f.carte}, capacité {f.capacite[0]}.{f.capacite[1]}) est plus récente que cette version "
-            f"de PyTorch ({f.torch}), qui n’a pas été compilée pour sm_{f.capacite[0]}{f.capacite[1]}.",
-            "Lance `uv sync --extra gpu` pour installer la version de PyTorch du projet, qui connaît les cartes "
-            f"récentes, puis {RELANCER}.",
-        )
+    elif f.cuda_disponible and f.capacite is not None and not carte_connue(f.capacite, f.architectures):
+        # Aucune architecture de la liste ne sert la carte : elle est plus ancienne que la première,
+        # ou d'une génération que la liste n'a pas.
+        ancienne = plus_ancienne(f.architectures)
+        if ancienne is not None and f.capacite < ancienne[0]:
+            constat = Constat(
+                Niveau.PROBLEME,
+                "carte_trop_ancienne",
+                f"Ta carte ({f.carte}, capacité {f.capacite[0]}.{f.capacite[1]}) est trop ancienne pour cette "
+                f"version de PyTorch ({f.torch}), qui commence à {ancienne[1]}.",
+                "Calcule sur le processeur\u202f: lance `uv run --extra cpu python -m poste`, et mets "
+                "FORGE_APPAREIL=cpu dans les projets suivants.",
+            )
+        else:
+            constat = Constat(
+                Niveau.PROBLEME,
+                "carte_trop_recente",
+                f"Ta carte ({f.carte}, capacité {f.capacite[0]}.{f.capacite[1]}) est plus récente que cette version "
+                f"de PyTorch ({f.torch}), qui n’a pas été compilée pour sm_{f.capacite[0]}{f.capacite[1]}.",
+                "Lance `uv sync --extra gpu` pour installer la version de PyTorch du projet, qui connaît les cartes "
+                f"récentes, puis {RELANCER}.",
+            )
     elif not f.cuda_disponible:
         constat = Constat(
             Niveau.PROBLEME,
@@ -155,8 +215,8 @@ def decrire_constat(c: Constat) -> list[str]:
 # Les architectures sont celles que rend torch.cuda.get_arch_list() :
 # - PyTorch 2.15.0+cu132 sous Windows : lues dans la roue installée le 05/11/2026 ;
 # - PyTorch 2.7 cu126 : celles que cite son avertissement pour une carte RTX 50, sans sm_120 ;
-# - PyTorch 2.11 cu130 (Colab) : pas relevées ; on reprend celles de la roue cu132, qui
-#   commencent comme elle à sm_75, la capacité de la T4.
+# - les roues CUDA 13.0 (celle de Colab) : les mêmes que cu132, d'après la table
+#   PYTORCH_RELEASES_CODE_CC de torch/cuda/__init__.py (PyTorch 2.15, lue le 05/11/2026).
 ARCHITECTURES_CU132 = ("sm_75", "sm_80", "sm_86", "sm_90", "sm_100", "sm_120")
 ARCHITECTURES_CU126 = ("sm_50", "sm_60", "sm_61", "sm_70", "sm_75", "sm_80", "sm_86", "sm_90")
 ARCHITECTURES_CU130 = ARCHITECTURES_CU132
@@ -221,13 +281,16 @@ SITUATIONS: dict[str, Faits] = {
         pilote=None,
         cuda_max_pilote=None,
     ),
-    # Colab avec une carte T4 (capacité 7.5), Python 3.13 et PyTorch 2.11 pour CUDA 13.0 (image du
-    # 03/11/2026). Le pilote est un exemple de la série 580, la première qui accepte CUDA 13, et les
-    # deux fils un exemple de petite machine. Le système est abrégé.
+    # Colab avec une carte T4 (capacité 7.5). Python 3.13.16 et PyTorch 2.14.1+cu130 : image de Colab
+    # avec carte, https://github.com/googlecolab/backend-info (os-info-gpu.txt et pip-freeze.gpu.txt),
+    # vérifié le 05/11/2026. Le dépôt ne donne pas le pilote : 580.82.07 (CUDA 13.0) est un exemple de
+    # la série 580, la première qui accepte CUDA 13 ; son apt-list-gpu.txt liste cuda-compat-13-0, qui
+    # fait aussi tourner CUDA 13 sur un pilote plus ancien. Les deux fils sont un exemple de petite
+    # machine, et le système est abrégé.
     "colab_t4": Faits(
         systeme="Linux",
         python="3.13.16",
-        torch="2.11.0+cu130",
+        torch="2.14.1+cu130",
         cuda_compilee="13.0",
         cuda_disponible=True,
         carte="Tesla T4",

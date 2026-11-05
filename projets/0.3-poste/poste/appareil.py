@@ -29,9 +29,17 @@ def choisir_appareil(demande: str | None = None) -> torch.device:
         return torch.device("cpu")
     if valeur == "cuda":
         if not torch.cuda.is_available():
+            # Le conseil dépend de l'endroit d'où vient la demande : l'argument passe avant la variable.
+            if variable:
+                demandee = "(FORGE_APPAREIL=cuda)"
+                processeur = "mets FORGE_APPAREIL=cpu (ou auto)"
+            else:
+                demandee = "(cuda)"
+                processeur = "demande cpu (ou auto) à la place, ou, sans rien demander, mets FORGE_APPAREIL=cpu"
             raise AppareilIndisponible(
-                "Tu as demandé la carte graphique (cuda), mais PyTorch ne la voit pas. "
-                "Lance `uv run --extra gpu python -m poste` pour savoir pourquoi, ou mets FORGE_APPAREIL=cpu."
+                f"Tu as demandé la carte graphique {demandee}, mais PyTorch ne la voit pas. "
+                f"Pour calculer sur le processeur, {processeur}. Pour savoir pourquoi, lance "
+                "`uv run --extra cpu python -m poste` dans le dossier projets/0.3-poste."
             )
         return torch.device("cuda")
     origine = " (lu dans la variable FORGE_APPAREIL)" if variable else ""

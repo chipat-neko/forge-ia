@@ -7,8 +7,28 @@ sur quelques variantes faites avec `replace`.
 import re
 from dataclasses import fields, replace
 
-from poste.diagnostic import SITUATIONS, Constat, Niveau, diagnostiquer
+from poste.diagnostic import (
+    ARCHITECTURES_CU126,
+    ARCHITECTURES_CU130,
+    ARCHITECTURES_CU132,
+    SITUATIONS,
+    Constat,
+    Niveau,
+    carte_connue,
+    diagnostiquer,
+    plus_ancienne,
+)
 from poste.faits import Faits
+
+_PRET = SITUATIONS["windows_cu132_rtx5070ti"]
+_SANS_CARTE_VUE = dict(cuda_disponible=False, carte=None, capacite=None, architectures=())
+# Les cas qui ne sont pas des situations du chapitre, pour les tests qui passent sur tous les constats.
+VARIANTES = [
+    replace(SITUATIONS["sans_carte"], torch=None),
+    replace(_PRET, **_SANS_CARTE_VUE, pilote=None, cuda_max_pilote=None),
+    replace(_PRET, **_SANS_CARTE_VUE),
+    replace(_PRET, carte="NVIDIA GeForce GTX 1080", capacite=(6, 1)),
+]
 
 
 def cles(nom):
@@ -80,19 +100,70 @@ def test_pilote_absent_puis_carte_invisible():
 
 def test_ordre_des_regles():
     pret = SITUATIONS["windows_cu132_rtx5070ti"]
-    # Un pilote trop ancien passe avant une carte trop récente : c'est lui qu'il faut changer d'abord.
-    les_deux = replace(pret, cuda_max_pilote="12.4", architectures=("sm_75", "sm_80"))
-    assert [c.cle for c in diagnostiquer(les_deux)] == ["pilote_trop_ancien"]
+    invisible = replace(pret, cuda_disponible=False, carte=None, capacite=None, architectures=())
+    # PyTorch ne voit pas la carte : un pilote trop ancien en est la cause, et passe avant « carte_invisible ».
+    assert [c.cle for c in diagnostiquer(replace(invisible, cuda_max_pilote="12.4"))] == ["pilote_trop_ancien"]
     # Même version majeure de CUDA : le pilote suffit (compatibilité entre versions mineures).
-    assert [c.cle for c in diagnostiquer(replace(pret, cuda_max_pilote="13.0"))] == ["carte_prete"]
+    assert [c.cle for c in diagnostiquer(replace(invisible, cuda_max_pilote="13.0"))] == ["carte_invisible"]
     # Sans PyTorch, on s'arrête là : ni pilote, ni fils.
     sans_torch = replace(SITUATIONS["fils_par_defaut"], torch=None, cuda_compilee=None)
     assert [c.cle for c in diagnostiquer(sans_torch)] == ["torch_absent"]
 
 
+def test_pilote_ancien_mais_carte_qui_calcule():
+    # Une T4 avec un pilote 550 (CUDA 12.4 dans nvidia-smi) et la roue cu130 : avec le paquet
+    # cuda-compat, PyTorch calcule quand même sur la carte. Le pilote suffit donc.
+    t4 = replace(SITUATIONS["colab_t4"], pilote="550.54.15", cuda_max_pilote="12.4")
+    assert t4.cuda_disponible and t4.cuda_compilee == "13.0"
+    assert [c.cle for c in diagnostiquer(t4)] == ["carte_prete"]
+
+
+def test_cartes_de_la_meme_generation():
+    pret = SITUATIONS["windows_cu132_rtx5070ti"]
+    # Une RTX 4070 (8.9) : aucune roue n'a sm_89, mais sm_86 sert toute la fin de la génération 8.
+    rtx_4070 = replace(pret, carte="NVIDIA GeForce RTX 4070", capacite=(8, 9))
+    assert [c.cle for c in diagnostiquer(rtx_4070)] == ["carte_prete"]
+    assert [c.cle for c in diagnostiquer(replace(rtx_4070, architectures=ARCHITECTURES_CU130))] == ["carte_prete"]
+    # Une carte 12.1 (DGX Spark) : sm_120 la sert.
+    assert [c.cle for c in diagnostiquer(replace(pret, carte="NVIDIA GB10", capacite=(12, 1)))] == ["carte_prete"]
+    # Une RTX 5070 Ti (12.0) avec la roue cu126, qui s'arrête à sm_90 : toujours trop récente.
+    assert [c.cle for c in diagnostiquer(replace(pret, architectures=ARCHITECTURES_CU126))] == ["carte_trop_recente"]
+
+
+def test_carte_connue():
+    assert carte_connue((8, 9), ARCHITECTURES_CU132)
+    assert carte_connue((7, 5), ARCHITECTURES_CU132)
+    assert not carte_connue((12, 0), ARCHITECTURES_CU126)
+    # Une mineure plus grande ne sert pas une carte plus ancienne de la même génération.
+    assert not carte_connue((8, 0), ("sm_86",))
+    # Les suffixes « a » et « f » ne comptent pas.
+    assert carte_connue((9, 0), ("sm_90a",)) and carte_connue((10, 3), ("sm_100f",))
+    # « compute_XY » (code recompilé par le pilote) sert toute carte de capacité plus grande ou égale.
+    assert carte_connue((12, 1), ("sm_80", "compute_120")) and carte_connue((13, 0), ("compute_90",))
+    assert not carte_connue((8, 6), ("compute_90",))
+    # Un nom illisible est ignoré.
+    assert not carte_connue((8, 6), ("gfx90a", "sm_"))
+    assert plus_ancienne(ARCHITECTURES_CU132) == ((7, 5), "sm_75")
+    assert plus_ancienne(("gfx90a",)) is None
+
+
+def test_carte_trop_ancienne():
+    pret = SITUATIONS["windows_cu132_rtx5070ti"]
+    gtx_1080 = replace(pret, carte="NVIDIA GeForce GTX 1080", capacite=(6, 1))
+    (constat,) = diagnostiquer(gtx_1080)
+    assert (constat.cle, constat.niveau) == ("carte_trop_ancienne", Niveau.PROBLEME)
+    assert "capacité 6.1" in constat.message and "trop ancienne" in constat.message
+    assert "commence à sm_75" in constat.message
+    assert "uv run --extra cpu python -m poste" in constat.a_faire and "FORGE_APPAREIL=cpu" in constat.a_faire
+    # Plus récente que la plus ancienne, mais sans architecture de sa génération : trop récente.
+    assert [c.cle for c in diagnostiquer(replace(pret, capacite=(9, 0), architectures=("sm_75", "sm_80")))] == [
+        "carte_trop_recente"
+    ]
+
+
 def test_niveaux():
     niveaux = {}
-    for f in [*SITUATIONS.values(), replace(SITUATIONS["sans_carte"], torch=None)]:
+    for f in [*SITUATIONS.values(), *VARIANTES]:
         for c in diagnostiquer(f):
             niveaux[c.cle] = c.niveau
             assert isinstance(c, Constat)
@@ -104,6 +175,9 @@ def test_niveaux():
         "roue_processeur": Niveau.ATTENTION,
         "fils": Niveau.ATTENTION,
         "carte_trop_recente": Niveau.PROBLEME,
+        "carte_trop_ancienne": Niveau.PROBLEME,
+        "carte_invisible": Niveau.PROBLEME,
+        "pilote_absent": Niveau.PROBLEME,
         "pilote_trop_ancien": Niveau.PROBLEME,
         "torch_absent": Niveau.PROBLEME,
     }
@@ -126,6 +200,9 @@ def test_messages_utiles():
     assert "12.4" in ancien.message and "13.2" in ancien.message and "CUDA 13.0" in ancien.a_faire
     prete = constat(SITUATIONS["windows_cu132_rtx5070ti"], "carte_prete")
     assert "NVIDIA GeForce RTX 5070 Ti" in prete.message and "12.0" in prete.message
+    # PyTorch installé mais qui ne se charge pas : la même commande, avec « import torch », montre l'erreur.
+    absent = constat(replace(SITUATIONS["sans_carte"], torch=None), "torch_absent")
+    assert "`python -c " in absent.a_faire and "import torch" in absent.a_faire
 
 
 def test_un_seul_fil():
@@ -135,13 +212,7 @@ def test_un_seul_fil():
 
 
 def tous_les_textes():
-    pret = SITUATIONS["windows_cu132_rtx5070ti"]
-    variantes = [
-        replace(SITUATIONS["sans_carte"], torch=None),
-        replace(pret, cuda_disponible=False, carte=None, capacite=None, architectures=(), pilote=None, cuda_max_pilote=None),
-        replace(pret, cuda_disponible=False, carte=None, capacite=None, architectures=()),
-    ]
-    for f in [*SITUATIONS.values(), *variantes]:
+    for f in [*SITUATIONS.values(), *VARIANTES]:
         for c in diagnostiquer(f):
             yield c.cle, c.message
             if c.a_faire:

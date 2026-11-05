@@ -75,6 +75,9 @@ def test_la_correction_de_l_exercice_reussit_le_defi(monkeypatch):
     sorties = executer(nb)
     assert "Défi réussi" in sorties
     assert "Pas encore" not in sorties
+    # Le nom seul ne suffit pas : sm_86 sert la RTX 4070 (8.9), et cu126 ne connaît pas la RTX 5070 Ti.
+    assert "NVIDIA GeForce RTX 4070 et PyTorch 2.15.0+cu132 : sm_89 n’est pas dans la liste, et la carte est connue." in sorties
+    assert "NVIDIA GeForce RTX 5070 Ti et PyTorch 2.7.1+cu126 : sm_120 n’est pas dans la liste, et la carte est inconnue." in sorties
 
 
 def test_notebook_sans_installation_de_torch_ni_api_recente():
