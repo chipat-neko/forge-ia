@@ -147,8 +147,10 @@ def diagnostiquer(f: Faits) -> list[Constat]:
                 "carte_trop_ancienne",
                 f"Ta carte ({f.carte}, capacité {f.capacite[0]}.{f.capacite[1]}) est trop ancienne pour cette "
                 f"version de PyTorch ({f.torch}), qui commence à {ancienne[1]}.",
-                "Calcule sur le processeur\u202f: lance `uv run --extra cpu python -m poste`, et mets "
-                "FORGE_APPAREIL=cpu dans les projets suivants.",
+                "Calcule sur le processeur\u202f: lance `uv run --extra cpu python -m poste`. Le "
+                "diagnostic dira alors que cette version laisse la carte de côté, et c’est voulu, puisque la "
+                "carte est trop ancienne. Dans les projets suivants, mets la variable d’environnement "
+                "FORGE_APPAREIL=cpu.",
             )
         else:
             constat = Constat(

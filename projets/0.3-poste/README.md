@@ -83,14 +83,14 @@ rend le code de sortie 1.
 | `pilote_absent` | problème | PyTorch est fait pour la carte, mais aucun pilote NVIDIA ne répond. | Installe le pilote de la carte, redémarre, puis relance. Sans carte NVIDIA : `uv run --extra cpu python -m poste`. |
 | `pilote_trop_ancien` | problème | PyTorch ne voit pas la carte, et le pilote ne va pas jusqu'à sa version de CUDA (CUDA 13 demande un pilote 580 ou plus récent). Si PyTorch voit la carte, le pilote suffit. | Mets à jour le pilote, redémarre, puis `uv run --extra gpu python -m poste`. |
 | `carte_trop_recente` | problème | PyTorch voit la carte, mais n'a rien pour sa génération : par exemple une RTX 50 (sm_120) avec une ancienne version pour CUDA 12.6, qui s'arrête à sm_90. | `uv sync --extra gpu`, pour la version du projet, puis `uv run --extra gpu python -m poste`. |
-| `carte_trop_ancienne` | problème | PyTorch voit la carte, mais commence à une génération plus récente : par exemple une GTX 1080 (capacité 6.1) avec la version du projet, qui commence à sm_75. | Calcule sur le processeur : `uv run --extra cpu python -m poste`, et `FORGE_APPAREIL=cpu` dans les projets suivants. |
+| `carte_trop_ancienne` | problème | PyTorch voit la carte, mais commence à une génération plus récente : par exemple une GTX 1080 (capacité 6.1) avec la version du projet, qui commence à sm_75. | Calcule sur le processeur : `uv run --extra cpu python -m poste`. Le diagnostic dira que cette version laisse la carte de côté : c'est voulu, la carte est trop ancienne. Dans les projets suivants, mets la variable d'environnement `FORGE_APPAREIL=cpu`. |
 | `carte_invisible` | problème | Pilote et PyTorch sont là, mais PyTorch ne voit aucune carte. | Lance `nvidia-smi`. S'il ne montre pas la carte : redémarre, ou réinstalle le pilote. S'il la montre : vérifie que `CUDA_VISIBLE_DEVICES` n'est pas réglée. |
 | `carte_prete` | bon | PyTorch voit la carte et sait calculer dessus. | Rien : c'est la ligne qu'on veut voir. |
 | `fils` | attention | PyTorch n'utilise qu'une partie des fils du processeur : sur le PC de La Forge IA, 8 sur 16 par défaut. | Au début de ton programme : `torch.set_num_threads(os.cpu_count())`. |
 
 Une carte est connue de PyTorch quand sa génération est dans la liste de ses
-architectures, avec une mineure plus petite ou égale : aucune version n'a
-`sm_89`, mais `sm_86` sert une RTX 4070, de capacité 8.9. Une entrée
+architectures, avec une mineure plus petite ou égale : les versions de PyTorch du projet
+n'ont pas `sm_89`, mais `sm_86` sert une RTX 4070, de capacité 8.9. Une entrée
 `compute_XY`, quand il y en a une, sert toute carte de capacité X.Y ou plus.
 
 Le diagnostic est la fonction `diagnostiquer(faits)` de `poste/diagnostic.py`.
@@ -118,9 +118,9 @@ Demander `cuda` sans carte visible donne un message qui dit quoi faire, pas
 une trace Python. Comme l'argument passe avant la variable, le conseil dépend
 de l'origine de la demande : demander `cpu` à la place, ou mettre
 `FORGE_APPAREIL=cpu`. Pour savoir pourquoi la carte manque, il renvoie à
-`uv run --extra cpu python -m poste`, dans ce dossier : la version pour le
-processeur suffit pour voir s'il y a un pilote NVIDIA, sans télécharger celle
-pour la carte.
+`python -m poste`, dans ce dossier, avec le même `uv run --extra` (cpu ou gpu)
+que la commande qui a échoué : le diagnostic nomme alors la vraie cause, sans
+changer de version de PyTorch.
 
 ## Enregistrer une sortie
 

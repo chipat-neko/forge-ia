@@ -155,6 +155,9 @@ def test_carte_trop_ancienne():
     assert "capacité 6.1" in constat.message and "trop ancienne" in constat.message
     assert "commence à sm_75" in constat.message
     assert "uv run --extra cpu python -m poste" in constat.a_faire and "FORGE_APPAREIL=cpu" in constat.a_faire
+    # Le conseil prévient que la version pour le processeur laissera la carte de côté, exprès.
+    assert "laisse la carte de côté, et c’est voulu" in constat.a_faire
+    assert "variable d’environnement FORGE_APPAREIL=cpu" in constat.a_faire
     # Plus récente que la plus ancienne, mais sans architecture de sa génération : trop récente.
     assert [c.cle for c in diagnostiquer(replace(pret, capacite=(9, 0), architectures=("sm_75", "sm_80")))] == [
         "carte_trop_recente"

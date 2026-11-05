@@ -26,7 +26,11 @@ def test_cuda_demande_sans_carte(monkeypatch):
         choisir_appareil("cuda")
 
 
-POUR_SAVOIR = "Pour savoir pourquoi, lance `uv run --extra cpu python -m poste` dans le dossier projets/0.3-poste."
+# Le même extra que le lecteur : le diagnostic nomme alors la vraie cause, sans changer sa version de PyTorch.
+POUR_SAVOIR = (
+    "Pour savoir pourquoi, lance `python -m poste` dans le dossier projets/0.3-poste, "
+    "avec le même `uv run --extra cpu` ou `--extra gpu` qu’ici."
+)
 
 
 def test_message_sans_carte_dit_quoi_faire(monkeypatch):

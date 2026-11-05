@@ -38,8 +38,8 @@ def choisir_appareil(demande: str | None = None) -> torch.device:
                 processeur = "demande cpu (ou auto) à la place, ou, sans rien demander, mets FORGE_APPAREIL=cpu"
             raise AppareilIndisponible(
                 f"Tu as demandé la carte graphique {demandee}, mais PyTorch ne la voit pas. "
-                f"Pour calculer sur le processeur, {processeur}. Pour savoir pourquoi, lance "
-                "`uv run --extra cpu python -m poste` dans le dossier projets/0.3-poste."
+                f"Pour calculer sur le processeur, {processeur}. Pour savoir pourquoi, lance `python -m poste` "
+                "dans le dossier projets/0.3-poste, avec le même `uv run --extra cpu` ou `--extra gpu` qu’ici."
             )
         return torch.device("cuda")
     origine = " (lu dans la variable FORGE_APPAREIL)" if variable else ""
