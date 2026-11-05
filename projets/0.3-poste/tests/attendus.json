@@ -1,0 +1,241 @@
+{
+ "situations": [
+  [
+   "windows_cu132_rtx5070ti",
+   {
+    "faits": {
+     "systeme": "Windows 11",
+     "python": "3.12.13",
+     "torch": "2.15.0+cu132",
+     "cuda_compilee": "13.2",
+     "cuda_disponible": true,
+     "carte": "NVIDIA GeForce RTX 5070 Ti",
+     "capacite": [
+      12,
+      0
+     ],
+     "architectures": [
+      "sm_75",
+      "sm_80",
+      "sm_86",
+      "sm_90",
+      "sm_100",
+      "sm_120"
+     ],
+     "pilote": "621.01",
+     "cuda_max_pilote": "13.5",
+     "fils_processeur": 16,
+     "fils_torch": 16
+    },
+    "constats": [
+     {
+      "niveau": "bon",
+      "cle": "carte_prete",
+      "message": "PyTorch 2.15.0+cu132 voit ta carte, NVIDIA GeForce RTX 5070 Ti (capacité 12.0), et sait calculer dessus.",
+      "a_faire": null
+     }
+    ]
+   }
+  ],
+  [
+   "windows_pypi_rtx5070ti",
+   {
+    "faits": {
+     "systeme": "Windows 11",
+     "python": "3.12.13",
+     "torch": "2.15.0+cpu",
+     "cuda_compilee": null,
+     "cuda_disponible": false,
+     "carte": null,
+     "capacite": null,
+     "architectures": [],
+     "pilote": "621.01",
+     "cuda_max_pilote": "13.5",
+     "fils_processeur": 16,
+     "fils_torch": 16
+    },
+    "constats": [
+     {
+      "niveau": "attention",
+      "cle": "roue_processeur",
+      "message": "Une carte NVIDIA est là (pilote 621.01), mais cette version de PyTorch (2.15.0+cpu) ne sait calculer que sur le processeur : elle laisse la carte de côté.",
+      "a_faire": "Lance `uv sync --extra gpu`, puis relance `uv run --extra gpu python -m poste`."
+     }
+    ]
+   }
+  ],
+  [
+   "windows_cu126_rtx5070ti",
+   {
+    "faits": {
+     "systeme": "Windows 11",
+     "python": "3.12.13",
+     "torch": "2.7.1+cu126",
+     "cuda_compilee": "12.6",
+     "cuda_disponible": true,
+     "carte": "NVIDIA GeForce RTX 5070 Ti",
+     "capacite": [
+      12,
+      0
+     ],
+     "architectures": [
+      "sm_50",
+      "sm_60",
+      "sm_61",
+      "sm_70",
+      "sm_75",
+      "sm_80",
+      "sm_86",
+      "sm_90"
+     ],
+     "pilote": "621.01",
+     "cuda_max_pilote": "13.5",
+     "fils_processeur": 16,
+     "fils_torch": 16
+    },
+    "constats": [
+     {
+      "niveau": "probleme",
+      "cle": "carte_trop_recente",
+      "message": "Ta carte (NVIDIA GeForce RTX 5070 Ti, capacité 12.0) est plus récente que cette version de PyTorch (2.7.1+cu126), qui n’a pas été compilée pour sm_120.",
+      "a_faire": "Lance `uv sync --extra gpu` pour installer la version de PyTorch du projet, qui connaît les cartes récentes, puis relance `uv run --extra gpu python -m poste`."
+     }
+    ]
+   }
+  ],
+  [
+   "pilote_ancien",
+   {
+    "faits": {
+     "systeme": "Windows 11",
+     "python": "3.12.13",
+     "torch": "2.15.0+cu132",
+     "cuda_compilee": "13.2",
+     "cuda_disponible": false,
+     "carte": null,
+     "capacite": null,
+     "architectures": [],
+     "pilote": "551.86",
+     "cuda_max_pilote": "12.4",
+     "fils_processeur": 16,
+     "fils_torch": 16
+    },
+    "constats": [
+     {
+      "niveau": "probleme",
+      "cle": "pilote_trop_ancien",
+      "message": "Ton pilote NVIDIA (551.86) va jusqu’à CUDA 12.4, mais cette version de PyTorch est faite pour CUDA 13.2 : le pilote est trop ancien pour elle.",
+      "a_faire": "Mets à jour le pilote de ta carte (site ou application de NVIDIA) pour qu’il aille au moins jusqu’à CUDA 13.0, redémarre, puis relance `uv run --extra gpu python -m poste`."
+     }
+    ]
+   }
+  ],
+  [
+   "sans_carte",
+   {
+    "faits": {
+     "systeme": "Windows 11",
+     "python": "3.12.13",
+     "torch": "2.15.0+cpu",
+     "cuda_compilee": null,
+     "cuda_disponible": false,
+     "carte": null,
+     "capacite": null,
+     "architectures": [],
+     "pilote": null,
+     "cuda_max_pilote": null,
+     "fils_processeur": 16,
+     "fils_torch": 16
+    },
+    "constats": [
+     {
+      "niveau": "bon",
+      "cle": "processeur_seul",
+      "message": "Pas de carte NVIDIA ici (aucun pilote trouvé) : PyTorch calcule sur le processeur. Tout marche ainsi, en plus lent pour entraîner ton IA.",
+      "a_faire": null
+     }
+    ]
+   }
+  ],
+  [
+   "colab_t4",
+   {
+    "faits": {
+     "systeme": "Linux",
+     "python": "3.13.16",
+     "torch": "2.11.0+cu130",
+     "cuda_compilee": "13.0",
+     "cuda_disponible": true,
+     "carte": "Tesla T4",
+     "capacite": [
+      7,
+      5
+     ],
+     "architectures": [
+      "sm_75",
+      "sm_80",
+      "sm_86",
+      "sm_90",
+      "sm_100",
+      "sm_120"
+     ],
+     "pilote": "580.82.07",
+     "cuda_max_pilote": "13.0",
+     "fils_processeur": 2,
+     "fils_torch": 2
+    },
+    "constats": [
+     {
+      "niveau": "bon",
+      "cle": "carte_prete",
+      "message": "PyTorch 2.11.0+cu130 voit ta carte, Tesla T4 (capacité 7.5), et sait calculer dessus.",
+      "a_faire": null
+     }
+    ]
+   }
+  ],
+  [
+   "fils_par_defaut",
+   {
+    "faits": {
+     "systeme": "Windows 11",
+     "python": "3.12.13",
+     "torch": "2.15.0+cu132",
+     "cuda_compilee": "13.2",
+     "cuda_disponible": true,
+     "carte": "NVIDIA GeForce RTX 5070 Ti",
+     "capacite": [
+      12,
+      0
+     ],
+     "architectures": [
+      "sm_75",
+      "sm_80",
+      "sm_86",
+      "sm_90",
+      "sm_100",
+      "sm_120"
+     ],
+     "pilote": "621.01",
+     "cuda_max_pilote": "13.5",
+     "fils_processeur": 16,
+     "fils_torch": 8
+    },
+    "constats": [
+     {
+      "niveau": "bon",
+      "cle": "carte_prete",
+      "message": "PyTorch 2.15.0+cu132 voit ta carte, NVIDIA GeForce RTX 5070 Ti (capacité 12.0), et sait calculer dessus.",
+      "a_faire": null
+     },
+     {
+      "niveau": "attention",
+      "cle": "fils",
+      "message": "PyTorch n’utilise que 8 fils de calcul sur les 16 de ton processeur.",
+      "a_faire": "Au début d’un programme qui calcule sur le processeur, écris `torch.set_num_threads(os.cpu_count())` (avec `import os`) : PyTorch prendra tous les fils."
+     }
+    ]
+   }
+  ]
+ ]
+}
