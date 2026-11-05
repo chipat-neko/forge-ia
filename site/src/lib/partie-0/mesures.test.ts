@@ -79,6 +79,17 @@ describe('lireMesures : les fichiers du dépôt', () => {
   it('la racine du dépôt se donne en chemin ou en URL (comme root d’astro:config/server)', () => {
     const parUrl = lireMesures('processeur', pathToFileURL(`${RACINE}/`));
     expect(parUrl).toStrictEqual(lireMesures('processeur', RACINE));
+    // Une chaîne file:///… est une URL, pas un chemin.
+    const parTexte = lireMesures('processeur', pathToFileURL(`${RACINE}/`).href);
+    expect(parTexte).toStrictEqual(lireMesures('processeur', RACINE));
+  });
+
+  it('une racine fausse est une erreur, pas « à mesurer »', () => {
+    // Le root d'Astro est site/ : passé sans '../', il n'a pas de dossier projets/0.4-tenseurs.
+    for (const fausse of [resolve('.'), pathToFileURL(`${resolve('.')}/`)]) {
+      expect(() => lireMesures('rtx-5070-ti', fausse)).toThrow(/n’a pas de dossier projets\/0\.4-tenseurs/);
+      expect(() => lireMesures('processeur', fausse)).toThrow(/new URL\('\.\.\/', root\)/);
+    }
   });
 });
 
@@ -132,10 +143,74 @@ describe('lireMesures : un dépôt factice', () => {
       ['transfert sur le processeur', { ...carte, appareil: 'cpu', mesures: [{ taille: 64, fils: 1, millisecondes: 1 }] }],
       ['transfert absent sur la carte', { ...carte, transfert_ms: null }],
       ['transfert en tableau', { ...carte, transfert_ms: [0.02] }],
+      ['fils_par_defaut au-dessus de fils_max', { ...carte, fils_par_defaut: 32, fils_max: 16 }],
+      [
+        'tailles décroissantes',
+        {
+          ...carte,
+          mesures: [
+            { taille: 128, fils: null, millisecondes: 0.02 },
+            { taille: 64, fils: null, millisecondes: 0.01 },
+          ],
+          transfert_ms: { '64': 0.02, '128': 0.03 },
+        },
+      ],
+      [
+        'taille en double',
+        {
+          ...carte,
+          mesures: [
+            { taille: 64, fils: null, millisecondes: 0.01 },
+            { taille: 64, fils: null, millisecondes: 0.01 },
+          ],
+        },
+      ],
+      [
+        'taille qui revient après une autre',
+        {
+          ...carte,
+          appareil: 'cpu',
+          transfert_ms: null,
+          mesures: [
+            { taille: 64, fils: 1, millisecondes: 0.01 },
+            { taille: 128, fils: 1, millisecondes: 0.02 },
+            { taille: 64, fils: 8, millisecondes: 0.01 },
+          ],
+        },
+      ],
+      ['transfert d’une autre taille', { ...carte, transfert_ms: { '128': 0.02 } }],
+      ['transfert vide', { ...carte, transfert_ms: {} }],
+      ['transfert en trop', { ...carte, transfert_ms: { '64': 0.02, '128': 0.03 } }],
     ];
     for (const [nom, valeur] of cas) {
       expect(() => verifierMesures(valeur, 'mesures/essai.json'), nom).toThrow(/^mesures\/essai\.json\u202F: /);
     }
     expect(verifierMesures(carte, 'mesures/essai.json')).toStrictEqual(carte);
+  });
+
+  it('verifierMesures accepte plusieurs fils par taille sur le processeur, rangés par taille', () => {
+    const processeur = {
+      ...carte,
+      appareil: 'cpu',
+      nom: 'AMD Ryzen 7 9800X3D 8-Core Processor',
+      torch: '2.15.0+cpu',
+      transfert_ms: null,
+      mesures: [
+        { taille: 64, fils: 1, millisecondes: 0.01 },
+        { taille: 64, fils: 8, millisecondes: 0.01 },
+        { taille: 128, fils: 1, millisecondes: 0.02 },
+        { taille: 128, fils: 8, millisecondes: 0.01 },
+      ],
+    };
+    expect(verifierMesures(processeur, 'mesures/essai.json')).toStrictEqual(processeur);
+    const deuxTailles = {
+      ...carte,
+      mesures: [
+        { taille: 64, fils: null, millisecondes: 0.01 },
+        { taille: 128, fils: null, millisecondes: 0.02 },
+      ],
+      transfert_ms: { '128': 0.03, '64': 0.02 },
+    };
+    expect(verifierMesures(deuxTailles, 'mesures/essai.json')).toStrictEqual(deuxTailles);
   });
 });

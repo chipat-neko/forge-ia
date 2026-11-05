@@ -5,6 +5,7 @@ pas leurs valeurs. Les mesures enregistrées, `mesures/processeur.json`, sont
 celles du PC de La Forge IA.
 """
 
+import ast
 import datetime
 import json
 import os
@@ -50,11 +51,20 @@ def verifier_format(m: dict, appareil: str) -> None:
         assert list(mesure) == ["taille", "fils", "millisecondes"]
         assert isinstance(mesure["taille"], int) and mesure["taille"] > 0
         assert type(mesure["millisecondes"]) is float and mesure["millisecondes"] > 0
+        # Un nombre de fils sur le processeur, null sur la carte.
+        if appareil == "cpu":
+            assert type(mesure["fils"]) is int and mesure["fils"] >= 1
+        else:
+            assert mesure["fils"] is None
     # Une seule mesure par couple (taille, fils), rangées par taille.
     couples = [(mesure["taille"], mesure["fils"]) for mesure in m["mesures"]]
     assert len(couples) == len(set(couples))
     tailles = [mesure["taille"] for mesure in m["mesures"]]
     assert tailles == sorted(tailles)
+    # Sur la carte, une copie vers la carte par taille mesurée, et rien d'autre.
+    if appareil == "cuda":
+        assert isinstance(m["transfert_ms"], dict)
+        assert set(m["transfert_ms"]) == {str(taille) for taille in tailles}
     # Le fichier s'écrit en JSON, sans NaN.
     assert json.loads(json.dumps(m, allow_nan=False)) == m
 
@@ -63,17 +73,36 @@ def test_chronometrer_produit_processeur():
     assert chronometrer_produit(64, "cpu") > 0
 
 
+def autre_nombre_de_fils(avant: int) -> int:
+    """Un nombre de fils différent du réglage en cours : sinon, rétablir ne prouverait rien."""
+    return 1 if avant != 1 else 2
+
+
 def test_chronometrer_produit_retablit_les_fils():
     avant = torch.get_num_threads()
-    assert chronometrer_produit(64, "cpu", fils=1, repetitions=3, echauffement=1) > 0
+    assert chronometrer_produit(64, "cpu", fils=autre_nombre_de_fils(avant), repetitions=3, echauffement=1) > 0
     assert torch.get_num_threads() == avant
 
 
 def test_les_fils_sont_retablis_meme_en_cas_d_erreur(monkeypatch):
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    # La panne survient après le réglage des fils : seul le `finally` peut les rétablir.
     avant = torch.get_num_threads()
-    with pytest.raises(AppareilIndisponible):
-        chronometrer_produit(64, "cuda", fils=1)
+    regles = []
+    vrai_reglage = torch.set_num_threads
+
+    def regler(n):
+        regles.append(n)
+        vrai_reglage(n)
+
+    def panne(*args, **kwargs):
+        raise RuntimeError("panne pendant la création des matrices")
+
+    monkeypatch.setattr(torch, "set_num_threads", regler)
+    monkeypatch.setattr(torch, "randn", panne)
+    autre = autre_nombre_de_fils(avant)
+    with pytest.raises(RuntimeError, match="panne"):
+        chronometrer_produit(64, "cpu", fils=autre)
+    assert regles[0] == autre  # les fils ont bien été changés avant la panne
     assert torch.get_num_threads() == avant
 
 
@@ -163,3 +192,37 @@ def test_en_francais():
     assert en_francais(0.00523) == "0,0052"
     assert en_francais(4096) == "4\u202f096"
     assert en_francais(1234.5, chiffres=3) == "1\u202f234"
+
+
+def test_le_format_verifie_la_sorte_des_fils():
+    # Sur le processeur, chaque mesure a un nombre de fils ; sur la carte, null.
+    m = mesurer("cpu", tailles=(16,), fils=(1,))
+    verifier_format(m, "cpu")
+    carte = {**m, "appareil": "cuda", "mesures": [{**m["mesures"][0], "fils": None}], "transfert_ms": {"16": 0.01}}
+    verifier_format(carte, "cuda")
+    with pytest.raises(AssertionError):
+        verifier_format({**m, "mesures": [{**m["mesures"][0], "fils": None}]}, "cpu")
+    with pytest.raises(AssertionError):
+        verifier_format({**m, "mesures": [{**m["mesures"][0], "fils": 1.0}]}, "cpu")
+    with pytest.raises(AssertionError):
+        verifier_format({**carte, "mesures": [{**carte["mesures"][0], "fils": 8}]}, "cuda")
+
+
+ESSAI_03 = PROJET.parent / "0.3-poste" / "poste" / "essai.py"
+
+
+def source_de(chemin: pathlib.Path, nom: str) -> str:
+    """Le texte exact de la fonction `nom` du fichier."""
+    texte = chemin.read_text(encoding="utf-8")
+    noeud = next(n for n in ast.parse(texte).body if isinstance(n, ast.FunctionDef) and n.name == nom)
+    return ast.get_source_segment(texte, noeud)
+
+
+def test_en_francais_copie_exacte_de_0_3():
+    # en_francais vient de projets/0.3-poste/poste/essai.py : la copie reste identique.
+    if not ESSAI_03.exists():
+        pytest.skip("projets/0.3-poste absent : la copie ne peut pas être comparée à l'original")
+    assert source_de(PROJET / "tenseurs" / "chrono.py", "en_francais") == source_de(ESSAI_03, "en_francais"), (
+        "en_francais (tenseurs/chrono.py) n'est plus la copie exacte de celle de projets/0.3-poste/poste/essai.py. "
+        "Recopie-la : une correction se fait dans 0.3, puis se recopie dans 0.4."
+    )

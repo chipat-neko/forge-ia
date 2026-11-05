@@ -71,7 +71,7 @@ def test_formes_nombre_seul(capsys):
 
 @pytest.mark.parametrize(
     ("texte", "forme"),
-    [("(3, 1)", (3, 1)), ("(4,)", (4,)), ("(4)", (4,)), ("()", ()), ("3, 1", (3, 1)), (" ( 2,3 , 4 ) ", (2, 3, 4))],
+    [("(3, 1)", (3, 1)), ("(4,)", (4,)), ("4,", (4,)), ("()", ()), ("3, 1", (3, 1)), (" ( 2,3 , 4 ) ", (2, 3, 4))],
 )
 def test_lire_forme(texte, forme):
     assert lire_forme(texte) == forme
@@ -82,6 +82,19 @@ def test_forme_illisible(capsys, texte):
     assert main(["formes", texte, "(3,)"]) == 2
     erreur = capsys.readouterr().err
     assert "Forme illisible" in erreur and "(4,)" in erreur and "Traceback" not in erreur
+
+
+@pytest.mark.parametrize("texte", ["(4)", "4", " ( 12 ) "])
+def test_une_dimension_sans_virgule_est_refusee(capsys, texte):
+    # En Python, (4) est le nombre 4 : une forme à une dimension s'écrit (4,) (M15).
+    assert main(["formes", texte, "(3,)"]) == 2
+    lu = capsys.readouterr()
+    n = texte.strip().strip("()").strip()
+    assert lu.out == ""
+    assert lu.err == (
+        f"Forme illisible\u202f: «\u202f{texte}\u202f». Pour une forme à une dimension, écris "
+        f'"({n},)"\u202f: sans la virgule, Python lit ({n}) comme le nombre {n}, pas comme une forme.\n'
+    )
 
 
 def test_sans_commande(capsys):

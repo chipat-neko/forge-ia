@@ -89,8 +89,14 @@ export function verifierMesures(valeur: unknown, fichier: string): MesuresChrono
   if (!entierPositif(m.fils_par_defaut) || !entierPositif(m.fils_max)) {
     throw faute('fils_par_defaut et fils_max doivent être des entiers de 1 ou plus');
   }
+  if (m.fils_par_defaut > m.fils_max) {
+    throw faute(`fils_par_defaut (${m.fils_par_defaut}) dépasse fils_max (${m.fils_max})`);
+  }
   if (!Array.isArray(m.mesures) || m.mesures.length === 0) throw faute('mesures est vide');
   const surLaCarte = m.appareil === 'cuda';
+  // Les tailles distinctes, dans l'ordre du fichier.
+  const tailles: number[] = [];
+  const couples = new Set<string>();
   for (const x of m.mesures as unknown[]) {
     if (!objet(x) || !entierPositif(x.taille) || !dureePositive(x.millisecondes)) {
       throw faute('chaque mesure a une taille (entier) et des millisecondes (plus de 0)');
@@ -98,10 +104,25 @@ export function verifierMesures(valeur: unknown, fichier: string): MesuresChrono
     if (surLaCarte ? x.fils !== null : !entierPositif(x.fils)) {
       throw faute(surLaCarte ? 'fils vaut null sur la carte' : 'fils est un entier de 1 ou plus sur le processeur');
     }
+    // Les mesures d'une même taille se suivent, et les tailles vont en croissant, sans doublon.
+    const derniere = tailles[tailles.length - 1];
+    const couple = `${x.taille}/${String(x.fils)}`;
+    if ((derniere !== undefined && x.taille < derniere) || couples.has(couple)) {
+      throw faute('les mesures doivent être rangées par taille strictement croissante, sans doublon');
+    }
+    if (x.taille !== derniere) tailles.push(x.taille);
+    couples.add(couple);
   }
   if (surLaCarte) {
     if (!objet(m.transfert_ms) || !Object.values(m.transfert_ms).every(dureePositive)) {
       throw faute('transfert_ms est un objet de durées sur la carte');
+    }
+    const cles = Object.keys(m.transfert_ms);
+    const attendues = tailles.map(String);
+    if (cles.length !== attendues.length || !attendues.every((t) => Object.hasOwn(m.transfert_ms as object, t))) {
+      throw faute(
+        `les clés de transfert_ms (${cles.join(', ') || 'aucune'}) doivent être les tailles mesurées (${attendues.join(', ')})`,
+      );
     }
   } else if (m.transfert_ms !== null) {
     throw faute('transfert_ms vaut null sur le processeur');
@@ -109,13 +130,27 @@ export function verifierMesures(valeur: unknown, fichier: string): MesuresChrono
   return m as unknown as MesuresChrono;
 }
 
+/** Le dossier du projet 0.4, depuis la racine du dépôt. */
+const PROJET_0_4 = 'projets/0.4-tenseurs';
+
 /**
  * Les mesures `nom` (processeur, ou carte de La Forge IA), lues dans le dépôt
- * dont on donne la racine (chemin, ou URL file: comme le root d'Astro). Null si
- * le fichier n'existe pas encore : la mesure reste « à mesurer ».
+ * dont on donne la racine : un chemin, une URL file: (comme new URL('../', root)
+ * avec le root d'Astro), ou une chaîne qui commence par file:. Null si le
+ * fichier de mesures n'existe pas encore : la mesure reste « à mesurer ». Une
+ * racine qui n'a pas le dossier projets/0.4-tenseurs est une erreur : elle ne
+ * doit pas passer pour une mesure absente.
  */
 export function lireMesures(nom: NomMesures, racineDepot: string | URL): MesuresChrono | null {
-  const racine = typeof racineDepot === 'string' ? racineDepot : fileURLToPath(racineDepot);
+  const racine =
+    typeof racineDepot === 'string' && !racineDepot.startsWith('file:') ? racineDepot : fileURLToPath(racineDepot);
+  if (!existsSync(join(racine, PROJET_0_4))) {
+    throw new Error(
+      `La racine du dépôt donnée à lireMesures (${racine}) n’a pas de dossier ${PROJET_0_4}. ` +
+        'Donne la racine du dépôt, le dossier au-dessus de site/ : new URL(\'../\', root) dans un composant Astro, ' +
+        'path.resolve(\'..\') depuis site/ dans Vitest et les parcours.',
+    );
+  }
   const chemin = join(racine, FICHIERS_MESURES[nom]);
   if (!existsSync(chemin)) return null;
   let valeur: unknown;

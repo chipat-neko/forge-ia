@@ -13,6 +13,8 @@ import nbformat
 import torch
 from nbclient import NotebookClient
 
+from tenseurs.exemples import exemple_calculer, exemple_creer, exemple_lire
+
 RACINE = pathlib.Path(__file__).resolve().parents[3]
 NOTEBOOK = RACINE / "notebooks" / "0.4-tenseurs.ipynb"
 # La ligne de l'exercice que le lecteur remplace par sa prédiction.
@@ -33,15 +35,38 @@ def code_du_notebook() -> str:
     return "".join(c.source for c in nbformat.read(NOTEBOOK, 4).cells if c.cell_type == "code")
 
 
+# Les étiquettes du notebook pour les valeurs d'exemple_calculer().
+ETIQUETTES_CALCULER = {
+    "somme": "a + b",
+    "produit_case_par_case": "a * b",
+    "produit_matriciel": "a @ b",
+    "total": "a.sum()",
+    "moyenne_par_colonne": "a.mean(dim=0)",
+    "diffusion": "a + (100, 200)",
+}
+
+
+def lignes_attendues() -> list[str]:
+    """Les lignes que le notebook doit afficher pour créer, lire et calculer, tirées d'exemples.py :
+    si les exemples changent, le notebook doit changer avec eux."""
+    lignes = [
+        f"{nom}\u202f: forme {tuple(t.shape)}, {t.dim()} dimension(s), type {t.dtype}\n"
+        for nom, t in exemple_creer().items()
+    ]
+    lignes += [f"{cle}\u202f: {valeur}\n" for cle, valeur in exemple_lire().items()]
+    calcul = exemple_calculer()
+    assert list(calcul) == list(ETIQUETTES_CALCULER), "une valeur d'exemple_calculer() n'a pas d'étiquette dans ce test"
+    lignes += [f"{ETIQUETTES_CALCULER[cle]}\u202f: {valeur}\n" for cle, valeur in calcul.items()]
+    return lignes
+
+
 def test_notebook_s_execute_de_bout_en_bout(monkeypatch):
     monkeypatch.setenv("FORGE_IA_LOCAL", str(RACINE))
     nb = nbformat.read(NOTEBOOK, as_version=4)
     sorties = executer(nb)
-    # Créer, lire, calculer.
-    assert "matrice\u202f: forme (2, 3), 2 dimension(s), type torch.float32" in sorties
-    assert "vecteur\u202f: forme (4,), 1 dimension(s)" in sorties
-    assert "case\u202f: 5.0" in sorties
-    assert "a @ b\u202f: [[70.0, 100.0], [150.0, 220.0]]" in sorties
+    # Créer, lire, calculer : les mêmes valeurs que tenseurs/exemples.py, que montre le chapitre.
+    for ligne in lignes_attendues():
+        assert ligne in sorties, ligne
     # La diffusion et le produit : la règle du projet et PyTorch, côte à côte.
     assert "(3, 1) + (4,)\u202f: (3, 4) selon la règle, (3, 4) selon PyTorch." in sorties
     assert "(2, 3) + (3, 2)\u202f: impossible selon la règle, impossible selon PyTorch." in sorties

@@ -26,13 +26,13 @@ TAILLES = (64, 256, 1024, 2048, 4096)  # des matrices de 64 × 64 à 4 096 × 4 
 NOMS = {"cpu": "le processeur", "cuda": "la carte graphique"}
 
 
+# region: chrono
 def attendre(appareil: torch.device) -> None:
     """Sur la carte, les calculs partent en file d'attente : on attend qu'ils soient finis."""
     if appareil.type == "cuda":
         torch.cuda.synchronize()
 
 
-# region: chrono
 def chronometrer_produit(
     taille: int, appareil: str, fils: int | None = None, repetitions: int = 5, echauffement: int = 2
 ) -> float:
@@ -146,9 +146,10 @@ def mesurer(appareil: str, tailles: tuple[int, ...] = TAILLES, fils: tuple[int, 
     }
 
 
+# Copie exacte de la fonction de projets/0.3-poste/poste/essai.py : un test le vérifie.
 def en_francais(x: float, chiffres: int = 2) -> str:
     """Un nombre positif à la française, avec `chiffres` chiffres significatifs (au moins les unités) :
-    2,1 ; 13 ; 0,0052 ; 4 096 (avec une espace fine)."""
+    2,1 ; 13 ; 123 ; 0,031 ; 0,0000012 ; 1 234 (avec une espace fine)."""
     if x == 0:
         return "0"
     decimales = max(0, chiffres - 1 - math.floor(math.log10(abs(x))))

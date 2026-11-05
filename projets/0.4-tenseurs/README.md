@@ -17,7 +17,7 @@ NVIDIA (extra `gpu`, CUDA 13.2) et celle pour le processeur seul (extra
 `uv` installe Python et les bibliothèques de chaque projet. Le fichier
 `.python-version` demande Python 3.12 : uv le télécharge lui-même s'il manque.
 Pour installer uv, voir le README du projet 0.3 (`projets/0.3-poste`), ou
-https://docs.astral.sh/uv/getting-started/installation/.
+<https://docs.astral.sh/uv/getting-started/installation/>.
 
 ## Lancer
 
@@ -49,7 +49,8 @@ Produit matriciel : (3, 1) @ (4,) est impossible : la dernière dimension de gau
 
 Écris les formes comme Python, entre guillemets : `"(2, 3)"`, `"(4,)"` pour
 un vecteur (la virgule dit que c'est un tuple), `"()"` pour un nombre seul.
-Cette commande n'a pas besoin de PyTorch : les règles sont dans
+Sans la virgule, `"(4)"` est refusé : en Python, `(4)` est le nombre 4, pas
+une forme. Cette commande n'a pas besoin de PyTorch : les règles sont dans
 `tenseurs/formes.py`, en Python pur, et les tests les comparent à PyTorch
 lui-même.
 
@@ -130,10 +131,16 @@ export FORGE_APPAREIL=cpu     # Linux, Mac
 uv run --extra cpu pytest -q
 ```
 
-Le test marqué `gpu` (les chronos sur la carte) est sauté sans carte, avec la
-raison « CUDA absente ». Avec une carte NVIDIA, `uv run --extra gpu pytest -q`
-le lance aussi. Le test du notebook l'exécute de bout en bout, sur la carte si
-elle est là.
+Les deux tests marqués `gpu` sont sautés sans carte, avec la raison « CUDA
+absente » :
+
+- `test_auto_prend_la_carte` (`tests/test_appareil.py`) : le choix
+  automatique de la carte ;
+- `test_mesurer_carte_petit` (`tests/test_chrono.py`) : les chronos sur la
+  carte.
+
+Avec une carte NVIDIA, `uv run --extra gpu pytest -q` les lance aussi. Le test
+du notebook l'exécute de bout en bout, sur la carte si elle est là.
 
 ## Les attendus de référence
 

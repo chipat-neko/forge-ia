@@ -21,17 +21,26 @@ ENTIER = re.compile(r"\d+", re.ASCII)
 
 
 def lire_forme(texte: str) -> tuple[int, ...]:
-    """« (3, 1) » donne (3, 1), « (4,) » ou « (4) » donne (4,), « () » donne (). ValueError sinon."""
+    """« (3, 1) » donne (3, 1), « (4,) » donne (4,), « () » donne (). ValueError sinon, et pour « (4) » :
+    en Python, c'est le nombre 4, pas une forme."""
     t = texte.strip()
     if t.startswith("(") and t.endswith(")"):
         t = t[1:-1]
     morceaux = [m.strip() for m in t.split(",")]
-    if morceaux[-1] == "":
+    virgule_finale = morceaux[-1] == ""
+    if virgule_finale:
         morceaux.pop()  # la virgule de (4,), ou une forme vide
     if not texte.strip() or not all(ENTIER.fullmatch(m) for m in morceaux):
         raise ValueError(
             f"Forme illisible\u202f: «\u202f{texte}\u202f». Écris-la comme en Python, entre guillemets\u202f: "
             '"(3, 1)", "(4,)" pour un vecteur, ou "()" pour un nombre seul.'
+        )
+    if len(morceaux) == 1 and not virgule_finale:
+        # (4) sans virgule : Python y lit le nombre 4.
+        n = morceaux[0]
+        raise ValueError(
+            f"Forme illisible\u202f: «\u202f{texte}\u202f». Pour une forme à une dimension, écris "
+            f'"({n},)"\u202f: sans la virgule, Python lit ({n}) comme le nombre {n}, pas comme une forme.'
         )
     return tuple(int(m) for m in morceaux)
 
@@ -117,6 +126,8 @@ def ecrire_en_utf8() -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Avant argparse, qui écrit lui-même ses messages d'erreur (par exemple celui de taille_positive).
+    ecrire_en_utf8()
     lecteur = argparse.ArgumentParser(
         prog="python -m tenseurs",
         description="Les règles de forme de PyTorch, et les chronos du processeur et de la carte graphique.",
@@ -136,7 +147,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     chronos.set_defaults(executer=commande_mesurer)
     options = lecteur.parse_args(argv)
-    ecrire_en_utf8()
     return options.executer(options)
 
 
