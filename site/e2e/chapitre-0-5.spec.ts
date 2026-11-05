@@ -517,7 +517,17 @@ test('l’ouverture et l’étape 9 citent les premiers prénoms du départ, et 
     expect(liens, id).toContain(m.source.url);
   }
   // L'« À suivre » nomme le chapitre 1.1, en texte (S3).
-  expect(await texteExact(page.locator('#etape-10 .texte'))).toContain(typographier(trouverChapitre('1.1').chapitre.titre));
+  const suite = page.locator('#etape-10 .texte');
+  expect(await texteExact(suite)).toContain(typographier(trouverChapitre('1.1').chapitre.titre));
+  // Tant que 1.1 n'a pas paru, il le dit, et renvoie par un lien au premier chapitre paru de la Partie 1.
+  const { partie } = trouverChapitre('1.1');
+  const parus = partie.chapitres.filter((c) => existsSync(`src/content/chapitres/${c.numero.replace('.', '-')}.mdx`));
+  if (parus[0]?.numero !== '1.1') {
+    expect(await texteExact(suite)).toContain(typographier('Il n\'a pas encore paru'));
+    if (parus.length > 0) {
+      await expect(suite.locator(`a[href="/forge-ia/partie-1/${parus[0].numero.replace('.', '-')}/"]`)).toHaveCount(1);
+    }
+  }
 });
 
 test('sans JavaScript, le neurone est sur ET avec 2 points sur 4, et tout se lit', async ({ browser, baseURL }) => {

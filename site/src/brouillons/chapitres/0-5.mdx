@@ -25,6 +25,7 @@ acquis:
     ou: "à l'étape 9, en menant l'entraînement du mini-modèle jusqu'au bout"
 ---
 
+import { existsSync } from 'node:fs';
 import { root } from 'astro:config/server';
 import AtelierNeurone from '../../components/chapitres/0-5/AtelierNeurone.svelte';
 import CourbeXor from '../../components/chapitres/0-5/CourbeXor.astro';
@@ -43,7 +44,7 @@ import { DEPOT } from '../../lib/depot';
 import { etatInitial } from '../../lib/mini-modele/apercu';
 import { prenomAffiche } from '../../lib/mini-modele/pilote';
 import { PRESETS_MINI } from '../../lib/mini-modele/reglages';
-import { trouverChapitre } from '../../lib/parcours';
+import { hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
 import { ecrirePoint, ecrireReglage, REGLAGE_MAX, REGLAGE_MIN, REGLAGE_PAS } from '../../lib/partie-0/atelier-neurone';
 import {
   ALLER_AU_PROJET_0_5,
@@ -240,7 +241,20 @@ export const LABO = (() => {
   };
 })();
 
-export const SUITE = typographier(trouverChapitre('1.1').chapitre.titre);
+export const SUITE = (() => {
+  // L'« À suivre » : le chapitre 1.1, qui ouvre la Partie 1. Tant qu'il n'a pas paru (aucun fichier dans
+  // src/content/chapitres/, comme pour le pied du chapitre), la phrase le dit, et renvoie au premier chapitre paru
+  // de la Partie 1, par un lien : un lien ne vise qu'un chapitre paru (S3).
+  const paru = (numero) => existsSync(new URL(`src/content/chapitres/${numero.replace('.', '-')}.mdx`, root));
+  const { partie, chapitre } = trouverChapitre('1.1');
+  const ouvert = paru(chapitre.numero) ? null : partie.chapitres.find((c) => paru(c.numero));
+  const aVenir = paru(chapitre.numero) ? '' : ' Il n\'a pas encore paru';
+  return {
+    titre: typographier(chapitre.titre),
+    avant: typographier(ouvert ? `${aVenir} ; tu peux déjà lire ` : aVenir && `${aVenir}.`),
+    lien: ouvert ? { href: hrefChapitre(ouvert.numero), texte: typographier(`le chapitre ${ouvert.numero}, « ${titreCourt(ouvert.titre)} »`) } : null,
+  };
+})();
 
 <OuverturePrenoms prenoms={DEPART.prenoms} poidsMini={DEPART.poids} poidsReseau={RESEAU.poids} />
 
@@ -562,7 +576,7 @@ Avant tout entraînement, il invente des prénoms comme {DEPART.cites[0]} et {DE
 
 <Fragment slot="note">
 
-Le mini-modèle est un tout petit transformer : ses pièces sont celles des grands modèles, en tout petit. Il tourne dans ton navigateur, sur le processeur.
+Le mini-modèle est un tout petit transformer, la sorte de réseau qu'utilisent les grands modèles de langage : il a les mêmes pièces qu'eux, en tout petit. Il tourne dans ton navigateur, sur le processeur.
 
 </Fragment>
 
@@ -586,6 +600,6 @@ Le projet complet (le neurone, le réseau à la main, le même avec PyTorch, et 
 
 ### À suivre
 
-Tu sais ce que fait un neurone, pourquoi il en faut plusieurs, et comment un réseau apprend : propager, mesurer l'erreur, la remonter, corriger. La Partie 1 commence au chapitre 1.1, « {SUITE} », et s'en sert pour fabriquer ton IA.
+Tu sais ce que fait un neurone, pourquoi il en faut plusieurs, et comment un réseau apprend : propager, mesurer l'erreur, la remonter, corriger. La Partie 1 commence au chapitre 1.1, « {SUITE.titre} », et s'en sert pour fabriquer ton IA.{SUITE.avant}{SUITE.lien && <><a href={SUITE.lien.href}>{SUITE.lien.texte}</a>.</>}
 
 </Etape>
