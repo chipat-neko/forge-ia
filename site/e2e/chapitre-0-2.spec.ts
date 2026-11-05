@@ -10,7 +10,7 @@
 // ne sont jamais recalculés : les tableaux doivent montrer les valeurs du
 // Python, mises en forme. Les valeurs clés sont aussi écrites ici en toutes
 // lettres, pour ne pas seulement comparer le module à lui-même.
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { formaterPuissanceDeDix, formaterQuantite } from '../src/lib/calculateur/formats';
 import { modelePublic } from '../src/lib/calculateur/donnees';
@@ -48,6 +48,7 @@ import {
   verifierLiensVersParus,
   verifierSansDebordement,
   verifierTypographieHorsCode,
+  verifierVoisin,
 } from './outils';
 
 const PAGE = '/forge-ia/partie-0/0-2/';
@@ -121,17 +122,6 @@ async function regler(nombreJaune: Locator, valeur: number): Promise<void> {
   const actuelle = Number(await nombreJaune.getAttribute('aria-valuenow'));
   for (let i = 0; i < Math.abs(valeur - actuelle); i++) await nombreJaune.press(valeur > actuelle ? 'ArrowRight' : 'ArrowLeft');
   await expect(nombreJaune).toHaveAttribute('aria-valuenow', String(valeur));
-}
-
-/** Le pied vers un voisin : un lien s'il a paru (son fichier est dans src/content/chapitres/), sinon « à venir » (S2). */
-async function verifierVoisin(page: Page, sens: 'precedent' | 'suivant', fichier: string, href: string): Promise<void> {
-  const voisin = page.locator(`footer .voisin.${sens}`);
-  if (existsSync(`src/content/chapitres/${fichier}`)) {
-    await expect(voisin).toHaveAttribute('href', href);
-  } else {
-    await expect(voisin).toContainText('à venir');
-    await expect(page.locator(`footer a.voisin.${sens}`)).toHaveCount(0);
-  }
 }
 
 test('chapitre 0.2 complet', async ({ page }) => {

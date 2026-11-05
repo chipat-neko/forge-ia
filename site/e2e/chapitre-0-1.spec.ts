@@ -5,7 +5,7 @@
 // Les attendus viennent du jumeau du mot suivant (src/lib/partie-0/mot-suivant.ts)
 // et des paris (paris-0-1.ts), appliqués au texte du projet lu sur le disque :
 // un parcours, chargé par Node sans Vite, n'importe aucun module à ?raw (B1).
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { test, expect, type Page } from '@playwright/test';
 import { extraireRegion } from '../src/lib/regions';
 import { trouverChapitre } from '../src/lib/parcours';
@@ -32,6 +32,7 @@ import {
   verifierLiensVersParus,
   verifierSansDebordement,
   verifierTypographieHorsCode,
+  verifierVoisin,
 } from './outils';
 
 const PAGE = '/forge-ia/partie-0/0-1/';
@@ -101,13 +102,7 @@ test('chapitre 0.1 complet', async ({ page }) => {
   await page.locator('[data-pari="boucle"] [data-juste]').click();
   await expect(page.locator('#recap [data-total]')).toContainText('5 sur 5');
   // Le pied suit les fichiers : 0.2 est « à venir » tant qu'il n'a pas paru (S2).
-  const suivant = page.locator('footer .voisin.suivant');
-  if (existsSync('src/content/chapitres/0-2.mdx')) {
-    await expect(suivant).toHaveAttribute('href', '/forge-ia/partie-0/0-2/');
-  } else {
-    await expect(suivant).toContainText('à venir');
-    await expect(page.locator('footer a.voisin')).toHaveCount(0);
-  }
+  await verifierVoisin(page, 'suivant', '0-2.mdx', '/forge-ia/partie-0/0-2/');
   // Aucun lien vers un chapitre qui n'a pas paru (S3) : les renvois à 0.2, 0.3 ou 1.1 sont du texte.
   await verifierLiensVersParus(page.locator('main'), PAGE);
   await attendreAnimations(page);

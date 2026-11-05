@@ -189,6 +189,21 @@ export async function verifierLiensVersParus(zone: Locator, lieu = ''): Promise<
   }
 }
 
+/**
+ * Le pied d'un chapitre vers un voisin : un lien s'il a paru (son fichier est
+ * dans src/content/chapitres/), sinon « à venir » (S2). Partagé par les
+ * parcours des chapitres de la Partie 0 (revue finale, m10).
+ */
+export async function verifierVoisin(page: Page, sens: 'precedent' | 'suivant', fichier: string, href: string): Promise<void> {
+  const voisin = page.locator(`footer .voisin.${sens}`);
+  if (existsSync(`src/content/chapitres/${fichier}`)) {
+    await expect(voisin).toHaveAttribute('href', href);
+  } else {
+    await expect(voisin).toContainText('à venir');
+    await expect(page.locator(`footer a.voisin.${sens}`)).toHaveCount(0);
+  }
+}
+
 // ---------- Le tableau de l'avant-goût du mini-modèle ----------
 // Partagé par e2e/mini-modele.spec.ts (page d'essai) et e2e/chapitre-0-5.spec.ts
 // (le chapitre qui l'accueille) : `t` est le tableau [data-test="mini-avant-apres"].
