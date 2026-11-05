@@ -8,9 +8,9 @@
 // complet en vitesse rapide prend quelques secondes.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { decimalesUtiles, nombre } from '../src/lib/nombres';
-import { MESSAGE_DIVERGENCE, MESSAGE_NOUVEAU_TAUX, MESSAGE_ONGLET } from '../src/lib/mini-modele/pilote';
+import { MESSAGE_DIVERGENCE, MESSAGE_NOUVEAU_TAUX, MESSAGE_ONGLET, prenomAffiche } from '../src/lib/mini-modele/pilote';
 import { PRESETS_MINI, TAUX_PROPOSES } from '../src/lib/mini-modele/reglages';
 import { attendreHydratation, verifierAxe, verifierSansDebordement, verifierTypographie } from './outils';
 
@@ -32,6 +32,68 @@ const action = (p: Page, nom = 'mini') => demo(p, nom).locator('[data-test="mini
 const validations = (p: Page, nom = 'mini') => demo(p, nom).locator('[data-test="mini-validations"] li');
 const echantillons = (p: Page, nom = 'mini') => demo(p, nom).locator('[data-test="mini-echantillons"] li');
 const taux = (p: Page) => demo(p).locator('[data-test="taux"]');
+// L'avant-goût : le tableau des prénoms du départ et de la fin, et la phrase qui invite à lancer.
+const avantApres = (p: Page) => demo(p, 'avant-gout').locator('[data-test="mini-avant-apres"]');
+const invite = (p: Page) => demo(p, 'avant-gout').locator('[data-test="mini-avant-apres-invite"]');
+const NB_LIGNES = AVANT_GOUT.nbEchantillons;
+const EN_TETE_DEPART = 'Au départ, pas 0';
+const EN_TETE_AVANT_LA_FIN = 'Après l’entraînement';
+
+/** Les textes d'une colonne du tableau de l'avant-goût (1 : le départ, 2 : la fin), blancs resserrés. */
+async function colonne(p: Page, n: 1 | 2): Promise<string[]> {
+  const textes = await avantApres(p).locator(`tbody tr td:nth-child(${n})`).allInnerTexts();
+  return textes.map((s) => s.replace(/\s+/g, ' ').trim());
+}
+
+/** Les en-têtes des deux colonnes, en texte brut (U+202F gardée). */
+const enTetes = async (p: Page) => (await avantApres(p).locator('thead th').allTextContents()).map((s) => s.trim());
+
+/** Un prénom tel que le tableau l'écrit : « Léa (existe déjà) », « (aucune lettre) ». */
+const caseAttendue = (p: { texte: string; existe: boolean }) => prenomAffiche(p.texte) + (p.existe ? ' (existe déjà)' : '');
+
+/** La colonne de droite n'a encore aucun prénom : un tiret par ligne, lu « pas encore » par les lecteurs d'écran. */
+async function verifierDroiteEnTirets(t: Locator): Promise<void> {
+  const droite = t.locator('tbody tr td:nth-child(2)');
+  await expect(droite).toHaveCount(NB_LIGNES);
+  await expect(droite.locator('[aria-hidden="true"]')).toHaveText(Array<string>(NB_LIGNES).fill('—'));
+  for (const td of await droite.all()) await expect(td).toHaveAccessibleName('pas encore');
+}
+
+/** Le tableau : une légende, deux en-têtes de colonne, NB_LIGNES lignes de deux cases, sans en-tête de ligne. */
+async function verifierStructure(t: Locator): Promise<void> {
+  expect(((await t.locator('caption').textContent()) ?? '').trim()).toBe('Les prénoms inventés, avant et après l’entraînement');
+  await expect(t.locator('thead th[scope="col"]')).toHaveCount(2);
+  await expect(t.locator('thead th')).toHaveCount(2);
+  await expect(t.locator('tbody tr')).toHaveCount(NB_LIGNES);
+  await expect(t.locator('tbody th')).toHaveCount(0);
+  for (const ligne of await t.locator('tbody tr').all()) await expect(ligne.locator('td')).toHaveCount(2);
+}
+
+/** Aucune case ne déborde de sa colonne, et le tableau tient dans la largeur de la démo. */
+async function verifierTableauSansDebordement(t: Locator): Promise<void> {
+  const debordements = await t
+    .locator('th, td')
+    .evaluateAll((cases) => cases.filter((c) => c.scrollWidth > c.clientWidth + 1).map((c) => c.textContent ?? ''));
+  expect(debordements, 'des cases débordent de leur colonne').toEqual([]);
+  const { largeur, place } = await t.evaluate((el) => ({
+    largeur: el.getBoundingClientRect().width,
+    place: el.parentElement!.clientWidth,
+  }));
+  expect(largeur, 'le tableau est plus large que la démo').toBeLessThanOrEqual(place + 0.5);
+}
+
+/** Les pas des « étapes d'avant » (« au pas 100 : »…), dans l'ordre. */
+const pasDesEtapesAvant = async (p: Page, nom = 'mini') =>
+  (await demo(p, nom).locator('details.avant .pas-groupe').allTextContents()).map((s) => s.trim());
+
+/** Les pas strictement entre 0 et la fin où l'avant-goût invente des prénoms, comme la page les écrit. */
+function pasEntreDepartEtFin(): string[] {
+  const pas: string[] = [];
+  for (let p = AVANT_GOUT.validationTous; p < AVANT_GOUT.pasTotal; p += AVANT_GOUT.validationTous) {
+    pas.push(`au pas ${nombre(p)}${FINE}:`);
+  }
+  return pas;
+}
 
 /** Un taux tel que la démo l'écrit : « 0,01 », « 0,3 ». */
 const texteTaux = (t: number) => nombre(t, decimalesUtiles(t));
@@ -486,25 +548,70 @@ test('au doigt, le taux avance d’un cran pour 30 px', async ({ page, isMobile 
   await expect(t).toHaveAttribute('aria-valuenow', String(depart + 1));
 });
 
-test('avant-goût : 600 pas, sans réglage de taux', async ({ page }) => {
+test('avant-goût : 600 pas, sans réglage de taux, les prénoms du départ et de la fin côte à côte', async ({
+  page,
+  browser,
+  baseURL,
+}) => {
   test.setTimeout(90_000);
+  // La référence de la colonne de gauche : la même page sans JavaScript, où Astro a écrit les
+  // prénoms du pas 0 (etatInitial, à la construction). Un parcours ne peut pas importer
+  // etatInitial (le moteur lit la liste des prénoms par ?raw) : apercu.test.ts vérifie, lui,
+  // que ces cases sont bien etatInitial('avant-gout').echantillons.
+  const sansJs = await browser.newContext({ javaScriptEnabled: false, baseURL });
+  const statique = await sansJs.newPage();
+  await statique.goto(PAGE);
+  const reference = await colonne(statique, 1);
+  await sansJs.close();
+  expect(reference).toHaveLength(NB_LIGNES);
+
   await page.goto(PAGE);
   await attendreHydratation(page);
   const ag = demo(page, 'avant-gout');
+  const t = avantApres(page);
   await expect(ag.locator('[data-test="taux"]')).toHaveCount(0);
   await expect(ag.locator('[data-test="mini-vitesse"]')).toHaveCount(0);
   await expect(ag).toContainText(`Il va s’entraîner pendant ${AVANT_GOUT.pasTotal} pas.`);
+  // Le tableau remplace la liste des prénoms.
+  await expect(echantillons(page, 'avant-gout')).toHaveCount(0);
+  await verifierStructure(t);
+  expect(await enTetes(page)).toEqual([EN_TETE_DEPART, EN_TETE_AVANT_LA_FIN]);
+  expect(await colonne(page, 1)).toEqual(reference);
+  await verifierDroiteEnTirets(t);
+  expect(((await invite(page).textContent()) ?? '').trim()).toBe(
+    `Lance l’entraînement${FINE}: ses prénoms viendront se ranger à droite.`,
+  );
+  await expect(invite(page)).toBeVisible();
+
   // Pas de verrou : il se lance sans pari.
   await action(page, 'avant-gout').click();
+  await expect(invite(page)).toHaveCount(0);
   await expect(ag).toHaveAttribute('data-phase', 'termine', { timeout: 60_000 });
   await expect(etat(page, 'avant-gout')).toHaveAttribute('data-pas', String(AVANT_GOUT.pasTotal));
   expect(await brut(page, 'avant-gout')).toMatch(new RegExp(`^Terminé${FINE}: ${AVANT_GOUT.pasTotal} pas en \\d+ s\\.$`));
+  // La fin s'annonce une fois, avec la ligne d'état visible.
+  expect(await brutAnnonce(page, 'avant-gout')).toBe(await brut(page, 'avant-gout'));
   await expect(validations(page, 'avant-gout')).toHaveCount(AVANT_GOUT.pasTotal / AVANT_GOUT.validationTous + 1);
-  await expect(echantillons(page, 'avant-gout')).toHaveCount(AVANT_GOUT.nbEchantillons);
-  // Les prénoms du départ restent là, dans les étapes d'avant.
+  // À droite, les prénoms du dernier pas, sous « Au pas 600 » ; à gauche, rien n'a bougé.
+  await verifierStructure(t);
+  expect(await enTetes(page)).toEqual([EN_TETE_DEPART, `Au pas ${nombre(AVANT_GOUT.pasTotal)}`]);
+  const droite = await colonne(page, 2);
+  expect(droite).toHaveLength(NB_LIGNES);
+  for (const prenom of droite) expect(prenom).toMatch(/^\S/);
+  await expect(t.locator('[aria-hidden="true"]')).toHaveCount(0);
+  expect(await colonne(page, 1)).toEqual(reference);
+  await expect(invite(page)).toHaveCount(0);
+  // Les étapes d'avant : seulement celles d'entre les deux (le pas 0 et le dernier sont dans le tableau).
   const avant = ag.locator('details.avant');
   await avant.locator('summary').click();
-  await expect(avant).toContainText('au pas 0');
+  expect(await pasDesEtapesAvant(page, 'avant-gout')).toEqual(pasEntreDepartEtFin());
+  await expect(avant).not.toContainText('au pas 0');
+  await expect(avant).not.toContainText(`au pas ${nombre(AVANT_GOUT.pasTotal)}`);
+  // Largeur (390 px sur le projet mobile), typographie, accessibilité.
+  await verifierTableauSansDebordement(t);
+  await verifierSansDebordement(page);
+  await verifierTypographie(ag);
+  await verifierAxe(page);
   // Le lien vers le chapitre 1.5, seulement s'il est paru.
   await expect(ag).toContainText('Tu le fabriqueras au chapitre 1.5.');
   const paru = existsSync('src/content/chapitres/1-5.mdx');
@@ -512,6 +619,125 @@ test('avant-goût : 600 pas, sans réglage de taux', async ({ page }) => {
   // L'entraînement complet n'a pas bougé, ni son acquis.
   expect(await pas(page)).toBe(0);
   await expect(page.locator('#recap [data-acquis="entraine"]')).toHaveAttribute('data-gagne', 'non');
+});
+
+// Un faux Worker pour l'avant-goût, aux prénoms connus : le parcours peut dire lesquels doivent
+// être à droite. Au premier lancement, il fait 40 pas, sans validation ; à la reprise (après la
+// pause, confirmée), il valide tous les validationTous pas jusqu'au dernier, avec les prénoms
+// prenomsFaux(pas), puis annonce la fin. Il suit le protocole du vrai, et passe donc par le vrai
+// réducteur et le vrai composant ; rien de cela n'entre dans le site.
+const PRENOMS_FAUX = ['jean-pierre', '', 'zoé', 'marie-christine-joséphine', 'léna', 'axel', 'inès', 'basile', 'odette', 'rémi'];
+/** Les prénoms du faux Worker au pas donné : une autre rotation de PRENOMS_FAUX à chaque pas, un sur trois « existe ». */
+function prenomsFaux(pas: number): { texte: string; existe: boolean }[] {
+  const decalage = pas / AVANT_GOUT.validationTous;
+  return Array.from({ length: NB_LIGNES }, (_, i) => {
+    const texte = PRENOMS_FAUX[(i + decalage) % PRENOMS_FAUX.length];
+    return { texte, existe: texte !== '' && i % 3 === 0 };
+  });
+}
+const fauxGroupes = () => {
+  const groupes: { pas: number; prenoms: { texte: string; existe: boolean }[] }[] = [];
+  for (let p = AVANT_GOUT.validationTous; p <= AVANT_GOUT.pasTotal; p += AVANT_GOUT.validationTous) {
+    groupes.push({ pas: p, prenoms: prenomsFaux(p) });
+  }
+  return groupes;
+};
+const TRAVAILLEUR_AVANT_GOUT = `
+const GROUPES = ${JSON.stringify(fauxGroupes())};
+const PAS_TOTAL = ${AVANT_GOUT.pasTotal};
+let generation = null;
+let lancements = 0;
+let pas = 0;
+const pertes = (n) => Array.from({ length: n }, (_, i) => 3.6 - (pas + i) * 0.002);
+self.onmessage = (evenement) => {
+  const m = evenement.data;
+  if (m.type === 'lancer') {
+    if (m.generation !== generation) {
+      generation = m.generation;
+      lancements = 0;
+      pas = 0;
+    }
+    lancements += 1;
+    if (lancements === 1) {
+      const p = pertes(40);
+      pas = 40;
+      self.postMessage({ type: 'progres', generation, pas, pasTotal: PAS_TOTAL, pertes: p, dureeMs: 300, pasParSeconde: 130 });
+      return;
+    }
+    for (const g of GROUPES) {
+      const p = pertes(g.pas - pas);
+      pas = g.pas;
+      self.postMessage({
+        type: 'progres', generation, pas, pasTotal: PAS_TOTAL, pertes: p, dureeMs: pas * 5, pasParSeconde: 200,
+        validation: { pas, perte: 3.3 - pas / 1000 }, echantillons: g,
+      });
+    }
+    self.postMessage({ type: 'etat', generation, etat: 'termine' });
+  } else if (m.type === 'pause' && m.generation === generation) {
+    self.postMessage({ type: 'etat', generation, etat: 'en-pause' });
+  }
+};
+`;
+
+test('avant-goût : à droite, les prénoms du dernier pas ; recommencer remet les tirets', async ({ page }) => {
+  await page.route(/\/_astro\/travailleur-[^/]*\.js$/, (route) =>
+    route.fulfill({ contentType: 'text/javascript', body: TRAVAILLEUR_AVANT_GOUT }),
+  );
+  // 390 px de large sur les deux projets : le tableau doit y tenir, même avec un prénom de 25 lettres.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(PAGE);
+  await attendreHydratation(page);
+  const ag = demo(page, 'avant-gout');
+  const t = avantApres(page);
+  const depart = await colonne(page, 1);
+  expect(depart).toHaveLength(NB_LIGNES);
+  expect(await enTetes(page)).toEqual([EN_TETE_DEPART, EN_TETE_AVANT_LA_FIN]);
+  await verifierDroiteEnTirets(t);
+  await expect(invite(page)).toBeVisible();
+
+  // Lancé, 40 pas, aucune validation encore : l'en-tête et les tirets restent ; l'invitation part.
+  await action(page, 'avant-gout').click();
+  await expect(etat(page, 'avant-gout')).toHaveAttribute('data-pas', '40', ATTENTE_TRAVAILLEUR);
+  expect(await brutAnnonce(page, 'avant-gout')).toBe('Entraînement lancé.');
+  expect(await enTetes(page)).toEqual([EN_TETE_DEPART, EN_TETE_AVANT_LA_FIN]);
+  await verifierDroiteEnTirets(t);
+  await expect(invite(page)).toHaveCount(0);
+
+  // Pause confirmée, puis reprise jusqu'au bout.
+  await action(page, 'avant-gout').click();
+  await expect(ag).toHaveAttribute('data-travailleur', 'en-pause');
+  await action(page, 'avant-gout').click();
+  await expect(ag).toHaveAttribute('data-phase', 'termine');
+  expect(await brutAnnonce(page, 'avant-gout')).toBe(await brut(page, 'avant-gout'));
+
+  // À droite, exactement les prénoms du dernier pas, « (existe déjà) » et « (aucune lettre) » compris.
+  expect(await enTetes(page)).toEqual([EN_TETE_DEPART, `Au pas ${nombre(AVANT_GOUT.pasTotal)}`]);
+  const fin = prenomsFaux(AVANT_GOUT.pasTotal).map(caseAttendue);
+  expect(fin).toContain('(aucune lettre)');
+  expect(fin.some((c) => c.endsWith(' (existe déjà)'))).toBe(true);
+  expect(await colonne(page, 2)).toEqual(fin);
+  expect(await colonne(page, 1)).toEqual(depart);
+  // Dans les étapes d'avant, les pas d'entre les deux, avec leurs prénoms ; ni le pas 0, ni le dernier.
+  await ag.locator('details.avant summary').click();
+  expect(await pasDesEtapesAvant(page, 'avant-gout')).toEqual(pasEntreDepartEtFin());
+  const avantDernier = AVANT_GOUT.pasTotal - AVANT_GOUT.validationTous;
+  await expect(ag.locator('details.avant p').last()).toContainText(
+    prenomsFaux(avantDernier).map(caseAttendue).join(', ') + '.',
+  );
+  await verifierTableauSansDebordement(t);
+  await verifierSansDebordement(page);
+  await verifierTypographie(ag);
+  await verifierAxe(page);
+
+  // Recommencer : le départ reste, la droite repasse en tirets, et l'invitation revient.
+  await ag.locator('[data-test="mini-recommencer"]').click();
+  await expect(ag).toHaveAttribute('data-phase', 'pret');
+  expect(await enTetes(page)).toEqual([EN_TETE_DEPART, EN_TETE_AVANT_LA_FIN]);
+  await verifierDroiteEnTirets(t);
+  expect(await colonne(page, 1)).toEqual(depart);
+  await expect(invite(page)).toBeVisible();
+  await expect(ag.locator('details.avant')).toHaveCount(0);
+  expect(await brutAnnonce(page, 'avant-gout')).toBe('');
 });
 
 test('sans JavaScript : message et valeurs du départ', async ({ browser, baseURL }) => {
@@ -527,11 +753,24 @@ test('sans JavaScript : message et valeurs du départ', async ({ browser, baseUR
     await expect(d.locator('[data-test="mini-action"]')).toBeHidden();
     await expect(d.locator('[data-test="mini-recommencer"]')).toBeHidden();
     await expect(validations(page, nom)).toHaveText([`au pas 0${FINE}: ${depart}`]);
-    await expect(echantillons(page, nom)).toHaveCount(8);
-    await expect(echantillons(page, nom).first()).toBeVisible();
     await expect(d.locator('[data-test="courbe"]')).toBeVisible();
     await expect(d.locator('[data-test="courbe"]')).toHaveAttribute('aria-label', `Courbe de l’erreur${FINE}: ${depart} au pas 0.`);
   }
+  // L'entraînement complet : la liste des prénoms du départ.
+  await expect(echantillons(page)).toHaveCount(8);
+  await expect(echantillons(page).first()).toBeVisible();
+  // L'avant-goût : le tableau, avec la colonne de gauche complète et celle de droite en tirets.
+  const t = avantApres(page);
+  await expect(echantillons(page, 'avant-gout')).toHaveCount(0);
+  await expect(t).toBeVisible();
+  await verifierStructure(t);
+  expect(await enTetes(page)).toEqual([EN_TETE_DEPART, EN_TETE_AVANT_LA_FIN]);
+  const gauche = await colonne(page, 1);
+  expect(gauche).toHaveLength(NB_LIGNES);
+  for (const prenom of gauche) expect(prenom).toMatch(/^[^\s—]/);
+  await verifierDroiteEnTirets(t);
+  // Sans les boutons, l'invitation à lancer n'a pas de sens : la phrase « besoin de JavaScript » la remplace.
+  await expect(invite(page)).toBeHidden();
   const pasTotal = nombre(COMPLET.pasTotal);
   expect(((await etat(page).textContent()) ?? '').trim()).toBe(`Pas 0 sur ${pasTotal}${FINE}: erreur ${depart}.`);
   await ctx.close();

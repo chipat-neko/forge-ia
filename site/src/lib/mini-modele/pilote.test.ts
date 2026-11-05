@@ -20,6 +20,7 @@ import {
   messageTermine,
   prenomAffiche,
   reduire,
+  tableauAvantApres,
   tauxIndexParDefaut,
   type EtatDemo,
   type Evenement,
@@ -540,6 +541,87 @@ describe('les aides d’affichage', () => {
     expect(prenomAffiche('ïa-ëlle')).toBe('Ïa-Ëlle');
     expect(prenomAffiche('a')).toBe('A');
     expect(prenomAffiche('')).toBe('(aucune lettre)');
+  });
+});
+
+describe('tableauAvantApres : les prénoms du départ et de la fin, côte à côte (avant-goût)', () => {
+  const AVANT_GOUT: EtatInitialMini = { ...INITIAL, preset: 'avant-gout', pasTotal: PRESETS_MINI['avant-gout'].pasTotal };
+  const depart = () => etatDeDepart(AVANT_GOUT, tauxIndexParDefaut('avant-gout'));
+  // Les cases du pas 0 d'INITIAL, telles qu'elles s'affichent.
+  const CASES_DEPART = [
+    { texte: 'Xqz', existe: false, vide: false },
+    { texte: '(aucune lettre)', existe: false, vide: true },
+    { texte: 'Léa', existe: true, vide: false },
+  ];
+  const validation = (pas: number, textes: [string, boolean][]): Evenement =>
+    progres(1, pas, {
+      pasTotal: AVANT_GOUT.pasTotal,
+      validation: { pas, perte: 3 - pas / 1000 },
+      echantillons: { pas, prenoms: textes.map(([texte, existe]) => ({ texte, existe })) },
+    });
+
+  it('avant le lancement : à gauche les prénoms du pas 0, à droite rien encore', () => {
+    expect(tableauAvantApres(depart())).toEqual({
+      enTetes: ['Au départ, pas 0', 'Après l’entraînement'],
+      pasFin: null,
+      lignes: CASES_DEPART.map((c) => ({ depart: c, fin: null })),
+    });
+  });
+
+  it('lancé, sans validation après le pas 0 : toujours rien à droite', () => {
+    const { etat } = jouer(depart(), [{ type: 'lancer' }, progres(1, 40, { pasTotal: AVANT_GOUT.pasTotal })], 'avant-gout');
+    const t = tableauAvantApres(etat);
+    expect(t.enTetes).toEqual(['Au départ, pas 0', 'Après l’entraînement']);
+    expect(t.pasFin).toBeNull();
+    expect(t.lignes.map((l) => l.fin)).toEqual([null, null, null]);
+  });
+
+  it('à droite, les prénoms du dernier pas d’échantillons, sous « Au pas N » ; à gauche, toujours ceux du pas 0', () => {
+    const { etat } = jouer(
+      depart(),
+      [
+        { type: 'lancer' },
+        validation(100, [
+          ['bob', true],
+          ['', false],
+          ['jean-pierre', false],
+        ]),
+        validation(600, [
+          ['', false],
+          ['marie-ève', true],
+          ['zoé', false],
+        ]),
+      ],
+      'avant-gout',
+    );
+    const t = tableauAvantApres(etat);
+    expect(t.enTetes).toEqual(['Au départ, pas 0', 'Au pas 600']);
+    expect(t.pasFin).toBe(600);
+    expect(t.lignes.map((l) => l.depart)).toEqual(CASES_DEPART);
+    expect(t.lignes.map((l) => l.fin)).toEqual([
+      { texte: '(aucune lettre)', existe: false, vide: true },
+      { texte: 'Marie-Ève', existe: true, vide: false },
+      { texte: 'Zoé', existe: false, vide: false },
+    ]);
+  });
+
+  it('un pas à quatre chiffres s’écrit avec une espace fine', () => {
+    const { etat } = jouer(depart(), [{ type: 'lancer' }, validation(3000, [['léo', false]])], 'avant-gout');
+    expect(tableauAvantApres(etat).enTetes[1]).toBe(`Au pas 3${FINE}000`);
+    // Une ligne par prénom du départ : il en manque un à droite, sa case reste vide (pas encore).
+    expect(tableauAvantApres(etat).lignes.map((l) => l.fin?.texte ?? null)).toEqual(['Léo', null, null]);
+  });
+
+  it('recommencer remet la colonne de droite à « pas encore »', () => {
+    const fini = jouer(depart(), [{ type: 'lancer' }, validation(100, [['bob', true]]), etatW(1, 'termine')], 'avant-gout').etat;
+    expect(tableauAvantApres(fini).pasFin).toBe(100);
+    const reparti = jouer(fini, [{ type: 'recommencer' }], 'avant-gout').etat;
+    expect(tableauAvantApres(reparti)).toEqual(tableauAvantApres(depart()));
+  });
+
+  it('ne modifie pas l’état reçu', () => {
+    const etat = geler(jouer(depart(), [{ type: 'lancer' }, validation(100, [['bob', true]])], 'avant-gout').etat);
+    expect(() => tableauAvantApres(etat)).not.toThrow();
   });
 });
 

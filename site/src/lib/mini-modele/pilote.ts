@@ -331,3 +331,59 @@ export function prenomAffiche(texte: string): string {
   if (texte === '') return '(aucune lettre)';
   return texte.replace(/(^|-)(\p{L})/gu, (_, avant: string, lettre: string) => avant + lettre.toUpperCase());
 }
+
+/** Une case du tableau de l'avant-goût : un prénom inventé, prêt à afficher. */
+export interface CasePrenom {
+  /** Le prénom tel que prenomAffiche l'écrit : « Jean-Pierre », ou « (aucune lettre) ». */
+  texte: string;
+  /** Il est déjà dans la liste : la case ajoute « (existe déjà) ». */
+  existe: boolean;
+  /** Le prénom est vide (aucune lettre). */
+  vide: boolean;
+}
+
+/** Le tableau de l'avant-goût : les prénoms du départ à gauche, ceux du dernier pas à droite. */
+export interface TableauAvantApres {
+  /** « Au départ, pas 0 », puis « Après l'entraînement » (rien encore à droite) ou « Au pas 600 ». */
+  enTetes: [string, string];
+  /** Le pas des prénoms de droite ; null tant qu'aucune validation n'a suivi le départ. */
+  pasFin: number | null;
+  /**
+   * Une ligne par prénom du départ. fin : le prénom du dernier pas sur la même ligne, ou null
+   * (pas encore : la page met un tiret, lu « pas encore » par les lecteurs d'écran).
+   */
+  lignes: { depart: CasePrenom; fin: CasePrenom | null }[];
+}
+
+/** Un pas, écrit comme la ligne d'état l'écrit : « 3 000 », ou « ? » s'il n'est pas fini. */
+const pasEcrit = (pas: number) => (Number.isFinite(pas) ? nombre(Math.round(pas)) : '?');
+
+const casePrenom = (p: Prenom): CasePrenom => ({ texte: prenomAffiche(p.texte), existe: p.existe, vide: p.texte === '' });
+
+/**
+ * Le tableau de l'avant-goût, d'après l'état de la démo : à gauche, les prénoms
+ * du départ (le premier groupe d'échantillons, celui du pas 0) ; à droite, ceux
+ * du dernier groupe, s'il y en a un après le départ. Avant la première
+ * validation (au départ, et juste après le lancement ou un recommencement), la
+ * colonne de droite est vide et son en-tête dit « Après l'entraînement ».
+ *
+ * Chaque groupe a nbEchantillons prénoms (boucle-travailleur.ts) : le tableau a
+ * une ligne par prénom du départ, et une case de droite qui manquerait resterait
+ * à null. Rien ne lève d'erreur : c'est de l'affichage.
+ */
+export function tableauAvantApres(etat: EtatDemo): TableauAvantApres {
+  const depart = etat.echantillons[0];
+  const dernier = etat.echantillons.length > 1 ? etat.echantillons[etat.echantillons.length - 1] : null;
+  const prenomsDepart = depart?.prenoms ?? [];
+  return {
+    enTetes: [
+      `Au départ, pas ${pasEcrit(depart?.pas ?? 0)}`,
+      dernier === null ? 'Après l’entraînement' : `Au pas ${pasEcrit(dernier.pas)}`,
+    ],
+    pasFin: dernier === null ? null : dernier.pas,
+    lignes: prenomsDepart.map((p, i) => {
+      const fin = dernier?.prenoms[i];
+      return { depart: casePrenom(p), fin: fin === undefined ? null : casePrenom(fin) };
+    }),
+  };
+}

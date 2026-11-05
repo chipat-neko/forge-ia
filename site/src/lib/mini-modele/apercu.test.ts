@@ -6,6 +6,7 @@ import { etatInitial } from './apercu';
 import { log, versHex } from './calcul';
 import { donneesParDefaut, tailleVocabulaire } from './donnees';
 import { configMini, nombreParametres } from './modele';
+import { etatDeDepart, prenomAffiche, tableauAvantApres, tauxIndexParDefaut } from './pilote';
 import { PRESETS_MINI } from './reglages';
 
 describe('etatInitial', { timeout: 60_000 }, () => {
@@ -35,6 +36,22 @@ describe('etatInitial', { timeout: 60_000 }, () => {
     expect(avant.preset).toBe('avant-gout');
     expect(avant.pasTotal).toBe(PRESETS_MINI['avant-gout'].pasTotal);
     expect({ ...avant, preset: 'complet', pasTotal: complet.pasTotal }).toEqual(complet);
+  });
+
+  it('l’avant-goût : la colonne de gauche du tableau, ce sont les prénoms du pas 0', () => {
+    // Le tableau que montre la page avant le lancement (MiniModele.svelte, préréglage avant-gout).
+    const avant = etatInitial('avant-gout');
+    const t = tableauAvantApres(etatDeDepart(avant, tauxIndexParDefaut('avant-gout')));
+    const affichee = (c: { texte: string; existe: boolean }) => c.texte + (c.existe ? ' (existe déjà)' : '');
+    const attendu = avant.echantillons.map((p) => prenomAffiche(p.texte) + (p.existe ? ' (existe déjà)' : ''));
+    expect(t.lignes).toHaveLength(PRESETS_MINI['avant-gout'].nbEchantillons);
+    expect(t.lignes.map((l) => affichee(l.depart))).toEqual(attendu);
+    // Le pas 0 a un prénom vide : la case dit « (aucune lettre) ».
+    expect(attendu).toContain('(aucune lettre)');
+    expect(t.lignes.find((l) => l.depart.texte === '(aucune lettre)')?.depart.vide).toBe(true);
+    // À droite, rien encore.
+    expect(t.lignes.every((l) => l.fin === null)).toBe(true);
+    expect(t.enTetes).toEqual(['Au départ, pas 0', 'Après l’entraînement']);
   });
 
   it('sérialisable : passe tel quel d’Astro à l’îlot', () => {

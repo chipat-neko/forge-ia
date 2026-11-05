@@ -34,6 +34,7 @@
     etatDeDepart,
     prenomAffiche,
     reduire,
+    tableauAvantApres,
     tauxIndexParDefaut,
     type EtatDemo,
     type Evenement,
@@ -203,7 +204,11 @@
     return `Pas ${entier(derniere.pas)} sur ${entier(etat.pasTotal)}${FINE}: erreur ${formaterPerte(derniere.perte)}${vitesse}.`;
   });
   const echantillons = $derived(etat.echantillons[etat.echantillons.length - 1]);
-  const echantillonsAvant = $derived(etat.echantillons.slice(0, -1));
+  // L'avant-goût montre le départ et la fin côte à côte (tableauAvantApres) : ses étapes d'avant
+  // ne gardent que les pas d'entre les deux. L'entraînement complet garde sa liste du dernier pas,
+  // et toutes les étapes d'avant, pas 0 compris.
+  const tableau = $derived(avantGout ? tableauAvantApres(etat) : null);
+  const echantillonsAvant = $derived(avantGout ? etat.echantillons.slice(1, -1) : etat.echantillons.slice(0, -1));
   const legendeFantome = $derived(
     etat.fantome === null ? undefined : `l’essai d’avant, au taux de ${texteTaux(etat.fantome.tauxIndex)}`,
   );
@@ -293,14 +298,50 @@
     {/each}
   </ol>
 
-  <p class="intro-liste">Les prénoms qu’il invente au pas {entier(echantillons.pas)}{FINE}:</p>
-  <ul class="prenoms" data-test="mini-echantillons">
-    {#each echantillons.prenoms as p, i (i)}
-      <li class:vide={p.texte === ''}>
-        {prenomAffiche(p.texte)}{#if p.existe}{' '}<span class="existe">(existe déjà)</span>{/if}
-      </li>
-    {/each}
-  </ul>
+  {#if tableau !== null}
+    <!-- L'avant-goût : les prénoms du départ et ceux du dernier pas, ligne à ligne. Une case pas encore remplie
+         montre un tiret, que les lecteurs d'écran lisent « pas encore ». Le tableau change à chaque validation :
+         il n'est pas une zone lue d'office (la fin s'annonce par la zone cachée, avec la ligne d'état). -->
+    <table class="avant-apres" data-test="mini-avant-apres">
+      <caption class="intro-liste">Les prénoms inventés, avant et après l’entraînement</caption>
+      <thead>
+        <tr>
+          <th scope="col">{tableau.enTetes[0]}</th>
+          <th scope="col">{tableau.enTetes[1]}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each tableau.lignes as ligne, i (i)}
+          <tr>
+            <td class:vide={ligne.depart.vide}>
+              {ligne.depart.texte}{#if ligne.depart.existe}{' '}<span class="existe">(existe déjà)</span>{/if}
+            </td>
+            {#if ligne.fin === null}
+              <td class="pas-encore"><span aria-hidden="true">—</span><span class="vh">pas encore</span></td>
+            {:else}
+              <td class:vide={ligne.fin.vide}>
+                {ligne.fin.texte}{#if ligne.fin.existe}{' '}<span class="existe">(existe déjà)</span>{/if}
+              </td>
+            {/if}
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+    {#if etat.phase === 'pret'}
+      <p class="invite" data-test="mini-avant-apres-invite">
+        Lance l’entraînement{FINE}: ses prénoms viendront se ranger à droite.
+      </p>
+    {/if}
+  {:else}
+    <p class="intro-liste">Les prénoms qu’il invente au pas {entier(echantillons.pas)}{FINE}:</p>
+    <ul class="prenoms" data-test="mini-echantillons">
+      {#each echantillons.prenoms as p, i (i)}
+        <li class:vide={p.texte === ''}>
+          {prenomAffiche(p.texte)}{#if p.existe}{' '}<span class="existe">(existe déjà)</span>{/if}
+        </li>
+      {/each}
+    </ul>
+  {/if}
   {#if echantillonsAvant.length > 0}
     <details class="avant">
       <summary>Les prénoms des étapes d’avant</summary>
@@ -379,7 +420,8 @@
   }
 
   @media (scripting: none) {
-    .commandes {
+    .commandes,
+    .invite {
       display: none;
     }
 
@@ -449,6 +491,65 @@
     font-size: 19px;
   }
 
+  /* L'avant-goût : un tableau typographié, sans cadre, comme ceux des chapitres (TableauChronos) :
+     un trait d'encre en haut et sous les en-têtes, des filets brume entre les lignes. Deux colonnes
+     égales : un prénom trop long se coupe dans sa case, la page ne s'élargit pas. */
+  .avant-apres {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    border-top: 2px solid var(--indigo);
+    margin: 0 0 0.6em;
+    font-size: 21px;
+    line-height: 1.35;
+    font-variation-settings: 'opsz' 36;
+  }
+
+  .avant-apres caption {
+    text-align: left;
+  }
+
+  .avant-apres th {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--indigo-doux);
+    text-align: left;
+    vertical-align: bottom;
+    padding: 6px 0 4px;
+    border-bottom: 2px solid var(--indigo);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .avant-apres td {
+    padding: 5px 0;
+    border-bottom: 1px solid var(--brume);
+    vertical-align: baseline;
+    overflow-wrap: anywhere;
+  }
+
+  .avant-apres th + th,
+  .avant-apres td + td {
+    padding-left: 20px;
+  }
+
+  .avant-apres td.vide {
+    font-style: italic;
+    color: var(--indigo-doux);
+    font-size: 18px;
+  }
+
+  /* Le tiret d'une case pas encore remplie ; son texte caché (.vh) se place dans la case. */
+  .pas-encore {
+    position: relative;
+    color: var(--indigo-doux);
+  }
+
+  .invite {
+    color: var(--indigo-doux);
+    margin: 0 0 1em;
+  }
+
   .existe {
     font-family: var(--titres);
     font-size: 14px;
@@ -507,6 +608,15 @@
 
     .prenoms {
       font-size: 20px;
+    }
+
+    .avant-apres {
+      font-size: 19px;
+    }
+
+    .avant-apres th + th,
+    .avant-apres td + td {
+      padding-left: 14px;
     }
   }
 </style>
