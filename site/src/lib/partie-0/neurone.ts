@@ -46,7 +46,7 @@ export const PORTES: Readonly<Record<Porte, readonly number[]>> = {
 /** Les valeurs essayées pour w1, w2 et b : de −2 à 2, par pas de 0,5. */
 export const GRILLE: readonly number[] = [-2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0];
 
-/** La réponse du neurone : 1 si la somme pondérée est positive, 0 sinon. */
+/** La réponse du neurone : 1 si la somme pondérée est plus grande que 0, 0 sinon. */
 export function sortieSeuil(poids: readonly [number, number], biais: number, x: Point): number {
   return poids[0] * x[0] + poids[1] * x[1] + biais > 0 ? 1 : 0;
 }

@@ -43,7 +43,7 @@ import {
 } from '../../lib/partie-0/commandes';
 import { ecrireForme, formeDiffusee, memoireOctets } from '../../lib/partie-0/formes';
 import { lireMesures } from '../../lib/partie-0/mesures';
-import { OCTETS_ROUE_CU132_WINDOWS } from '../../lib/partie-0/sources-0-3';
+import { enGo, OCTETS_ROUE_CU132_WINDOWS } from '../../lib/partie-0/sources-0-3';
 import {
   choixDiffusion,
   choixFils,
@@ -179,9 +179,10 @@ export const DIFFUSION = (() => {
 export const PAIRES = nombre(attendusFormes.paires.length);
 
 export const ROUE_CARTE = (() => {
-  // La version de PyTorch pour la carte, sous Windows (relevée pour le chapitre 0.3), en Go de 2³⁰ octets,
-  // comme tout ce chapitre (étape 5).
-  return formaterOctets(OCTETS_ROUE_CU132_WINDOWS);
+  // La version de PyTorch pour la carte, sous Windows (relevée pour le chapitre 0.3) : une taille de
+  // téléchargement, en Go décimaux comme PyPI et le chapitre 0.3 (« 2,1 Go », l'unité insécable). Les Go de
+  // 2³⁰ octets restent ceux de la mémoire des tenseurs (étape 5).
+  return enGo(OCTETS_ROUE_CU132_WINDOWS);
 })();
 
 export const MEMOIRE = (() => {

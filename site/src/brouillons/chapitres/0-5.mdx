@@ -35,7 +35,7 @@ import SortieCommande from '../../components/gabarit/SortieCommande.astro';
 import attendus from '../../../../projets/0.5-reseau/tests/attendus.json';
 import sortieProcesseur from '../../../../projets/0.5-reseau/sorties/processeur.txt?raw';
 import { modelePublic } from '../../lib/calculateur/donnees';
-import { formaterOctets, formaterQuantite } from '../../lib/calculateur/formats';
+import { formaterQuantite } from '../../lib/calculateur/formats';
 import { PRESETS_FORGE } from '../../lib/calculateur/ton-ia';
 import { DEPOT } from '../../lib/depot';
 import { etatInitial } from '../../lib/mini-modele/apercu';
@@ -70,7 +70,7 @@ import {
   questionGradient,
   Y_DU_PARI,
 } from '../../lib/partie-0/paris-0-5';
-import { OCTETS_ROUE_CU132_WINDOWS } from '../../lib/partie-0/sources-0-3';
+import { enGo, OCTETS_ROUE_CU132_WINDOWS } from '../../lib/partie-0/sources-0-3';
 import { exigeur } from '../../lib/exiger';
 import { decimalesUtiles, nombre } from '../../lib/nombres';
 import { typographier } from '../../lib/typo';
@@ -86,10 +86,13 @@ export const N = POINTS.length;
 export const NEURONE = (() => {
   // La grille du neurone à seuil (étape 1), et son meilleur réglage pour le OU exclusif (étape 2).
   const [meilleur, [w1, w2], b] = meilleurReglage('ou_exclusif');
-  exiger(meilleur < N, 'un neurone seul classe maintenant tous les points du OU exclusif : l’explication du pari « xor » est à revoir');
-  const tous = POINTS.map(ecrirePoint);
+  exiger(
+    meilleur === N - 1,
+    `le meilleur réglage de la grille classe ${meilleur} points du OU exclusif, et non ${N - 1} : l’étape 2 (« au mieux », « aucun réglage ne fait mieux », renvoi à l’atelier) et le pari « xor » sont à revoir`,
+  );
   return {
-    points: `${tous.slice(0, -1).join(', ')} et ${tous.at(-1)}`,
+    // Les 4 points, écrits comme Python : chacun dans un span insécable du texte.
+    tous: POINTS.map(ecrirePoint),
     min: ecrireReglage(REGLAGE_MIN),
     max: ecrireReglage(REGLAGE_MAX),
     pas: ecrireReglage(REGLAGE_PAS),
@@ -160,6 +163,10 @@ export const COINCE = (() => {
   // Le pari « coince » : les départs qui n'apprennent pas, comptés dans la section « graines » des attendus.
   const k = nbCoinces(GRAINES);
   const n = GRAINES.length;
+  exiger(
+    n - k > k,
+    `${n - k} graines sur ${n} apprennent, pas plus que les ${k} coincées : « Changer de départ suffit souvent » (explication du pari « coince ») est à revoir`,
+  );
   return {
     k: nombre(k),
     n: nombre(n),
@@ -180,7 +187,7 @@ export const ECARTS = (() => {
 
 export const DEPART = (() => {
   // Le mini-modèle de l'avant-goût au pas 0 : ses deux premiers prénoms (un prénom vide, « (aucune lettre) », est
-  // sauté), son nombre de poids, ses pas, son vocabulaire et son lot (préréglage avant-gout).
+  // sauté), son nombre de poids, son vocabulaire et son lot (préréglage avant-gout).
   const etat = etatInitial('avant-gout');
   const prenoms = etat.echantillons.filter((p) => p.texte !== '').slice(0, 2).map((p) => prenomAffiche(p.texte));
   exiger(prenoms.length === 2, 'l’avant-goût n’invente plus deux prénoms non vides au pas 0');
@@ -188,23 +195,28 @@ export const DEPART = (() => {
     prenoms,
     cites: prenoms.map((p) => `«\u202F${p}\u202F»`),
     poids: nombre(etat.nbParametres),
-    pas: nombre(etat.pasTotal),
     vocabulaire: nombre(etat.tailleVocabulaire),
     lot: nombre(PRESETS_MINI['avant-gout'].lot),
   };
 })();
 
-export const ROUE_CARTE = formaterOctets(OCTETS_ROUE_CU132_WINDOWS);
+export const ROUE_CARTE = (() => {
+  // La version de PyTorch pour la carte sous Windows : une taille de téléchargement, en Go décimaux comme
+  // PyPI et le chapitre 0.3 (« 2,1 Go », l'unité insécable).
+  return enGo(OCTETS_ROUE_CU132_WINDOWS);
+})();
 
 export const LABO = (() => {
   // Ton IA dans sa plus grande taille (le calculateur), GPT-3 et Llama 3 405B (modèles publics, sourcés).
   const gpt3 = modelePublic('gpt-3-175b');
   const llama = modelePublic('llama-3-405b');
   const vers = (s) => ({ titre: s.titre, url: s.url, verifieLe: s.releveLe });
+  // « 405 milliards » ne se coupe pas : une espace insécable avant « millions » ou « milliards ».
+  const quantite = (n) => formaterQuantite(n).replace(' ', '\u00A0');
   return {
-    tonIA: formaterQuantite(PRESETS_FORGE.tres_grand.parametres),
-    gpt3: formaterQuantite(gpt3.parametres),
-    llama: formaterQuantite(llama.parametres),
+    tonIA: quantite(PRESETS_FORGE.tres_grand.parametres),
+    gpt3: quantite(gpt3.parametres),
+    llama: quantite(llama.parametres),
     sources: [vers(gpt3.source), vers(llama.source)],
   };
 })();
@@ -215,20 +227,20 @@ export const SUITE = typographier(trouverChapitre('1.1').chapitre.titre);
 
 <Etape numero={1} titre="Un neurone">
 
-Un neurone artificiel reçoit des nombres, ses entrées. Il multiplie chacune par un poids, additionne le tout, ajoute un dernier nombre, le biais, puis décide. Avec deux entrées, x1 et x2, sa somme pondérée vaut <span class="formule-en-texte">w1 × x1 + w2 × x2 + b</span>. Le neurone le plus simple répond 1 si cette somme est positive, 0 sinon : c'est un neurone à seuil.
+Un neurone artificiel reçoit des nombres, ses entrées. Il multiplie chacune par un poids, additionne le tout, ajoute un dernier nombre, le biais, puis décide. Avec deux entrées, x1 et x2, sa somme pondérée vaut <span class="formule-en-texte">w1 × x1 + w2 × x2 + b</span>. Le neurone le plus simple répond 1 si cette somme est plus grande que 0, et 0 sinon : c'est un neurone à seuil.
 
-Prends les portes logiques de l'électronique : deux entrées qui valent 0 ou 1, et une réponse. ET répond 1 seulement si ses deux entrées valent 1 ; OU, si au moins l'une des deux vaut 1. Il n'y a que {N} cas, les {N} points du carré : {NEURONE.points}.
+Prends les portes logiques de l'électronique : deux entrées qui valent 0 ou 1, et une réponse. ET répond 1 seulement si ses deux entrées valent 1 ; OU, si au moins l'une des deux vaut 1. Il n'y a que {N} cas, les {N} points du carré : <span class="formule-en-texte">{NEURONE.tous[0]}</span>, <span class="formule-en-texte">{NEURONE.tous[1]}</span>, <span class="formule-en-texte">{NEURONE.tous[2]}</span> et <span class="formule-en-texte">{NEURONE.tous[3]}</span>.
 
-Le neurone sépare ces points par une droite : celle où sa somme vaut 0. D'un côté, la somme est positive, et il répond 1 ; de l'autre, il répond 0. Règle w1, w2 et b pour que ses réponses soient celles de ET.
+Le neurone sépare ces points par une droite : celle où sa somme vaut 0. D'un côté, la somme est plus grande que 0, et il répond 1 ; de l'autre côté, et sur la droite elle-même, il répond 0. Règle w1, w2 et b pour que ses réponses soient celles de ET.
 
 <AtelierNeurone client:load acquis="neurone" />
 
-L'atelier cherche à la main ce que le projet du chapitre cherche partout : il essaie tous les réglages d'une grille, et garde le meilleur pour chaque porte.
+Dans l'atelier, tu cherches à la main. Le projet du chapitre, lui, essaie tous les réglages d'une grille, et garde le meilleur pour chaque porte.
 
 <CodeExplique fichier="projets/0.5-reseau/premier_reseau/neurone.py" region="neurone">
-  <li data-lignes="1-7">`POINTS`, les {N} points (x1, x2), et `PORTES`, la réponse attendue de chaque porte, point par point. Le OU exclusif est l'objet de l'étape suivante.</li>
+  <li data-lignes="1-7">`POINTS`, les {N} points <span class="formule-en-texte">(x1, x2)</span>, et `PORTES`, la réponse attendue de chaque porte, point par point. Le OU exclusif est l'objet de l'étape suivante.</li>
   <li data-lignes="8-9">`GRILLE`, les valeurs essayées pour w1, w2 et b : de {NEURONE.min} à {NEURONE.max}, par pas de {NEURONE.pas}, comme les nombres de l'atelier.</li>
-  <li data-lignes="12-14">`sortie_seuil`, le neurone : la somme pondérée, puis la décision. Une somme nulle n'est pas positive : elle donne 0.</li>
+  <li data-lignes="12-14">`sortie_seuil`, le neurone : la somme pondérée, puis la décision. Une somme nulle n'est pas plus grande que 0 : elle donne 0.</li>
   <li data-lignes="17-23">`bien_classes` compte les points où le neurone donne la réponse de la porte. `zip`, du chapitre 0.1, parcourt les points et les réponses ensemble.</li>
   <li data-lignes="26-35">`meilleur_reglage` essaie les {NEURONE.reglages} réglages de la grille, {NEURONE.valeurs} valeurs pour chacun des trois nombres, et garde le premier qui classe le plus de points.</li>
 </CodeExplique>
@@ -245,7 +257,7 @@ Changer b déplace la droite sans la tourner : seuls w1 et w2 décident de sa pe
 
 <Etape numero={2} titre="Le OU exclusif">
 
-Le OU exclusif répond 1 quand une seule de ses deux entrées vaut 1. Il répond donc 1 pour {NEURONE.uns[0]} et pour {NEURONE.uns[1]}, mais 0 pour {NEURONE.zeros[0]} et pour {NEURONE.zeros[1]}. Sur le carré, ses deux points à 1 sont sur une diagonale, ses deux points à 0 sur l'autre.
+Le OU exclusif répond 1 quand une seule de ses deux entrées vaut 1. Il répond donc 1 pour <span class="formule-en-texte">{NEURONE.uns[0]}</span> et pour <span class="formule-en-texte">{NEURONE.uns[1]}</span>, mais 0 pour <span class="formule-en-texte">{NEURONE.zeros[0]}</span> et pour <span class="formule-en-texte">{NEURONE.zeros[1]}</span>. Sur le carré, ses deux points à 1 sont sur une diagonale, ses deux points à 0 sur l'autre.
 
 <Pari
   id="xor"
@@ -257,7 +269,7 @@ Le OU exclusif répond 1 quand une seule de ses deux entrées vaut 1. Il répond
 
 Non : au mieux {NEURONE.xor} points sur {N}. Sur toute la grille du projet, le meilleur réglage en classe {NEURONE.xor}, par exemple <span class="formule-en-texte">w1 = {NEURONE.xorW1}</span>, <span class="formule-en-texte">w2 = {NEURONE.xorW2}</span> et <span class="formule-en-texte">b = {NEURONE.xorB}</span>.
 
-Et aucun réglage ne fait mieux, même hors de la grille. Additionne les sommes pondérées de {NEURONE.uns[0]} et de {NEURONE.uns[1]} : <span class="formule-en-texte">w1 + w2 + 2b</span>. Celles de {NEURONE.zeros[0]} et de {NEURONE.zeros[1]} font exactement le même total. Pour répondre 1 aux deux premiers points, ce total doit être positif ; pour répondre 0 aux deux autres, il doit être négatif ou nul. C'est impossible à la fois.
+Et aucun réglage ne fait mieux, même hors de la grille. Additionne les sommes pondérées de <span class="formule-en-texte">{NEURONE.uns[0]}</span> et de <span class="formule-en-texte">{NEURONE.uns[1]}</span> : <span class="formule-en-texte">w1 + w2 + 2b</span>. Celles de <span class="formule-en-texte">{NEURONE.zeros[0]}</span> et de <span class="formule-en-texte">{NEURONE.zeros[1]}</span> font exactement le même total. Pour répondre 1 aux deux premiers points, leurs deux sommes doivent être plus grandes que 0, et leur total aussi. Pour répondre 0 aux deux autres, leurs deux sommes doivent valoir au plus 0, et leur total aussi. Un même total ne peut pas être à la fois plus grand que 0 et au plus 0.
 
 Essaie-le dans l'atelier de l'étape 1, sur « OU exclusif » : tu n'y dépasseras pas {NEURONE.xor} points sur {N}. Il faut une couche de plus : deux neurones qui tracent chacun leur droite, puis un troisième qui combine leurs réponses.
 
@@ -330,7 +342,7 @@ Au bout de la chaîne, un calcul se simplifie. La pente de l'erreur par rapport 
   acquis="gradient"
 >
 
-<span class="formule-en-texte">p − y = {GRADIENT.p} − {GRADIENT.y} = {GRADIENT.resultat}</span>. La pente est positive : la sortie est trop haute. La descente retire à chaque poids le taux fois sa pente. Le biais de la sortie, dont la pente est ici p − y elle-même, recule donc ; z2 baisse, et p avec elle, vers la bonne réponse. Plus le réseau se trompe, plus la pente est grande ; s'il avait répondu exactement {GRADIENT.y}, elle serait nulle.
+<span class="formule-en-texte">p − y = {GRADIENT.p} − {GRADIENT.y} = {GRADIENT.resultat}</span>. La pente est plus grande que 0 : la sortie est trop haute. La descente retire à chaque poids le taux fois sa pente. Le biais de la sortie, dont la pente est ici p − y elle-même, recule donc ; z2 baisse, et p avec elle, vers la bonne réponse. Plus le réseau se trompe, plus la pente est grande ; s'il avait répondu exactement {GRADIENT.y}, elle serait nulle.
 
 </Pari>
 
@@ -428,14 +440,14 @@ PyTorch fait tout cela pour toi. `nn.Linear` fait les sommes pondérées d'une c
 
 <CodeExplique fichier="projets/0.5-reseau/premier_reseau/avec_pytorch.py" region="modele">
   <li data-lignes="1-2">`construire` reçoit les poids d'un réseau de l'étape 3, et rend le même réseau dans PyTorch.</li>
-  <li data-lignes="3-8">`nn.Sequential` enchaîne quatre couches, dans l'ordre : `nn.Linear(2, 2)`, deux entrées vers deux neurones, leurs sigmoïdes, puis `nn.Linear(2, 1)` et la sigmoïde de la sortie. `dtype=torch.float64` : des nombres sur 64 bits.</li>
+  <li data-lignes="3-8">`nn.Sequential` enchaîne quatre couches, dans l'ordre : <code class="insecable">nn.Linear(2, 2)</code>, deux entrées vers deux neurones, leurs sigmoïdes, puis <code class="insecable">nn.Linear(2, 1)</code> et la sigmoïde de la sortie. `dtype=torch.float64` : des nombres sur 64 bits.</li>
   <li data-lignes="9-13">On y recopie les poids de départ. `torch.no_grad()` dit à autograd de ne pas suivre ce calcul : recopier n'est pas à dériver. Les poids d'une couche forment un tenseur, rangé comme `w1[j][i]` : une ligne par neurone, une colonne par entrée.</li>
   <li data-lignes="14">Le modèle est prêt.</li>
 </CodeExplique>
 
 <CodeExplique fichier="projets/0.5-reseau/premier_reseau/avec_pytorch.py" region="autograd">
   <li data-lignes="1-2">`gradients_pytorch` rend les dérivées de la perte moyenne par rapport aux {RESEAU.poids} poids, calculées par autograd.</li>
-  <li data-lignes="3">Les points, dans un tenseur de forme {RESEAU.formePoints}, et leurs bonnes réponses, de forme {RESEAU.formeReponses}, sur l'appareil des poids.</li>
+  <li data-lignes="3">Les points, dans un tenseur de forme <span class="formule-en-texte">{RESEAU.formePoints}</span>, et leurs bonnes réponses, de forme <span class="formule-en-texte">{RESEAU.formeReponses}</span>, sur l'appareil des poids.</li>
   <li data-lignes="4">`zero_grad` efface les dérivées d'un calcul précédent : sinon, PyTorch les ajouterait aux nouvelles.</li>
   <li data-lignes="5">Le modèle propage les {N} points d'un coup, et `nn.BCELoss` fait la moyenne de leurs erreurs.</li>
   <li data-lignes="6">`backward` : autograd remonte la chaîne des calculs, comme `retropropager`, et range la dérivée de chaque poids dans son `.grad`.</li>
@@ -496,7 +508,7 @@ Avec une carte NVIDIA, la version de PyTorch pour la carte lance le même script
 
 <BlocCommande commandes={[RESEAU_ENTRAINER_GPU]} ou="un terminal, dans le dossier du projet" />
 
-Si PyTorch ne voit pas la carte, le script ne plante pas : il dit quoi faire, et s'arrête. Sans `--appareil`, il suit la variable `FORGE_APPAREIL` du chapitre 0.3, et sans elle, il prend la carte si PyTorch la voit. Pour qu'il calcule sur le processeur, règle-la dans le même terminal, puis lance-le sans `--appareil` : <code>{FORCER_PROCESSEUR_POWERSHELL}</code> dans PowerShell, ou <code>{FORCER_PROCESSEUR_BASH}</code> sous Linux ou macOS.
+Si PyTorch ne voit pas la carte, le script ne plante pas : il dit quoi faire, et s'arrête. Sans <code class="insecable">{'--appareil'}</code>, il suit la variable `FORGE_APPAREIL` du chapitre 0.3, et sans elle, il prend la carte si PyTorch la voit. Pour qu'il calcule sur le processeur, règle-la dans le même terminal, puis lance-le sans <code class="insecable">{'--appareil'}</code> : <code>{FORCER_PROCESSEUR_POWERSHELL}</code> dans PowerShell, ou <code>{FORCER_PROCESSEUR_BASH}</code> sous Linux ou macOS.
 
 Voici la sortie du script sur la carte de ce PC :
 
@@ -521,7 +533,7 @@ Le mini-modèle de l'ouverture apprend de la même façon. Ses {DEPART.poids} po
 
 Seule la correction est plus fine que la nôtre. Au lieu de reculer chaque poids du taux fois sa dérivée, il suit AdamW, la recette de ton IA, qui règle la longueur du pas de chaque poids d'après ses dérivées passées.
 
-Avant tout entraînement, il invente des prénoms comme {DEPART.cites[0]} et {DEPART.cites[1]}. Lance ses {DEPART.pas} pas, et regarde ses nouveaux prénoms se ranger à droite.
+Avant tout entraînement, il invente des prénoms comme {DEPART.cites[0]} et {DEPART.cites[1]}. Lance-le, et regarde ses nouveaux prénoms se ranger à droite.
 
 <DemoMiniModele preset="avant-gout" nom="avant-gout" acquis="avant-gout" />
 
@@ -541,7 +553,7 @@ La boucle ne change pas quand le réseau grandit : seule l'échelle change.
 
 Ton réseau du OU exclusif a {RESEAU.poids} poids, et le mini-modèle {DEPART.poids}. Ton IA, dans sa plus grande taille, en a {LABO.tonIA}. GPT-3, d'OpenAI, en a {LABO.gpt3}, et Llama 3 405B, de Meta, {LABO.llama}.
 
-Tous apprennent par la boucle de ce chapitre : propager un lot d'exemples, mesurer l'erreur, la remonter jusqu'à chaque poids, puis corriger. À chaque pas, Llama 3 405B corrige ainsi ses {LABO.llama} de poids à la fois.
+Ton IA, GPT-3 et Llama 3 405B apprennent par la boucle de ce chapitre : propager un lot d'exemples, mesurer l'erreur, la remonter jusqu'à chaque poids, puis corriger, avec une recette plus fine, comme le mini-modèle. À chaque pas, Llama 3 405B corrige ainsi ses {LABO.llama} de poids à la fois.
 
 </EncadreLabo>
 

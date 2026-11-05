@@ -20,6 +20,7 @@ import { materiel, REPERES_EFFICACITE } from '../src/lib/calculateur/donnees';
 import { formaterDate, formaterOctets } from '../src/lib/calculateur/formats';
 import { memoirePoidsOctets } from '../src/lib/calculateur/formules';
 import { MESURES_TON_IA, PRESETS_FORGE } from '../src/lib/calculateur/ton-ia';
+import { enGo, OCTETS_ROUE_CU132_WINDOWS } from '../src/lib/partie-0/sources-0-3';
 import { nombre, pourcent } from '../src/lib/nombres';
 import { trouverChapitre } from '../src/lib/parcours';
 import { extraireRegion } from '../src/lib/regions';
@@ -449,6 +450,9 @@ test('l’ouverture, les exemples, la mémoire et l’encadré viennent des donn
   for (const nom of ['vecteur', 'matrice', 'lot']) expect(etape1, nom).toContain(ecrireForme(ATTENDUS.exemples.creer[nom].forme));
   expect(etape1).toContain('(4,)');
   // Étape 5 : 1 Mo = 2²⁰ octets, et les poids de ton IA en bf16, par le calculateur.
+  // La taille de la version pour la carte (étape 6) : une taille de téléchargement, en Go décimaux comme
+  // PyPI et le chapitre 0.3 (« 2,1 Go »), et non en Go de 2³⁰ octets comme la mémoire des tenseurs.
+  expect(await texteExact(page.locator('#etape-6'))).toContain(enGo(OCTETS_ROUE_CU132_WINDOWS));
   const etape5 = await texteExact(page.locator('#etape-5'));
   expect(etape5).toContain(nombre(2 ** 20));
   // Les poids de ton IA restent en float32 (autocast calcule en bf16) : les deux tailles, calculées.

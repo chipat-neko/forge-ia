@@ -83,7 +83,7 @@ export interface EtatPoint {
   attendu: number;
   /** La somme pondérée w1 × x1 + w2 × x2 + b, dans l'ordre de sortieSeuil. */
   somme: number;
-  /** La réponse du neurone : 1 si la somme est positive, 0 sinon (sortieSeuil). */
+  /** La réponse du neurone : 1 si la somme est plus grande que 0, 0 sinon (sortieSeuil). */
   reponse: number;
   juste: boolean;
 }
@@ -140,12 +140,12 @@ function croisement(p: Coordonnees, q: Coordonnees, sp: number, sq: number): Coo
 
 /**
  * Le côté « 1 » du neurone dans le dessin : le polygone (convexe) où la somme
- * est positive, bords compris, rogné au cadre du dessin. Vide s'il n'a pas
+ * est plus grande que 0, avec son bord (la droite, où elle vaut 0), rogné au cadre du dessin. Vide s'il n'a pas
  * d'aire. Sans poids, c'est tout le dessin si b > 0, rien sinon.
  */
 export function regionUn(w1: number, w2: number, b: number): Coordonnees[] {
   if (w1 === 0 && w2 === 0) return b > 0 ? [...COINS] : [];
-  // Le cadre, rogné par le demi-plan « somme ≥ 0 » (algorithme de Sutherland et Hodgman).
+  // Le cadre, rogné par le demi-plan « somme ≥ 0 » (son bord compris) (algorithme de Sutherland et Hodgman).
   const poly: Coordonnees[] = [];
   for (let i = 0; i < COINS.length; i++) {
     const p = COINS[i];

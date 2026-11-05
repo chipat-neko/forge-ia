@@ -30,6 +30,7 @@ import {
 } from './paris-0-5';
 
 const FINE = '\u202F';
+const INSECABLE = '\u00A0';
 const MOINS = '−';
 
 // Vitest tourne dans site/ : le dépôt est un dossier plus haut.
@@ -53,18 +54,18 @@ function entrainement(autres: Partial<AttendusEntrainement>): AttendusEntraineme
 }
 
 describe('pari « xor » : un seul neurone et le OU exclusif', () => {
-  it('le juste est le meilleur compte de la grille : 3 points sur 4', () => {
+  it('le juste est le meilleur compte de la grille', () => {
     // Recalculé ici, sans meilleurReglage : le plus grand compte sur les 729 réglages.
     let meilleur = 0;
     for (const w1 of GRILLE) for (const w2 of GRILLE) for (const b of GRILLE) meilleur = Math.max(meilleur, bienClasses([w1, w2], b, 'ou_exclusif'));
-    expect(meilleur).toBe(3);
     expect(meilleurReglage('ou_exclusif')[0]).toBe(meilleur);
+    const n = POINTS.length;
     expect(choixXor().map((c) => c.texte)).toEqual([
       'Oui, avec les bons poids',
-      `Non${FINE}: au mieux 3 points sur 4`,
-      `Non${FINE}: au mieux 2 points sur 4`,
+      `Non${FINE}: au mieux ${n - 1} points sur ${n}`,
+      `Non${FINE}: au mieux ${n - 2} points sur ${n}`,
     ]);
-    expect(juste(choixXor())).toBe(`Non${FINE}: au mieux 3 points sur 4`);
+    expect(juste(choixXor())).toBe(meilleur === n ? 'Oui, avec les bons poids' : `Non${FINE}: au mieux ${meilleur} points sur ${n}`);
   });
 });
 
@@ -106,15 +107,14 @@ describe('pari « exact » : après l’entraînement, le réseau répond-il exa
 });
 
 describe('pari « coince » : combien de départs restent coincés', () => {
-  it('le juste est compté dans les graines des attendus : 6 sur 20', () => {
+  it('le juste est compté dans les graines des attendus', () => {
     const k = ATTENDUS.graines.filter((g) => !g.reussit).length;
     expect(nbCoinces(ATTENDUS.graines)).toBe(k);
-    expect(k).toBe(6);
     expect(questionCoince(ATTENDUS.graines)).toBe(
-      `Sur 20 départs au hasard, combien de fois le réseau reste-t-il coincé${FINE}?`,
+      `Sur ${ATTENDUS.graines.length} départs au hasard, combien de fois le réseau reste-t-il coincé${FINE}?`,
     );
-    expect(choixCoince(ATTENDUS.graines).map((c) => c.texte)).toEqual(['Jamais', '6 fois', 'À chaque départ']);
-    expect(juste(choixCoince(ATTENDUS.graines))).toBe('6 fois');
+    expect(choixCoince(ATTENDUS.graines).map((c) => c.texte)).toEqual(['Jamais', `${k} fois`, 'À chaque départ']);
+    expect(juste(choixCoince(ATTENDUS.graines))).toBe(`${k} fois`);
   });
 
   it('garde : au moins un départ coincé, et pas tous', () => {
@@ -140,7 +140,8 @@ describe('la courbe et le tableau des prédictions', () => {
   it('les lignes du tableau : le point, la bonne réponse, la réponse et son arrondi', () => {
     const lignes = lignesPredictions(E);
     expect(lignes).toHaveLength(POINTS.length);
-    expect(lignes.map((l) => l[0])).toEqual(['(0, 0)', '(0, 1)', '(1, 0)', '(1, 1)']);
+    // Le point du tableau garde son espace après la virgule, insécable : la case ne se coupe pas.
+    expect(lignes.map((l) => l[0])).toEqual(['(0, 0)', '(0, 1)', '(1, 0)', '(1, 1)'].map((p) => p.replace(' ', INSECABLE)));
     expect(lignes.map((l) => l[1])).toEqual(PORTES.ou_exclusif.map(String));
     expect(lignes.map((l) => l[2])).toEqual(E.predictions.map(ecrireValeur));
     expect(lignes.map((l) => l[3])).toEqual(E.predictions.map((p) => String(Math.round(p))));

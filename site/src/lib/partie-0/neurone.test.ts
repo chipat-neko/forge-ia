@@ -60,7 +60,7 @@ describe('jumeau du Python : le neurone à seuil de 0.5', () => {
     expect(bienClasses([1, 1], 0, 'et')).toBe(2);
     expect(bienClasses([1, 1], -1.5, 'et')).toBe(4);
     expect(POINTS.map((x) => sortieSeuil([1, 1], -1.5, x))).toStrictEqual([0, 0, 0, 1]);
-    // Tout à 0 : la somme vaut 0 partout, et 0 n'est pas positif.
+    // Tout à 0 : la somme vaut 0 partout, et 0 n'est pas plus grand que 0.
     expect(POINTS.map((x) => sortieSeuil([0, 0], 0, x))).toStrictEqual([0, 0, 0, 0]);
     expect(POINTS.map((x) => sortieSeuil([-0, -0], -0, x))).toStrictEqual([0, 0, 0, 0]);
   });

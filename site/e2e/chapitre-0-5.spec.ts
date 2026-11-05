@@ -23,6 +23,7 @@ import { nombre } from '../src/lib/nombres';
 import { trouverChapitre } from '../src/lib/parcours';
 import { extraireRegion } from '../src/lib/regions';
 import { lireSortie } from '../src/lib/sorties';
+import { enGo, OCTETS_ROUE_CU132_WINDOWS } from '../src/lib/partie-0/sources-0-3';
 import { typographier } from '../src/lib/typo';
 import { bilan, DEFI_NEURONE_REUSSI, SANS_POIDS } from '../src/lib/partie-0/atelier-neurone';
 import * as commandes from '../src/lib/partie-0/commandes';
@@ -251,8 +252,8 @@ test('les choix des paris viennent du jumeau du neurone et des attendus', async 
     expect(await page.locator(`[data-pari="${id}"] [data-juste]`).textContent(), id).toBe(typographier(juste.texte));
   }
   // Les bonnes réponses, recalculées ici depuis le jumeau et le fichier.
-  expect(meilleurReglage('ou_exclusif')[0]).toBe(POINTS.length - 1);
-  expect(await page.locator('[data-pari="xor"] [data-juste]').textContent()).toBe(`Non${FINE}: au mieux ${POINTS.length - 1} points sur ${POINTS.length}`);
+  const meilleur = meilleurReglage('ou_exclusif')[0];
+  expect(await page.locator('[data-pari="xor"] [data-juste]').textContent()).toBe(`Non${FINE}: au mieux ${meilleur} points sur ${POINTS.length}`);
   expect(await page.locator('[data-pari="gradient"] [data-juste]').textContent()).toBe('0,9');
   const bornes = [Math.min(...E.predictions), Math.max(...E.predictions)].map(ecrireValeur);
   expect(await page.locator('[data-pari="exact"] [data-juste]').textContent()).toBe(`Non${FINE}: il s’en approche, de ${bornes[0]} à ${bornes[1]}`);
@@ -424,6 +425,8 @@ test('les sorties : celle du processeur est le fichier, celle de la carte reste 
   }
   // Avant la porte, aucune phrase ne compare la vitesse de la carte et celle du processeur.
   const etape8 = await texteExact(page.locator('#etape-8 .texte'));
+  // La taille de la version pour la carte : en Go décimaux, comme PyPI et le chapitre 0.3 (« 2,1 Go »).
+  expect(etape8).toContain(enGo(OCTETS_ROUE_CU132_WINDOWS));
   expect(etape8).not.toMatch(/plus vite|plus lent|moins vite|fois plus|rapide/);
 });
 
@@ -491,11 +494,13 @@ test('l’ouverture et l’étape 9 citent les premiers prénoms du départ, et 
   const labo = page.locator('#etape-10 .labo');
   const texteLabo = await texteExact(labo);
   expect(texteLabo).toContain(`${E.nb_poids} poids`);
-  expect(texteLabo).toContain(formaterQuantite(PRESETS_FORGE.tres_grand.parametres));
+  // « 405 milliards » ne se coupe pas : l'espace avant l'unité est insécable.
+  const quantite = (n: number) => formaterQuantite(n).replace(' ', '\u00A0');
+  expect(texteLabo).toContain(quantite(PRESETS_FORGE.tres_grand.parametres));
   const liens = await labo.locator('a').evaluateAll((a) => a.map((e) => e.getAttribute('href')));
   for (const id of ['gpt-3-175b', 'llama-3-405b']) {
     const m = modelePublic(id);
-    expect(texteLabo, id).toContain(formaterQuantite(m.parametres));
+    expect(texteLabo, id).toContain(quantite(m.parametres));
     expect(liens, id).toContain(m.source.url);
   }
   // L'« À suivre » nomme le chapitre 1.1, en texte (S3).

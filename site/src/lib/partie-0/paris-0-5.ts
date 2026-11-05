@@ -22,6 +22,8 @@ import { ecrirePoint } from './atelier-neurone';
 import { meilleurReglage, POINTS, PORTES } from './neurone';
 
 const FINE = '\u202F';
+/** L'espace insécable ordinaire, dans un point du tableau (« (0, 1) ») : la case ne s'y coupe pas. */
+const INSECABLE = '\u00A0';
 /** Le signe moins de la typographie (U+2212), plus long que le trait d'union. */
 const MOINS = '−';
 const exiger = exigeur('src/lib/partie-0/paris-0-5.ts et le texte des paris du chapitre 0.5');
@@ -114,8 +116,8 @@ export function questionGradient(): string {
 
 /**
  * Les choix du pari « gradient » : y − p (le signe à l'envers), p − y (juste),
- * et 1 − p (la chance donnée à la mauvaise réponse). Tous écrits avec les
- * décimales de p.
+ * et 1 − p (la chance que le réseau donne à la réponse 0 : ici la bonne
+ * réponse, pas la pente). Tous écrits avec les décimales de p.
  */
 export function choixGradientSortie(): Choix[] {
   const d = decimalesUtiles(P_DU_PARI);
@@ -219,12 +221,14 @@ export function etiquetteCourbe(pertes: readonly number[]): string {
 
 /**
  * Les lignes du tableau des prédictions : le point, la bonne réponse du OU
- * exclusif, la réponse du réseau à 3 décimales, et son arrondi.
+ * exclusif, la réponse du réseau à 3 décimales, et son arrondi. Le point est
+ * écrit pour l'affichage, avec une espace insécable après la virgule : sa case
+ * ne se coupe pas sur un téléphone.
  */
 export function lignesPredictions(e: AttendusEntrainement): string[][] {
   verifierEntrainement(e);
   return POINTS.map((x, i) => [
-    ecrirePoint(x),
+    ecrirePoint(x).replace(', ', `,${INSECABLE}`),
     String(PORTES.ou_exclusif[i]),
     ecrireValeur(e.predictions[i]),
     String(Math.round(e.predictions[i])),
