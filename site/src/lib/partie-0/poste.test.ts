@@ -142,7 +142,8 @@ describe('le tableau des situations', () => {
     expect(texte('windows_cu126_rtx5070ti')).toBe('La même carte, avec PyTorch 2.7.1+cu126, d’un ancien tutoriel');
     expect(texte('pilote_ancien')).toBe('Un pilote 551.86, qui va jusqu’à CUDA 12.4');
     expect(texte('sans_carte')).toBe('Un PC sans carte NVIDIA, avec PyTorch 2.15.0+cpu');
-    expect(texte('colab_t4')).toBe('Colab avec une Tesla T4, et son PyTorch 2.14.1+cu130');
+    // La T4 est celle que rapportent les utilisateurs de Colab : Google ne la nomme pas (point mis de côté à la tâche 9, N1).
+    expect(texte('colab_t4')).toBe('Colab, avec la Tesla T4 que rapportent ses utilisateurs, et son PyTorch 2.14.1+cu130');
     expect(texte('fils_par_defaut')).toBe('La RTX 5070 Ti prête, mais PyTorch réglé par défaut');
     expect(() => decrireSituation('inconnue', situation('sans_carte').faits)).toThrow(/DESCRIPTIONS/);
   });

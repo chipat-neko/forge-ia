@@ -160,7 +160,9 @@ function nomCourt(carte: string | null): string {
  * Comment le tableau décrit chaque situation, d'après ses faits : les versions
  * et les cartes sont lues dans les faits, jamais recopiées. La situation de
  * Colab ne nomme ni le pilote ni les fils : ce sont des exemples, que le dépôt
- * de l'image de Colab ne donne pas (voir colab_t4 dans diagnostic.py).
+ * de l'image de Colab ne donne pas (voir colab_t4 dans diagnostic.py). Sa
+ * carte, la T4, est celle que rapportent ses utilisateurs : Google ne la nomme
+ * pas, et la ligne le dit.
  */
 const DESCRIPTIONS: Readonly<Record<string, (f: FaitsPoste) => string>> = Object.freeze({
   windows_cu132_rtx5070ti: (f) => `${f.systeme}, ${nomCourt(f.carte)}, PyTorch ${f.torch} (la version du projet)`,
@@ -168,7 +170,7 @@ const DESCRIPTIONS: Readonly<Record<string, (f: FaitsPoste) => string>> = Object
   windows_cu126_rtx5070ti: (f) => `La même carte, avec PyTorch ${f.torch}, d'un ancien tutoriel`,
   pilote_ancien: (f) => `Un pilote ${f.pilote}, qui va jusqu'à CUDA ${f.cuda_max_pilote}`,
   sans_carte: (f) => `Un PC sans carte NVIDIA, avec PyTorch ${f.torch}`,
-  colab_t4: (f) => `Colab avec une ${f.carte}, et son PyTorch ${f.torch}`,
+  colab_t4: (f) => `Colab, avec la ${f.carte} que rapportent ses utilisateurs, et son PyTorch ${f.torch}`,
   fils_par_defaut: (f) => `La ${nomCourt(f.carte)} prête, mais PyTorch réglé par défaut`,
 });
 

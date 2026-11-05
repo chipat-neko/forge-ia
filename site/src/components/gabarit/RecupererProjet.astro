@@ -1,0 +1,70 @@
+---
+// Récupérer le projet d'un chapitre de la Partie 0 : le passage commun aux
+// chapitres 0.3, 0.4 et 0.5 (revue finale, m10). Le lecteur met à jour le dépôt
+// téléchargé au chapitre 0.1, ou le télécharge, puis entre dans le projet ; un
+// zip, lui, ne se met pas à jour. Les commandes viennent de commandes.ts (M4),
+// et l'entrée dans le projet suit la prop `projet`.
+//
+// « Ouvre un nouveau terminal » (revue finale, m11) : au chapitre 0.1, le
+// lecteur ouvre un terminal et y télécharge le dépôt sans changer de dossier.
+// Un nouveau terminal démarre au même endroit, son dossier personnel (Windows
+// Terminal : startingDirectory vaut %USERPROFILE% par défaut, d'après
+// https://learn.microsoft.com/en-us/windows/terminal/customize-settings/profile-general,
+// lu le 06/11/2026 ; un terminal Linux ou macOS s'ouvre dans le dossier
+// personnel). Le terminal resté dans projets/0.1-python, lui, ne trouverait
+// pas forge-ia.
+//
+//   <RecupererProjet projet="0.4-tenseurs" intro="Le projet du chapitre a aussi un script … dépôt du site." suite="Puis, dans le dossier du projet :" />
+import BlocCommande from './BlocCommande.astro';
+import {
+  ALLER_AU_PROJET_0_3,
+  ALLER_AU_PROJET_0_4,
+  ALLER_AU_PROJET_0_5,
+  CLONER_DEPOT,
+  METTRE_A_JOUR_DEPOT,
+} from '../../lib/partie-0/commandes';
+import { typographier } from '../../lib/typo';
+
+interface Props {
+  /** Le dossier du projet, par exemple « 0.4-tenseurs ». */
+  projet: string;
+  /** La phrase d'avant, propre au chapitre : où est le projet, ce qu'il contient. */
+  intro: string;
+  /** Une phrase après celle du zip, pour la commande qui suit (« Puis, dans le dossier du projet : »). */
+  suite?: string;
+}
+
+const { projet, intro, suite } = Astro.props;
+const ALLER: Record<string, string> = {
+  '0.3-poste': ALLER_AU_PROJET_0_3,
+  '0.4-tenseurs': ALLER_AU_PROJET_0_4,
+  '0.5-reseau': ALLER_AU_PROJET_0_5,
+};
+const aller = ALLER[projet];
+if (aller === undefined) {
+  throw new Error(
+    `RecupererProjet : projet « ${projet} » inconnu. Ajoute sa commande d'entrée (ALLER_AU_PROJET_…, dans ` +
+      'src/lib/partie-0/commandes.ts) à la table ALLER de ce composant.',
+  );
+}
+const miseAJour = typographier(
+  `${intro} Si tu l'as téléchargé avec git au chapitre 0.1, ouvre un nouveau terminal : il démarre dans ton ` +
+    "dossier personnel, là où git l'a téléchargé. Mets-le à jour, pour recevoir les projets parus depuis, puis " +
+    'entre dans le projet de ce chapitre :',
+);
+const zip = typographier("Si tu avais pris le fichier zip au chapitre 0.1, télécharge-le de nouveau : un zip ne se met pas à jour. Son dossier s'appelle ");
+---
+
+<p>{miseAJour}</p>
+
+<BlocCommande commandes={[METTRE_A_JOUR_DEPOT, aller]} ou="un nouveau terminal, dans ton dossier personnel" />
+
+<p>{typographier('Sinon, télécharge-le, puis entre dans le projet :')}</p>
+
+<BlocCommande commandes={[CLONER_DEPOT, aller]} ou="un terminal, depuis le dossier où tu veux télécharger le dépôt" />
+
+<p>
+  {zip}<code>forge-ia-main</code>{typographier(' : écris ce nom à la place de ')}<code>forge-ia</code>{
+    ' dans la commande '
+  }<code>cd</code>.{suite && ` ${typographier(suite)}`}
+</p>

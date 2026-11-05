@@ -18,11 +18,26 @@
 //   cp312 de cu126 est 2.14.1, celle de cu128 2.11.0, de cu121 2.5.1, de
 //   cu118 2.7.1.
 //
+// - Le réglage par défaut des fils de PyTorch 2.15.0 (le code, au tag v2.15.0) :
+//   avec MKL, comme les versions pour Windows et Linux sur processeur x86, il
+//   prend le nombre de fils de MKL (aten/src/ATen/ParallelOpenMP.cpp,
+//   init_num_threads), qui vaut par défaut le nombre de cœurs physiques (guide
+//   de oneMKL) ; sans MKL, un fil par cœur physique (c10/core/thread_pool.cpp,
+//   defaultNumThreads), et sur puce Apple, les cœurs rapides seulement
+//   (aten/src/ATen/ParallelCommon.cpp). Mesuré sur ce PC (8 cœurs, 16 fils) :
+//   8 (torch.__config__.parallel_info(), PyTorch 2.15.0+cpu).
+//
 // - Les pages de NVIDIA des cartes de l'encadré (T4, H100, livre blanc RTX
 //   Blackwell, tableau 5) donnent toujours les chiffres de MATERIELS : 16 Go et
 //   65 TFLOPS en FP16 pour la T4, 80 Go et 1 979 TFLOPS en bf16 avec sparsité
 //   pour la H100 SXM, 16 Go et 87,9 TFLOPS en bf16 (175,8 avec sparsité) pour
 //   la RTX 5070 Ti.
+//
+// Relevé du 6 novembre 2026 :
+// - La version de PyTorch 2.7.1 pour CUDA 12.6 sous Windows est compilée pour
+//   sm_50 à sm_90 (TORCH_CUDA_ARCH_LIST de .ci/pytorch/windows/cuda126.bat, au
+//   tag v2.7.1) : la liste ARCHITECTURES_CU126 de diagnostic.py, et
+//   l'avertissement que cite le forum de PyTorch pour une RTX 5070 Ti.
 //
 // Ce module n'importe ni ?raw, ni .json, ni astro:* (B1) : le parcours du
 // chapitre l'importe pour vérifier que chaque source a son lien sur la page.
@@ -41,8 +56,8 @@ const VERIFIE = '2026-11-05';
 /** L'espace insécable (U+00A0) entre un nombre et son unité : « 2,1 Go » ne se coupe pas en fin de ligne. */
 const INSECABLE = '\u00A0';
 
-function source(titre: string, url: string): SourceVerifiee {
-  return Object.freeze({ titre, url, verifieLe: VERIFIE });
+function source(titre: string, url: string, verifieLe: string = VERIFIE): SourceVerifiee {
+  return Object.freeze({ titre, url, verifieLe });
 }
 
 const PYPI_TORCH = source('PyPI, les fichiers de torch 2.15.0', 'https://pypi.org/pypi/torch/2.15.0/json');
@@ -85,6 +100,34 @@ export const SOURCES_0_3 = Object.freeze({
       'https://dev-discuss.pytorch.org/t/pytorch-2-15-rc1-produced-for-pytorch-torchvision-torchaudio/3464',
     ),
     source('Index de PyTorch pour CUDA 12.6 (dernière version : 2.14.1)', 'https://download.pytorch.org/whl/cu126/torch/'),
+  ]),
+  /** PyTorch 2.7.1 pour CUDA 12.6, sous Windows : compilé de sm_50 à sm_90, rien pour les RTX 50 (sm_120). */
+  cu126: Object.freeze([
+    source(
+      'PyTorch 2.7.1, .ci/pytorch/windows/cuda126.bat (TORCH_CUDA_ARCH_LIST, de 5.0 à 9.0)',
+      'https://github.com/pytorch/pytorch/blob/v2.7.1/.ci/pytorch/windows/cuda126.bat',
+      '2026-11-06',
+    ),
+    source(
+      'Forum de PyTorch, « NVIDIA GeForce RTX 5070 Ti with CUDA capability sm_120 » (l’avertissement, de sm_50 à sm_90)',
+      'https://discuss.pytorch.org/t/nvidia-geforce-rtx-5070-ti-with-cuda-capability-sm-120/221509',
+      '2026-11-06',
+    ),
+  ]),
+  /** Par défaut, PyTorch prend un fil par cœur physique : la moitié des fils, quand chaque cœur en fait tourner deux. */
+  fils: Object.freeze([
+    source(
+      'PyTorch 2.15.0, aten/src/ATen/ParallelOpenMP.cpp (init_num_threads : les fils de MKL)',
+      'https://github.com/pytorch/pytorch/blob/v2.15.0/aten/src/ATen/ParallelOpenMP.cpp',
+    ),
+    source(
+      'PyTorch 2.15.0, c10/core/thread_pool.cpp (defaultNumThreads : un fil par cœur physique)',
+      'https://github.com/pytorch/pytorch/blob/v2.15.0/c10/core/thread_pool.cpp',
+    ),
+    source(
+      'Intel, guide de oneMKL pour Windows, « Improving Performance with Threading » (autant de fils que de cœurs physiques)',
+      'https://www.intel.com/content/www/us/en/docs/onemkl/developer-guide-windows/2025-2/improving-performance-with-threading.html',
+    ),
   ]),
   /** Installer uv, et uv qui installe Python lui-même. */
   uv: Object.freeze([
@@ -130,15 +173,29 @@ export const OCTETS_ROUE_PYPI_WINDOWS = 126_738_207;
 /** La taille de torch-2.15.0+cu132-cp312-cp312-win_amd64.whl, CUDA 13.2 compris, en octets (SOURCES_0_3.pypi). */
 export const OCTETS_ROUE_CU132_WINDOWS = 2_108_273_925;
 
+/**
+ * Les unités des tailles de téléchargement, comme PyPI : 1 Mo vaut 10⁶ octets, 1 Go 10⁹ (revue finale, m1).
+ * La mémoire des tenseurs, au chapitre 0.4, compte comme le calculateur : 2²⁰ et 2³⁰ octets.
+ */
+export const OCTETS_PAR_MO_DECIMAL = 1_000_000;
+export const OCTETS_PAR_GO_DECIMAL = 1_000_000_000;
+
 /** Des octets en Mo décimaux (10⁶ octets, comme PyPI), une décimale, l'unité insécable : « 126,7 Mo ». */
 export function enMo(octets: number): string {
-  return `${nombre(octets / 1e6, 1)}${INSECABLE}Mo`;
+  return `${nombre(octets / OCTETS_PAR_MO_DECIMAL, 1)}${INSECABLE}Mo`;
 }
 
 /** Des octets en Go décimaux (10⁹ octets), une décimale : « 2,1 Go ». */
 export function enGo(octets: number): string {
-  return `${nombre(octets / 1e9, 1)}${INSECABLE}Go`;
+  return `${nombre(octets / OCTETS_PAR_GO_DECIMAL, 1)}${INSECABLE}Go`;
 }
+
+/**
+ * Les deux tailles de téléchargement telles que les chapitres 0.3, 0.4 et 0.5 les écrivent : « 126,7 Mo »
+ * pour la version de PyPI, « 2,1 Go » pour celle de la carte (revue finale, m10 : un seul calcul).
+ */
+export const TAILLE_ROUE_PYPI_WINDOWS = enMo(OCTETS_ROUE_PYPI_WINDOWS);
+export const TAILLE_ROUE_CU132_WINDOWS = enGo(OCTETS_ROUE_CU132_WINDOWS);
 
 /** Les capacités de calcul que le chapitre cite, d'après NVIDIA (SOURCES_0_3.capacites). */
 export const CAPACITES: Readonly<Record<'RTX 5070 Ti' | 'T4' | 'RTX 4070' | 'H100', readonly [number, number]>> = Object.freeze({

@@ -22,6 +22,7 @@ import TableauCartes from '../../components/chapitres/0-3/TableauCartes.astro';
 import TableauSituations from '../../components/chapitres/0-3/TableauSituations.astro';
 import RapportDuScript from '../../components/chapitres/0-3/RapportDuScript.astro';
 import BlocCommande from '../../components/gabarit/BlocCommande.astro';
+import RecupererProjet from '../../components/gabarit/RecupererProjet.astro';
 import SortieCommande from '../../components/gabarit/SortieCommande.astro';
 import sortieProcesseur from '../../../../projets/0.3-poste/sorties/processeur.txt?raw';
 import sortieCarte from '../../../../projets/0.3-poste/sorties/rtx-5070-ti.txt?raw';
@@ -29,15 +30,12 @@ import { materiel } from '../../lib/calculateur/donnees';
 import { formaterDate } from '../../lib/calculateur/formats';
 import { MESURES_TON_IA, NOMS_TAILLES } from '../../lib/calculateur/ton-ia';
 import {
-  ALLER_AU_PROJET_0_3,
-  CLONER_DEPOT,
   CONDA_INSTALL_PYTORCH,
   FORCER_PROCESSEUR_BASH,
   FORCER_PROCESSEUR_POWERSHELL,
   INSTALLER_UV_LINUX_MAC,
   INSTALLER_UV_WINDOWS,
   INSTALLER_UV_WINGET,
-  METTRE_A_JOUR_DEPOT,
   NVIDIA_SMI,
   PIP_INSTALL_TORCH,
   SYNC_CPU,
@@ -61,13 +59,12 @@ import {
   CAPACITES,
   CARTES_LLAMA_3_405B,
   COLAB,
-  enGo,
-  enMo,
   MACOS_MINIMUM,
-  OCTETS_ROUE_CU132_WINDOWS,
-  OCTETS_ROUE_PYPI_WINDOWS,
+  OCTETS_PAR_MO_DECIMAL,
   PILOTE_MINIMUM_CUDA_13,
   SOURCES_0_3,
+  TAILLE_ROUE_CU132_WINDOWS,
+  TAILLE_ROUE_PYPI_WINDOWS,
 } from '../../lib/partie-0/sources-0-3';
 import { exigeur } from '../../lib/exiger';
 import { nombre } from '../../lib/nombres';
@@ -94,9 +91,15 @@ export const VITESSE = (() => {
 })();
 
 export const FILS = (() => {
-  // PyTorch réglé par défaut sur ce PC : une partie des fils seulement (mesure du 3 novembre 2026).
+  // PyTorch réglé par défaut sur ce PC : un fil par cœur, soit la moitié des fils, puisque chaque cœur en fait
+  // tourner deux (mesure du 3 novembre 2026). L'étape 7 ne dit « un par cœur » que pour un tel processeur
+  // (revue finale, m3), d'après le code de PyTorch et le guide de MKL (SOURCES_0_3.fils).
   const { faits } = situation('fils_par_defaut');
   exiger(faits.fils_torch < faits.fils_processeur, 'PyTorch prend déjà tous les fils du processeur par défaut');
+  exiger(
+    faits.fils_processeur === 2 * faits.fils_torch,
+    'les fils de ce PC ne sont plus deux par cœur, dont PyTorch prendrait un : l’étape 7 (« comme celui de ce PC ») est à revoir',
+  );
   return { processeur: nombre(faits.fils_processeur), torch: nombre(faits.fils_torch), constat: constat('fils_par_defaut', 'fils') };
 })();
 
@@ -127,7 +130,7 @@ export const GENERATION = (() => {
   return { capacite: capacite(c), nom: nomArchitecture(c), sert, t4: capacite(CAPACITES.T4) };
 })();
 
-export const ROUES = { pypi: enMo(OCTETS_ROUE_PYPI_WINDOWS), carte: enGo(OCTETS_ROUE_CU132_WINDOWS) };
+export const ROUES = { pypi: TAILLE_ROUE_PYPI_WINDOWS, carte: TAILLE_ROUE_CU132_WINDOWS };
 
 export const PYPI = (() => {
   // La situation de PyPI : ce que dit le script, mot pour mot.
@@ -298,15 +301,7 @@ Tu n'as pas besoin d'installer Python toi-même : uv télécharge la version que
 
 <Etape numero={4} titre="Le projet et sa version de PyTorch">
 
-Le projet de ce chapitre est dans le dépôt du site. Si tu l'as déjà téléchargé avec git au chapitre 0.1, mets-le à jour : il reçoit ainsi les projets parus depuis. Puis entre dans le projet de ce chapitre :
-
-<BlocCommande commandes={[METTRE_A_JOUR_DEPOT, ALLER_AU_PROJET_0_3]} ou="un terminal, depuis le dossier où tu as téléchargé le dépôt" />
-
-Sinon, télécharge-le, puis entre dans le projet :
-
-<BlocCommande commandes={[CLONER_DEPOT, ALLER_AU_PROJET_0_3]} ou="un terminal, depuis le dossier où tu veux télécharger le dépôt" />
-
-Si tu avais pris le fichier zip au chapitre 0.1, télécharge-le de nouveau : un zip ne se met pas à jour. Son dossier s'appelle `forge-ia-main` : écris ce nom à la place de `forge-ia` dans la commande `cd`.
+<RecupererProjet projet="0.3-poste" intro="Le projet de ce chapitre est dans le dépôt du site." />
 
 PyTorch n'est pas une bibliothèque comme les autres : il en existe une version pour la carte, et une pour le processeur seul. Le fichier `pyproject.toml` du projet décrit les deux :
 
@@ -339,6 +334,8 @@ C'est pour cela que le projet va chercher PyTorch sur le site de PyTorch, dans l
 <Fragment slot="note">
 
 Sous Linux, PyPI sert déjà des versions pour la carte : c'est sous Windows que ce réglage change tout. Le projet le fait partout de la même façon.
+
+Ce site compte les tailles de téléchargement comme PyPI : 1 Mo vaut 10⁶ octets, soit {nombre(OCTETS_PAR_MO_DECIMAL)}, et 1 Go 10⁹. La mémoire des tenseurs, au chapitre 0.4, se compte autrement.
 
 <SourcesNote sources={SOURCES_0_3.pypi} />
 
@@ -445,13 +442,15 @@ Ces lignes sont celles du script, mot pour mot : la page les lit dans le fichier
 
 Le script connaît aussi d'autres cas, sans situation au tableau : {HORS_TABLEAU}. Il nomme alors la cause, et dit quoi faire.
 
+<SourcesNote sources={SOURCES_0_3.cu126} />
+
 </Fragment>
 
 </Etape>
 
 <Etape numero={7} titre="Le processeur, Colab, Linux et Mac">
 
-**Le processeur.** Sans carte NVIDIA, les projets du site marchent aussi sur le processeur, en plus lent pour entraîner ton IA. Mais PyTorch n'y prend pas tous les fils : sur ce PC, il en prend {FILS.torch} sur {FILS.processeur} quand on ne règle rien. Le diagnostic le signale :
+**Le processeur.** Sans carte NVIDIA, les projets du site marchent aussi sur le processeur, en plus lent pour entraîner ton IA. Mais un processeur se divise en cœurs, et sur un processeur dont chaque cœur fait tourner deux fils, comme celui de ce PC, PyTorch n'en prend par défaut qu'un par cœur : ici, {FILS.torch} fils sur {FILS.processeur}, quand on ne règle rien. Le diagnostic le signale :
 
 <RapportDuScript constats={[FILS.constat]} />
 
@@ -470,6 +469,8 @@ La mesure de l'étape 1 a été faite ainsi, avec les {FILS.processeur} fils du 
 <Fragment slot="note">
 
 La variable d'environnement `FORGE_APPAREIL` force le choix de l'appareil dans les projets suivants : `cpu` pour le processeur, `cuda` pour la carte, `auto` par défaut. Pour calculer sur le processeur, tape dans PowerShell <code>{FORCER_PROCESSEUR_POWERSHELL}</code>, ou dans un terminal Linux ou macOS <code>{FORCER_PROCESSEUR_BASH}</code>, puis lance le projet depuis le même terminal.
+
+<SourcesNote sources={SOURCES_0_3.fils} />
 
 <SourcesNote sources={[...SOURCES_0_3.colab, SOURCES_0_3.pypi[0], ...SOURCES_0_3.mac]} />
 

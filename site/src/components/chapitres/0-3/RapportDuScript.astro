@@ -6,6 +6,12 @@
 // graves comprises. Les constats viennent des attendus du projet, jamais d'un
 // texte recopié. Les lignes longues passent à la ligne au lieu de défiler.
 //
+// Dans une commande (entre accents graves), une option comme « --extra » ne se
+// coupe pas après ses tirets : elle est posée dans un <span class="option">
+// insécable, et la ligne ne passe à la ligne qu'aux espaces de la commande
+// (point mis de côté à la tâche 9, N3). Le texte, et donc le copier-coller,
+// ne change pas.
+//
 //   <RapportDuScript constats={[constat('windows_pypi_rtx5070ti', 'roue_processeur')]} />
 import { lignesDuRapport, type Constat } from '../../../lib/partie-0/situations-0-3';
 
@@ -18,10 +24,17 @@ if (constats.length === 0) {
   throw new Error('RapportDuScript sans constat : passe au moins un constat dans la prop constats.');
 }
 const texte = constats.flatMap(lignesDuRapport).join('\n');
+
+/** Le texte en morceaux : les options d'une commande (« --extra », « -m ») à part, pour les garder d'un bloc. */
+const morceaux = texte.split('`').flatMap((partie, i) => {
+  const avant = i > 0 ? [{ texte: '`', option: false }] : [];
+  if (i % 2 === 0) return [...avant, { texte: partie, option: false }];
+  return [...avant, ...partie.split(/(?<=\s)|(?=\s)/).map((mot) => ({ texte: mot, option: /^-{1,2}\S/.test(mot) }))];
+});
 ---
 
 <div class="rapport-du-script" data-test="rapport-du-script" role="group" aria-label="Ce qu’écrit le script">
-  <pre>{texte}</pre>
+  <pre>{morceaux.map((m) => (m.option ? <span class="option">{m.texte}</span> : m.texte))}</pre>
 </div>
 
 <style>
@@ -41,6 +54,10 @@ const texte = constats.flatMap(lignesDuRapport).join('\n');
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     color: var(--indigo);
+  }
+
+  .option {
+    white-space: nowrap;
   }
 
   @media (max-width: 720px) {

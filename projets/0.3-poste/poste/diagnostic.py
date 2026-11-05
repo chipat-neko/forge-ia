@@ -235,7 +235,9 @@ def decrire_constat(c: Constat) -> list[str]:
 #
 # Les architectures sont celles que rend torch.cuda.get_arch_list() :
 # - PyTorch 2.15.0+cu132 sous Windows : lues dans la roue installée le 05/11/2026 ;
-# - PyTorch 2.7 cu126 : celles que cite son avertissement pour une carte RTX 50, sans sm_120 ;
+# - PyTorch 2.7.1 cu126 sous Windows : son TORCH_CUDA_ARCH_LIST, de 5.0 à 9.0, sans sm_120
+#   (.ci/pytorch/windows/cuda126.bat au tag v2.7.1, lu le 06/11/2026), la liste que cite son
+#   avertissement pour une RTX 5070 Ti sur le forum de PyTorch ;
 # - les roues CUDA 13.0 (celle de Colab) : les mêmes que cu132, d'après la table
 #   PYTORCH_RELEASES_CODE_CC de torch/cuda/__init__.py (PyTorch 2.15, lue le 05/11/2026).
 ARCHITECTURES_CU132 = ("sm_75", "sm_80", "sm_86", "sm_90", "sm_100", "sm_120")

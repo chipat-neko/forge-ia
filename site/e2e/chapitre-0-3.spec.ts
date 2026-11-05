@@ -12,7 +12,7 @@
 // (B1) : il n'importe ni poste.ts ni paris-0-3.ts, qui lisent le fichier
 // d'attendus par un import. Les choix des paris sont donc écrits ici en toutes
 // lettres, et rapprochés des attendus et des mesures.
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { materiel } from '../src/lib/calculateur/donnees';
 import { formaterDate } from '../src/lib/calculateur/formats';
@@ -41,6 +41,7 @@ import {
   verifierLiensVersParus,
   verifierSansDebordement,
   verifierTypographieHorsCode,
+  verifierVoisin,
 } from './outils';
 
 const PAGE = '/forge-ia/partie-0/0-3/';
@@ -100,17 +101,6 @@ async function texteExact(zone: Locator): Promise<string> {
 /** Attend la fin des animations en cours (fondu du verrou, verdict des paris) : axe mesure alors les vraies couleurs. */
 async function attendreAnimations(page: Page): Promise<void> {
   await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)).then(() => undefined));
-}
-
-/** Le pied vers un voisin : un lien s'il a paru (son fichier est dans src/content/chapitres/), sinon « à venir » (S2). */
-async function verifierVoisin(page: Page, sens: 'precedent' | 'suivant', fichier: string, href: string): Promise<void> {
-  const voisin = page.locator(`footer .voisin.${sens}`);
-  if (existsSync(`src/content/chapitres/${fichier}`)) {
-    await expect(voisin).toHaveAttribute('href', href);
-  } else {
-    await expect(voisin).toContainText('à venir');
-    await expect(page.locator(`footer a.voisin.${sens}`)).toHaveCount(0);
-  }
 }
 
 test('chapitre 0.3 complet', async ({ page }) => {
@@ -204,6 +194,8 @@ test('le tableau des situations est celui des attendus', async ({ page }) => {
   expect(ligneColab).toContain(colab.torch!);
   expect(ligneColab).not.toContain(colab.pilote!);
   expect(ligneColab).not.toContain('fils');
+  // La T4 : Google ne la nomme pas, ses utilisateurs la rapportent (point mis de côté à la tâche 9, N1).
+  expect(ligneColab).toContain(typographier(`la ${colab.carte} que rapportent ses utilisateurs`));
 });
 
 test('les sorties : celles du processeur et de la carte sont les fichiers, et le texte dit ce qu’elles montrent', async ({ page }) => {
@@ -291,6 +283,34 @@ test('les messages du script sont montrés comme dans le terminal', async ({ pag
     expect(await texteExact(rapports.nth(i)), c.cle).toBe(lignesDuRapport(c).join('\n'));
     expect(await texteExact(rapports.nth(i))).toContain(`À faire${FINE}: `);
   }
+  // Une commande ne se coupe jamais juste après un tiret : « --extra » reste d'un bloc, sur un téléphone
+  // aussi (point mis de côté à la tâche 9, N3). On compare la ligne de chaque tiret à celle du caractère suivant.
+  for (const rapport of await rapports.all()) {
+    const coupures = await rapport.evaluate((pre) => {
+      const trouvees: string[] = [];
+      const marcheur = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT);
+      const caracteres: { c: string; haut: number }[] = [];
+      for (let n = marcheur.nextNode() as Text | null; n; n = marcheur.nextNode() as Text | null) {
+        for (let i = 0; i < n.length; i++) {
+          const r = document.createRange();
+          r.setStart(n, i);
+          r.setEnd(n, i + 1);
+          caracteres.push({ c: n.data[i], haut: r.getClientRects()[0]?.top ?? Number.NaN });
+        }
+      }
+      // Seulement dans les commandes, entre accents graves : la prose, elle, peut se couper à « Mets-le ».
+      let dansLeCode = false;
+      for (let i = 0; i + 1 < caracteres.length; i++) {
+        const [a, b] = [caracteres[i], caracteres[i + 1]];
+        if (a.c === '`') dansLeCode = !dansLeCode;
+        if (dansLeCode && a.c === '-' && b.c !== '\n' && Math.abs(a.haut - b.haut) > 2) {
+          trouvees.push(caracteres.slice(Math.max(0, i - 12), i + 12).map((x) => x.c).join(''));
+        }
+      }
+      return trouvees;
+    });
+    expect(coupures, 'une ligne coupée juste après un tiret').toEqual([]);
+  }
   // Ces lignes sont celles de la sortie enregistrée sur ce PC, pour les constats qu'elle contient.
   for (const ligne of [...lignesDuRapport(attendus[0]), ...lignesDuRapport(attendus[2])]) {
     expect(SORTIE_PROCESSEUR.split('\n')).toContain(ligne);
@@ -360,15 +380,19 @@ test('les faits de la recherche portent leur source, et l’encadré vient des d
   expect(await texteExact(page.locator('#etape-6 .texte'))).toContain('que ses utilisateurs rapportent le plus souvent');
 });
 
-test('les zones de terminal défilent dans leur zone, sans faire déborder la page', async ({ page }) => {
+test('les commandes défilent dans leur zone, les sorties passent à la ligne, sans faire déborder la page', async ({ page }) => {
   await page.goto(PAGE);
   const zones = page.locator('.bloc-terminal .zone-defilable');
-  expect(await zones.count()).toBeGreaterThanOrEqual(COMMANDES_DES_BLOCS.length + 1);
+  expect(await zones.count()).toBe(COMMANDES_DES_BLOCS.length);
   for (const zone of await zones.all()) await expect(zone).toHaveCSS('overflow-x', 'auto');
-  // La sortie du processeur a des lignes plus longues que la colonne : sa zone défile en largeur.
-  const sortie = page.locator(`[data-sortie="${FICHIER_PROCESSEUR}"] .zone-defilable`);
-  const { large, visible } = await sortie.evaluate((z) => ({ large: z.scrollWidth, visible: z.clientWidth }));
-  expect(large).toBeGreaterThan(visible);
+  // Les sorties passent à la ligne, comme le rapport du script : une phrase du diagnostic se lit en entier,
+  // sur un téléphone aussi, sans défiler (point mis de côté à la tâche 15).
+  for (const fichier of [FICHIER_PROCESSEUR, FICHIER_CARTE]) {
+    const sortie = page.locator(`[data-sortie="${fichier}"] .zone-sortie`);
+    await expect(sortie.locator('pre')).toHaveCSS('white-space', 'pre-wrap');
+    const { large, visible } = await sortie.evaluate((z) => ({ large: z.scrollWidth, visible: z.clientWidth }));
+    expect(large, fichier).toBeLessThanOrEqual(visible);
+  }
   await verifierSansDebordement(page);
 });
 
