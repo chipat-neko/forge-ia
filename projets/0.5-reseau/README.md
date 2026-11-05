@@ -76,9 +76,15 @@ dit quoi faire, pas une trace Python, et le code de sortie 2. Sans PyTorch
 Tout le projet tourne sur le processeur, avec la première commande : le
 neurone, l'entraînement à la main, et celui de PyTorch. C'est aussi ce qu'il
 faut sur un Mac (à puce Apple, macOS 14 ou plus récent) : la puce graphique
-des Mac (MPS) n'est pas essayée par le site. Pour qu'un lancement sans
-`--appareil` calcule sur le processeur même avec la version pour la carte,
-mets la variable `FORGE_APPAREIL` à `cpu`, dans le même terminal :
+des Mac (MPS) n'est pas essayée par le site. Sans carte visible, le choix
+« auto » prend déjà le processeur : il n'y a rien à régler.
+
+### Forcer le processeur
+
+Avec une carte NVIDIA et la version pour la carte (`--extra gpu`), un
+lancement sans `--appareil` calcule sur la carte. Pour qu'il calcule sur le
+processeur, mets `--appareil cpu`, ou la variable `FORGE_APPAREIL` à `cpu`,
+dans le même terminal :
 
 ```powershell
 $env:FORGE_APPAREIL = "cpu"   # PowerShell

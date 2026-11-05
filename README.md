@@ -17,7 +17,7 @@ Le site est en ligne : <https://chipat-neko.github.io/forge-ia/>
   `site/src/content/`.
 - `projets/` : les projets Python, un dossier par projet, chacun avec ses
   tests (par exemple `projets/1.3-tokenizer`).
-- `notebooks/` : les carnets Jupyter qui accompagnent certaines étapes.
+- `notebooks/` : les carnets Jupyter qui accompagnent certains chapitres.
 - `docs/` : la spécification, les plans de travail et les maquettes
   (`docs/maquettes/`).
 
@@ -34,10 +34,10 @@ Les ports du projet sont listés dans `PORTS.md`.
 
 ## Les projets
 
-Les projets Python sont dans `projets/`, un par chapitre, chacun avec son
-README, ses tests et son verrou `uv.lock` : chacun se lance seul.
+Les projets Python sont dans `projets/`, chacun avec son README, ses tests
+et son verrou `uv.lock` : chacun se lance seul.
 
-La Partie 0, « Les bases » :
+Chaque chapitre de la Partie 0, « Les bases », a le sien :
 
 | Projet | Chapitre | Ce qu'il fait |
 | --- | --- | --- |

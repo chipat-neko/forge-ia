@@ -29,6 +29,11 @@ cd forge-ia/projets/0.2-maths
 uv run python -m maths_utiles
 ```
 
+Sans git, le bouton « Code » de la page GitHub du dépôt donne aussi un
+fichier zip : son dossier s'appelle `forge-ia-main`, à écrire à la place de
+`forge-ia` dans la commande `cd`. Un zip ne se met pas à jour : pour recevoir
+les projets parus depuis, télécharge-le de nouveau.
+
 Le programme montre un exemple de chaque idée : le produit scalaire de deux
 vecteurs, une matrice fois un vecteur, dix pas de descente au taux 0,1, puis
 1 000 tirages au sort. Avec `--taux 0.5`, la descente change de taux ; avec

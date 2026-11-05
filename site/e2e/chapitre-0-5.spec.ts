@@ -20,7 +20,7 @@ import { formaterDate, formaterQuantite } from '../src/lib/calculateur/formats';
 import { PRESETS_FORGE } from '../src/lib/calculateur/ton-ia';
 import { PRESETS_MINI } from '../src/lib/mini-modele/reglages';
 import { nombre } from '../src/lib/nombres';
-import { trouverChapitre } from '../src/lib/parcours';
+import { titreCourt, trouverChapitre } from '../src/lib/parcours';
 import { extraireRegion } from '../src/lib/regions';
 import { lireSortie } from '../src/lib/sorties';
 import { enGo, OCTETS_ROUE_CU132_WINDOWS } from '../src/lib/partie-0/sources-0-3';
@@ -519,14 +519,24 @@ test('l’ouverture et l’étape 9 citent les premiers prénoms du départ, et 
   // L'« À suivre » nomme le chapitre 1.1, en texte (S3).
   const suite = page.locator('#etape-10 .texte');
   expect(await texteExact(suite)).toContain(typographier(trouverChapitre('1.1').chapitre.titre));
-  // Tant que 1.1 n'a pas paru, il le dit, et renvoie par un lien au premier chapitre paru de la Partie 1.
+  // Tant que 1.1 n'a pas paru, la phrase le dit, et renvoie par un lien au premier chapitre paru de la Partie 1 ;
+  // quand 1.1 aura paru, ni l'un ni l'autre (le pied du chapitre y mène).
   const { partie } = trouverChapitre('1.1');
   const parus = partie.chapitres.filter((c) => existsSync(`src/content/chapitres/${c.numero.replace('.', '-')}.mdx`));
+  const aVenir = typographier('n\'a pas encore paru');
+  const lienVers = (numero: string) => suite.locator(`a[href="/forge-ia/partie-1/${numero.replace('.', '-')}/"]`);
   if (parus[0]?.numero !== '1.1') {
-    expect(await texteExact(suite)).toContain(typographier('Il n\'a pas encore paru'));
+    expect(await texteExact(suite)).toContain(aVenir);
     if (parus.length > 0) {
-      await expect(suite.locator(`a[href="/forge-ia/partie-1/${parus[0].numero.replace('.', '-')}/"]`)).toHaveCount(1);
+      const [premier] = parus;
+      await expect(lienVers(premier.numero)).toHaveCount(1);
+      expect(await texteExact(lienVers(premier.numero))).toBe(
+        typographier(`le chapitre ${premier.numero}, « ${titreCourt(premier.titre)} »`),
+      );
     }
+  } else {
+    expect(await texteExact(suite)).not.toContain(aVenir);
+    for (const c of partie.chapitres.filter((c) => c.numero !== '1.1')) await expect(lienVers(c.numero)).toHaveCount(0);
   }
 });
 
