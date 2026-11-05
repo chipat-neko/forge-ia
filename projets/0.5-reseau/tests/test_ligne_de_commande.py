@@ -154,6 +154,48 @@ def test_carte_absente_dans_un_vrai_processus(tmp_path):
     assert resultat.stdout == "" and not sortie.exists()
 
 
+def test_carte_vue_mais_inutilisable(monkeypatch, capsys, tmp_path):
+    # Revue finale, I1 : une carte que PyTorch voit, mais pour laquelle sa version n'a pas de code
+    # (une GTX 1080 avec la roue cu132, par exemple). Le premier calcul sur elle lève une
+    # RuntimeError : le script le dit en français, rend le code 2, sans trace Python, et
+    # n'enregistre rien. Le neurone et l'entraînement à la main, déjà affichés, restent.
+    import premier_reseau.avec_pytorch
+
+    def en_panne(*arguments, **options):
+        raise RuntimeError(
+            "CUDA error: no kernel image is available for execution on the device\n"
+            "CUDA kernel errors might be asynchronously reported at some other API call."
+        )
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(premier_reseau.avec_pytorch, "entrainer_pytorch", en_panne)
+    fichier = tmp_path / "carte.txt"
+    assert main(["entrainer", "--appareil", "cuda", "--enregistrer", str(fichier)]) == 2
+    lu = capsys.readouterr()
+    assert lu.err == (
+        "La carte graphique n’a pas pu calculer avec cette version de PyTorch\u202f: CUDA error: no kernel "
+        "image is available for execution on the device. Pour savoir pourquoi, lance `uv run --extra gpu "
+        "python -m poste` dans le dossier projets/0.3-poste. Pour calculer sur le processeur, relance avec "
+        "`--appareil cpu` (ou, sans `--appareil`, mets FORGE_APPAREIL=cpu).\n"
+    )
+    n, m = lignes_du_neurone(), lignes_a_la_main()
+    assert lu.out.splitlines() == [*n, "", *m]
+    assert not fichier.exists()
+
+
+def test_erreur_sur_le_processeur_non_masquee(monkeypatch):
+    # Seule la carte a droit au message : sur le processeur, une RuntimeError est un défaut du
+    # projet, qui doit se voir en entier.
+    import premier_reseau.avec_pytorch
+
+    def en_panne(*arguments, **options):
+        raise RuntimeError("panne")
+
+    monkeypatch.setattr(premier_reseau.avec_pytorch, "entrainer_pytorch", en_panne)
+    with pytest.raises(RuntimeError, match="panne"):
+        main(["entrainer", "--appareil", "cpu"])
+
+
 def test_pytorch_absent_sans_trace():
     # Le lecteur qui lance `uv run python -m premier_reseau entrainer` sans extra : PyTorch
     # manque. Le script le dit en français, avec la commande à lancer, sans trace Python.

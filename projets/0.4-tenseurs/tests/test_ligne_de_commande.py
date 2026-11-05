@@ -7,6 +7,7 @@ import subprocess
 import sys
 
 import pytest
+import torch
 
 from tenseurs.__main__ import lire_forme, main
 
@@ -142,6 +143,72 @@ def test_carte_absente_dans_un_vrai_processus(tmp_path):
     assert "Traceback" not in resultat.stderr + resultat.stdout
     assert "FORGE_APPAREIL=cpu" in resultat.stderr
     assert not sortie.exists()
+
+
+PANNE_DE_LA_CARTE = (
+    "CUDA error: no kernel image is available for execution on the device\n"
+    "CUDA kernel errors might be asynchronously reported at some other API call."
+)
+
+
+def carte_vue_mais_inutilisable(monkeypatch) -> None:
+    """Une carte que PyTorch voit, mais pour laquelle sa version n'a pas de code (une GTX 1080 avec la
+    roue cu132, par exemple) : son nom se lit, mais le premier calcul lève une RuntimeError."""
+    import tenseurs.chrono
+
+    def en_panne(*arguments, **options):
+        raise RuntimeError(PANNE_DE_LA_CARTE)
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda *arguments: "NVIDIA GeForce GTX 1080")
+    monkeypatch.setattr(tenseurs.chrono, "mesurer", en_panne)
+
+
+def test_carte_vue_mais_inutilisable(monkeypatch, capsys, tmp_path):
+    # Revue finale, I1 : la carte est vue, le calcul échoue. Un message français qui dit quoi
+    # faire, le code 2, et pas de trace Python ; le fichier de mesures n'est pas écrit.
+    carte_vue_mais_inutilisable(monkeypatch)
+    sortie = tmp_path / "carte.json"
+    code, _, erreur = lancer(capsys, "mesurer", "--sortie", str(sortie))
+    assert code == 2
+    assert erreur == (
+        "La carte graphique n’a pas pu calculer avec cette version de PyTorch\u202f: CUDA error: no kernel "
+        "image is available for execution on the device. Pour savoir pourquoi, lance `uv run --extra gpu "
+        "python -m poste` dans le dossier projets/0.3-poste. Pour calculer sur le processeur, relance avec "
+        "`--appareil cpu` (ou, sans `--appareil`, mets FORGE_APPAREIL=cpu).\n"
+    )
+    assert "Traceback" not in erreur and not sortie.exists()
+
+
+def test_erreur_sur_le_processeur_non_masquee(monkeypatch):
+    # Seule la carte a droit au message : sur le processeur, une RuntimeError est un défaut du
+    # projet, qui doit se voir en entier.
+    carte_vue_mais_inutilisable(monkeypatch)
+    with pytest.raises(RuntimeError, match="no kernel image"):
+        main(["mesurer", "--appareil", "cpu"])
+
+
+def test_pytorch_absent_sans_trace():
+    # Revue finale, m4 : le lecteur qui lance `uv run python -m tenseurs mesurer` sans extra.
+    # PyTorch manque : le script le dit en français, avec la commande à lancer, sans trace Python.
+    script = (
+        "import runpy, sys\n"
+        "sys.modules['torch'] = None\n"
+        "sys.argv = ['tenseurs', 'mesurer']\n"
+        "runpy.run_module('tenseurs', run_name='__main__')\n"
+    )
+    resultat = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+        cwd=PROJET,
+        env={**os.environ, "PYTHONIOENCODING": "cp1252"},
+        timeout=60,
+    )
+    assert resultat.returncode == 2
+    assert "Traceback" not in resultat.stderr + resultat.stdout
+    assert "PyTorch ne s’importe pas" in resultat.stderr and "--extra cpu" in resultat.stderr
 
 
 def test_formes_sans_pytorch():

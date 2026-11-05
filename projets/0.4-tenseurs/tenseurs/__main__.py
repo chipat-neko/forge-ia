@@ -7,7 +7,9 @@
 `formes` dit quelle forme donnent a + b (la diffusion) et a @ b (le produit
 matriciel), ou pourquoi c'est impossible. `mesurer` chronomètre un produit de
 matrices et, avec `--sortie`, écrit les mesures en JSON (UTF-8, LF). Sans
-carte, `--appareil cuda` dit quoi faire, sans trace Python, et rend le code 2.
+carte, `--appareil cuda` dit quoi faire, sans trace Python, et rend le code 2 ;
+de même sans PyTorch, ou avec une carte que PyTorch voit sans savoir calculer
+dessus.
 """
 
 import argparse
@@ -85,19 +87,44 @@ def commande_formes(options: argparse.Namespace) -> int:
     return 0
 
 
+def carte_inutilisable(erreur: RuntimeError) -> str:
+    """Le message quand PyTorch voit la carte, mais ne sait pas calculer dessus : une carte trop
+    ancienne ou trop récente pour sa version (le diagnostic du projet 0.3 dit laquelle)."""
+    texte = str(erreur).strip()
+    premiere_ligne = texte.splitlines()[0].rstrip(".") if texte else type(erreur).__name__
+    return (
+        f"La carte graphique n’a pas pu calculer avec cette version de PyTorch\u202f: {premiere_ligne}. "
+        "Pour savoir pourquoi, lance `uv run --extra gpu python -m poste` dans le dossier projets/0.3-poste. "
+        "Pour calculer sur le processeur, relance avec `--appareil cpu` (ou, sans `--appareil`, mets FORGE_APPAREIL=cpu)."
+    )
+
+
 def commande_mesurer(options: argparse.Namespace) -> int:
     # PyTorch ne sert qu'ici : `formes` marche sans lui.
-    from tenseurs.appareil import AppareilIndisponible, choisir_appareil
-    from tenseurs.attendus import vers_json
-    from tenseurs.chrono import TAILLES, decrire_mesures, entete, mesurer
-
+    try:
+        from tenseurs.appareil import AppareilIndisponible, choisir_appareil
+        from tenseurs.attendus import vers_json
+        from tenseurs.chrono import TAILLES, decrire_mesures, entete, mesurer
+    except ImportError:
+        print(
+            "PyTorch ne s’importe pas. Lance le script avec la version de PyTorch de ton poste\u202f: "
+            "`uv run --extra cpu python -m tenseurs mesurer`, ou `--extra gpu` avec une carte NVIDIA.",
+            file=sys.stderr,
+        )
+        return 2
     try:
         ou = choisir_appareil(options.appareil)
     except (AppareilIndisponible, ValueError) as erreur:
         print(erreur, file=sys.stderr)
         return 2
-    print(entete(ou.type), flush=True)
-    m = mesurer(ou.type, tailles=tuple(options.tailles or TAILLES))
+    try:
+        print(entete(ou.type), flush=True)
+        m = mesurer(ou.type, tailles=tuple(options.tailles or TAILLES))
+    except RuntimeError as erreur:
+        if ou.type != "cuda":
+            raise  # sur le processeur, c'est un défaut du projet : sa trace entière doit se voir
+        print(carte_inutilisable(erreur), file=sys.stderr)
+        return 2
     print("\n".join(decrire_mesures(m)))
     if options.sortie:
         chemin = Path(options.sortie)

@@ -9,7 +9,8 @@ l'entraînement à la main sur le OU exclusif, le plus grand écart entre les
 gradients de départ calculés à la main et par PyTorch, puis l'entraînement
 PyTorch sur l'appareil, sa durée, et le plus grand écart de ses poids finaux
 avec ceux de la main. Sans carte, `--appareil cuda` dit quoi faire, sans
-trace Python, et rend le code 2.
+trace Python, et rend le code 2 ; de même sans PyTorch, ou avec une carte que
+PyTorch voit sans savoir calculer dessus.
 """
 
 import argparse
@@ -108,6 +109,18 @@ def ecrire_en_utf8() -> None:
                 flux.reconfigure(encoding="utf-8")
 
 
+def carte_inutilisable(erreur: RuntimeError) -> str:
+    """Le message quand PyTorch voit la carte, mais ne sait pas calculer dessus : une carte trop
+    ancienne ou trop récente pour sa version (le diagnostic du projet 0.3 dit laquelle)."""
+    texte = str(erreur).strip()
+    premiere_ligne = texte.splitlines()[0].rstrip(".") if texte else type(erreur).__name__
+    return (
+        f"La carte graphique n’a pas pu calculer avec cette version de PyTorch\u202f: {premiere_ligne}. "
+        "Pour savoir pourquoi, lance `uv run --extra gpu python -m poste` dans le dossier projets/0.3-poste. "
+        "Pour calculer sur le processeur, relance avec `--appareil cpu` (ou, sans `--appareil`, mets FORGE_APPAREIL=cpu)."
+    )
+
+
 def commande_entrainer(options: argparse.Namespace) -> int:
     try:
         from premier_reseau.appareil import AppareilIndisponible, choisir_appareil
@@ -125,7 +138,13 @@ def commande_entrainer(options: argparse.Namespace) -> int:
         return 2
     lignes: list[str] = []
     for section in (lignes_du_neurone, lignes_a_la_main, lambda: lignes_avec_pytorch(ou.type)):
-        nouvelles = section()
+        try:
+            nouvelles = section()
+        except RuntimeError as erreur:
+            if ou.type != "cuda":
+                raise  # sur le processeur, c'est un défaut du projet : sa trace entière doit se voir
+            print(carte_inutilisable(erreur), file=sys.stderr)
+            return 2
         if lignes:
             nouvelles = ["", *nouvelles]  # une ligne vide entre deux parties
         print("\n".join(nouvelles), flush=True)
