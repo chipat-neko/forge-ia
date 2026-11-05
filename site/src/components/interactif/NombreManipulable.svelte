@@ -72,14 +72,16 @@
 
   // Assez large pour le plus long nombre possible : la phrase ne bouge pas
   // pendant qu'on fait glisser le nombre de 9 à 10, ou de 99 à 100. Avec un
-  // texte, c'est le plus long des textes de min à max (de 1 en 1, si l'écart
-  // ne dépasse pas 200 ; au-delà, celui de min ou celui de max).
-  const ECART_MESURE_MAX = 200;
+  // texte, c'est le plus long des textes de min à max (de pas en pas, s'il y en
+  // a au plus 200 ; au-delà, celui de min ou celui de max). Un pas de 0,5 compte
+  // donc « −1,5 », plus long que « −2 ».
+  const CRANS_MESURES_MAX = 200;
   const chiffres = $derived.by(() => {
     if (texte === undefined) return Math.max(String(min).length, String(max).length);
     let longueur = Math.max(texte(min).length, texte(max).length);
-    if (max - min <= ECART_MESURE_MAX) {
-      for (let v = min; v < max; v += 1) longueur = Math.max(longueur, texte(v).length);
+    if ((max - min) / pas <= CRANS_MESURES_MAX) {
+      // min + i × pas, plutôt qu'une somme de pas : aucun arrondi ne s'accumule.
+      for (let i = 0; min + i * pas < max; i += 1) longueur = Math.max(longueur, texte(min + i * pas).length);
     }
     return longueur;
   });
