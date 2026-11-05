@@ -574,8 +574,9 @@ Pour tirer au sort, on range ces probabilités bout à bout entre 0 et 1 : {TIRA
   <li data-lignes="1-7">`tirer` reçoit les probabilités et un nombre `u`, tiré au hasard entre 0 et 1.</li>
   <li data-lignes="8-12">`cumul` additionne les probabilités une à une : dès que `u` passe sous le cumul, il est tombé dans la case de ce mot.</li>
   <li data-lignes="13-15">Les arrondis des nombres à virgule peuvent laisser le cumul un peu sous 1 : un `u` tout au bout prend le dernier mot.</li>
-  <li data-lignes="18-34">`tirages` tire `n` fois, et compte combien de fois chaque mot est sorti.</li>
+  <li data-lignes="18-24">`tirages` tire `n` fois, et compte combien de fois chaque mot est sorti.</li>
   <li data-lignes="25-29">Sans aucune issue, rien à tirer : la fonction s'arrête, avec un message où `\u202f` est l'espace fine de l'étape 2.</li>
+  <li data-lignes="30-34">Puis les `n` tirages : `Hasard`, présenté juste après, donne chaque `u`, et le mot tiré gagne 1 dans `comptes`.</li>
 </CodeExplique>
 
 Le hasard d'un ordinateur est un calcul : on part d'un nombre, la graine, et chaque nouveau nombre découle du précédent. La même graine donne toujours la même suite, sur toutes les machines. Ce site refait les tirages du Python dans ton navigateur, et trouve exactement les mêmes comptes.

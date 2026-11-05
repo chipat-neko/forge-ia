@@ -103,6 +103,52 @@ test('vecteurs : le produit scalaire et le cosinus suivent les réglages', async
   expect(await attributsDuDessin(page.locator('[data-test="vec-dessin"]'))).not.toMatch(/NaN|Infinity/);
 });
 
+/** Les flèches tracées (trait de a, de b, de la somme) qui passent sous le texte d'une étiquette du dessin. */
+async function traitsSousEtiquette(page: Page, etiquette: string): Promise<string[]> {
+  return page.locator('[data-test="vec-dessin"]').evaluate((svg, classe) => {
+    const texte = svg.querySelector<SVGTextElement>(`text.${classe}`);
+    if (texte === null) return [`pas d’étiquette ${classe}`];
+    // La boîte du texte, élargie de son halo de papier (stroke-width: 5px, la moitié de chaque côté).
+    const b = texte.getBBox();
+    const [x0, y0, x1, y1] = [b.x - 2.5, b.y - 2.5, b.x + b.width + 2.5, b.y + b.height + 2.5];
+    const touches: string[] = [];
+    for (const trait of svg.querySelectorAll<SVGLineElement>('line.trait-a, line.trait-b, line.trait-s')) {
+      const [ax, ay, bx, by] = ['x1', 'y1', 'x2', 'y2'].map((n) => Number(trait.getAttribute(n)));
+      for (let i = 0; i <= 200; i++) {
+        const [x, y] = [ax + ((bx - ax) * i) / 200, ay + ((by - ay) * i) / 200];
+        if (x >= x0 && x <= x1 && y >= y0 && y <= y1) {
+          touches.push(trait.getAttribute('class') ?? '');
+          break;
+        }
+      }
+    }
+    return touches;
+  }, etiquette);
+}
+
+test('vecteurs : l’étiquette « a + b » ne chevauche aucune tige quand la somme est alignée avec b', async ({ page }) => {
+  // Point mis de côté à la tâche 6 : a + b colinéaire avec b, plus court que b ou plus long.
+  await ouvrirFigures(page);
+  for (const [ax, ay, bx, by] of [
+    [-1, 0, 3, 0], // a + b = (2, 0), sur la tige de b
+    [1, 0, 2, 0], // a + b = (3, 0), au-delà de b
+    [-1, -1, 3, 3], // en diagonale
+    [0, -1, 0, 4], // à la verticale
+  ]) {
+    await regler(page.locator('[data-test="vec-ax"]'), ax);
+    await regler(page.locator('[data-test="vec-ay"]'), ay);
+    await regler(page.locator('[data-test="vec-bx"]'), bx);
+    await regler(page.locator('[data-test="vec-by"]'), by);
+    expect(await traitsSousEtiquette(page, 'nom-s'), `a = (${ax}, ${ay}), b = (${bx}, ${by})`).toEqual([]);
+  }
+  // Hors de ce cas, l'étiquette reste au bout de la flèche, sur son prolongement : a = (3, 1), b = (1, 2) au départ.
+  await regler(page.locator('[data-test="vec-ax"]'), 3);
+  await regler(page.locator('[data-test="vec-ay"]'), 1);
+  await regler(page.locator('[data-test="vec-bx"]'), 1);
+  await regler(page.locator('[data-test="vec-by"]'), 2);
+  expect(await traitsSousEtiquette(page, 'nom-s')).toEqual([]);
+});
+
 test('vecteurs : un vecteur nul ne casse rien', async ({ page }) => {
   await ouvrirFigures(page);
   await regler(page.locator('[data-test="vec-ax"]'), 0);

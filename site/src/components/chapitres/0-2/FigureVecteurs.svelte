@@ -106,13 +106,23 @@
   /**
    * Une flèche de l'origine au bout du vecteur (non nul) : le trait, arrêté
    * sous la pointe, la pointe, et la place de l'étiquette, un peu au-delà.
+   *
+   * `aCote` : l'étiquette se pose à côté du bout, perpendiculairement à la
+   * flèche, au lieu de la prolonger. C'est le cas de la somme quand elle est
+   * alignée avec b : prolongée, son étiquette tomberait sur la tige de b, plus
+   * longue, ou de a (point mis de côté à la tâche 6). Le côté choisi est vers
+   * le haut ou la droite, loin des graduations, qui sont sous l'axe des x et à
+   * gauche de celui des y ; l'écart couvre la demi-largeur de « a + b ».
    */
-  function fleche(v: readonly number[]) {
+  function fleche(v: readonly number[], aCote = false) {
     const [tx, ty] = bout(v);
     const [ux, uy] = direction(v);
     const [nx, ny] = [-uy, ux];
     const [baseX, baseY] = [tx - TETE * ux, ty - TETE * uy];
     const borne = (x: number, min: number, max: number) => Math.min(max, Math.max(min, x));
+    const [cx, cy] = nx - ny >= 0 ? [nx, ny] : [-nx, -ny];
+    const ecart = 20 * Math.abs(cx) + 14 * Math.abs(cy) + 8;
+    const [ex, ey] = aCote ? [tx + ecart * cx, ty + ecart * cy] : [tx + 15 * ux, ty + 15 * uy];
     return {
       x2: f(tx - (TETE - 2) * ux),
       y2: f(ty - (TETE - 2) * uy),
@@ -124,8 +134,8 @@
         .map(([x, y]) => `${f(x)},${f(y)}`)
         .join(' '),
       // L'étiquette reste dans le carré, même au bout d'un vecteur du bord.
-      etiquetteX: f(borne(tx + 15 * ux, 16, TAILLE - 16)),
-      etiquetteY: f(borne(ty + 15 * uy, 14, TAILLE - 10)),
+      etiquetteX: f(borne(ex, aCote ? 24 : 16, TAILLE - (aCote ? 24 : 16))),
+      etiquetteY: f(borne(ey, 14, TAILLE - 10)),
     };
   }
 
@@ -133,7 +143,9 @@
   const flecheA = $derived(estNul(a) ? null : fleche(a));
   const flecheB = $derived(estNul(b) ? null : fleche(b));
   // La somme n'est dessinée qu'avec deux vecteurs non nuls : sinon elle se confond avec l'autre flèche.
-  const flecheS = $derived(estNul(a) || estNul(b) || estNul(s) ? null : fleche(s));
+  // La somme alignée avec b (produit en croix nul : a l'est aussi) : son étiquette se pose à côté.
+  const sommeAlignee = $derived(s[0] * b[1] - s[1] * b[0] === 0);
+  const flecheS = $derived(estNul(a) || estNul(b) || estNul(s) ? null : fleche(s, sommeAlignee));
   const sommeDedans = $derived(dansLaGrille(s));
 
   // Le petit arc de l'angle entre a et b, ou l'équerre quand ils sont perpendiculaires.
