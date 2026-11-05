@@ -145,8 +145,10 @@ Pour faire paraître un chapitre :
    sur la RTX 5070 Ti ; l'auteur du site a dit oui à la publication.
 2. Déplacer le brouillon :
    `git mv site/src/brouillons/chapitres/<p>-<n>.mdx site/src/content/chapitres/<p>-<n>.mdx`.
-3. Mettre à jour les parcours qui disent ce chapitre « à venir »
-   (`navigation.spec.ts`, et le pied des chapitres voisins).
+3. Rien à changer dans les parcours : ils lisent les fichiers sur le
+   disque, et voient d'eux-mêmes le chapitre paru (le pied des chapitres
+   voisins, l'accueil, la recherche). Seuls leurs commentaires qui le disent
+   « à venir » sont à relire.
 4. Si le chapitre contient le mini-modèle (0.5), écarter
    `dist/_astro/travailleur-*.js` de la recherche du prénom dans
    `.github/workflows/site.yml`, comme le dit son commentaire.
