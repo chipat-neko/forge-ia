@@ -52,6 +52,7 @@ import {
   verifierSansDebordement,
   verifierStructureAvantApres,
   verifierTypographieHorsCode,
+  verifierVoisin,
 } from './outils';
 
 const PAGE = '/forge-ia/partie-0/0-5/';
@@ -127,17 +128,6 @@ async function texteExact(zone: Locator): Promise<string> {
 /** Attend la fin des animations en cours (verdict des paris, coches) : axe mesure alors les vraies couleurs. */
 async function attendreAnimations(page: Page): Promise<void> {
   await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)).then(() => undefined));
-}
-
-/** Le pied vers un voisin : un lien s'il a paru (son fichier est dans src/content/chapitres/), sinon « à venir » (S2). */
-async function verifierVoisin(page: Page, sens: 'precedent' | 'suivant', fichier: string, href: string): Promise<void> {
-  const voisin = page.locator(`footer .voisin.${sens}`);
-  if (existsSync(`src/content/chapitres/${fichier}`)) {
-    await expect(voisin).toHaveAttribute('href', href);
-  } else {
-    await expect(voisin).toContainText('à venir');
-    await expect(page.locator(`footer a.voisin.${sens}`)).toHaveCount(0);
-  }
 }
 
 /** Règle un nombre jaune au clavier sur une valeur (aria-valuenow), par les flèches, de 0,5 en 0,5. */
@@ -536,7 +526,7 @@ test('l’ouverture et l’étape 9 citent les premiers prénoms du départ, et 
     }
   } else {
     expect(await texteExact(suite)).not.toContain(aVenir);
-    for (const c of partie.chapitres.filter((c) => c.numero !== '1.1')) await expect(lienVers(c.numero)).toHaveCount(0);
+    for (const autre of partie.chapitres.filter((c) => c.numero !== '1.1')) await expect(lienVers(autre.numero)).toHaveCount(0);
   }
 });
 
