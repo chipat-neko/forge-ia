@@ -351,7 +351,7 @@ Une fois créé, un tenseur se lit : sa forme, le type de ses nombres, l'apparei
   <li data-lignes="3">La matrice de l'exemple précédent : <code>{CREER.valeurs}</code>.</li>
   <li data-lignes="5">`m.shape`, sa forme : {LIRE.forme}. `tuple` en fait un tuple de Python.</li>
   <li data-lignes="6-7">`m.dim()`, son nombre de dimensions : {LIRE.dimensions}. `m.numel()`, son nombre de nombres : {LIRE.nombres}, le produit des tailles.</li>
-  <li data-lignes="8">`m.dtype`, le type de ses nombres : <code>{LIRE.type}</code>, des nombres à virgule sur 32 bits.</li>
+  <li data-lignes="8">`m.dtype`, le type de ses nombres : <code>{LIRE.type}</code>, des nombres à virgule sur 32 bits, c'est-à-dire écrits avec 32 chiffres binaires, des 0 et des 1.</li>
   <li data-lignes="9">`m.device`, l'appareil où il est rangé : <code>{LIRE.appareil}</code>, le processeur. L'étape 6 montre comment le ranger sur la carte.</li>
   <li data-lignes="10">`m[1, 2]`, la case de la ligne 1 et de la colonne 2, en comptant depuis 0 : <code>{LIRE.case}</code>. `.item()` en fait un nombre de Python.</li>
   <li data-lignes="11-12">`m[1]` prend toute la ligne 1 : <code>{LIRE.ligne}</code>. `m[:, 0]` prend toute la colonne 0 : <code>{LIRE.colonne}</code>. Les deux-points veulent dire « toutes les lignes ». `.tolist()` en fait une liste de Python.</li>
@@ -554,7 +554,7 @@ Pour chronométrer ton poste, dans le dossier du projet :
 
 <BlocCommande commandes={[TENSEURS_MESURER_CPU]} ou="un terminal, dans le dossier du projet" />
 
-Avec une carte NVIDIA, la version de PyTorch pour la carte la chronomètre, si PyTorch la voit. La première fois, uv télécharge cette version, si elle n'est pas déjà dans son cache depuis le chapitre 0.3 : sous Windows, {ROUE_CARTE}.
+Avec une carte NVIDIA, la version de PyTorch pour la carte la chronomètre, si PyTorch la voit. La première fois, uv télécharge cette version : sous Windows, {ROUE_CARTE}. S'il l'a déjà téléchargée au chapitre 0.3, il la reprend dans son cache, le dossier où il garde ce qu'il a déjà téléchargé.
 
 <BlocCommande commandes={[TENSEURS_MESURER_GPU]} ou="un terminal, dans le dossier du projet" />
 
