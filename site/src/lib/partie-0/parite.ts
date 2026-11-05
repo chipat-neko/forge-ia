@@ -97,6 +97,7 @@ export interface EntreesMaths {
 const APPELS: Readonly<Record<string, (args: readonly unknown[]) => unknown>> = {
   produit_scalaire: ([a, b]) => produitScalaire(a as number[], b as number[]),
   somme: ([a, b]) => somme(a as number[], b as number[]),
+  matrice_fois_vecteur: ([m, v]) => matriceFoisVecteur(m as number[][], v as number[]),
   // Les comptes s'écrivent en paires [mot, compte], comme EXEMPLE_COMPTES.
   probabilites: ([comptes]) => probabilites(comptes as [string, number][]),
   tirages: ([probas, n, graine]) => tirages(probas as number[], n as number, graine as number),

@@ -116,6 +116,7 @@ CAS_MESSAGES: list[tuple[str, list]] = [
     ("produit_scalaire", [[1, 2, 3], [1, 2]]),
     ("produit_scalaire", [[], [4]]),
     ("somme", [[1], [1, 2]]),
+    ("matrice_fois_vecteur", [[[1, 2, 3], [0, 1, 0]], [1, 1]]),
     ("probabilites", [[]]),
     ("probabilites", [[["fer", 0], ["feu", 0]]]),
     ("tirages", [[], 10, GRAINE_TIRAGE]),
@@ -126,6 +127,7 @@ CAS_MESSAGES: list[tuple[str, list]] = [
 FONCTIONS_DES_MESSAGES = {
     "produit_scalaire": produit_scalaire,
     "somme": somme,
+    "matrice_fois_vecteur": matrice_fois_vecteur,
     "probabilites": lambda paires: probabilites(dict(paires)),
     "tirages": tirages,
 }

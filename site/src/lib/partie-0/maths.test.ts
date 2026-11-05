@@ -170,6 +170,7 @@ describe('les messages d’erreur, mot pour mot ceux du Python', () => {
     const appels: Record<string, (args: unknown[]) => unknown> = {
       produit_scalaire: ([a, b]) => produitScalaire(a as number[], b as number[]),
       somme: ([a, b]) => somme(a as number[], b as number[]),
+      matrice_fois_vecteur: ([m, v]) => matriceFoisVecteur(m as number[][], v as number[]),
       probabilites: ([comptes]) => probabilites(comptes as [string, number][]),
       tirages: ([probas, n, graine]) => tirages(probas as number[], n as number, graine as number),
     };
@@ -177,6 +178,7 @@ describe('les messages d’erreur, mot pour mot ceux du Python', () => {
       'produit_scalaire',
       'produit_scalaire',
       'somme',
+      'matrice_fois_vecteur',
       'probabilites',
       'probabilites',
       'tirages',

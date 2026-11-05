@@ -7898,6 +7898,28 @@
    "message": "Les deux vecteurs n’ont pas la même taille (1 et 2 nombres) : il en faut autant."
   },
   {
+   "fonction": "matrice_fois_vecteur",
+   "arguments": [
+    [
+     [
+      1,
+      2,
+      3
+     ],
+     [
+      0,
+      1,
+      0
+     ]
+    ],
+    [
+     1,
+     1
+    ]
+   ],
+   "message": "La matrice a 3 colonnes et le vecteur 2 nombres : il en faut autant."
+  },
+  {
    "fonction": "probabilites",
    "arguments": [
     []
