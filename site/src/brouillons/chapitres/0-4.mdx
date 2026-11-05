@@ -15,7 +15,7 @@ acquis:
     texte: "La mémoire d'un tenseur, c'est son nombre de cases fois la taille d'un nombre."
     ou: "à l'étape 5"
   - cle: fils
-    texte: "Le processeur aussi calcule en parallèle, sur tous ses fils."
+    texte: "Le processeur aussi calcule en parallèle, sur plusieurs fils ; pour les prendre tous, il faut le demander."
     ou: "à l'étape 7"
 ---
 
@@ -29,6 +29,7 @@ import { materiel, REPERES_EFFICACITE } from '../../lib/calculateur/donnees';
 import { formaterOctets } from '../../lib/calculateur/formats';
 import { memoirePoidsOctets } from '../../lib/calculateur/formules';
 import { MESURES_TON_IA, PRESETS_FORGE, reperesTonIA } from '../../lib/calculateur/ton-ia';
+import { DEPOT } from '../../lib/depot';
 import { A_DEPART, B_DEPART, expliquer } from '../../lib/partie-0/atelier-formes';
 import {
   ALLER_AU_PROJET_0_4,
@@ -42,17 +43,18 @@ import {
 } from '../../lib/partie-0/commandes';
 import { ecrireForme, formeDiffusee, memoireOctets } from '../../lib/partie-0/formes';
 import { lireMesures } from '../../lib/partie-0/mesures';
+import { OCTETS_ROUE_CU132_WINDOWS } from '../../lib/partie-0/sources-0-3';
 import {
   choixDiffusion,
   choixFils,
   choixMemoire,
   chrono,
   ecrireMillisecondes,
+  gainDuReglageParDefaut,
   OCTETS_FLOAT32,
   OCTETS_PAR_MO,
   phraseFils,
   questionFils,
-  rapportFils,
   TAILLE_DU_PARI_FILS,
   TAILLE_DU_PARI_MEMOIRE,
 } from '../../lib/partie-0/paris-0-4';
@@ -90,12 +92,25 @@ export const FORMES = (() => {
 
 export const TON_IA = (() => {
   // Le tenseur qui entre dans ton IA, dans sa plus grande taille (les tailles de forge, dans le calculateur).
+  // La note de l'étape 1 : pour la plus grande taille, un micro-lot d'un seul texte est le seul qui tient
+  // dans la mémoire de la carte (rapport de mesure du 3 novembre 2026, docs/mesures/entrainement-2026-11.md),
+  // avec son pic de mémoire mesuré.
   const f = PRESETS_FORGE.tres_grand;
-  exiger(MESURES_TON_IA.tres_grand.carte.microLot === 1, 'la plus grande taille de ton IA ne va plus le plus vite avec un micro-lot de 1, celui de l’ouverture');
+  const carte = MESURES_TON_IA.tres_grand.carte;
+  const memoireCarte = materiel('rtx-5070-ti').memoireGo;
+  exiger(
+    carte.microLot === 1,
+    'la plus grande taille de ton IA s’entraîne maintenant avec plus d’un texte par micro-lot : la note de l’étape 1 (« deux ne tiennent pas dans sa mémoire ») et l’ouverture sont à revoir, d’après le rapport de mesure (docs/mesures/entrainement-2026-11.md)',
+  );
+  exiger(carte.memoireGo < memoireCarte, 'le pic de mémoire mesuré de ton IA ne tient plus dans la carte de ce PC');
   return {
     contexte: nombre(f.contexte),
     dim: nombre(f.dim),
     couches: nombre(f.couches),
+    // L'unité reste collée au nombre (espace insécable) : « 10,9 Go » ne se coupe pas.
+    pic: `${nombre(carte.memoireGo, 1)}\u00A0Go`,
+    memoireCarte: `${nombre(memoireCarte)}\u00A0Go`,
+    rapport: MESURES_TON_IA.tres_grand.source.url,
   };
 })();
 
@@ -163,6 +178,12 @@ export const DIFFUSION = (() => {
 
 export const PAIRES = nombre(attendusFormes.paires.length);
 
+export const ROUE_CARTE = (() => {
+  // La version de PyTorch pour la carte, sous Windows (relevée pour le chapitre 0.3), en Go de 2³⁰ octets,
+  // comme tout ce chapitre (étape 5).
+  return formaterOctets(OCTETS_ROUE_CU132_WINDOWS);
+})();
+
 export const MEMOIRE = (() => {
   // La place d'un nombre selon son type, telle que PyTorch la donne (attendus du projet), et le pari.
   const par = (dtype) => {
@@ -197,6 +218,9 @@ export const POIDS = (() => {
     bf16: formaterOctets(memoirePoidsOctets(f.parametres, MEMOIRE.bfloat16)),
     float32: formaterOctets(memoirePoidsOctets(f.parametres, MEMOIRE.float32)),
     ouverture: formaterOctets(memoireOctets([f.contexte, f.dim], MEMOIRE.bfloat16)),
+    ouvertureFloat32: formaterOctets(memoireOctets([f.contexte, f.dim], MEMOIRE.float32)),
+    // La boucle d'entraînement de la forge : calculs en bf16 sous torch.autocast, poids en float32.
+    boucle: `${DEPOT}/blob/main/projets/forge/forge/entrainement/boucle.py`,
   };
 })();
 
@@ -211,19 +235,17 @@ export const FILS = (() => {
   // Le pari « fils » : 1 fil, le réglage par défaut et tous les fils, au plus gros produit des chronos.
   const m = PROCESSEUR;
   const t = TAILLE_DU_PARI_FILS;
-  const un = chrono(m, t, 1);
-  const defaut = chrono(m, t, m.fils_par_defaut);
   return {
     taille: nombre(t),
     defaut: nombre(m.fils_par_defaut),
     max: nombre(m.fils_max),
-    msUn: ecrireMillisecondes(un),
-    msDefaut: ecrireMillisecondes(defaut),
-    msTous: ecrireMillisecondes(chrono(m, t, m.fils_max)),
-    gainDefaut: nombre(un / defaut, 1),
-    gainTous: nombre(rapportFils(m), 2),
+    msUn: ecrireMillisecondes(chrono(m, t, 1)),
+    msDefaut: ecrireMillisecondes(chrono(m, t, m.fils_par_defaut)),
+    // Gardé : sous SEUIL_PARALLELE, « le processeur aussi calcule en parallèle » ne serait plus démontré.
+    gainDefaut: nombre(gainDuReglageParDefaut(m), 1),
     question: questionFils(m),
-    phrase: phraseFils(m),
+    // Toute l'explication du pari, juste pour n'importe quel fichier de mesures valide (paris-0-4.test.ts).
+    explication: phraseFils(m),
   };
 })();
 
@@ -243,6 +265,7 @@ export const LABO = (() => {
   exiger(palm.min === palm.max && llama.min < llama.max, 'PaLM n’a plus une seule efficacité, ou Llama 3 plus une fourchette');
   exiger(palm.compteAttention && llama.compteAttention, 'PaLM ou Llama 3 ne comptent plus l’attention, comme le repère de ton IA');
   exiger(tonIA > palm.max && tonIA > llama.max, 'ton IA ne tire plus davantage de sa carte que PaLM et Llama 3 de leurs milliers de puces');
+  exiger(llama.materiel.startsWith('de '), 'le matériel de Llama 3 ne s’écrit plus « de … à … » : revois la phrase de l’encadré');
   const vers = (s) => ({ titre: s.titre, url: s.url, verifieLe: s.releveLe });
   return {
     crete: nombre(h100.creteTflops),
@@ -250,7 +273,8 @@ export const LABO = (() => {
     palmMateriel: palm.materiel,
     llamaMin: pourcent(llama.min).replace(/\u202F%$/, ''),
     llamaMax: pourcent(llama.max),
-    llamaMateriel: llama.materiel,
+    // « de 8 192 à 16 384 H100 » : la phrase dit « sur 8 192 à 16 384 H100 ».
+    llamaMateriel: llama.materiel.replace(/^de /, ''),
     tonIA: pourcent(tonIA),
     sources: [vers(h100.source), vers(rtx.source), vers(palm.source), vers(llama.source), vers(MESURES_TON_IA.tres_grand.source)],
   };
@@ -270,7 +294,7 @@ Ton IA lit des textes découpés en morceaux, et chaque morceau a son numéro. E
 
 Le mot tenseur vient des maths et de la physique. En IA, il veut seulement dire : un tableau de nombres, avec autant de dimensions qu'il en faut.
 
-Sur la carte de ce PC, la plus grande taille de ton IA va le plus vite avec des micro-lots d'un seul texte, comme celui de l'ouverture.
+Sur la carte de ce PC, la plus grande taille de ton IA s'entraîne avec des micro-lots d'un seul texte, comme celui de l'ouverture : deux ne tiennent pas dans sa mémoire. Un seul y prend déjà {TON_IA.pic} au plus fort, sur les {TON_IA.memoireCarte} de la carte (<a href={TON_IA.rapport}>rapport de mesure</a>).
 
 </Fragment>
 
@@ -311,7 +335,7 @@ Le notebook du chapitre, à ouvrir dans Colab (le lien est à l'étape 8), te fa
 
 <Etape numero={3} titre="Calculer">
 
-Entre deux tenseurs de même forme, `+`, `-`, `*` et `/` calculent case par case : chaque case du résultat ne regarde que les deux cases à la même place. Une somme peut parcourir tout un tenseur, ou une seule de ses dimensions. Et `@` fait le produit matriciel du chapitre 0.2 : chaque case du résultat est le produit scalaire d'une ligne et d'une colonne.
+Entre deux tenseurs de même forme, `+`, `-`, `*` et `/` calculent case par case : chaque case du résultat ne regarde que les deux cases à la même place. Une somme peut parcourir tout un tenseur, ou une seule de ses dimensions. Et `@` fait le produit matriciel : celui du chapitre 0.2, une matrice fois un vecteur, étendu à deux matrices. Chaque case du résultat est le produit scalaire d'une ligne et d'une colonne.
 
 <CodeExplique fichier="projets/0.4-tenseurs/tenseurs/exemples.py" region="calculer">
   <li data-lignes="3-4">Deux matrices de forme {CALCUL.matrice}, `a` et `b`.</li>
@@ -394,7 +418,7 @@ Le script dit ce que donnent A + B et A @ B, ou pourquoi c'est impossible. Écri
 
 Tout ce qui est jaune se manipule. Fais glisser un nombre à la souris ou au doigt ; au clavier, atteins-le avec Tab, puis utilise les flèches.
 
-Dans la grille, un trait en pointillé entoure une taille qui s'étire. Pour A @ B, les deux tailles qui doivent être égales sont soulignées : en vert si elles le sont, en rouge sinon.
+Dans la grille, un trait en pointillé entoure une taille qui s'étire. Pour A @ B, les deux tailles qui doivent être égales sont soulignées : en vert si elles le sont ; sinon en rouge, et encadrées, comme une taille qui bloque A + B.
 
 </Fragment>
 
@@ -404,7 +428,7 @@ Dans la grille, un trait en pointillé entoure une taille qui s'étire. Pour A @
 
 Un tenseur range ses nombres les uns à la suite des autres, et chacun y prend la même place, selon son type. `float32`, le type par défaut des nombres à virgule, prend {MEMOIRE.float32} octets par nombre. `bfloat16`, qu'on écrit bf16, n'en prend que {MEMOIRE.bfloat16} : il va des très petits aux très grands nombres comme `float32`, mais avec moins de chiffres significatifs. `int64`, le type des entiers, en prend {MEMOIRE.int64} : c'est celui des numéros des morceaux de texte.
 
-Sur la carte, ton IA calcule en bf16 : {MEMOIRE.moitie} fois moins de mémoire qu'en `float32`. Pour compter en mégaoctets, ce site fait comme le calculateur : 1 Mo vaut 2²⁰ octets, soit {MEMOIRE.unMo}, et 1 Go vaut 2³⁰ octets.
+Sur la carte, ton IA fait ses calculs en bf16, grâce à `torch.autocast` : chaque nombre calculé y prend {MEMOIRE.moitie} fois moins de place qu'en `float32`. Ses poids, eux, restent en `float32`. Pour compter en mégaoctets, ce site fait comme le calculateur : 1 Mo vaut 2²⁰ octets, soit {MEMOIRE.unMo}, et 1 Go vaut 2³⁰ octets.
 
 <Pari
   id="memoire"
@@ -421,15 +445,17 @@ Sur la carte, ton IA calcule en bf16 : {MEMOIRE.moitie} fois moins de mémoire q
 <CodeExplique fichier="projets/0.4-tenseurs/tenseurs/memoire.py" region="memoire">
   <li data-lignes="1-2">`octets` reçoit une forme et un type de PyTorch, et rend un nombre d'octets.</li>
   <li data-lignes="3">`math.prod` multiplie toutes les tailles : le nombre de nombres du tenseur.</li>
-  <li data-lignes="4">`element_size()` donne la place d'un nombre de ce type, d'après PyTorch lui-même. On la demande à un tenseur vide de forme (), créé par `torch.empty`.</li>
+  <li data-lignes="4">`element_size()` donne la place d'un nombre de ce type, d'après PyTorch lui-même. On la demande à un tenseur d'un seul nombre, de forme (), laissé sans valeur : `torch.empty` le crée sans le remplir.</li>
   <li data-lignes="5">Les deux, multipliés.</li>
 </CodeExplique>
 
-Les poids de ton IA, dans sa plus grande taille, sont {POIDS.nombre} nombres. En bf16, ils prennent {POIDS.bf16} ; en `float32`, {POIDS.float32}. Le tenseur de l'ouverture, pour un micro-lot de 1, prend {POIDS.ouverture} en bf16 : à côté des poids, c'est peu. Mais pendant l'entraînement, chaque couche en garde plusieurs de cette taille, pour calculer ses pentes.
+Les poids de ton IA, dans sa plus grande taille, sont {POIDS.nombre} nombres. Rangés en `float32`, ils prennent {POIDS.float32} ; en bf16, ils n'en prendraient que {POIDS.bf16}. Le tenseur de l'ouverture, pour un micro-lot de 1, prend {POIDS.ouvertureFloat32} en `float32`, {POIDS.ouverture} en bf16 : à côté des poids, c'est peu. Mais l'entraînement garde bien d'autres tenseurs, pour calculer les pentes des poids et les régler : au plus fort, ton IA occupe {TON_IA.pic} de la carte, avec un micro-lot d'un seul texte.
 
 <Fragment slot="note">
 
 Un octet vaut 8 bits : `float32` tient sur 32 bits, bf16 sur 16, `int64` sur 64.
+
+Des calculs en bf16 sur des poids gardés en `float32` : c'est la précision mixte. Pour ton IA, c'est la boucle d'entraînement de la forge qui la règle (<a href={POIDS.boucle}>son code</a>).
 
 </Fragment>
 
@@ -478,7 +504,7 @@ Pour chronométrer ton poste, dans le dossier du projet :
 
 <BlocCommande commandes={[TENSEURS_MESURER_CPU]} ou="un terminal, dans le dossier du projet" />
 
-Avec une carte NVIDIA, la version de PyTorch pour la carte la chronomètre, si PyTorch la voit. La première fois, uv télécharge cette version, plusieurs gigaoctets.
+Avec une carte NVIDIA, la version de PyTorch pour la carte la chronomètre, si PyTorch la voit. La première fois, uv télécharge cette version, si elle n'est pas déjà dans son cache depuis le chapitre 0.3 : sous Windows, {ROUE_CARTE}.
 
 <BlocCommande commandes={[TENSEURS_MESURER_GPU]} ou="un terminal, dans le dossier du projet" />
 
@@ -504,7 +530,7 @@ Le processeur aussi calcule en parallèle : PyTorch partage un produit en morcea
   acquis="fils"
 >
 
-Avec {FILS.max} fils, le produit prend {FILS.msTous} ms, contre {FILS.msDefaut} ms avec {FILS.defaut} : {FILS.gainTous} fois plus vite. {FILS.phrase} Un fil n'est pas un cœur : un cœur du processeur peut faire tourner deux fils à la fois, qui se partagent alors ses unités de calcul.
+<p>{FILS.explication}</p>
 
 </Pari>
 
@@ -524,7 +550,7 @@ Ton IA et les plus grands modèles font les mêmes calculs, sur des tenseurs de 
 
 <EncadreLabo sources={LABO.sources}>
 
-Les grands labos entraînent leurs modèles en bf16, le type de l'étape 5. En bf16, une carte H100 fait au plus {LABO.crete} milliers de milliards d'opérations par seconde : c'est sa crête, en TFLOPS. Aucun entraînement ne l'atteint : il faut aussi lire la mémoire, et des milliers de cartes doivent s'attendre et s'échanger leurs résultats.
+Les grands labos font eux aussi leurs calculs en bf16, le type de l'étape 5. En bf16, une carte H100 fait au plus {LABO.crete} milliers de milliards d'opérations par seconde : c'est sa crête, en TFLOPS. Aucun entraînement ne l'atteint : il faut aussi lire la mémoire, et des milliers de cartes doivent s'attendre et s'échanger leurs résultats.
 
 La part de la crête vraiment utilisée s'appelle l'efficacité. PaLM, de Google, en a tiré {LABO.palm}, sur {LABO.palmMateriel} ; Llama 3 405B, de Meta, de {LABO.llamaMin} à {LABO.llamaMax}, sur {LABO.llamaMateriel}. Ton IA, seule sur la carte de ce PC, en tire {LABO.tonIA}, en comptant de la même façon : une seule carte n'attend personne.
 

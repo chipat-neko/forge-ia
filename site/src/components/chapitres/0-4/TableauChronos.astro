@@ -48,7 +48,7 @@ function releve(m: MesuresChrono): string {
   return `PyTorch ${m.torch}, relevé le ${formaterDate(m.releve_le)}`;
 }
 
-const titre = typographier('La durée d’un produit de deux matrices carrées en float32, en millisecondes, selon leur taille.');
+const objet = typographier('La durée d’un produit de deux matrices carrées en float32, en millisecondes, selon leur taille.');
 // Les appareils : le nom tel que le fichier le donne, qui ne se coupe pas, puis PyTorch et la date du relevé.
 const appareils = [
   { quoi: 'Processeur', nom: processeur.nom, suite: `, avec ${releve(processeur)}.` },
@@ -60,7 +60,7 @@ const appareils = [
 
 <figure class="tableau-chronos">
   <figcaption id="legende-chronos" data-test="chronos-legende">
-    <span class="titre">{titre}</span>
+    <span class="objet">{objet}</span>
     {
       appareils.map((a) => (
         <span class="appareil">
@@ -119,8 +119,9 @@ const appareils = [
     margin-bottom: 10px;
   }
 
-  /* La légende : ce que mesure le tableau, puis un appareil par ligne. */
-  figcaption .titre {
+  /* La légende : ce que mesure le tableau, puis un appareil par ligne. Pas de classe « titre » : la
+     règle globale .titre du gabarit (l'ouverture du chapitre, padding-top: 64px) s'y appliquerait. */
+  figcaption .objet {
     display: block;
     color: var(--indigo);
     margin-bottom: 4px;

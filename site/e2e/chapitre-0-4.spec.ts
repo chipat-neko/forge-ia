@@ -19,7 +19,7 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 import { materiel, REPERES_EFFICACITE } from '../src/lib/calculateur/donnees';
 import { formaterDate, formaterOctets } from '../src/lib/calculateur/formats';
 import { memoirePoidsOctets } from '../src/lib/calculateur/formules';
-import { PRESETS_FORGE } from '../src/lib/calculateur/ton-ia';
+import { MESURES_TON_IA, PRESETS_FORGE } from '../src/lib/calculateur/ton-ia';
 import { nombre, pourcent } from '../src/lib/nombres';
 import { trouverChapitre } from '../src/lib/parcours';
 import { extraireRegion } from '../src/lib/regions';
@@ -28,7 +28,7 @@ import { A_DEPART, B_DEPART, DEFI_FORMES_REUSSI, expliquer, type Operation } fro
 import * as commandes from '../src/lib/partie-0/commandes';
 import { ecrireForme, formeDiffusee, formeProduit } from '../src/lib/partie-0/formes';
 import { FICHIERS_MESURES, lireMesures, type MesuresChrono } from '../src/lib/partie-0/mesures';
-import { choixDiffusion, choixFils, choixMemoire, ecrireMillisecondes, questionFils } from '../src/lib/partie-0/paris-0-4';
+import { choixDiffusion, choixFils, choixMemoire, ecrireMillisecondes, phraseFils, questionFils } from '../src/lib/partie-0/paris-0-4';
 import {
   attendreHydratation,
   plusLongueLigne,
@@ -39,6 +39,8 @@ import {
 } from './outils';
 
 const PAGE = '/forge-ia/partie-0/0-4/';
+/** --corail de jetons.css (#B8342D), tel que le navigateur le calcule. */
+const CORAIL = 'rgb(184, 52, 45)';
 const FINE = '\u202F';
 
 // Playwright tourne dans site/ : le dépôt est un dossier plus haut.
@@ -61,7 +63,14 @@ const TITRES = [
   'À grande échelle',
 ];
 const PARIS = ['diffusion', 'memoire', 'fils'];
-const NB_ACQUIS = 4;
+/** Les acquis, dans l'ordre du chapitre ; le texte de `fils` est celui de la décision du contrôleur (ronde 1). */
+const ACQUIS: [string, string][] = [
+  ['diffusion', "Une dimension de taille 1 s'étire pour suivre l'autre."],
+  ['formes', 'Pour A @ B, les colonnes de A doivent égaler les lignes de B.'],
+  ['memoire', "La mémoire d'un tenseur, c'est son nombre de cases fois la taille d'un nombre."],
+  ['fils', 'Le processeur aussi calcule en parallèle, sur plusieurs fils ; pour les prendre tous, il faut le demander.'],
+];
+const NB_ACQUIS = ACQUIS.length;
 
 /** Les commandes que les blocs « À taper » du chapitre montrent, dans l'ordre de la page. */
 const COMMANDES_DES_BLOCS = [
@@ -181,6 +190,9 @@ test('chapitre 0.4 complet', async ({ page }) => {
   expect(await titres.evaluateAll((h) => h.map((e) => e.textContent))).toEqual(TITRES.map(typographier));
   await expect(page.locator('[data-pari]')).toHaveCount(PARIS.length);
   await expect(page.locator('#recap [data-acquis]')).toHaveCount(NB_ACQUIS);
+  for (const [cle, texte] of ACQUIS) {
+    expect(await texteExact(page.locator(`#recap [data-acquis="${cle}"]`)), cle).toContain(typographier(texte));
+  }
 
   // Avant le pari « diffusion », l'atelier est verrouillé : ses nombres et ses bascules ne répondent pas.
   await expect(page.locator('[data-verrou="formes"]')).toHaveAttribute('inert', '');
@@ -257,6 +269,7 @@ test('l’atelier suit formeDiffusee et formeProduit, réglé au clavier', async
     [[1, 3, 4], [2, 4, 5], 'produit'], // le défi : deux formes à 3 dimensions
     [[6, 6, 6], [6, 6, 6], 'plus'], // les plus grandes formes
     [[1, 1, 1], [1], 'plus'], // que des 1
+    [[3], [3], 'produit'], // deux vecteurs : un nombre seul, ()
   ];
   for (const [a, b, op] of REGLAGES) {
     await reglerFormes(page, a, b, op);
@@ -280,6 +293,18 @@ test('l’atelier suit formeDiffusee et formeProduit, réglé au clavier', async
       await expect(grille.locator('[data-souligne="oui"]'), nom).toHaveCount(2);
       await expect(grille.locator('[data-rangee="a"] td').nth(2), nom).toHaveAttribute('data-souligne', 'oui');
       await expect(grille.locator('[data-rangee="b"] td').nth(b.length === 1 ? 2 : 1), nom).toHaveAttribute('data-souligne', 'oui');
+      // Égales ou non, les deux tailles soulignées le disent aussi en mots (pas seulement par la couleur),
+      // et deux tailles différentes sont encadrées, comme les conflits de A + B.
+      const egales = a[a.length - 1] === (b.length === 1 ? b[0] : b[b.length - 2]);
+      for (const souligne of await grille.locator('[data-souligne="oui"]').all()) {
+        expect(await texteExact(souligne), nom).toContain(egales ? 'égale à l’autre taille soulignée' : 'différente de l’autre taille soulignée');
+        if (egales) await expect(souligne, nom).not.toHaveAttribute('data-conflit', 'oui');
+        else await expect(souligne.locator('.taille'), nom).toHaveCSS('border-top-color', CORAIL);
+      }
+      // Un nombre seul s'écrit (), dans la rangée du résultat aussi.
+      if (resultatAttendu(a, b, op) === '()') {
+        expect(await texteExact(grille.locator('[data-rangee="resultat"] td')), nom).toBe('()');
+      }
     } else {
       // Les cases étirées : celles que la règle de la diffusion fait grandir, et elles seules.
       const etirees = await grille.locator('[data-etire="oui"]').evaluateAll((cases) =>
@@ -355,6 +380,16 @@ test('le tableau des chronos est celui des fichiers de mesures', async ({ page }
   expect(legende).toContain(PROCESSEUR.torch);
   expect(legende).toContain(formaterDate(PROCESSEUR.releve_le));
   expect(legende).toContain(CARTE === null ? materiel('rtx-5070-ti').nom : CARTE.nom);
+  // Pas d'espace vide au-dessus du tableau (ronde 1) : le premier mot de la légende suit de près le paragraphe d'avant.
+  const ecart = await page.locator('.tableau-chronos').evaluate((figure) => {
+    const marcheur = document.createTreeWalker(figure.querySelector('figcaption')!, NodeFilter.SHOW_TEXT);
+    let texte = marcheur.nextNode();
+    while (texte && (texte.textContent ?? '').trim() === '') texte = marcheur.nextNode();
+    const plage = document.createRange();
+    plage.selectNodeContents(texte!);
+    return plage.getClientRects()[0].top - figure.previousElementSibling!.getBoundingClientRect().bottom;
+  });
+  expect(ecart, `écart de ${Math.round(ecart)} px au-dessus de la légende`).toBeLessThan(60);
   // Le tableau défile dans sa zone, sans faire déborder la page ; sur un téléphone, une phrase le dit.
   const zone = page.locator('[data-test="chronos-zone"]');
   await expect(zone).toHaveCSS('overflow-x', 'auto');
@@ -416,7 +451,19 @@ test('l’ouverture, les exemples, la mémoire et l’encadré viennent des donn
   // Étape 5 : 1 Mo = 2²⁰ octets, et les poids de ton IA en bf16, par le calculateur.
   const etape5 = await texteExact(page.locator('#etape-5'));
   expect(etape5).toContain(nombre(2 ** 20));
+  // Les poids de ton IA restent en float32 (autocast calcule en bf16) : les deux tailles, calculées.
+  expect(etape5).toContain(formaterOctets(memoirePoidsOctets(parametres, 4)));
   expect(etape5).toContain(formaterOctets(memoirePoidsOctets(parametres, 2)));
+  expect(etape5).toContain('restent en float32');
+  // Le pic de mémoire mesuré pour un micro-lot d'un seul texte, cité aux étapes 1 et 5, avec le rapport de mesure.
+  const pic = `${nombre(MESURES_TON_IA.tres_grand.carte.memoireGo, 1)}\u00A0Go`;
+  expect(MESURES_TON_IA.tres_grand.carte.microLot).toBe(1);
+  expect(await texteExact(page.locator('#etape-1 .note'))).toContain(pic);
+  expect(await texteExact(page.locator('#etape-1 .note'))).toContain('deux ne tiennent pas dans sa mémoire');
+  await expect(page.locator(`#etape-1 .note a[href="${MESURES_TON_IA.tres_grand.source.url}"]`)).toHaveCount(1);
+  expect(etape5).toContain(pic);
+  // Étape 7 : l'explication du pari « fils » est celle que tirent les mesures (phraseFils).
+  expect(await texteExact(page.locator('[data-pari="fils"] .explication'))).toContain(phraseFils(PROCESSEUR));
   // L'encadré : la crête d'une H100 en bf16, et les efficacités de PaLM et de Llama 3, sourcées.
   const labo = page.locator('#etape-8 .labo');
   const texteLabo = await texteExact(labo);

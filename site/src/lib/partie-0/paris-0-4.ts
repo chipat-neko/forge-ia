@@ -21,6 +21,8 @@ import { ecrireForme, formeDiffusee, memoireOctets } from './formes';
 import type { MesuresChrono } from './mesures';
 
 const FINE = '\u202F';
+/** L'espace insécable ordinaire, autour du × d'une taille (« 4 096 × 4 096 ») : la ligne ne s'y coupe pas. */
+const INSECABLE = '\u00A0';
 const exiger = exigeur('src/lib/partie-0/paris-0-4.ts et le texte des paris du chapitre 0.4');
 
 /** Deux formes égales (null compris). */
@@ -160,10 +162,30 @@ export function verdictFils(rapport: number): VerdictFils {
   return 'pas';
 }
 
-/** La question du pari « fils », avec les fils du fichier de mesures. */
+/**
+ * Le gain minimal du réglage par défaut sur un seul fil. L'étape 7 dit « Le
+ * processeur aussi calcule en parallèle » en montrant ce gain : à 1,5, les
+ * fils du réglage par défaut font gagner au moins un tiers du temps, bien
+ * au-delà de ce qu'une mesure dérangée peut déplacer ; en dessous, la phrase
+ * ne serait plus démontrée par le tableau, et la mesure est à refaire.
+ */
+export const SEUIL_PARALLELE = 1.5;
+
+/** Combien de fois le réglage par défaut va plus vite qu'un seul fil, au produit du pari ; gardé par SEUIL_PARALLELE. */
+export function gainDuReglageParDefaut(m: MesuresChrono): number {
+  const gain = m.fils_par_defaut > 1 ? chrono(m, TAILLE_DU_PARI_FILS, 1) / chrono(m, TAILLE_DU_PARI_FILS, m.fils_par_defaut) : 1;
+  exiger(
+    gain >= SEUIL_PARALLELE,
+    `le réglage par défaut (${m.fils_par_defaut} fils) ne va plus que ${nombre(gain, 1)} fois plus vite qu’un seul fil, ` +
+      `sous ${nombre(SEUIL_PARALLELE, 1)} : l’étape 7 ne montre plus que le processeur calcule en parallèle (refais la mesure du processeur)`,
+  );
+  return gain;
+}
+
+/** La question du pari « fils », avec les fils du fichier de mesures ; « 4 096 × 4 096 » ne se coupe pas. */
 export function questionFils(m: MesuresChrono): string {
   const t = nombre(TAILLE_DU_PARI_FILS);
-  return `Avec ${nombre(m.fils_max)} fils au lieu de ${nombre(m.fils_par_defaut)}, le produit ${t} × ${t} va-t-il deux fois plus vite${FINE}?`;
+  return `Avec ${nombre(m.fils_max)} fils au lieu de ${nombre(m.fils_par_defaut)}, le produit ${t}${INSECABLE}×${INSECABLE}${t} va-t-il deux fois plus vite${FINE}?`;
 }
 
 /** Les choix du pari « fils » : le juste suit le rapport des chronos. */
@@ -177,15 +199,38 @@ export function choixFils(m: MesuresChrono): Choix[] {
   return choix.map(([cle, texte]) => ({ texte, juste: cle === v }));
 }
 
-/** La phrase de l'explication du pari « fils », selon le verdict des mesures. */
+/**
+ * L'explication du pari « fils », tirée des mesures et juste pour n'importe
+ * quel fichier valide : les deux chronos, la comparaison (« 1,20 fois plus
+ * vite », « 1,30 fois plus lent » si tous les fils vont moins vite, « pas plus
+ * vite » à 1 % près), une phrase selon le verdict, et, quand les fils en plus
+ * aident peu ou pas, la raison : deux fils d'un même cœur se partagent ses
+ * unités de calcul (8 cœurs et 16 fils sur ce PC, docs/mesures/entrainement-2026-11.md).
+ */
 export function phraseFils(m: MesuresChrono): string {
-  switch (verdictFils(rapportFils(m))) {
+  const r = rapportFils(m);
+  const tous = ecrireMillisecondes(chrono(m, TAILLE_DU_PARI_FILS, m.fils_max));
+  const defaut = ecrireMillisecondes(chrono(m, TAILLE_DU_PARI_FILS, m.fils_par_defaut));
+  const plusVite = r >= 1;
+  const facteur = plusVite ? r : 1 / r;
+  // À 1 % près (deux décimales), ni plus vite ni plus lent.
+  const egaux = Number(facteur.toFixed(2)) === 1;
+  const comparaison = egaux ? 'pas plus vite' : `${nombre(facteur, 2)} fois ${plusVite ? 'plus vite' : 'plus lent'}`;
+  const debut =
+    `Avec ${nombre(m.fils_max)} fils, le produit prend ${tous} ms, contre ${defaut} ms ` +
+    `avec ${nombre(m.fils_par_defaut)}${FINE}: ${comparaison}.`;
+  const coeurs =
+    `Un fil n’est pas un cœur${FINE}: un cœur du processeur peut faire tourner deux fils à la fois, ` +
+    'qui se partagent alors ses unités de calcul.';
+  switch (verdictFils(r)) {
     case 'deux-fois':
-      return 'Ici, les fils en plus calculent presque autant que les premiers.';
+      return `${debut} Ici, les fils en plus calculent presque autant que les premiers.`;
     case 'un-peu':
-      return 'Les fils en plus aident, mais bien moins que les premiers.';
+      return `${debut} Les fils en plus aident, mais bien moins que les premiers. ${coeurs}`;
     case 'pas':
-      return 'Ici, les fils en plus n’aident pas.';
+      return plusVite || egaux
+        ? `${debut} Ici, les fils en plus n’aident presque pas. ${coeurs}`
+        : `${debut} Ici, les fils en plus ralentissent même le calcul. ${coeurs}`;
   }
 }
 

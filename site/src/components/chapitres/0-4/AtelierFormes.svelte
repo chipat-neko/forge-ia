@@ -150,6 +150,8 @@
         class:manque={c.manque}>{c.taille}</span
       >{#if c.manque}<span class="vh">, dimension qui manque, comptée pour 1</span>{/if}{#if c.etire}<span class="vh"
           >, s’étire</span
+        >{/if}{#if c.souligne}<span class="vh"
+          >{c.conflit ? ', différente de l’autre taille soulignée' : ', égale à l’autre taille soulignée'}</span
         >{/if}{/if}</td
   >
 {/snippet}
@@ -218,10 +220,13 @@
       {@render rangee('b', 'B', g.b)}
       <tr data-rangee="resultat" class="ligne-resultat">
         <th scope="row">{nomOperation}</th>
-        {#if g.resultat !== null}
-          {#each g.resultat as c, i (i)}{@render cellule(c, i)}{/each}
-        {:else}
+        {#if r === null}
           <td colspan={DIMENSIONS_MAX} class="impossible">impossible</td>
+        {:else if r.length === 0}
+          <!-- Un nombre seul (vecteur @ vecteur) n'a aucune dimension : la rangée l'écrit (), comme le résultat. -->
+          <td colspan={DIMENSIONS_MAX} class="nombre-seul">()</td>
+        {:else}
+          {#each g.resultat ?? [] as c, i (i)}{@render cellule(c, i)}{/each}
         {/if}
       </tr>
     </tbody>
@@ -328,6 +333,10 @@
     padding-top: 8px;
   }
 
+  .grille td.nombre-seul {
+    text-align: right;
+  }
+
   .grille td.impossible {
     font-family: var(--texte);
     font-weight: 400;
@@ -372,8 +381,9 @@
     border-color: var(--corail);
   }
 
+  /* Deux tailles soulignées différentes : soulignées et encadrées de corail, comme les conflits de
+     A + B. La différence ne tient donc pas qu'à la couleur du trait. */
   .taille.souligne.conflit {
-    border-color: transparent;
     text-decoration-color: var(--corail);
   }
 

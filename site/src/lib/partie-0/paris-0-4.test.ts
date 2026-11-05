@@ -24,6 +24,8 @@ import {
   OCTETS_FLOAT32,
   OCTETS_PAR_MO,
   phraseFils,
+  gainDuReglageParDefaut,
+  SEUIL_PARALLELE,
   questionFils,
   rapportFils,
   TAILLE_DU_PARI_FILS,
@@ -33,6 +35,7 @@ import {
 } from './paris-0-4';
 
 const FINE = '\u202F';
+const INSECABLE = '\u00A0';
 // Vitest tourne dans site/ : le dépôt est un dossier plus haut.
 const RACINE = resolve('..');
 
@@ -137,22 +140,48 @@ describe('pari « fils » : tous les fils contre le réglage par défaut', () =>
 
   it('la question nomme les fils du fichier, et la garde refuse un processeur sans fils en plus', () => {
     const m = processeur({ [T]: { 1: 1000, 8: 192, 16: 160 } });
-    expect(questionFils(m)).toBe(`Avec 16 fils au lieu de 8, le produit 4${FINE}096 × 4${FINE}096 va-t-il deux fois plus vite${FINE}?`);
+    // Des espaces insécables autour du × : « 4 096 × 4 096 » ne se coupe pas.
+    expect(questionFils(m)).toBe(
+      `Avec 16 fils au lieu de 8, le produit 4${FINE}096${INSECABLE}×${INSECABLE}4${FINE}096 va-t-il deux fois plus vite${FINE}?`,
+    );
     expect(rapportFils(m)).toBe(192 / 160);
     expect(() => choixFils(processeur({ [T]: { 1: 1000, 8: 200 } }, 8, 8))).toThrow(/fils_par_defaut/);
     // Une mesure absente est une erreur qui dit quoi faire.
     expect(() => choixFils(processeur({ 1024: { 1: 10, 8: 2, 16: 2 } }))).toThrow(/4096.*python -m tenseurs mesurer/);
   });
 
-  it('la phrase de l’explication suit le verdict', () => {
-    const deux = phraseFils(processeur({ [T]: { 1: 1000, 8: 200, 16: 100 } }));
-    const unPeu = phraseFils(processeur({ [T]: { 1: 1000, 8: 192, 16: 160 } }));
-    const pas = phraseFils(processeur({ [T]: { 1: 1000, 8: 100, 16: 130 } }));
-    expect(new Set([deux, unPeu, pas]).size).toBe(3);
-    expect(deux).toContain('presque autant');
-    expect(unPeu).toContain('bien moins');
-    expect(pas).toContain('n’aident pas');
-    for (const p of [deux, unPeu, pas]) expect(p).not.toMatch(/ [;:!?]/);
+  it('l’explication suit le verdict : la comparaison entière, et les cœurs seulement quand les fils en plus aident peu', () => {
+    const coeurs = `Un fil n’est pas un cœur${FINE}: un cœur du processeur peut faire tourner deux fils à la fois, qui se partagent alors ses unités de calcul.`;
+    const avant = (tous: string, defaut: string) => `Avec 16 fils, le produit prend ${tous} ms, contre ${defaut} ms avec 8${FINE}: `;
+    // Deux fois plus vite : pas de phrase sur les cœurs, qui la contredirait.
+    expect(phraseFils(processeur({ [T]: { 1: 1000, 8: 200, 16: 100 } }))).toBe(
+      `${avant('100', '200')}2,00 fois plus vite. Ici, les fils en plus calculent presque autant que les premiers.`,
+    );
+    // Un peu plus vite (les chronos provisoires de ce PC : 192 et 160 ms).
+    expect(phraseFils(processeur({ [T]: { 1: 1000, 8: 192.3, 16: 160 } }))).toBe(
+      `${avant('160', '192')}1,20 fois plus vite. Les fils en plus aident, mais bien moins que les premiers. ${coeurs}`,
+    );
+    // Pas plus vite, mais un peu quand même.
+    expect(phraseFils(processeur({ [T]: { 1: 1000, 8: 105, 16: 100 } }))).toBe(
+      `${avant('100', '105')}1,05 fois plus vite. Ici, les fils en plus n’aident presque pas. ${coeurs}`,
+    );
+    // Plus lent : la comparaison se retourne (1 / rapport), jamais « 0,77 fois plus vite ».
+    expect(phraseFils(processeur({ [T]: { 1: 1000, 8: 100, 16: 130 } }))).toBe(
+      `${avant('130', '100')}1,30 fois plus lent. Ici, les fils en plus ralentissent même le calcul. ${coeurs}`,
+    );
+    // Égaux à 1 % près : ni plus vite, ni plus lent.
+    expect(phraseFils(processeur({ [T]: { 1: 1000, 8: 100, 16: 100.4 } }))).toBe(
+      `${avant('100', '100')}pas plus vite. Ici, les fils en plus n’aident presque pas. ${coeurs}`,
+    );
+  });
+
+  it('le gain du réglage par défaut sur un seul fil est gardé : sous 1,5, la page ne dirait plus vrai', () => {
+    expect(SEUIL_PARALLELE).toBe(1.5);
+    expect(gainDuReglageParDefaut(processeur({ [T]: { 1: 1066, 8: 192.3, 16: 160 } }))).toBe(1066 / 192.3);
+    expect(gainDuReglageParDefaut(processeur({ [T]: { 1: 150, 8: 100, 16: 90 } }))).toBe(1.5);
+    expect(() => gainDuReglageParDefaut(processeur({ [T]: { 1: 140, 8: 100, 16: 90 } }))).toThrow(/réglage par défaut.*1,4/);
+    // Un réglage par défaut d'un seul fil n'a rien à montrer : la garde le refuse aussi.
+    expect(() => gainDuReglageParDefaut(processeur({ [T]: { 1: 100, 16: 50 } }, 1, 16))).toThrow(/réglage par défaut/);
   });
 
   it('le fichier du processeur donne un verdict, et un seul choix juste', () => {
