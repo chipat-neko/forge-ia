@@ -32,13 +32,44 @@ cd site; npm install; npm run dev
 Le site est alors servi en local sur <http://127.0.0.1:8530/forge-ia/>.
 Les ports du projet sont listés dans `PORTS.md`.
 
+## Les projets
+
+Les projets Python sont dans `projets/`, un par chapitre, chacun avec son
+README, ses tests et son verrou `uv.lock` : chacun se lance seul.
+
+La Partie 0, « Les bases » :
+
+| Projet | Chapitre | Ce qu'il fait |
+| --- | --- | --- |
+| `projets/0.1-python` | 0.1, Python pour l'IA | compte quel mot suit quel autre dans un texte, et devine le mot suivant |
+| `projets/0.2-maths` | 0.2, Les maths utiles | vecteurs, matrices, pente et descente, tirages au sort, softmax et erreur |
+| `projets/0.3-poste` | 0.3, Installer son poste | vérifie le poste (Python, PyTorch, carte graphique, pilote) et dit quoi faire |
+| `projets/0.4-tenseurs` | 0.4, Tenseurs et calcul sur GPU | crée des tenseurs, prévoit leurs formes, compte leur mémoire, chronomètre le processeur et la carte |
+| `projets/0.5-reseau` | 0.5, Premier réseau de neurones | un neurone à seuil, puis un réseau entraîné à la main et avec PyTorch |
+
+Les autres :
+
+- `projets/1.3-tokenizer` : le tokenizer BPE du chapitre 1.3 ;
+- `projets/mini-modele` : le jumeau Python des démos du mini-modèle
+  (l'avant-goût de 0.5, puis 1.5) ;
+- `projets/forge` : le moteur de « ton IA », l'IA que le site entraîne.
+
 ## Lancer un projet Python
 
-Il faut [uv](https://docs.astral.sh/uv/). Les commandes Python se lancent
-depuis la racine du dépôt. Par exemple pour le projet du tokenizer :
+Il faut [uv](https://docs.astral.sh/uv/). Chaque projet se lance depuis son
+dossier. Par exemple, depuis la racine du dépôt, pour le projet du
+tokenizer :
 
 ```powershell
 cd projets/1.3-tokenizer; uv run pytest
+```
+
+Les projets qui utilisent PyTorch (0.3, 0.4, 0.5 et `forge`) demandent en
+plus un extra : `--extra cpu` pour la version de PyTorch pour le
+processeur, `--extra gpu` pour celle de la carte NVIDIA. Par exemple :
+
+```powershell
+cd projets/0.3-poste; uv run --extra cpu pytest
 ```
 
 ## Tests et publication

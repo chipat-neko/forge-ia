@@ -4,30 +4,76 @@ Un petit programme qui lit un texte, compte quel mot suit quel autre, puis
 devine le mot suivant. En partant d'un mot, il enchaîne à chaque fois le mot
 qui le suit le plus souvent dans le texte : il écrit ainsi une suite de mots.
 
-C'est le projet de l'étape 0.1 de La Forge IA, « Python pour l'IA ». Il
+C'est le projet du chapitre 0.1 de La Forge IA, « Python pour l'IA ». Il
 n'utilise que la bibliothèque standard de Python : texte, listes, tranches,
 `zip`, dictionnaires et `Counter`. Le site en propose un jumeau en TypeScript
 qui doit donner exactement les mêmes résultats.
 
-## Lancer
+## Installer uv
 
-Il faut `uv` et Python 3.12 ou plus. Dans PowerShell :
+`uv` installe Python et ce dont le projet a besoin. Le projet demande Python
+3.12 ou plus récent : uv en télécharge un lui-même s'il n'en trouve pas.
+
+Windows, dans PowerShell (ou `winget install --id=astral-sh.uv -e`) :
 
 ```powershell
-cd projets/0.1-python
-uv run python -m mot_suivant le --longueur 12
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+uv --version
 ```
 
+Linux et Mac, dans un terminal :
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Si le terminal ne connaît pas encore `uv`, ferme-le et rouvre-le.
+
+## Lancer
+
+Récupère le dépôt avec git, puis va dans le dossier du projet. Les commandes
+sont les mêmes dans PowerShell (Windows) et dans un terminal (Linux, Mac) :
+
+```bash
+git clone https://github.com/chipat-neko/forge-ia
+cd forge-ia/projets/0.1-python
+uv run python -m mot_suivant le
+```
+
+Sans git, le bouton « Code » de la page GitHub du dépôt donne aussi un
+fichier zip : son dossier s'appelle `forge-ia-main`, à écrire à la place de
+`forge-ia` dans la commande `cd`.
+
 Le programme affiche les mots qui suivent « le » dans le texte, avec leur
-nombre d'apparitions, puis une suite de 12 mots qui commence par « le ». Avec
-`--fichier mon-texte.txt`, il lit un autre texte (en UTF-8).
+nombre d'apparitions, le plus probable d'entre eux, puis une suite de 12 mots
+qui commence par « le ». `--longueur 20` change la longueur de la suite, et
+`--fichier mon-texte.txt` lui fait lire un autre texte (en UTF-8).
 
 ## Tester
 
-```powershell
-cd projets/0.1-python
-uv run pytest -q
+Dans le dossier du projet :
+
+```bash
+uv run pytest
 ```
+
+Avec `-q`, pytest n'affiche qu'un point par test réussi et le bilan.
+
+## Ce que montre le chapitre
+
+Les extraits de code du chapitre 0.1 sont tirés du projet, entre les
+marqueurs `# region: <nom>` et `# fin: <nom>` :
+
+| Fichier | Région | Étape du chapitre |
+| --- | --- | --- |
+| `mot_suivant/mots.py` | `decouper` | 3, « Des listes de mots » |
+| `mot_suivant/mots.py` | `compter` | 4, « Compter avec un dictionnaire » |
+| `mot_suivant/mots.py` | `predire`, `generer`, `suivre` | 7, « Ranger son code » |
+| `tests/test_mots.py` | `test-predire` | 8, « Les tests » |
+
+La région `trier` de `mots.py` est balisée aussi, mais le chapitre ne la
+montre pas. Les commandes du chapitre sont celles de « Installer uv »,
+« Lancer » et « Tester » ci-dessus.
 
 ## Les règles à connaître
 

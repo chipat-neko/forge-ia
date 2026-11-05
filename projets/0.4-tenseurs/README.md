@@ -7,10 +7,10 @@ aura un résultat : la diffusion (`a + b`) et le produit matriciel (`a @ b`).
 Il compte la mémoire d'un tenseur, et chronomètre un produit de matrices sur
 le processeur, et sur la carte graphique si elle est là.
 
-C'est le projet de l'étape 0.4 de La Forge IA, « Les tenseurs ». Comme le
-projet 0.3, il utilise PyTorch, en deux versions au choix : celle pour carte
-NVIDIA (extra `gpu`, CUDA 13.2) et celle pour le processeur seul (extra
-`cpu`).
+C'est le projet du chapitre 0.4 de La Forge IA, « Tenseurs et calcul sur
+GPU ». Comme le projet 0.3, il utilise PyTorch, en deux versions au choix :
+celle pour carte NVIDIA (extra `gpu`, CUDA 13.2) et celle pour le processeur
+seul (extra `cpu`).
 
 ## Installer uv
 
@@ -29,9 +29,22 @@ git clone https://github.com/chipat-neko/forge-ia
 cd forge-ia/projets/0.4-tenseurs
 ```
 
+Si tu as déjà récupéré le dépôt (au chapitre 0.1 ou 0.3, par exemple),
+mets-le à jour depuis le dossier où tu l'as récupéré, puis va dans le projet :
+
+```bash
+git -C forge-ia pull
+cd forge-ia/projets/0.4-tenseurs
+```
+
+Un fichier zip du dépôt, lui, ne se met pas à jour : télécharge-le de
+nouveau, et écris `forge-ia-main` à la place de `forge-ia` dans la commande
+`cd`.
+
 Dans les commandes qui suivent, `--extra cpu` prend la version de PyTorch pour
 le processeur. Avec une carte NVIDIA, mets `--extra gpu` : la première fois,
-uv télécharge cette version, plusieurs gigaoctets.
+uv télécharge cette version, plusieurs gigaoctets, sauf si elle est déjà dans
+son cache depuis le projet 0.3.
 
 ### Les règles de forme
 
@@ -57,9 +70,12 @@ lui-même.
 ### Les chronos
 
 ```bash
-uv run --extra cpu python -m tenseurs mesurer --appareil cpu
-uv run --extra gpu python -m tenseurs mesurer --appareil cuda
+uv run --extra cpu python -m tenseurs mesurer
+uv run --extra gpu python -m tenseurs mesurer
 ```
+
+La première commande mesure le processeur. La seconde, avec la version pour
+la carte, mesure la carte si PyTorch la voit, sinon le processeur.
 
 Le script chronomètre le produit de deux matrices de 64 × 64 à 4 096 × 4 096
 nombres, en float32. Sur le processeur, il le fait avec 1 fil, avec le
@@ -68,13 +84,22 @@ carte, il mesure aussi la copie de chaque matrice vers la carte. Chaque durée
 est la médiane de 5 produits, après 2 produits pour rien qui préparent le
 calcul.
 
+- `--appareil cpu` ou `--appareil cuda` choisit l'appareil ; sans
+  `--appareil`, le script suit la variable `FORGE_APPAREIL`, sinon prend la
+  carte si PyTorch la voit, sinon le processeur ;
 - `--sortie FICHIER` écrit aussi les mesures dans FICHIER, en JSON (UTF-8) ;
-- `--tailles 64 256` choisit d'autres tailles ;
-- sans `--appareil`, le script suit la variable `FORGE_APPAREIL`, sinon prend
-  la carte si PyTorch la voit, sinon le processeur.
+- `--tailles 64 256` choisit d'autres tailles.
 
 Demander `--appareil cuda` sans carte visible donne un message qui dit quoi
 faire, pas une trace Python, et le code de sortie 2.
+
+### Sans carte NVIDIA
+
+Tout le projet tourne sur le processeur, avec `--extra cpu` : les règles de
+forme, les exemples, la mémoire, et les chronos du processeur. C'est aussi ce
+qu'il faut sur un Mac (à puce Apple, macOS 14 ou plus récent) : la puce
+graphique des Mac (MPS) n'est pas essayée par le site. Seuls les chronos de la
+carte manquent, et les tests de la carte sont sautés (voir « Tester »).
 
 ## Les mesures du PC de La Forge IA
 
@@ -166,6 +191,25 @@ uv run --extra cpu python -m tenseurs.attendus
 
 Un test vérifie qu'il est à jour : si PyTorch ou les exemples changent, il
 échoue tant que le fichier n'est pas régénéré.
+
+## Ce que montre le chapitre
+
+Les extraits de code du chapitre 0.4 sont tirés du projet, entre les
+marqueurs `# region: <nom>` et `# fin: <nom>`. `tests/test_paquet.py`
+vérifie que ces régions sont là, et bien fermées.
+
+| Fichier | Région | Étape du chapitre |
+| --- | --- | --- |
+| `tenseurs/exemples.py` | `creer`, `lire` | 2, « Créer et lire » |
+| `tenseurs/exemples.py` | `calculer` | 3, « Calculer » |
+| `tenseurs/formes.py` | `diffusion`, `produit` | 4, « La diffusion » |
+| `tenseurs/memoire.py` | `memoire` | 5, « Les types de nombres et la mémoire » |
+| `tenseurs/appareil.py` | `appareil` | 6, « Sur la carte » |
+| `tenseurs/chrono.py` | `chrono`, `transfert` | 6, « Sur la carte » |
+
+Le `pyproject.toml` a la même région `pytorch` que celui du projet 0.3 : c'est
+le chapitre 0.3 qui la montre. L'étape 6 montre aussi les chronos de
+`mesures/`, dans un tableau.
 
 ## Le notebook
 

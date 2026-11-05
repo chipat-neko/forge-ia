@@ -6,7 +6,7 @@ pilote, et le nombre de fils de calcul du processeur. Il en tire un
 diagnostic, dit quoi faire quand quelque chose cloche, puis fait un essai de
 calcul sur le processeur, et sur la carte si elle est prête.
 
-C'est le projet de l'étape 0.3 de La Forge IA, « Installer son poste ». Il
+C'est le projet du chapitre 0.3 de La Forge IA, « Installer son poste ». Il
 utilise PyTorch, en deux versions au choix : celle pour carte NVIDIA (extra
 `gpu`, CUDA 13.2) et celle pour le processeur seul (extra `cpu`).
 
@@ -15,7 +15,7 @@ utilise PyTorch, en deux versions au choix : celle pour carte NVIDIA (extra
 `uv` installe Python et les bibliothèques de chaque projet. Le fichier
 `.python-version` demande Python 3.12 : uv le télécharge lui-même s'il manque.
 
-Windows, dans PowerShell :
+Windows, dans PowerShell (ou `winget install --id=astral-sh.uv -e`) :
 
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
@@ -38,6 +38,18 @@ mêmes dans PowerShell (Windows) et dans un terminal (Linux, Mac) :
 git clone https://github.com/chipat-neko/forge-ia
 cd forge-ia/projets/0.3-poste
 ```
+
+Si tu as déjà récupéré le dépôt (au chapitre 0.1, par exemple), mets-le à
+jour depuis le dossier où tu l'as récupéré, puis va dans le projet :
+
+```bash
+git -C forge-ia pull
+cd forge-ia/projets/0.3-poste
+```
+
+Sans git, le bouton « Code » de la page GitHub du dépôt donne un fichier zip,
+à télécharger de nouveau à chaque mise à jour : son dossier s'appelle
+`forge-ia-main`, à écrire à la place de `forge-ia` dans la commande `cd`.
 
 **Avec une carte NVIDIA** (Windows ou Linux), d'abord `nvidia-smi` pour voir
 le pilote, puis :
@@ -63,6 +75,8 @@ installer.
 
 `uv run` installe ce qu'il faut avant de lancer le script. Sans `--extra`,
 PyTorch n'est pas installé : le script le dit, et donne la commande à lancer.
+`uv sync --extra gpu` (ou `uv sync --extra cpu`) fait la même installation
+sans rien lancer.
 
 ## Ce que dit le script
 
@@ -160,6 +174,21 @@ uv run --extra cpu python -m poste.attendus
 
 Un test vérifie qu'il est à jour : si le diagnostic change, il échoue tant que
 le fichier n'est pas régénéré.
+
+## Ce que montre le chapitre
+
+Les extraits de code du chapitre 0.3 sont tirés du projet, entre les
+marqueurs `# region: <nom>` et `# fin: <nom>` :
+
+| Fichier | Région | Étape du chapitre |
+| --- | --- | --- |
+| `pyproject.toml` | `pytorch` | 4, « Le projet et sa version de PyTorch » |
+| `poste/diagnostic.py` | `diagnostiquer` | 5, « Vérifier » |
+| `poste/appareil.py` | `appareil` | 5, « Vérifier » |
+
+La région `essai` de `poste/essai.py` est balisée aussi, mais le chapitre ne
+la montre pas. L'étape 5 montre aussi les deux sorties de `sorties/`, telles
+quelles, et l'étape 6 le tableau des situations de `tests/attendus.json`.
 
 ## Le notebook
 

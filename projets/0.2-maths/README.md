@@ -5,17 +5,27 @@ vecteurs et produit scalaire, une matrice fois un vecteur, la pente d'une
 erreur et la descente qui la suit, des tirages au sort, puis softmax et
 l'erreur d'une prédiction.
 
-C'est le projet de l'étape 0.2 de La Forge IA, « Les maths utiles ». Il
+C'est le projet du chapitre 0.2 de La Forge IA, « Les maths utiles ». Il
 n'utilise que la bibliothèque standard de Python. Le site en propose un jumeau
 en TypeScript, pour ses trois figures (vecteurs, descente, tirages), qui doit
 donner exactement les mêmes nombres.
 
 ## Lancer
 
-Il faut `uv` et Python 3.12 ou plus. Dans PowerShell :
+Il faut `uv` : pour l'installer, voir le README du projet 0.1
+(`projets/0.1-python`), ou
+<https://docs.astral.sh/uv/getting-started/installation/>. Le projet demande
+Python 3.12 ou plus récent : uv en télécharge un lui-même s'il n'en trouve
+pas.
 
-```powershell
-cd projets/0.2-maths
+Récupère le dépôt avec git (si tu l'as déjà fait au chapitre 0.1,
+`git -C forge-ia pull` le met à jour), puis va dans le dossier du projet. Les
+commandes sont les mêmes dans PowerShell (Windows) et dans un terminal
+(Linux, Mac) :
+
+```bash
+git clone https://github.com/chipat-neko/forge-ia
+cd forge-ia/projets/0.2-maths
 uv run python -m maths_utiles
 ```
 
@@ -26,10 +36,28 @@ vecteurs, une matrice fois un vecteur, dix pas de descente au taux 0,1, puis
 
 ## Tester
 
-```powershell
-cd projets/0.2-maths
-uv run pytest -q
+Dans le dossier du projet :
+
+```bash
+uv run pytest
 ```
+
+Avec `-q`, pytest n'affiche qu'un point par test réussi et le bilan.
+
+## Ce que montre le chapitre
+
+Le chapitre 0.2 ne fait taper aucune commande : il montre le code du projet,
+tiré des régions balisées par `# region: <nom>` et `# fin: <nom>`.
+
+| Fichier | Région | Étape du chapitre |
+| --- | --- | --- |
+| `maths_utiles/vecteurs.py` | `scalaire` | 1, « Des nombres en colonne : les vecteurs » |
+| `maths_utiles/vecteurs.py` | `matrice` | 2, « Les matrices : beaucoup de produits scalaires » |
+| `maths_utiles/derivees.py` | `erreur`, `pente` | 3, « La pente » |
+| `maths_utiles/derivees.py` | `descendre` | 4, « Descendre la pente » |
+| `maths_utiles/derivees.py` | `chaine` | 5, « La règle de la chaîne » |
+| `maths_utiles/tirage.py` | `tirer`, `hasard` | 6, « Les probabilités » |
+| `maths_utiles/probabilites.py` | `softmax`, `erreur-de-prediction` | 7, « Des scores aux probabilités, et l'erreur » |
 
 ## Ce que contient le paquet
 

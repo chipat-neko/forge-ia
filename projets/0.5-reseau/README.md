@@ -8,10 +8,10 @@ main, en Python pur, avec l'erreur et la descente de gradient du chapitre
 Les dérivées calculées à la main et celles d'autograd sont les mêmes, à
 10⁻¹² près.
 
-C'est le projet de l'étape 0.5 de La Forge IA, « Un premier réseau ». Comme
-les projets 0.3 et 0.4, il utilise PyTorch, en deux versions au choix :
-celle pour carte NVIDIA (extra `gpu`, CUDA 13.2) et celle pour le processeur
-seul (extra `cpu`).
+C'est le projet du chapitre 0.5 de La Forge IA, « Premier réseau de
+neurones ». Comme les projets 0.3 et 0.4, il utilise PyTorch, en deux versions
+au choix : celle pour carte NVIDIA (extra `gpu`, CUDA 13.2) et celle pour le
+processeur seul (extra `cpu`).
 
 ## Installer uv
 
@@ -30,9 +30,22 @@ git clone https://github.com/chipat-neko/forge-ia
 cd forge-ia/projets/0.5-reseau
 ```
 
+Si tu as déjà récupéré le dépôt (à un chapitre précédent), mets-le à jour
+depuis le dossier où tu l'as récupéré, puis va dans le projet :
+
+```bash
+git -C forge-ia pull
+cd forge-ia/projets/0.5-reseau
+```
+
+Un fichier zip du dépôt, lui, ne se met pas à jour : télécharge-le de
+nouveau, et écris `forge-ia-main` à la place de `forge-ia` dans la commande
+`cd`.
+
 Dans les commandes qui suivent, `--extra cpu` prend la version de PyTorch pour
 le processeur. Avec une carte NVIDIA, mets `--extra gpu` : la première fois,
-uv télécharge cette version, plusieurs gigaoctets.
+uv télécharge cette version, plusieurs gigaoctets, sauf si elle est déjà dans
+son cache depuis le projet 0.3 ou 0.4.
 
 ```bash
 uv run --extra cpu python -m premier_reseau entrainer --appareil cpu
@@ -57,6 +70,23 @@ précédée de la date du relevé. Sans `--appareil`, il suit la variable
 processeur. Demander `--appareil cuda` sans carte visible donne un message qui
 dit quoi faire, pas une trace Python, et le code de sortie 2. Sans PyTorch
 (sans `--extra`), le script le dit aussi, et rend le code 2.
+
+### Sans carte NVIDIA
+
+Tout le projet tourne sur le processeur, avec la première commande : le
+neurone, l'entraînement à la main, et celui de PyTorch. C'est aussi ce qu'il
+faut sur un Mac (à puce Apple, macOS 14 ou plus récent) : la puce graphique
+des Mac (MPS) n'est pas essayée par le site. Pour qu'un lancement sans
+`--appareil` calcule sur le processeur même avec la version pour la carte,
+mets la variable `FORGE_APPAREIL` à `cpu`, dans le même terminal :
+
+```powershell
+$env:FORGE_APPAREIL = "cpu"   # PowerShell
+```
+
+```bash
+export FORGE_APPAREIL=cpu     # Linux, Mac
+```
 
 ## Le réseau et son entraînement
 
@@ -144,6 +174,27 @@ fichier :
 ```bash
 uv run --extra cpu python -m premier_reseau.attendus
 ```
+
+## Ce que montre le chapitre
+
+Les extraits de code du chapitre 0.5 sont tirés du projet, entre les
+marqueurs `# region: <nom>` et `# fin: <nom>`. `tests/test_paquet.py`
+vérifie que ces régions sont là, et bien fermées.
+
+| Fichier | Région | Étape du chapitre |
+| --- | --- | --- |
+| `premier_reseau/neurone.py` | `neurone` | 1, « Un neurone » |
+| `premier_reseau/a_la_main.py` | `sigmoide`, `propager` | 3, « Deux couches » |
+| `premier_reseau/a_la_main.py` | `erreur` | 4, « L'erreur » |
+| `premier_reseau/a_la_main.py` | `retropropager` | 5, « Remonter l'erreur » |
+| `premier_reseau/a_la_main.py` | `pas`, `entrainer` | 6, « Entraîner à la main » |
+| `premier_reseau/avec_pytorch.py` | `modele`, `autograd`, `entrainer-pytorch` | 7, « Le même, avec PyTorch » |
+
+La région `appareil` de `premier_reseau/appareil.py` est celle du projet 0.3,
+que montrent les chapitres 0.3 et 0.4 ; le chapitre 0.5 y renvoie. De même, le
+`pyproject.toml` a la région `pytorch` du projet 0.3. Les étapes 7 et 8
+montrent aussi les deux sorties de `sorties/`, telles quelles, et l'étape 6 la
+courbe des pertes de `tests/attendus.json`.
 
 ## Le notebook
 
