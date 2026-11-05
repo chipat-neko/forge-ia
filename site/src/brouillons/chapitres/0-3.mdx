@@ -309,7 +309,7 @@ Si tu avais pris le fichier zip au chapitre 0.1, télécharge-le de nouveau : un
 PyTorch n'est pas une bibliothèque comme les autres : il en existe une version pour la carte, et une pour le processeur seul. Le fichier `pyproject.toml` du projet décrit les deux :
 
 <CodeExplique fichier="projets/0.3-poste/pyproject.toml" region="pytorch" langue="toml">
-  <li data-lignes="1-5">Un commentaire : les deux façons de lancer le projet, avec la carte ou sans. Une roue, c'est le fichier tout prêt qui installe une bibliothèque de Python.</li>
+  <li data-lignes="1-5">Un commentaire : les deux façons de lancer le projet, avec la carte ou sans. Une roue, c'est le fichier tout prêt d'une bibliothèque de Python, qu'uv n'a plus qu'à installer.</li>
   <li data-lignes="6-8">Deux extras, des options du projet : `gpu` et `cpu`. Chacun demande PyTorch, dans la même version.</li>
   <li data-lignes="10-16">Les deux extras sont en conflit : uv n'installe jamais les deux ensemble.</li>
   <li data-lignes="18-22">D'où vient PyTorch : de l'index `pytorch-cu132` avec l'extra `gpu`, de l'index `pytorch-cpu` avec l'extra `cpu`. Un index est un site d'où uv télécharge les bibliothèques.</li>
