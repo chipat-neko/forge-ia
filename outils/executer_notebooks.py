@@ -6,7 +6,7 @@ Usage, depuis la racine du dépôt (voir la section « Notebooks » du README) :
 
 Sans argument : tous les notebooks/*.ipynb. Le Python qui lance ce script est
 celui de l'environnement .colab, qui reproduit l'image de Colab sans carte
-(Python 3.13, torch 2.11.0+cpu, numpy 2.4.6 : voir outils/colab-sans-carte.txt).
+(Python 3.13, torch 2.14.1+cpu, numpy 2.4.6 : voir outils/colab-sans-carte.txt).
 Chaque notebook est exécuté dans une copie en mémoire (le fichier du dépôt reste
 sans sorties), dans le noyau « python3 » de ce même Python, avec FORGE_IA_LOCAL
 à la racine du dépôt : il prend le code du dépôt, et n'installe ni ne

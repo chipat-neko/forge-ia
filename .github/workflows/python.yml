@@ -3,7 +3,7 @@ name: Python
 # Les tests des projets Python (et l'exécution des notebooks qui les
 # accompagnent) tournent sous Linux et sous Windows, comme chez les lecteurs.
 # Le job notebooks-colab exécute en plus chaque notebook comme sur Colab sans
-# carte graphique (Python 3.13, PyTorch 2.11 pour processeur).
+# carte graphique (Python 3.13, PyTorch 2.14.1 pour processeur).
 on:
   push:
     paths:
@@ -65,10 +65,11 @@ jobs:
           exit "$echec"
 
   # Chaque notebook, exécuté dans un environnement qui reproduit l'image de Colab sans
-  # carte graphique (relevé du 03/11/2026, https://github.com/googlecolab/backend-info) :
-  # Python 3.13, torch 2.11.0 pour processeur (de l'index de PyTorch, pas de PyPI), puis
-  # numpy et le noyau de Colab (outils/colab-sans-carte.txt). La carte de Colab, elle,
-  # n'est pas testée. Les mêmes commandes se lancent en local : voir « Notebooks » dans le README.
+  # carte graphique (relue le 05/11/2026, https://github.com/googlecolab/backend-info) :
+  # Python 3.13, torch 2.14.1 pour processeur (de l'index de PyTorch, pas de PyPI), puis
+  # numpy, le noyau et pytest de Colab (outils/colab-sans-carte.txt). La carte de Colab,
+  # elle, n'est pas testée. Les mêmes commandes se lancent en local : voir « Notebooks »
+  # dans le README. Les tests d'outils/ (l'exécuteur des notebooks) tournent avant.
   notebooks-colab:
     name: Notebooks comme sur Colab, sans carte
     runs-on: ubuntu-latest
@@ -81,7 +82,9 @@ jobs:
       - name: Environnement de Colab sans carte (.colab)
         run: |
           uv venv --python 3.13 .colab
-          uv pip install --python .colab --index-url https://download.pytorch.org/whl/cpu torch==2.11.0
+          uv pip install --python .colab --index-url https://download.pytorch.org/whl/cpu torch==2.14.1
           uv pip install --python .colab -r outils/colab-sans-carte.txt
+      - name: Tests de l'exécuteur des notebooks
+        run: .colab/bin/python -m pytest -q outils
       - name: Exécution des notebooks
         run: .colab/bin/python outils/executer_notebooks.py

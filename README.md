@@ -94,8 +94,8 @@ Colab : ils sont exécutés automatiquement, de deux façons.
 - Par le `test_notebook.py` de leur projet, avec les autres tests du projet
   (son Python et son PyTorch, sous Linux et sous Windows).
 - Par le job `notebooks-colab` de `.github/workflows/python.yml`, qui
-  reproduit le logiciel de l'image de Colab sans carte graphique (relevé du
-  03/11/2026) : Python 3.13, `torch==2.11.0` pour processeur (depuis l'index
+  reproduit le logiciel de l'image de Colab sans carte graphique (relue le
+  05/11/2026) : Python 3.13, `torch==2.14.1` pour processeur (depuis l'index
   de PyTorch), puis les paquets de `outils/colab-sans-carte.txt` (numpy 2.4.6,
   ipykernel 6.17.1…). Le script `outils/executer_notebooks.py` exécute alors
   chaque notebook dans une copie en mémoire, avec `FORGE_IA_LOCAL` à la racine
@@ -113,7 +113,7 @@ Les mêmes commandes en local, dans PowerShell, depuis la racine du dépôt.
 ```powershell
 . .\outils\env-forge.ps1
 uv venv --python 3.13 .colab
-uv pip install --python .colab --index-url https://download.pytorch.org/whl/cpu torch==2.11.0
+uv pip install --python .colab --index-url https://download.pytorch.org/whl/cpu torch==2.14.1
 uv pip install --python .colab -r outils/colab-sans-carte.txt
 .colab\Scripts\python outils\executer_notebooks.py
 ```
@@ -123,7 +123,8 @@ ligne par notebook : son nom, sa durée, et `ok` ou `ÉCHEC`. Il peut aussi
 exécuter un seul notebook :
 `.colab\Scripts\python outils\executer_notebooks.py notebooks\1.3-tokenizer.ipynb`.
 Toute modification d'un notebook se rejoue ainsi avant son commit, et le
-résultat attendu est `ok`.
+résultat attendu est `ok`. Les tests de l'exécuteur lui-même, sans noyau, se
+lancent avec `.colab\Scripts\python -m pytest -q outils`.
 
 ## Parution d'un chapitre
 
