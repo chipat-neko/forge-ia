@@ -180,6 +180,29 @@ def test_carte_vue_mais_inutilisable(monkeypatch, capsys, tmp_path):
     assert "Traceback" not in erreur and not sortie.exists()
 
 
+def test_carte_sans_memoire_libre(monkeypatch, capsys, tmp_path):
+    # Un manque de mémoire sur la carte n'est pas une affaire de version de PyTorch : le message le
+    # dit, sans renvoyer au diagnostic du chapitre 0.3.
+    import tenseurs.chrono
+
+    def sans_memoire(*arguments, **options):
+        raise torch.OutOfMemoryError("CUDA out of memory. Tried to allocate 64.00 MiB.")
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda *arguments: "NVIDIA GeForce RTX 5070 Ti")
+    monkeypatch.setattr(tenseurs.chrono, "mesurer", sans_memoire)
+    sortie = tmp_path / "carte.json"
+    code, _, erreur = lancer(capsys, "mesurer", "--sortie", str(sortie))
+    assert code == 2
+    assert erreur == (
+        "La carte graphique n’a plus assez de mémoire libre\u202f: CUDA out of memory. Tried to allocate "
+        "64.00 MiB. Un autre programme s’en sert peut-être\u202f: ferme-le, puis relance le script. Pour "
+        "calculer sur le processeur, relance avec `--appareil cpu` (ou, sans `--appareil`, mets "
+        "FORGE_APPAREIL=cpu).\n"
+    )
+    assert "Traceback" not in erreur and not sortie.exists()
+
+
 def test_erreur_sur_le_processeur_non_masquee(monkeypatch):
     # Seule la carte a droit au message : sur le processeur, une RuntimeError est un défaut du
     # projet, qui doit se voir en entier.

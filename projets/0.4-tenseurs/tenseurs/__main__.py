@@ -88,14 +88,24 @@ def commande_formes(options: argparse.Namespace) -> int:
 
 
 def carte_inutilisable(erreur: RuntimeError) -> str:
-    """Le message quand PyTorch voit la carte, mais ne sait pas calculer dessus : une carte trop
-    ancienne ou trop récente pour sa version (le diagnostic du projet 0.3 dit laquelle)."""
+    """Le message quand PyTorch voit la carte, mais n'a pas pu calculer dessus : une carte trop
+    ancienne ou trop récente pour sa version (le diagnostic du projet 0.3 dit laquelle), ou une
+    carte dont la mémoire est déjà prise par un autre programme."""
+    import torch  # déjà chargé : la carte vient d'être choisie
+
     texte = str(erreur).strip()
     premiere_ligne = texte.splitlines()[0].rstrip(".") if texte else type(erreur).__name__
+    processeur = (
+        "Pour calculer sur le processeur, relance avec `--appareil cpu` (ou, sans `--appareil`, mets FORGE_APPAREIL=cpu)."
+    )
+    if isinstance(erreur, torch.OutOfMemoryError):
+        return (
+            f"La carte graphique n’a plus assez de mémoire libre\u202f: {premiere_ligne}. "
+            f"Un autre programme s’en sert peut-être\u202f: ferme-le, puis relance le script. {processeur}"
+        )
     return (
         f"La carte graphique n’a pas pu calculer avec cette version de PyTorch\u202f: {premiere_ligne}. "
-        "Pour savoir pourquoi, lance `uv run --extra gpu python -m poste` dans le dossier projets/0.3-poste. "
-        "Pour calculer sur le processeur, relance avec `--appareil cpu` (ou, sans `--appareil`, mets FORGE_APPAREIL=cpu)."
+        f"Pour savoir pourquoi, lance `uv run --extra gpu python -m poste` dans le dossier projets/0.3-poste. {processeur}"
     )
 
 

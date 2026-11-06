@@ -196,6 +196,39 @@ def test_erreur_sur_le_processeur_non_masquee(monkeypatch):
         main(["entrainer", "--appareil", "cpu"])
 
 
+def test_carte_sans_memoire_libre(monkeypatch, capsys):
+    # Un manque de mémoire sur la carte n'est pas une affaire de version de PyTorch : le message le
+    # dit, sans renvoyer au diagnostic du chapitre 0.3.
+    import premier_reseau.avec_pytorch
+
+    def sans_memoire(*arguments, **options):
+        raise torch.OutOfMemoryError("CUDA out of memory. Tried to allocate 2.00 MiB.")
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(premier_reseau.avec_pytorch, "entrainer_pytorch", sans_memoire)
+    assert main(["entrainer", "--appareil", "cuda"]) == 2
+    assert capsys.readouterr().err == (
+        "La carte graphique n’a plus assez de mémoire libre\u202f: CUDA out of memory. Tried to allocate "
+        "2.00 MiB. Un autre programme s’en sert peut-être\u202f: ferme-le, puis relance le script. Pour "
+        "calculer sur le processeur, relance avec `--appareil cpu` (ou, sans `--appareil`, mets "
+        "FORGE_APPAREIL=cpu).\n"
+    )
+
+
+def test_erreur_hors_pytorch_non_masquee_sur_la_carte(monkeypatch):
+    # Le neurone et l'entraînement à la main ne calculent pas sur la carte : une RuntimeError chez
+    # eux est un défaut du projet, qui doit se voir en entier, même avec --appareil cuda.
+    import premier_reseau.__main__ as script
+
+    def en_panne():
+        raise RuntimeError("panne")
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(script, "lignes_a_la_main", en_panne)
+    with pytest.raises(RuntimeError, match="panne"):
+        main(["entrainer", "--appareil", "cuda"])
+
+
 def test_pytorch_absent_sans_trace():
     # Le lecteur qui lance `uv run python -m premier_reseau entrainer` sans extra : PyTorch
     # manque. Le script le dit en français, avec la commande à lancer, sans trace Python.
