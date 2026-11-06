@@ -91,9 +91,9 @@ jobs:
       # la liste. Ce contrôle ne vaut que pour le site publié (construit sans FORGE_ESSAIS) : une
       # construction avec les pages d'essai contient aussi ce prénom, dans le Worker du mini-modèle
       # (travailleur-*.js) et dans la page de parité (ControleParite.*.js).
-      # Quand le plan 5 publiera une page avec le mini-modèle, son Worker entrera dans le site :
-      # il faudra alors écarter dist/_astro/travailleur-*.js de la recherche du prénom (par exemple
-      # grep --exclude='travailleur-*.js'), en gardant la vérification de dist/essais.
+      # Depuis la parution du chapitre 0.5, son avant-goût publie le mini-modèle : le Worker
+      # (dist/_astro/travailleur-*.js) porte la liste des prénoms, et il est écarté de la
+      # recherche. Le prénom ne doit se trouver nulle part ailleurs, ni dist/essais exister.
       - name: Aucune page d'essai dans le site construit
         run: |
           if [ -e dist/essais ]; then
@@ -105,7 +105,7 @@ jobs:
           total=$(grep -c . "$liste")
           prenom=$(grep . "$liste" | tail -n +$((total / 2 + 1)) | LC_ALL=C.UTF-8 grep -m1 -E '^.{7,}$')
           test -n "$prenom" || { echo "Aucun prénom d'au moins 7 lettres dans la seconde moitié de $liste." >&2; exit 1; }
-          if grep -rlF -- "$prenom" dist/_astro; then
+          if grep -rlF --exclude='travailleur-*.js' -- "$prenom" dist/_astro; then
             echo "Le prénom « $prenom » est dans les fichiers ci-dessus : la liste des prénoms entrerait dans le site publié." >&2
             exit 1
           fi

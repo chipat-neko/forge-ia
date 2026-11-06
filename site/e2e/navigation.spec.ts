@@ -149,7 +149,8 @@ test('recherche : les titres du parcours, un numéro, et rien de la page d’ess
   await page.goto('/forge-ia/recherche/');
   const champ = page.getByRole('searchbox');
   await champ.fill('images');
-  // Aucun chapitre paru n'en parle encore : les titres à venir le disent.
+  // Le sommaire trouve les titres à venir qui en parlent ; le texte de 0.3 dit « image »
+  // (même racine pour Pagefind), mais ce compte ne porte que sur les titres du sommaire.
   await expect(page.locator('.sommaire-trouve [data-resultat]')).toHaveCount(6);
   await champ.fill('1.3');
   await expect(page.locator('[data-resultat]').first()).toContainText('Le tokenizer');
