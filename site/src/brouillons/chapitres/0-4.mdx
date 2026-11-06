@@ -240,11 +240,11 @@ export const PROCESSEUR = (() => {
 
 export const CARTE = (() => {
   // Les chronos de la carte, lus dans projets/0.4-tenseurs/mesures/rtx-5070-ti.json : relevés à la porte de la
-  // Partie 0, carte au repos. Le pari « petite » et les phrases de l'étape 6 en ont besoin.
+  // Partie 0, carte au repos. Le pari « petite » (étape 6) et les phrases de l'étape 7 en ont besoin.
   const m = lireMesures('rtx-5070-ti', new URL('../', root));
   exiger(
     m !== null,
-    'le fichier projets/0.4-tenseurs/mesures/rtx-5070-ti.json manque : le pari « petite » et les phrases de l’étape 6 ont besoin des chronos de la carte',
+    'le fichier projets/0.4-tenseurs/mesures/rtx-5070-ti.json manque : le pari « petite » (étape 6) et les phrases de l’étape 7 ont besoin des chronos de la carte',
   );
   return m;
 })();

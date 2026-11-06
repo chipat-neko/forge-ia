@@ -554,7 +554,10 @@ test('l’ouverture, les exemples, la mémoire et l’encadré viennent des donn
   // Aucune version de Colab ni de PyTorch dans le texte, sauf celles des fichiers de mesures, dans la légende des chronos,
   // et celle du code de PyTorch que citent les sources de l'étape 7 (le réglage des fils, revue finale m3).
   let texte = (await texteExact(page.locator('main'))).replaceAll(PROCESSEUR.torch, '').replaceAll(CARTE.torch, '');
-  for (const note of await page.locator('main .sources-poste').all()) texte = texte.replace(await texteExact(note), '');
+  // Seule la note qui cite ce code est retirée : toute autre note de sources reste sous la garde.
+  const noteFils = page.locator('main .sources-poste').filter({ has: page.locator(`a[href="${SOURCES_0_3.fils[0].url}"]`) });
+  await expect(noteFils).toHaveCount(1);
+  texte = texte.replace(await texteExact(noteFils), '');
   expect(texte).not.toMatch(/\b2\.\d+\.\d+/);
 });
 

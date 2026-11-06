@@ -139,6 +139,13 @@ export const SOURCES_0_3 = Object.freeze({
     source('uv, guide de PyTorch', 'https://docs.astral.sh/uv/guides/integration/pytorch/'),
     PYPI_TORCH,
     source('Index de PyTorch pour CUDA 13.2', 'https://download.pytorch.org/whl/cu132/torch/'),
+    // La page des fichiers affiche « 126.7 MB » pour la roue Windows sans CUDA, de 126 738 207 octets :
+    // PyPI compte en Mo décimaux (10⁶ octets), comme ce site pour les téléchargements.
+    source(
+      'PyPI, page de torch 2.15.0 (tailles des fichiers en Mo décimaux)',
+      'https://pypi.org/project/torch/2.15.0/#files',
+      '2026-11-06',
+    ),
   ]),
   /** Colab : son image, sa FAQ, et la carte que rapportent ses utilisateurs. */
   colab: Object.freeze([

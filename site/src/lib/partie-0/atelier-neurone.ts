@@ -146,7 +146,8 @@ function croisement(p: Coordonnees, q: Coordonnees, sp: number, sq: number): Coo
  */
 export function regionUn(w1: number, w2: number, b: number): Coordonnees[] {
   if (w1 === 0 && w2 === 0) return b > 0 ? [...COINS] : [];
-  // Le cadre, rogné par le demi-plan « somme ≥ 0 » (son bord compris) (algorithme de Sutherland et Hodgman).
+  // Le cadre, rogné par le demi-plan « somme ≥ 0 », son bord compris : c'est l'algorithme de
+  // Sutherland et Hodgman.
   const poly: Coordonnees[] = [];
   for (let i = 0; i < COINS.length; i++) {
     const p = COINS[i];
