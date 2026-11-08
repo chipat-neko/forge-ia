@@ -4,11 +4,13 @@
   // chacun dans son <pre>. Le parcours e2e/parite.spec.ts les compare aux
   // fichiers du Python, au bit près, dans Chrome, Firefox et WebKit.
   //
-  // Deux jeux (prop `jeu`, lue une fois) :
+  // Trois jeux (prop `jeu`, lue une fois) :
   //  - « mini-modele » (par défaut) : les quatre fichiers
   //    projets/mini-modele/tests/attendus-<nom>.json, avec mini-modele/parite.ts ;
   //  - « partie-0 » : les fichiers de FICHIERS_PARTIE_0 (partie-0/fichiers.ts),
-  //    avec partie-0/parite.ts.
+  //    avec partie-0/parite.ts ;
+  //  - « partie-1 » : les fichiers de FICHIERS_PARTIE_1 (partie-1/fichiers.ts),
+  //    avec partie-1/parite.ts. Un calcul peut y être asynchrone : chacun est attendu.
   //
   // Seul le module du jeu demandé est chargé, par import(), dans onMount :
   // une page ne charge ni les attendus ni le code de l'autre jeu. Tout se
@@ -25,16 +27,17 @@
   // À poser dans le MDX avec client:load :
   //   <ControleParite client:load />
   //   <ControleParite client:load jeu="partie-0" />
+  //   <ControleParite client:load jeu="partie-1" />
   import { onMount, untrack } from 'svelte';
   import { nombre } from '../../lib/nombres';
   import { versJson } from '../../lib/mini-modele/cles-json';
-  import type { Attendus } from '../../lib/mini-modele/parite';
   import { FICHIERS_PARTIE_0 } from '../../lib/partie-0/fichiers';
+  import { FICHIERS_PARTIE_1 } from '../../lib/partie-1/fichiers';
 
-  type NomDuJeu = 'mini-modele' | 'partie-0';
+  type NomDuJeu = 'mini-modele' | 'partie-0' | 'partie-1';
 
   interface Props {
-    /** Le jeu d'attendus à refaire : celui du mini-modèle (par défaut) ou celui de la Partie 0. */
+    /** Le jeu d'attendus à refaire : celui du mini-modèle (par défaut), de la Partie 0 ou de la Partie 1. */
     jeu?: NomDuJeu;
   }
 
@@ -50,7 +53,7 @@
   interface Jeu {
     noms: readonly string[];
     fichier: (nom: string) => string;
-    charger: () => Promise<Readonly<Record<string, () => Attendus>>>;
+    charger: () => Promise<Readonly<Record<string, () => unknown | Promise<unknown>>>>;
   }
 
   const JEUX: Readonly<Record<NomDuJeu, Jeu>> = {
@@ -65,13 +68,18 @@
       fichier: (nom) => FICHIERS_PARTIE_0[nom],
       charger: async () => (await import('../../lib/partie-0/parite')).CALCULS_PARTIE_0,
     },
+    'partie-1': {
+      noms: Object.keys(FICHIERS_PARTIE_1),
+      fichier: (nom) => FICHIERS_PARTIE_1[nom],
+      charger: async () => (await import('../../lib/partie-1/parite')).CALCULS_PARTIE_1,
+    },
   };
 
   /** Le jeu demandé ; un nom inconnu arrête la construction de la page, avec quoi écrire à la place. */
   function choisirJeu(nom: string): Jeu {
     if (!Object.hasOwn(JEUX, nom)) {
       throw new Error(
-        `ControleParite : jeu « ${nom} » inconnu. Dans le MDX, écris jeu="partie-0", ` +
+        `ControleParite : jeu « ${nom} » inconnu. Dans le MDX, écris jeu="partie-0" ou jeu="partie-1", ` +
           'ou rien du tout pour le mini-modèle (jeu="mini-modele").',
       );
     }
@@ -134,7 +142,8 @@
         for (const nom of NOMS) {
           await pause();
           if (arrete) return;
-          resultats[nom] = versJson(calculs[nom]());
+          // await : un calcul de la Partie 1 peut être asynchrone ; pour les autres, il ne change rien.
+          resultats[nom] = versJson(await calculs[nom]());
         }
         duree = performance.now() - debut;
         phase = 'pret';

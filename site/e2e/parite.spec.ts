@@ -1,6 +1,7 @@
-// Parcours de la parité, sur les pages d'essai /forge-ia/essais/parite/ et
-// /forge-ia/essais/parite-partie-0/ (construites seulement avec FORGE_ESSAIS=1,
-// voir src/essais/parite.mdx et parite-partie-0.mdx).
+// Parcours de la parité, sur les pages d'essai /forge-ia/essais/parite/,
+// /forge-ia/essais/parite-partie-0/ et /forge-ia/essais/parite-partie-1/
+// (construites seulement avec FORGE_ESSAIS=1, voir src/essais/parite.mdx,
+// parite-partie-0.mdx et parite-partie-1.mdx).
 //
 // La première refait dans le navigateur les quatre fichiers d'attendus du
 // mini-modèle (ControleParite.svelte, avec src/lib/mini-modele/parite.ts) ; la
@@ -12,7 +13,9 @@
 // des flottants), au bit près. Les sections que le site lit sans les refaire
 // (SECTIONS_NON_REFAITES, src/lib/partie-0/fichiers.ts : softmax et −ln p de 0.2,
 // qui passent par exp et log, et ce qui ne sert qu'en Python) sont retirées du
-// fichier avant la comparaison. Il tourne dans les projets Chrome (ordinateur,
+// fichier avant la comparaison. La troisième, ceux des jumeaux de la Partie 1
+// (jeu="partie-1", avec src/lib/partie-1/parite.ts) : le modèle à n-grammes de 1.1,
+// sans ses perplexités (CLES_NON_REFAITES, src/lib/partie-1/fichiers.ts). Il tourne dans les projets Chrome (ordinateur,
 // mobile) et, avec FORGE_TOUS_NAVIGATEURS=1, dans Firefox et WebKit (projets
 // parite-firefox et parite-webkit, voir playwright.config.ts) : c'est la seule
 // façon de voir qu'un moteur JavaScript s'écarte du Python.
@@ -20,11 +23,13 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { test, expect, type Page } from '@playwright/test';
 import { cheminsDesCles } from '../src/lib/mini-modele/cles-json';
 import { FICHIERS_PARTIE_0, partieRefaite } from '../src/lib/partie-0/fichiers';
+import { FICHIERS_PARTIE_1, partieRefaite as partieRefaite1 } from '../src/lib/partie-1/fichiers';
 import { verifierAxe, verifierSansDebordement, verifierTypographie } from './outils';
 
 const PAGE = '/forge-ia/essais/parite/';
 const NOMS = ['calcul', 'donnees', 'modele', 'attention'] as const;
 const PAGE_PARTIE_0 = '/forge-ia/essais/parite-partie-0/';
+const PAGE_PARTIE_1 = '/forge-ia/essais/parite-partie-1/';
 
 /**
  * Une page de parité : son adresse, chaque calcul avec le fichier du Python qu'il
@@ -48,6 +53,12 @@ const PAGES: PageDeParite[] = [
     // FICHIERS_PARTIE_0 donne les chemins depuis la racine du dépôt (src/lib/partie-0/fichiers.ts).
     fichiers: Object.entries(FICHIERS_PARTIE_0).map(([nom, chemin]) => [nom, `../${chemin}`]),
     aRetrouver: partieRefaite,
+  },
+  {
+    adresse: PAGE_PARTIE_1,
+    // FICHIERS_PARTIE_1 donne les chemins depuis la racine du dépôt (src/lib/partie-1/fichiers.ts).
+    fichiers: Object.entries(FICHIERS_PARTIE_1).map(([nom, chemin]) => [nom, `../${chemin}`]),
+    aRetrouver: partieRefaite1,
   },
 ];
 
@@ -123,6 +134,20 @@ test('Partie 0 : le navigateur refait les attendus des jumeaux du Python, à l�
   // Le fichier de 0.2 est bien dans la liste, à côté de celui de 0.1.
   expect(PAGES[1].fichiers.map(([nom]) => nom)).toEqual(['mot-suivant', 'maths']);
   await comparerAuxFichiers(page, browserName, PAGES[1]);
+});
+
+test('Partie 1 : le navigateur refait les attendus des jumeaux du Python, à l’identique', async ({
+  page,
+  browserName,
+}) => {
+  await calculer(page, PAGE_PARTIE_1);
+  await verifierMoteur(page, browserName);
+  await expect(etat(page)).toContainText(
+    PAGES[2].fichiers.length === 1 ? 'le fichier d’attendus est refait' : 'fichiers d’attendus sont refaits',
+  );
+  // Le fichier de 1.1 est bien dans la liste.
+  expect(PAGES[2].fichiers.map(([nom]) => nom)).toEqual(['ngrammes']);
+  await comparerAuxFichiers(page, browserName, PAGES[2]);
 });
 
 for (const { adresse, fichiers } of PAGES) {

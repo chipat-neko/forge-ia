@@ -1,0 +1,800 @@
+Python est un langage de programmation : on écrit des instructions dans un fichier texte, et le programme `python` les exécute une à une. La plupart des programmes d'IA s'écrivent en Python, des petits essais aux plus grands modèles ; l'étape 9 montre comment font les grands labos.
+
+**Sans rien installer.** Ce chapitre a son notebook, un cahier de code qui s'ouvre dans Colab, le service de Google qui fait tourner Python dans ton navigateur. Le lien est à l'étape 9.
+
+**Sur ton PC.** Il te faut uv, un outil qui installe Python et les paquets dont chaque projet a besoin. Tout se fait dans un terminal : une fenêtre où tu tapes des commandes, et où l'ordinateur te répond. Sous Windows, le terminal s'appelle PowerShell : cherche-le dans le menu Démarrer, ouvre-le, puis tape :
+
+La seconde commande affiche la version d'uv : s'il répond, il est installé. Si PowerShell ne connaît pas encore `uv`, ferme-le et rouvre-le. Avec winget, installe le même outil. Sous Linux ou macOS :
+
+Le chapitre 0.3 reviendra en détail sur l'installation de ton poste, carte graphique comprise. Pour l'instant, télécharge le dépôt du site, le dossier de tous ses projets. La première commande le fait avec git, un outil qui télécharge le code d'un projet, puis le met à jour quand tu le lui demandes. Entre ensuite dans le projet de ce chapitre, et lance son programme :
+
+La première fois, uv installe si besoin une version de Python qui convient au projet. Le programme lit ensuite son texte, affiche les mots qui suivent « le », le plus probable d'entre eux, puis une suite de mots. Tout ce chapitre explique ce programme.
+
+`python -m mot_suivant` lance le module `mot_suivant` : le dossier du même nom, dans le projet. `uv run` le fait tourner dans l'environnement du projet, préparé à la première commande.
+
+Sans git, le bouton « Code » de la page GitHub du dépôt propose aussi un fichier zip. Une fois décompressé, son dossier s'appelle `forge-ia-main` : écris ce nom à la place de `forge-ia` dans la commande `cd`.
+
+En Python, chaque valeur a un type. `12` est un nombre entier, de type `int`. `2.5` est un nombre à virgule, de type `float` : il s'écrit avec un point, jamais avec une virgule. "" est du texte, de type `str`, toujours entre guillemets : simples ou doubles, c'est pareil, '' est le même texte.
+
+Une variable est un nom posé sur une valeur, avec `=` : après mot = "", le nom `mot` désigne ce texte. Une f-string, un texte précédé de la lettre `f`, remplace chaque morceau entre accolades par sa valeur : `f" a lettres"` donne . La fonction `len` donne la longueur d'un texte.
+
+Les nombres entiers sont exacts. Les nombres à virgule, eux, réservent une surprise.
+
+Un nombre à virgule est rangé en binaire, avec un nombre fixe de chiffres. `0.1` et `0.2` n'y tombent pas juste : ils sont arrondis au plus proche. Leur somme vaut , pas tout à fait `0.3`, et `==` répond `False`. Comparer deux nombres avec `==` ne lève pas d'erreur : au pire, la réponse est `False`.
+
+Pour comparer deux nombres à virgule, on accepte un tout petit écart : `math.isclose(0.1 + 0.2, 0.3)` répond `True`.
+
+JavaScript fait le même calcul que Python, avec les mêmes arrondis : la réponse de ce pari est calculée par JavaScript, pas recopiée.
+
+Une liste range des valeurs dans l'ordre, entre crochets : mots = . On lit une case avec son indice, qui commence à 0 : mots[0] vaut '', et `mots[-1]`, la dernière case, ''.
+
+Une tranche prend un morceau de la liste : `mots[a:b]` va de l'indice `a` inclus à l'indice `b` exclu. Sans le premier nombre, elle part du début ; sans le second, elle va jusqu'au bout. Elle fabrique une nouvelle liste : `mots` ne change pas.
+
+Le programme du chapitre commence par découper le texte en une liste de mots :
+
+`def` définit une fonction, `decouper_mots`. Elle reçoit un texte (`str`) et rend une liste de textes (`list[str]`) : ce sont des annotations, l'étape 7 y revient.
+Entre triples guillemets, la documentation de la fonction : ce qu'elle fait, avec un exemple.
+`texte.lower()` met le texte en minuscules, et `MOTIF.findall` y trouve tous les mots. `MOTIF`, défini plus haut dans le fichier, reconnaît les suites de lettres, d'apostrophes et de traits d'union, et prend à part le point, le point d'exclamation et le point d'interrogation.
+
+`mots[1:]` part de l'indice 1, le deuxième mot, et va jusqu'au bout de la liste. `mots`, lui, garde tous ses mots : la tranche est une nouvelle liste.
+
+Une tranche sert à décaler une liste d'un cran. `zip` avance dans deux listes en même temps et forme des couples : avec `mots` et `mots[1:]`, chaque couple est un mot et son voisin de droite. `list(zip(mots, mots[1:]))` donne . Le dernier mot n'a pas de voisin : `zip` s'arrête dès que la plus courte des deux listes est épuisée.
+
+`mots[-1]` compte depuis la fin : `-1` est la dernière case, `-2` l'avant-dernière.
+
+Le chapitre 1.3 se sert du même `zip` pour compter les paires de lettres voisines.
+
+Un dictionnaire associe des clés à des valeurs, entre accolades : après `d = `, le dictionnaire `d` associe deux mots à deux nombres. `d['fer']` lit la valeur de la clé `'fer'`, et `d['fer'] += 1` l'augmente de 1.
+
+`Counter`, du module `collections`, est un dictionnaire fait pour compter : une clé encore jamais vue y vaut 0. compte toute une liste en une ligne, et donne .
+
+Le programme donne à chaque mot du texte son propre `Counter` : celui des mots qui le suivent.
+
+La fonction reçoit la liste des mots et rend un dictionnaire : à chaque mot, un `Counter` de ses suivants.
+On part d'un dictionnaire vide. L'annotation dit ce qu'il contiendra.
+`zip(mots, mots[1:])` donne chaque mot avec son voisin de droite, comme à l'étape 3. La boucle `for` prend ces couples un par un, dans `mot` et `suivant`.
+La première fois qu'on rencontre un mot, on lui donne un `Counter` vide.
+On ajoute 1 au compte de ce suivant. Un `Counter` part de zéro : pas besoin de vérifier si ce suivant a déjà été vu.
+Le dictionnaire est rendu. Ses clés restent dans l'ordre où les mots sont apparus.
+
+Survole une explication, ou atteins-la avec Tab : ses lignes de code s'allument.
+
+`Counter` fait partie de la bibliothèque standard de Python : rien à installer. Le projet n'utilise rien d'autre.
+
+L'atelier de l'étape suivante fait tourner ces fonctions sur un texte de mots, points compris : celui du chapitre 1.3. Avant de le voir, parie.
+
+Dans le programme, c'est le `Counter` de « » qui tient ces comptes. À toi de jouer : l'étape 6 est ouverte.
+
+Se tromper ici n'a aucune importance : un pari, même faux, fait mieux retenir la réponse qu'une lecture passive.
+
+Choisis un mot de départ et le nombre de mots à écrire. Le tableau montre ce qui suit ce mot dans le texte ; le programme prend le plus fréquent, puis recommence à partir de lui. À l'arrivée, il écrit mots à partir de « ».
+
+Change le mot de départ : toute la suite change avec lui. Tu peux aussi réécrire le texte, ou en coller un autre.
+
+Pour en sortir, un vrai modèle de langage ne prend pas toujours le mot le plus probable : il tire au sort, en donnant plus de chances aux mots fréquents. Le chapitre 0.2 montre comment. Le défi de l'atelier reste ouvert : trouver un départ qui tient mots sans boucle.
+
+Tout ce qui est jaune se manipule. Le nombre se fait glisser à la souris ou au doigt ; au clavier, atteins-le avec Tab, puis utilise les flèches.
+
+Le chapitre 1.1 dira pourquoi ce petit programme est déjà, en miniature, un modèle de langage.
+
+Le projet range tout cela dans des fonctions, réparties dans des fichiers. Quelques outils de Python rendent ce code facile à relire et à réutiliser.
+
+**Des fonctions annotées.** Chaque fonction annonce ce qu'elle reçoit et ce qu'elle rend : `mot: str` dit que `mot` est un texte, et `-> str | None`, que la fonction rend un texte ou `None`, la valeur de Python qui veut dire « rien ». Python ne vérifie pas ces annotations pendant que le programme tourne : elles aident à lire le code, et des outils s'en servent pour le contrôler.
+
+`predire` reçoit le dictionnaire des suivants et un mot, un paramètre par ligne, et rend un mot ou `None`.
+La documentation dit la règle, égalités comprises.
+`suivants.get(mot)` lit le `Counter` du mot, ou `None` si le mot n'est pas une clé du dictionnaire : un mot inconnu ne fait pas d'erreur.
+Rien ne suit ce mot : la fonction rend `None`. `None` et un `Counter` vide comptent tous deux pour faux.
+`min` garde le suivant qui donne la plus petite valeur. Cette valeur, c'est l'argument `key=` qui la calcule : une petite fonction sans nom, écrite `lambda m: …`, qui reçoit chaque mot `m` et rend ce qu'on compare, le couple (-compte[m], m). Ce `key` n'a rien à voir avec les clés du dictionnaire.
+Deux couples se comparent d'abord par leur premier élément. -compte[m] est d'autant plus petit que le compte est grand : le plus fréquent passe en tête. À égalité, le mot lui-même départage, dans l'ordre des numéros des caractères, comme au chapitre 1.3.
+
+`generer` s'en sert pour écrire une suite, un mot après l'autre :
+
+`generer` reçoit les suivants, un mot de départ et une longueur ; elle rend une liste de mots.
+Une longueur nulle ou négative donne une liste vide.
+La suite commence par le mot de départ.
+Tant que la suite est plus courte que demandé, on prédit le suivant de son dernier mot, `suite[-1]`.
+Si rien ne le suit, `break` sort de la boucle : la suite s'arrête là.
+Sinon, `append` ajoute le mot prédit au bout de la liste.
+
+**Un NamedTuple.** Une suite, c'est deux informations : ses mots, et l'endroit où elle se met à tourner en rond. `Suite` les range ensemble. Un `NamedTuple` est un tuple, une suite de valeurs qui ne change plus, dont chaque case porte un nom : on écrit `suite.mots` et `suite.reprise`, plutôt que `suite[0]` et `suite[1]`.
+
+`class Suite(NamedTuple)` crée un nouveau type, `Suite`, à partir de `NamedTuple`.
+Ses deux champs, avec leur type : `mots`, une liste de textes, et `reprise`, un entier ou `None`.
+`suivre` rend une `Suite`, comme l'annonce `-> Suite`.
+Les mots viennent de `generer`. `premiere_reprise`, définie plus haut dans le fichier, cherche le premier mot déjà vu, et `Suite(…)` remplit les deux champs.
+
+Un `NamedTuple` reste un tuple : `mots, reprise = suivre(suivants, "le", 20)` le découpe en ses deux champs.
+
+**Des modules.** Chaque fichier `.py` est un module, et un dossier de modules qui contient un fichier `__init__.py` est un paquet. Le projet a un paquet, `mot_suivant`, avec le module `mots.py`. Un autre fichier y prend ce qu'il lui faut : `from mot_suivant.mots import predire`.
+
+**Un point d'entrée.** `python -m mot_suivant le` lance le fichier `mot_suivant/__main__.py`, en lui passant `le`. C'est lui qui lit la ligne de commande, appelle les fonctions et affiche le résultat. Il se termine par `if __name__ == "__main__":`, une condition vraie quand on lance le fichier, et fausse quand on l'importe.
+
+**Des chemins, et de l'UTF-8.** `pathlib` construit les chemins de fichiers avec `/`, le même code sous Windows, Linux et macOS : `Path(__file__).resolve().parent.parent / "donnees" / "texte.txt"` désigne le texte du projet, quel que soit le dossier d'où l'on lance le programme. Le fichier s'ouvre avec `encoding="utf-8"` : sans cela, sous Windows, Python 3.12 pourrait lire le texte avec l'ancien encodage du système, et « é » deviendrait « Ã© ».
+
+Depuis Python 3.15, l'UTF-8 est le choix par défaut partout ([PEP 686](https://peps.python.org/pep-0686/)). Le projet accepte aussi des versions plus anciennes : il l'écrit donc toujours.
+
+Un test est une fonction dont le nom commence par `test_`, et qui vérifie un résultat avec `assert` : si la condition est fausse, le test échoue. pytest trouve tous ces tests et les lance. Dans le dossier du projet :
+
+pytest affiche un point par test réussi, puis le nombre de tests passés. Voici l'un d'eux :
+
+Le nom commence par `test_` : pytest le trouve tout seul.
+Un tout petit texte. Après « a » viennent « c » et « b », une fois chacun : égalité.
+En cas d'égalité, `predire` prend le premier dans l'ordre des numéros des caractères : « b ».
+« b » est le dernier mot : rien ne le suit, et `predire` rend `None`.
+
+Les tests du projet vérifient aussi que cette page refait exactement les mêmes calculs que le Python. Elle ne lance pas Python : elle refait tout en TypeScript, dans ton navigateur. Le fichier `tests/attendus.json`, écrit par le Python, sert de référence aux deux.
+
+Quand un test échoue, pytest montre la ligne de l'`assert` et les deux valeurs comparées : on voit tout de suite ce qui cloche.
+
+Ton programme tient en quelques fonctions, et Python les fait tourner seul. Pour entraîner un modèle de langage, il faut des milliards de multiplications : Python seul serait bien trop lent. Voici comment font ceux qui entraînent les grands modèles.
+
+Chez eux aussi, on écrit en Python. Meta s'appuie sur PyTorch pour entraîner Llama 3, sur jusqu'à 16 384 cartes graphiques H100. Google a entraîné Gemma 3 avec JAX, sur ses propres puces, les TPU.
+
+Mais Python ne fait que piloter. Sous PyTorch, les calculs partent dans ATen, une bibliothèque écrite en C++ sur laquelle reposent presque toutes les fonctions de PyTorch ; sur la carte graphique, elle lance des programmes CUDA et des bibliothèques de NVIDIA comme cuDNN. Sous JAX, chaque opération est confiée à XLA, un compilateur qui produit le code de la carte ou du TPU. Meta va jusqu'à écrire ses propres programmes CUDA pour aller plus vite. Python décide quoi calculer ; le C++ et CUDA calculent.
+
+Le projet complet (le programme, ses tests et son texte) est sur GitHub, avec un notebook à ouvrir dans Colab :
+
+### À suivre
+
+Ton programme tourne en rond parce qu'il prend toujours le mot le plus fréquent. Un vrai modèle de langage tire au sort, en donnant plus de chances aux mots fréquents : il raisonne en probabilités. Le chapitre 0.2 pose les maths utiles pour la suite : vecteurs, matrices, dérivées et probabilités.
+
+Un vecteur est une liste de nombres, écrite entre parenthèses : en a deux. On le dessine comme une flèche qui part de l'origine, cases vers la droite et vers le haut. Dans ton IA, chaque morceau de texte devient un vecteur de nombres : impossible à dessiner, mais les calculs sont exactement les mêmes qu'avec deux.
+
+Deux vecteurs s'additionnent case par case : + = . Ils se multiplient aussi, et donnent alors un seul nombre, le produit scalaire, noté avec un point : on multiplie les cases deux à deux, puis on additionne. · = .
+
+· = . Le produit est nul : ces deux flèches forment un angle droit, elles sont perpendiculaires. Le produit scalaire dit si deux vecteurs vont dans le même sens : positif s'ils pointent du même côté, nul s'ils sont perpendiculaires, négatif s'ils vont en sens contraires. La figure juste en dessous est ouverte : vérifie-le.
+
+Le produit scalaire grandit aussi avec la longueur des flèches. La longueur d'un vecteur, sa norme, est la racine carrée de son produit scalaire avec lui-même : celle de vaut √, environ . Divisé par les deux normes, le produit scalaire ne garde que la direction : c'est le cosinus de l'angle entre les deux flèches, toujours entre −1 et 1.
+
+Le programme du chapitre calcule tout cela en quelques lignes :
+
+`produit_scalaire` reçoit deux vecteurs, `a` et `b` : n'importe quelle suite de nombres (`Sequence[float]`), une liste comme un tuple. Elle rend un nombre.
+Deux vecteurs de tailles différentes n'ont pas de produit scalaire : `verifier_tailles`, définie plus haut dans le fichier, arrête le calcul avec un message en français.
+`zip` avance dans les deux vecteurs à la fois ; `s` additionne les produits, case par case, de gauche à droite.
+`norme` : la racine carrée (`math.sqrt`) du produit scalaire du vecteur avec lui-même.
+`cosinus` : le produit scalaire divisé par les deux normes. Un vecteur nul n'a pas de direction : la fonction rend `None` plutôt que de diviser par zéro.
+
+Tout ce qui est jaune se manipule. Fais glisser un nombre à la souris ou au doigt ; au clavier, atteins-le avec Tab, puis utilise les flèches.
+
+La somme, en pointillé, arrive au même endroit que b posé au bout de a.
+
+Une matrice est un tableau de nombres, rangés en lignes et en colonnes. Prends celle de lignes et colonnes dont les lignes sont . En Python, on l'écrit comme la liste de ses lignes : .
+
+Multiplier une matrice par un vecteur, c'est faire un produit scalaire par ligne : chaque ligne de la matrice, fois le vecteur, donne une case du résultat.
+
+Le résultat est le vecteur : autant de cases que la matrice a de lignes.
+
+Chaque ligne de la matrice fait un produit scalaire avec le vecteur. Une ligne a nombres, un par colonne : le vecteur doit en avoir autant, . Le résultat, lui, a une case par ligne, donc nombres. Avec un vecteur de nombres, le programme refuse :
+
+`matrice_fois_vecteur` reçoit une matrice, écrite comme une liste de lignes (`list[list[float]]`), et un vecteur. Elle rend un vecteur.
+Le résultat part d'une liste vide, et la boucle prend les lignes de la matrice une à une.
+Une ligne qui n'a pas autant de nombres que le vecteur arrête le calcul, avec un message en français. `quantite`, définie plus haut dans le fichier, met « colonne » et « nombre » au pluriel quand il le faut. Dans ce message, `\u202f` est l'espace fine de la typographie française, écrite ainsi pour rester visible dans le code.
+Chaque ligne, fois le vecteur : le `produit_scalaire` de l'étape 1. Il devient la case suivante du résultat.
+
+Dans chaque couche de ton IA, une matrice de lignes et colonnes change un vecteur de nombres en un autre vecteur de nombres : produits scalaires d'un coup. À elle seule, cette matrice compte poids. Au chapitre 0.4, un atelier te fera manipuler ces formes : ce qui se multiplie avec quoi, et ce qui en sort.
+
+Le nombre de lignes, puis le nombre de colonnes : c'est la forme de la matrice. Celle de l'exemple est une matrice × .
+
+Un vecteur peut se voir comme une matrice d'une seule colonne : c'est pour cela qu'on parle de nombres « en colonne ».
+
+Une IA apprend en réglant ses poids, des nombres qu'elle ajuste pour faire baisser son erreur. Prends un seul poids, x, et une erreur toute simple, qui vaut (x − 3)² + 1. Cette erreur est la plus basse en x = , où elle vaut : c'est le fond. Mais l'IA ne voit pas la courbe en entier. Elle ne connaît que sa position, et la pente sous ses pieds.
+
+La pente dit à quelle vitesse l'erreur monte quand x avance vers la droite : c'est la montée de l'erreur sur un tout petit pas, divisée par la longueur de ce pas. Si l'erreur descend, la pente est négative.
+
+En x = , on est à gauche du fond : vers la droite, l'erreur descend, et la pente est négative. Pour cette erreur, la pente vaut 2 × (x − 3), soit en x = . Pour descendre, il faut donc aller du côté opposé au signe de la pente : ici, vers la droite. La figure juste en dessous est ouverte.
+
+La pente se mesure aussi sans formule : on regarde l'erreur un millionième à droite de x et un millionième à gauche, puis on divise l'écart par la distance. En x = , Python trouve ainsi au lieu de : presque la même chose. C'est utile quand on n'a pas de formule, mais c'est lent et approché ; ton IA calcule ses pentes exactement.
+
+La figure dessine la courbe de l'erreur, le point x, et la droite qui touche la courbe en ce point, la tangente : sa pente est celle de la courbe. Ses boutons font descendre le point, comme l'explique l'étape suivante.
+
+`erreur` reçoit le poids x et rend l'erreur.
+Le carré s'écrit comme une multiplication : (x − 3) × (x − 3).
+
+`pente` : la formule exacte, 2 × (x − 3).
+`pente_approchee` reçoit une fonction `f` (`Callable` : quelque chose qu'on peut appeler), un point x, et un petit écart `h`, un millionième par défaut (`1e-6`).
+La montée de `f` entre x − h et x + h, divisée par la distance parcourue, 2h.
+
+La pente s'appelle aussi la dérivée. Avec plusieurs poids, la liste de toutes les pentes s'appelle le gradient.
+
+Voici toute la règle : à chaque pas, x ← x − taux × pente(x). La flèche se lit « devient » : la nouvelle position est l'ancienne, moins le taux fois la pente. Une pente négative fait avancer x vers la droite, une pente positive le fait reculer, et le taux règle la longueur du pas.
+
+Au taux , depuis x = , la pente vaut , et x devient − × () = . C'est exactement ce que fait le bouton « Un pas » de la figure, à l'étape 3.
+
+`descendre` reçoit le départ, le taux et un nombre de pas ; elle rend la liste des positions.
+La liste commence par le départ.
+À chaque pas, la règle x ← x − taux × pente(x), puis la nouvelle position rejoint la liste. La boucle n'a pas besoin du numéro du pas : son nom est `_`.
+
+Au taux , x devient − × () = : le premier pas tombe pile sur le fond. Un seul pas suffit. Ce taux convient exactement à cette courbe ; pour une vraie IA, personne ne connaît le bon taux à l'avance.
+
+À ce taux, chaque pas saute par-dessus le fond et atterrit de l'autre côté, un peu plus loin qu'avant : x oscille bien autour du fond, mais jamais à la même distance. Au départ, x est à du fond ; après un pas, à , puis à , soit de plus à chaque pas ; au bout de pas, à . L'erreur, au lieu de baisser, grimpe.
+
+C'est au taux que x oscillerait toujours à la même distance, entre et . Dans la figure, au plus grand taux, , x part à plus de du fond dès le pas .
+
+Ton IA apprend sur ce principe. À chaque pas d'entraînement, elle calcule la pente de son erreur pour chacun de ses millions de poids, et les déplace tous à la fois. Sa recette, AdamW, règle en plus la longueur du pas de chaque poids. Le chapitre 0.5 montre comment obtenir toutes ces pentes d'un coup.
+
+Une IA n'est pas une seule formule : c'est une longue chaîne d'opérations, chacune appliquée au résultat de la précédente. Pour descendre la pente, il lui faut pourtant la pente de toute la chaîne. La règle de la chaîne la donne, maillon par maillon.
+
+Prends h(x) = (2x + 1)². Elle enchaîne deux opérations :
+
+- d'abord f(x) = 2x + 1, dont la pente vaut 2 partout ;
+- puis g(u) = u², le carré du résultat u de f, dont la pente vaut 2u.
+
+La règle dit : la pente de h en x, c'est la pente de g en u = f(x), multipliée par la pente de f. Quand x avance d'un tout petit pas, u avance 2 fois plus ; et quand u avance d'un tout petit pas, h avance 2u fois plus. Les deux effets se multiplient.
+
+En x = , u = 2 × + 1 = , et h = ² = . La pente de g en vaut 2 × = , celle de f vaut : la pente de h en vaut × = . Mesurée sans formule, comme à l'étape 3, la pente approchée de Python vaut : presque .
+
+`interieur` : f(x) = 2x + 1, l'opération du dedans.
+`exterieur` : g(u) = u², écrit comme une multiplication, u × u.
+`composee` : h(x) = g(f(x)). On calcule f d'abord, puis g sur son résultat.
+`pente_composee`, la règle de la chaîne : la pente de g en u, 2u, fois la pente de f, 2.
+`exemple_chaine` calcule tout en x = 1, et mesure aussi la pente avec `pente_approchee`, la fonction de l'étape 3, pour vérifier la règle.
+
+Une IA enchaîne des centaines d'opérations, mais la règle reste la même : on multiplie les pentes, maillon par maillon. Au chapitre 0.5, elle servira à remonter l'erreur d'un petit réseau, de la sortie jusqu'à chacun de ses poids. Cette remontée s'appelle la rétropropagation ; c'est elle qui donne à ton IA la pente de son erreur pour chacun de ses poids.
+
+En maths, la pente d'une fonction f s'écrit souvent avec un prime : f′(x). La règle de la chaîne devient h′(x) = g′(f(x)) × f′(x).
+
+Au chapitre 0.1, le programme prenait toujours le mot le plus fréquent, et tournait en rond. Un modèle de langage fait autrement : il transforme ses comptes en probabilités, puis tire au sort.
+
+Prends un petit texte où le mot « le » est suivi . Chaque compte divisé par le total, , donne une probabilité : . Une probabilité va de 0 à 1, et celles de tous les mots possibles font 1 ensemble.
+
+Pour tirer au sort, on range ces probabilités bout à bout entre 0 et 1 : . On choisit ensuite un nombre au hasard entre 0 et 1, et le mot tiré est celui où il tombe.
+
+`tirer` reçoit les probabilités et un nombre `u`, tiré au hasard entre 0 et 1.
+`cumul` additionne les probabilités une à une : dès que `u` passe sous le cumul, il est tombé dans la case de ce mot.
+Les arrondis des nombres à virgule peuvent laisser le cumul un peu sous 1 : un `u` tout au bout prend le dernier mot.
+`tirages` tire `n` fois, et compte combien de fois chaque mot est sorti.
+Sans aucune issue, rien à tirer : la fonction s'arrête, avec un message où `\u202f` est l'espace fine de l'étape 2.
+Puis les `n` tirages : `Hasard`, présenté juste après, donne chaque `u`, et le mot tiré gagne 1 dans `comptes`.
+
+Le hasard d'un ordinateur est un calcul : on part d'un nombre, la graine, et chaque nouveau nombre découle du précédent. La même graine donne toujours la même suite, sur toutes les machines. Ce site refait les tirages du Python dans ton navigateur, et trouve exactement les mêmes comptes.
+
+`Hasard` est une classe : un objet qui garde son état, `self.etat`, d'un tirage au suivant.
+`__init__` vérifie que la graine est un entier qui convient, puis la range dans `self.etat`, sur 32 bits (`& 0xFFFFFFFF`).
+`suivant32` avance l'état, puis le brouille : décalages (`>>`), ou exclusifs (`^`) et multiplications. Le résultat semble pris au hasard, mais il est entièrement calculé.
+`uniforme` le ramène entre 0 et 1, en le divisant par 2^32.
+
+Avec la graine , « » sort fois sur . Une probabilité de dit ce qui arrive en moyenne, pas à chaque fois : sur peu de tirages, la part de « » s'en écarte beaucoup ; sur beaucoup de tirages, elle s'en rapproche.
+
+Dans la figure, avec la même graine, « » sort fois sur tirages, soit , quand on l'attend fois en moyenne. Sur tirages, il sort fois, soit : tout près des . Pourtant, l'écart avec ce qu'on attend en moyenne, fois, a grandi : fois, contre sur tirages. Ce qui se rapproche de la probabilité, c'est la part : le nombre de sorties, divisé par le nombre de tirages.
+
+Essaie dans la figure : monte le nombre de tirages, puis change de graine.
+
+La graine fixe tous les tirages : même graine, mêmes comptes. C'est ce qui permet de refaire exactement un entraînement, ou de vérifier que ce site calcule comme le Python.
+
+À l'étape 6, les probabilités venaient de comptes. Un modèle de langage, lui, calcule un score pour chaque mot possible : un nombre quelconque, positif ou négatif, d'autant plus grand que le mot lui semble convenir. Il doit ensuite changer ces scores en probabilités : c'est le rôle de softmax.
+
+Softmax prend l'exponentielle de chaque score, notée exp. Une exponentielle est toujours positive, et grandit avec le score : le plus grand score garde la plus grande part. Softmax divise ensuite chaque exponentielle par leur somme, si bien que les probabilités font 1 ensemble.
+
+Avant l'exponentielle, les scores sont divisés par un réglage, la température. Sous 1, elle creuse les écarts entre les scores, et le meilleur mot sort plus souvent au tirage ; au-dessus de 1, elle les resserre, et le modèle ose des mots moins probables. Voici softmax pour les trois mots de l'étape 6. Leurs scores : .
+
+Chaque ligne fait : ce sont des probabilités. Plus la température monte, plus « », le mot au plus grand score, perd de sa part, et plus « », celui au plus petit, en gagne.
+
+`softmax` reçoit les scores et une température, 1 par défaut. Elle rend une probabilité par score.
+Une température nulle ou négative n'a pas de sens : la fonction s'arrête, et dit quoi essayer. `\u202f` est l'espace fine de l'étape 2.
+On retire d'abord le plus grand score à chacun. Les probabilités ne changent pas, car toutes les exponentielles sont divisées par le même nombre ; mais `exp` ne reçoit plus jamais de grand nombre, qui la ferait déborder.
+`math.exp` de chaque score, divisé par la température.
+Une boucle additionne les exponentielles, de gauche à droite, puis chacune est divisée par ce total.
+
+Pour apprendre, le modèle mesure son erreur sur chaque prédiction. Si p est la probabilité qu'il donnait à la bonne réponse, son erreur vaut −ln p. Ici, ln est le logarithme naturel : ln 1 = 0, et ln p est négatif quand p est entre 0 et 1 ; le signe moins rend donc l'erreur positive. Sûr de la bonne réponse (p = 1), le modèle ne fait aucune erreur ; moins il lui donnait de chances, plus l'erreur est grande.
+
+Une chance sur , c'est p = 1 ÷ = . L'erreur vaut −ln , c'est-à-dire ln : environ . Ce n'est ni la chance, ni le nombre de lettres possibles. Le logarithme grandit lentement : diviser la chance par ajoute toujours ln à l'erreur, quelle que soit la chance de départ.
+
+La dernière ligne est l'erreur de départ d'un modèle qui devine au hasard parmi caractères, comme le mini-modèle qui invente des prénoms au chapitre 0.5. Avant tout entraînement, il donne à peu près une chance sur à chaque caractère, et son erreur est proche de ln . Apprendre, pour lui, c'est faire baisser ce nombre.
+
+`erreur_de_prediction` reçoit p, la probabilité donnée à la bonne réponse, et rend l'erreur.
+p doit être plus grand que 0, et au plus 1 : ln 0 n'existe pas. Le message emploie lui aussi `\u202f`, l'espace fine.
+`math.log` est le logarithme naturel, ln. Le signe moins rend l'erreur positive.
+
+Cette erreur s'appelle l'entropie croisée. C'est elle que ton IA fait baisser pendant son entraînement : la moyenne de −ln p sur tous les morceaux de texte qu'elle doit deviner.
+
+Le logarithme et l'exponentielle se défont l'un l'autre : ln(exp(y)) = y.
+
+Pour l'essentiel, ton IA fait les calculs de ce chapitre : des produits scalaires, rangés en matrices ; softmax, pour donner une probabilité à chaque morceau de texte qui pourrait suivre ; puis, pour apprendre, une pente par poids et un pas pour descendre. Les plus grands modèles aussi. Seule l'échelle change.
+
+Pour entraîner un modèle de N poids sur D morceaux de texte, il faut environ 6 × N × D opérations. Pour chaque morceau de texte, la prédiction coûte à peu près 2 opérations par poids, une multiplication et une addition, comme dans un produit scalaire ; remonter l'erreur jusqu'aux pentes en coûte environ deux fois plus.
+
+Llama 3 405B, de Meta, a de poids, entraînés sur de morceaux de texte : 6 × N × D en fait opérations, environ un . Meta annonce dans son article.
+
+Un morceau de texte y est un vecteur de nombres, et chacune de ses couches contient des matrices de lignes et colonnes : de poids pour une seule d'entre elles, plus de la moitié de ton IA tout entière.
+
+Le projet complet (les fonctions, leurs tests, et les valeurs de référence calculées par Python) est sur GitHub, avec un notebook à ouvrir dans Colab :
+
+### À suivre
+
+Tu as les outils : vecteurs, matrices, pentes et probabilités. Pour les faire tourner sur des millions de poids, il faut une bibliothèque faite pour cela, PyTorch, et un ordinateur prêt à s'en servir. Le chapitre 0.3 prépare ton poste : Python, uv, PyTorch, et la carte graphique si tu en as une.
+
+Une opération, ici, c'est une addition ou une multiplication de deux nombres à virgule.
+
+Entraîner ton IA, c'est surtout multiplier des matrices, comme au chapitre 0.2 : des milliards de produits scalaires, tous construits de la même façon, et indépendants les uns des autres. Le processeur de ce PC a fils de calcul, chacun capable de tout faire, l'un après l'autre. Une carte graphique a des milliers de petits calculateurs, plus simples, qui font la même opération en même temps, avec une mémoire très rapide.
+
+Sur ce PC, la carte est une RTX 5070 Ti, de NVIDIA. Ton IA a été entraînée quelques pas sur elle, puis sur le processeur, pour comparer.
+
+Mesuré sur ce PC le , pour la taille « » de ton IA : la carte lit morceaux de texte par seconde, le processeur , avec ses fils à plein régime. La carte va fois plus vite. Un entraînement d'une nuit sur la carte prendrait des semaines sur le processeur.
+
+Le rapport de mesure, dans le dépôt du site, donne le détail : les autres tailles, la mémoire prise sur la carte, la charge de chaque fil du processeur.
+
+Une carte graphique s'appelle aussi un GPU, et le processeur un CPU. Ce sont les mots que tu croiseras dans les commandes du projet : `gpu` pour la carte, `cpu` pour le processeur.
+
+Pour que PyTorch calcule sur ta carte NVIDIA, il faut trois pièces : la carte, son pilote, et une version de PyTorch faite pour elle. Le pilote est le programme qui fait parler le système à la carte. Il s'installe avec la carte, ou depuis le site ou l'application de NVIDIA.
+
+Et CUDA ? C'est la boîte à outils de NVIDIA pour calculer sur ses cartes. Les versions de PyTorch pour la carte embarquent leur propre CUDA : tu n'as pas besoin d'installer le « CUDA Toolkit ». Il ne sert qu'à compiler, c'est-à-dire à traduire en programme pour la machine, le code de PyTorch lui-même ou celui d'extensions écrites pour CUDA. Il ne te faut que le pilote.
+
+Pour voir ton pilote, tape :
+
+`nvidia-smi` est livré avec le pilote. En haut, il affiche la version du pilote, sous le nom « Driver Version », ou « KMD Version » avec les pilotes récents. À côté, la version de CUDA la plus haute que ce pilote accepte : « CUDA Version », ou « CUDA UMD Version ». En dessous : ta carte, sa mémoire, et les programmes qui s'en servent. Si la commande est introuvable, le pilote n'est pas installé.
+
+Le projet de ce chapitre utilise PyTorch , fait pour CUDA . Un pilote de la série ou plus récent accepte toutes les versions de CUDA. Sur ce PC, le pilote va jusqu'à CUDA : c'est largement assez.
+
+Reste la carte elle-même. NVIDIA donne à chacune une capacité de calcul, en deux nombres : la génération, puis une mineure. pour la RTX 5070 Ti, pour la T4. Une version de PyTorch est compilée pour une liste d'architectures, écrites comme pour la capacité . Elle reconnaît une carte si la liste a une architecture de la même génération, avec une mineure plus petite ou égale. La liste du projet n'a pas , mais sert une RTX 4070, de capacité .
+
+**Ce qui rend faux d'anciens tutoriels.**
+
+« Installe le CUDA Toolkit » : inutile pour se servir de PyTorch.
+
+: ce canal s'est arrêté à PyTorch 2.5.
+
+sous Windows : tu obtiens la version pour le processeur seul (étape 4).
+
+Les adresses en `cu118` ou `cu121` : ces versions de CUDA ne connaissent pas les cartes RTX 50. Il a fallu attendre CUDA 12.8 et PyTorch 2.7. Et PyTorch 2.15 ne publie plus de version pour CUDA 12.
+
+uv installe Python et les bibliothèques dont chaque projet a besoin, dans un dossier à part pour chaque projet. Si tu l'as installé au chapitre 0.1, passe à l'étape 4. Sous Windows, ouvre PowerShell et tape :
+
+La seconde commande affiche la version d'uv : s'il répond, il est installé. Si PowerShell ne connaît pas encore `uv`, ferme-le et rouvre-le. Avec winget, installe le même outil. Sous Linux ou macOS :
+
+Tu n'as pas besoin d'installer Python toi-même : uv télécharge la version que demande le projet, la première fois qu'il en a besoin.
+
+PyTorch n'est pas une bibliothèque comme les autres : il en existe une version pour la carte, et une pour le processeur seul. Le fichier `pyproject.toml` du projet décrit les deux :
+
+Un commentaire : les deux façons de lancer le projet, avec la carte ou sans. Une roue, c'est le fichier tout prêt d'une bibliothèque de Python, qu'uv n'a plus qu'à installer.
+Deux extras, des options du projet : `gpu` et `cpu`. Chacun demande PyTorch, dans la même version.
+Les deux extras sont en conflit : uv n'installe jamais les deux ensemble.
+D'où vient PyTorch : de l'index `pytorch-cu132` avec l'extra `gpu`, de l'index `pytorch-cpu` avec l'extra `cpu`. Un index est un site d'où uv télécharge les bibliothèques.
+Les deux index, sur le site de PyTorch : celui des versions pour CUDA , et celui des versions pour le processeur. Avec `explicit = true`, uv n'y cherche que PyTorch.
+
+Pourquoi tout ce réglage, plutôt qu'une simple ligne qui demande PyTorch ?
+
+Sous Windows, PyPI ne sert que la version de PyTorch pour le processeur : , contre pour celle de la carte, qui embarque CUDA. PyTorch s'importe, et calcule, mais sur le processeur seul. Le script de l'étape 5 le voit, et dit quoi faire :
+
+C'est pour cela que le projet va chercher PyTorch sur le site de PyTorch, dans l'index de la version voulue. installe la version pour la carte, sans rien lancer, et celle pour le processeur. `uv run`, à l'étape suivante, fait la même installation avant de lancer le script.
+
+Sous Linux, PyPI sert déjà des versions pour la carte : c'est sous Windows que ce réglage change tout. Le projet le fait partout de la même façon.
+
+Ce site compte les tailles de téléchargement comme PyPI : 1 Mo vaut 10⁶ octets, soit , et 1 Go 10⁹. La mémoire des tenseurs, au chapitre 0.4, se compte autrement.
+
+Le projet contient un script qui regarde ton poste comme le verront les projets suivants : le système, Python, PyTorch, la carte et son pilote, les fils du processeur. Il en tire un diagnostic, dit quoi faire quand quelque chose cloche, puis fait un essai de calcul. Avec une carte NVIDIA, dans le dossier du projet :
+
+La première fois, uv télécharge la version de PyTorch pour la carte : sous Windows, . Sans carte NVIDIA, ou sur un Mac :
+
+Voici ce qu'il affiche sur ce PC, avec la version pour le processeur. La carte est là, mais cette version la laisse de côté : le script le voit.
+
+Et voici ce qu'il affiche avec la version pour la carte : PyTorch la voit, et l'essai de calcul tourne aussi sur elle.
+
+Chaque constat a un niveau : « bon », « attention » si ça marche moins bien que ça pourrait, « problème » s'il faut agir. Avec la version pour le processeur, le script met au niveau « attention » la carte laissée de côté. Avec l'une comme avec l'autre, il y met aussi les fils du processeur que PyTorch n'utilise pas. La dernière ligne compte les problèmes ; s'il y en a, le script rend un code d'erreur.
+
+Le diagnostic est une seule fonction, `diagnostiquer`. Elle ne lance rien : elle lit des faits et rend des constats. On peut donc la tester sur les postes d'autres lecteurs, décrits à la main, sans leur ordinateur. Voici la règle des générations, puis la chaîne de décision ; le texte de chaque constat est plus bas dans le fichier.
+
+`architecture` lit un nom comme « sm_86 » : la génération 8 et la mineure 6.
+`carte_connue`, la règle des générations : un « sm » de la même génération que la carte, de mineure plus petite ou égale ; ou un « compute », du code que le pilote recompile pour les cartes plus récentes.
+`diagnostiquer` reçoit les faits et rend la liste des constats. Elle ne fait que choisir la clé de chaque constat : `constat_pour`, plus bas dans le fichier, en écrit le texte, celui du tableau de l'étape 6.
+Sans PyTorch, un seul constat, et on s'arrête là.
+`torch.version.cuda` vaut `None` : c'est la version pour le processeur. Sans pilote, tout va bien ; avec un pilote, la carte est laissée de côté.
+Une version pour la carte, mais aucun pilote ne répond.
+PyTorch ne voit pas la carte, et le pilote ne va pas jusqu'à la version de CUDA de PyTorch (`majeure` en garde le premier nombre) : il est trop ancien. Si PyTorch voit la carte, le pilote suffit.
+PyTorch voit la carte, mais aucune architecture de sa liste ne la sert : la carte est trop ancienne si elle précède la plus ancienne de la liste (`plus_ancienne`, plus bas dans le fichier), sinon trop récente.
+Le pilote et la bonne version sont là, mais PyTorch ne voit aucune carte.
+Sinon, tout est prêt : c'est la ligne du haut de ce chapitre.
+Le constat choisi, puis, en plus, un constat « attention » quand PyTorch n'utilise pas tous les fils du processeur.
+
+Les projets suivants calculent sur la carte quand PyTorch la voit, sinon sur le processeur. Une petite fonction choisit pour eux :
+
+`AppareilIndisponible`, une erreur à part : l'appareil demandé existe, mais PyTorch ne peut pas s'en servir ici.
+`choisir_appareil` prend l'appareil demandé, sinon la variable d'environnement `FORGE_APPAREIL`, un réglage que le terminal passe aux programmes qu'il lance (l'étape 7 dit comment la régler), sinon « auto ». `variable` retient d'où vient la valeur.
+« auto » prend la carte si PyTorch la voit, sinon le processeur ; « cpu » prend le processeur.
+« cuda » sans carte visible : un message qui dit quoi faire, selon d'où vient la demande, plutôt qu'une longue erreur de Python.
+Toute autre valeur : un message qui donne les trois choix.
+
+Le script enregistre aussi sa sortie, avec la date du relevé : c'est ainsi que cette page montre les vraies sorties de ce PC, et pas des copies.
+
+Les projets des chapitres 0.4 et 0.5 ont une copie de `appareil.py`.
+
+Le diagnostic est testé sur situations, des postes de lecteurs décrits par leurs faits. Avant de les voir, parie sur l'une d'elles : celle d'un ancien tutoriel.
+
+Cette version pour CUDA s'arrête à : rien pour la génération de la carte. PyTorch voit bien la carte, mais ne sait pas calculer dessus. Le pilote, lui, suffit : il va jusqu'à CUDA . Une carte plus récente que sa version de PyTorch reste donc inutilisable : seule une version de PyTorch qui connaît sa génération la débloque.
+
+Ces lignes sont celles du script, mot pour mot : la page les lit dans le fichier de référence que le diagnostic écrit, `tests/attendus.json`. La situation de Colab ne montre que des valeurs sourcées : la version de PyTorch de son image, publiée par Google, et la T4 que ses utilisateurs rapportent le plus souvent, de capacité , que sert.
+
+Le script connaît aussi d'autres cas, sans situation au tableau : . Il nomme alors la cause, et dit quoi faire.
+
+**Le processeur.** Sans carte NVIDIA, les projets du site marchent aussi sur le processeur, en plus lent pour entraîner ton IA. Mais un processeur se divise en cœurs, et sur un processeur dont chaque cœur fait tourner deux fils, comme celui de ce PC, PyTorch n'en prend par défaut qu'un par cœur : ici, fils sur , quand on ne règle rien. Le diagnostic le signale :
+
+La mesure de l'étape 1 a été faite ainsi, avec les fils du processeur.
+
+**Colab.** C'est le service de Google qui fait tourner les notebooks du site dans ton navigateur, sans rien installer. Au , Python et PyTorch y sont déjà installés, avec une carte ; sans carte, c'est PyTorch . Une carte s'y demande par Exécution, puis Modifier le type d'exécution. Dans l'offre gratuite, elle n'est pas garantie : Google ne la nomme pas, et dit que ses cartes changent avec le temps. Ses utilisateurs rapportent le plus souvent une T4, de capacité . Une session dure au plus heures. Le site, lui, vérifie ses notebooks sans carte : la carte de Colab n'y est pas essayée.
+
+**Ton défi.** Lance sur ton PC, ou sans carte NVIDIA. Ouvre ensuite le notebook du chapitre dans Colab (le lien est à l'étape 8), et compare les deux rapports : les versions, la carte, sa capacité, les fils.
+
+**Linux.** Les commandes sont les mêmes. PyPI y sert déjà des versions pour la carte, mais le projet passe quand même par l'index de PyTorch, comme sous Windows.
+
+**Mac.** Un Mac n'a pas de carte NVIDIA, donc pas de CUDA. Sa puce graphique a son propre moteur dans PyTorch, MPS, mais le site ne l'essaie pas : sur Mac, tout calcule sur le processeur, avec . Le projet ne s'installe que sur un Mac à puce Apple (M1 et suivantes), sous macOS ou plus récent : PyTorch ne publie plus de version pour les Mac à processeur Intel.
+
+**WSL2,** le Linux intégré à Windows, n'est pas nécessaire : les projets du site marchent dans PowerShell.
+
+La variable d'environnement `FORGE_APPAREIL` force le choix de l'appareil dans les projets suivants : `cpu` pour le processeur, `cuda` pour la carte, `auto` par défaut. Pour calculer sur le processeur, tape dans PowerShell , ou dans un terminal Linux ou macOS , puis lance le projet depuis le même terminal.
+
+Ton poste a une carte, ou n'en a pas. Ceux qui entraînent les plus grands modèles en ont des milliers, et chacune doit s'accorder avec son pilote et son logiciel, comme la tienne.
+
+Meta a entraîné Llama 3 405B sur jusqu'à cartes H100 à la fois. Une H100 a Go de mémoire, fois ta RTX 5070 Ti, et calcule environ fois plus vite. Sa capacité de calcul est : la version de PyTorch du projet la reconnaît, avec .
+
+Le projet complet (le script, son diagnostic, ses tests et les sorties de ce PC) est sur GitHub, avec un notebook à ouvrir dans Colab :
+
+### À suivre
+
+Ton poste est prêt, et tu sais sur quoi il calcule. Le chapitre 0.4 manipule les tenseurs de PyTorch, les tableaux de nombres qu'il range sur le processeur ou sur la carte : leurs formes, et ce qui se multiplie avec quoi.
+
+Un tenseur est un tableau de nombres, rangés selon un certain nombre de dimensions. Un nombre seul, qu'on appelle aussi un scalaire, n'en a aucune. Une liste de nombres, le vecteur du chapitre 0.2, en a une. Une matrice, rangée en lignes et en colonnes, en a deux. Et des matrices de même taille s'empilent : un lot de matrices est un tenseur à 3 dimensions.
+
+La forme d'un tenseur, c'est la liste de ses tailles, une par dimension, écrite comme Python écrit un tuple : pour une matrice de lignes et colonnes, pour un lot de matrices de lignes et colonnes, et pour un nombre seul. Une forme à une seule dimension garde une virgule : pour un vecteur de nombres. Sans elle, Python lirait le nombre entre parenthèses. Ce chapitre écrit toutes les formes ainsi.
+
+Ton IA lit des textes découpés en morceaux, et chaque morceau a son numéro. Elle les reçoit par paquets, les micro-lots, de textes de morceaux : son entrée est un tenseur d'entiers de forme (micro-lot, ), un numéro par case. Puis chaque numéro y est remplacé par un vecteur de nombres, comme au chapitre 0.2 : le tenseur devient (micro-lot, , ), celui de l'ouverture. Chacune de ses couches reçoit un tenseur de cette forme, et en rend un de la même forme.
+
+Le mot tenseur vient des maths et de la physique. En IA, il veut seulement dire : un tableau de nombres, avec autant de dimensions qu'il en faut.
+
+Sur la carte de ce PC, la plus grande taille de ton IA s'entraîne avec des micro-lots d'un seul texte, comme celui de l'ouverture : deux ne tiennent pas dans sa mémoire. Un seul y prend déjà au plus fort, sur les de la carte (rapport de mesure).
+
+Dans PyTorch, un tenseur se crée à partir d'une liste de Python, ou par une fonction qui le remplit. Voici les sortes de l'étape 1, telles que les crée le projet du chapitre :
+
+`exemple_creer` rend ses tenseurs dans un dictionnaire, chacun sous son nom. `torch.Tensor` est le type des tenseurs.
+`torch.tensor` reçoit un nombre : un nombre seul, de forme .
+Une liste de nombres : un vecteur, de forme .
+`torch.arange` donne les nombres de à ; `reshape` les range en lignes de , ligne après ligne.
+`torch.zeros` remplit de zéros un tenseur de la forme demandée : un lot de matrices de lignes et colonnes.
+Des nombres écrits sans `.0` donnent des entiers, de type `int64`. Les autres tenseurs sont des `float32`, des nombres à virgule.
+
+Une fois créé, un tenseur se lit : sa forme, le type de ses nombres, l'appareil où il est rangé, et ses cases.
+
+La matrice de l'exemple précédent : .
+`m.shape`, sa forme : . `tuple` en fait un tuple de Python.
+`m.dim()`, son nombre de dimensions : . `m.numel()`, son nombre de nombres : , le produit des tailles.
+`m.dtype`, le type de ses nombres : , des nombres à virgule sur 32 bits, c'est-à-dire écrits avec 32 chiffres binaires, des 0 et des 1.
+`m.device`, l'appareil où il est rangé : , le processeur. L'étape 6 montre comment le ranger sur la carte.
+`m[1, 2]`, la case de la ligne 1 et de la colonne 2, en comptant depuis 0 : . `.item()` en fait un nombre de Python.
+`m[1]` prend toute la ligne 1 : . `m[:, 0]` prend toute la colonne 0 : . Les deux-points veulent dire « toutes les lignes ». `.tolist()` en fait une liste de Python.
+
+Le notebook du chapitre, à ouvrir dans Colab (le lien est à l'étape 8), te fait créer et lire ces tenseurs toi-même. Change leurs nombres et leurs formes, puis relance la cellule.
+
+Entre deux tenseurs de même forme, `+`, `-`, `*` et `/` calculent case par case : chaque case du résultat ne regarde que les deux cases à la même place. Une somme peut parcourir tout un tenseur, ou une seule de ses dimensions. Et `@` fait le produit matriciel : celui du chapitre 0.2, une matrice fois un vecteur, étendu à deux matrices. Chaque case du résultat est le produit scalaire d'une ligne et d'une colonne.
+
+Deux matrices de forme , `a` et `b`.
+`a + b`, case par case : .
+`a * b` multiplie aussi case par case : . Ce n'est pas le produit matriciel.
+`a @ b`, le produit matriciel : . Sa première case vient de la première ligne de `a` et de la première colonne de `b` : .
+`a.sum()` additionne tous les nombres de `a` : .
+`a.mean(dim=0)` fait la moyenne en descendant chaque colonne : il reste une moyenne par colonne, .
+`a` plus un vecteur de nombres : le vecteur s'ajoute à chaque ligne, . C'est la diffusion, l'objet de l'étape suivante.
+
+Pour `a @ b`, la forme compte. Chaque ligne de `a` rencontre chaque colonne de `b`, et elles doivent avoir autant de nombres : `a` doit avoir autant de colonnes que `b` a de lignes. Une matrice de forme (n, m) se multiplie par une matrice de forme (m, p), et le résultat a la forme (n, p) : les lignes de `a`, les colonnes de `b`.
+
+Dans PyTorch, `dim` désigne une dimension par son numéro, en comptant depuis 0 : `dim=0` pour les lignes d'une matrice, `dim=1` pour ses colonnes. La dimension parcourue disparaît du résultat : `a.mean(dim=1)` donnerait une moyenne par ligne.
+
+À l'étape 3, un vecteur de forme s'est ajouté à une matrice de forme : PyTorch l'a ajouté à chaque ligne, sans qu'on le lui demande. C'est la diffusion. Quand deux formes diffèrent, PyTorch les aligne par la droite, puis étire ce qui a une taille de 1, ou une dimension en moins, pour suivre l'autre. Rien n'est recopié en mémoire : PyTorch fait comme si.
+
+A + B a donc la forme : chacune de ses cases est la somme d'une case de A et d'une case de B.
+
+La règle complète : alignées par la droite, deux tailles vont ensemble si elles sont égales, ou si l'une vaut 1, qui s'étire alors. Une dimension qui manque compte pour 1. Sinon, PyTorch refuse. L'atelier juste en dessous est ouvert : essaie-la, et essaie aussi A @ B.
+
+Les deux règles de l'atelier tiennent en quelques lignes de Python, sans PyTorch. Les tests du projet les comparent à PyTorch lui-même, sur paires de formes ; l'atelier en a une copie exacte, en JavaScript, vérifiée sur les mêmes paires.
+
+`forme_diffusee` reçoit deux formes, des tuples d'entiers, et rend la forme de `a + b`, ou `None` si PyTorch refuserait.
+L'alignement par la droite : on ajoute des 1 à gauche de la forme la plus courte, jusqu'à la longueur de l'autre. `(1,) * 2` donne `(1, 1)`.
+Dimension par dimension, avec `zip` : deux tailles égales, ou une taille 1 qui s'étire ; sinon, PyTorch refuserait.
+La forme du résultat, en tuple.
+
+`forme_produit` rend la forme de `a @ b`. Un nombre seul n'a pas de produit matriciel.
+Un vecteur compte pour une ligne à gauche, pour une colonne à droite : on lui ajoute un 1.
+La règle de l'étape 3 : les colonnes de gauche, sa dernière dimension, doivent égaler les lignes de droite, son avant-dernière.
+Les dimensions de devant, celles du lot, se diffusent comme pour `a + b`.
+Le résultat : le lot, les lignes de gauche, les colonnes de droite.
+On retire le 1 ajouté à un vecteur.
+
+Le script dit ce que donnent A + B et A @ B, ou pourquoi c'est impossible. Écris les formes entre guillemets, comme Python : un vecteur avec sa virgule, `"(4,)"`. La première fois, uv installe la version de PyTorch pour le processeur, comme au chapitre 0.3.
+
+Tout ce qui est jaune se manipule. Fais glisser un nombre à la souris ou au doigt ; au clavier, atteins-le avec Tab, puis utilise les flèches.
+
+Dans la grille, un trait en pointillé entoure une taille qui s'étire. Pour A @ B, les deux tailles qui doivent être égales sont soulignées : en vert si elles le sont ; sinon en rouge, et encadrées, comme une taille qui bloque A + B.
+
+Un tenseur range ses nombres les uns à la suite des autres, et chacun y prend la même place, selon son type. `float32`, le type par défaut des nombres à virgule, prend octets par nombre. `bfloat16`, qu'on écrit bf16, n'en prend que : il va des très petits aux très grands nombres comme `float32`, mais avec moins de chiffres significatifs. `int64`, le type des entiers, en prend : c'est celui des numéros des morceaux de texte.
+
+Sur la carte, ton IA fait ses calculs en bf16, grâce à `torch.autocast` : chaque nombre calculé y prend fois moins de place qu'en `float32`. Ses poids, eux, restent en `float32`. Pour la mémoire des tenseurs, ce site compte comme le calculateur : 1 Mo vaut 2²⁰ octets, soit , et 1 Go vaut 2³⁰ octets.
+
+× = nombres, fois octets : octets, soit Mo. Mo, c'est le nombre de cases seul, sans la place de chaque nombre. La mémoire d'un tenseur, c'est toujours son nombre de cases fois la taille d'un nombre. En bf16, la même matrice prend Mo.
+
+`octets` reçoit une forme et un type de PyTorch, et rend un nombre d'octets.
+`math.prod` multiplie toutes les tailles : le nombre de nombres du tenseur.
+`element_size()` donne la place d'un nombre de ce type, d'après PyTorch lui-même. On la demande à un tenseur d'un seul nombre, de forme (), laissé sans valeur : `torch.empty` le crée sans le remplir.
+Les deux, multipliés.
+
+Les poids de ton IA, dans sa plus grande taille, sont nombres. Rangés en `float32`, ils prennent ; en bf16, ils n'en prendraient que .
+Le tenseur de l'ouverture, lui, reste en `float32` dans ton IA : `torch.autocast` ne passe en bf16 que certains calculs, comme les produits de matrices. Pour un micro-lot de 1, il prend , et ses copies en bf16, le temps d'un calcul, : à côté des poids, c'est peu. Mais l'entraînement garde bien d'autres tenseurs, pour calculer les pentes des poids et les régler : au plus fort, ton IA occupe de la carte, avec un micro-lot d'un seul texte.
+
+Un octet vaut 8 bits : `float32` tient sur 32 bits, bf16 sur 16, `int64` sur 64.
+
+Des calculs en bf16 sur des poids gardés en `float32` : c'est la précision mixte. Pour ton IA, c'est la boucle d'entraînement de la forge qui la règle (son code).
+
+Un tenseur est rangé sur un appareil : dans la mémoire du processeur, ou dans celle de la carte graphique. `.to(appareil)` le copie de l'un à l'autre, et chaque calcul se fait là où sont ses tenseurs : les tenseurs d'un même calcul doivent être sur le même appareil, sinon PyTorch refuse.
+
+Le projet choisit l'appareil avec la fonction du chapitre 0.3, copiée telle quelle :
+
+`choisir_appareil` prend l'appareil demandé, sinon la variable d'environnement `FORGE_APPAREIL`, sinon « auto ».
+« auto » prend la carte si PyTorch la voit, sinon le processeur ; « cpu » prend le processeur.
+« cuda » sans carte visible : un message qui dit quoi faire, plutôt qu'une longue erreur de Python.
+Toute autre valeur : un message qui donne les trois choix.
+
+Chronométrer un calcul sur la carte cache un piège : PyTorch ne l'attend pas. Il le range dans la file d'attente de la carte, puis passe aussitôt à la suite. Sans précaution, on chronométrerait le temps de poser la commande, pas celui du calcul.
+
+`attendre` : sur la carte, `torch.cuda.synchronize()` attend la fin de tous les calculs de la file. Sur le processeur, il n'y a rien à attendre.
+`chronometrer_produit` reçoit la taille des matrices, l'appareil et, sur le processeur, un nombre de fils. Elle retient le réglage des fils d'avant.
+`torch.set_num_threads` règle le nombre de fils du processeur qui calculent ensemble : l'étape 7 s'en sert.
+Deux matrices tirées au hasard, toujours les mêmes grâce à la graine 0, puis copiées sur l'appareil avec `.to`.
+À chaque tour : attendre, déclencher le chronomètre, calculer `a @ b`, attendre la fin, l'arrêter. Les premiers tours préparent le calcul, et ne comptent pas.
+La médiane : la durée du milieu, qu'un tour dérangé ne fausse pas.
+`finally` rend à PyTorch son réglage des fils, même si le calcul a échoué.
+
+L'étape suivante chronomètre ce produit sur le processeur et sur la carte, pour des matrices carrées de plus en plus grandes. Avant de lire ses chronos, parie sur la plus petite.
+
+Dans PyTorch, l'appareil de la carte s'appelle `cuda`, du nom de la boîte à outils de NVIDIA du chapitre 0.3. Celui du processeur s'appelle `cpu`.
+
+Le processeur aussi calcule en parallèle : PyTorch partage un produit en morceaux, et chaque fil en calcule un. Sur ce PC, pour le produit × , un seul fil prend ms, et les fils du réglage par défaut de PyTorch ms : fois moins. Le processeur de ce PC a pourtant fils en tout.
+
+Au chapitre 0.3, le script de vérification le signalait déjà : sur un processeur dont chaque cœur fait tourner deux fils, comme celui de ce PC, PyTorch n'en prend par défaut qu'un par cœur. Pour les prendre tous, `torch.set_num_threads` reçoit leur nombre, que donne `os.cpu_count()`.
+
+Voici les chronos de ce PC. Doubler la taille fait 4 fois plus de cases dans le résultat, et chaque case demande 2 fois plus de produits : 8 fois plus de calcul.
+
+Copier vers la carte a aussi un prix :
+
+Une matrice tirée au hasard, rangée sur le processeur.
+Le même chronomètre, autour de `a.to(carte)` : la copie de la mémoire du processeur à celle de la carte, entre deux attentes.
+La médiane, comme pour le produit.
+
+Pour que la carte vaille le voyage, mieux vaut que les tenseurs y restent. C'est ce que fait ton IA : ses poids y sont rangés une fois pour toutes, et seuls les morceaux de texte y voyagent, micro-lot après micro-lot.
+
+Pour chronométrer ton poste, dans le dossier du projet :
+
+Avec une carte NVIDIA, la version de PyTorch pour la carte la chronomètre, si PyTorch la voit. La première fois, uv télécharge cette version : sous Windows, . S'il l'a déjà téléchargée au chapitre 0.3, il la reprend dans son cache, le dossier où il garde ce qu'il a déjà téléchargé.
+
+Pour chronométrer quand même le processeur avec cette version, règle d'abord la variable `FORGE_APPAREIL` du chapitre 0.3, dans le même terminal : dans PowerShell, ou sous Linux ou macOS. Si le script dit que ta carte n'a pas pu calculer, le diagnostic du chapitre 0.3 dit pourquoi.
+
+Un fil se dit thread en anglais : c'est le mot de `set_num_threads`.
+
+Ton IA et les plus grands modèles font les mêmes calculs, sur des tenseurs de mêmes sortes. Seule l'échelle change.
+
+Les grands labos font eux aussi leurs calculs en bf16, le type de l'étape 5. En bf16, une carte H100 fait au plus milliers de milliards d'opérations par seconde : c'est sa crête, en TFLOPS. Aucun entraînement ne l'atteint : il faut aussi lire la mémoire, et des milliers de cartes doivent s'attendre et s'échanger leurs résultats.
+
+La part de la crête vraiment utilisée s'appelle l'efficacité. PaLM, de Google, en a tiré , sur ; Llama 3 405B, de Meta, de à , sur . Ton IA, seule sur la carte de ce PC, en tire , en comptant de la même façon : une seule carte n'attend personne.
+
+Le projet complet (les exemples, les deux règles de forme, la mémoire, les chronos et leurs tests) est sur GitHub, avec un notebook à ouvrir dans Colab :
+
+### À suivre
+
+Tu sais créer des tenseurs, prévoir leur forme, compter leur mémoire et les faire calculer où tu veux. Le chapitre 0.5 s'en sert pour un premier réseau de neurones : d'abord à la main, en Python pur, puis avec PyTorch.
+
+TFLOPS : des milliers de milliards (téra) d'opérations à virgule par seconde.
+
+Un neurone artificiel reçoit des nombres, ses entrées. Il multiplie chacune par un poids, additionne le tout, ajoute un dernier nombre, le biais, puis décide. Avec deux entrées, x1 et x2, sa somme pondérée vaut w1 × x1 + w2 × x2 + b. Le neurone le plus simple répond 1 si cette somme est plus grande que 0, et 0 sinon : c'est un neurone à seuil.
+
+Prends les portes logiques de l'électronique : deux entrées qui valent 0 ou 1, et une réponse. ET répond 1 seulement si ses deux entrées valent 1 ; OU, si au moins l'une des deux vaut 1. Il n'y a que cas, les points du carré : , , et .
+
+Le neurone sépare ces points par une droite : celle où sa somme vaut 0. D'un côté, la somme est plus grande que 0, et il répond 1 ; de l'autre côté, et sur la droite elle-même, il répond 0. Règle w1, w2 et b pour que ses réponses soient celles de ET.
+
+Dans l'atelier, tu cherches à la main. Le projet du chapitre, lui, essaie tous les réglages d'une grille, et garde le meilleur pour chaque porte.
+
+`POINTS`, les points (x1, x2), et `PORTES`, la réponse attendue de chaque porte, point par point. Le OU exclusif est l'objet de l'étape suivante.
+`GRILLE`, les valeurs essayées pour w1, w2 et b : de à , par pas de , comme les nombres de l'atelier.
+`sortie_seuil`, le neurone : la somme pondérée, puis la décision. Une somme nulle n'est pas plus grande que 0 : elle donne 0.
+`bien_classes` compte les points où le neurone donne la réponse de la porte. `zip`, du chapitre 0.1, parcourt les points et les réponses ensemble.
+`meilleur_reglage` essaie les réglages de la grille, valeurs pour chacun des trois nombres, et garde le premier qui classe le plus de points.
+
+Tout ce qui est jaune se manipule. Fais glisser un nombre à la souris ou au doigt ; au clavier, atteins-le avec Tab, puis utilise les flèches.
+
+Changer b déplace la droite sans la tourner : seuls w1 et w2 décident de sa pente.
+
+Le OU exclusif répond 1 quand une seule de ses deux entrées vaut 1. Il répond donc 1 pour et pour , mais 0 pour et pour . Sur le carré, ses deux points à 1 sont sur une diagonale, ses deux points à 0 sur l'autre.
+
+Non : au mieux points sur . Sur toute la grille du projet, le meilleur réglage en classe , par exemple w1 = , w2 = et b = .
+
+Et aucun réglage ne fait mieux, même hors de la grille. Additionne les sommes pondérées de et de : w1 + w2 + 2b. Celles de et de font exactement le même total. Pour répondre 1 aux deux premiers points, leurs deux sommes doivent être plus grandes que 0, et leur total aussi. Pour répondre 0 aux deux autres, leurs deux sommes doivent valoir au plus 0, et leur total aussi. Un même total ne peut pas être à la fois plus grand que 0 et au plus 0.
+
+Essaie-le dans l'atelier de l'étape 1, sur « OU exclusif » : tu n'y dépasseras pas points sur . Il faut une couche de plus : deux neurones qui tracent chacun leur droite, puis un troisième qui combine leurs réponses.
+
+Le réseau du projet a entrées, une couche cachée de neurones, et un neurone de sortie : c'est un réseau . Chaque neurone caché fait sa somme pondérée des entrées ; le neurone de sortie, celle des neurones cachés. Chacun a un poids par entrée, et un biais : × + = poids en tout, tirés au hasard au départ.
+
+Un neurone caché peut, par exemple, répondre comme OU, l'autre comme ET, et la sortie, « le premier, mais pas le second » : c'est exactement le OU exclusif. Personne ne dicte ce partage au réseau : l'entraînement trouve le sien.
+
+Mais le seuil a un défaut. Sa réponse saute de 0 à 1 d'un coup ; ailleurs, elle ne bouge pas. Sa pente est nulle, et la descente du chapitre 0.2 n'aurait rien à suivre. Le réseau remplace donc le seuil par la sigmoïde, qui monte en douceur : 0,5 pour une somme nulle, presque 1 pour une grande somme positive, presque 0 pour une grande somme négative. Elle a une pente partout.
+
+`sigmoide` calcule 1 ÷ (1 + exp(−z)) : `math.exp` est l'exponentielle du chapitre 0.2. Pour z = 0, exp(0) vaut 1, et la sigmoïde 1 ÷ 2.
+
+La sortie du réseau, p, est donc un nombre entre 0 et 1 : la probabilité, selon lui, que la réponse soit 1. Faire traverser le réseau à un point, de l'entrée vers la sortie, s'appelle propager :
+
+`Passage` range tout ce que calcule un point en traversant le réseau : la somme `z1` et la sortie `h` de chaque neurone caché, puis la somme `z2` et la sortie `p` du neurone de sortie. `@dataclass` fait de la classe une simple boîte à valeurs nommées. L'étape 5 se servira de chacune.
+`propager` fait traverser le réseau au point x. `r` contient les poids : `r.w1[j][i]` est le poids de l'entrée i vers le neurone caché j.
+La couche cachée : pour chaque neurone j, la somme pondérée des deux entrées, plus son biais `r.b1[j]`.
+Leur sortie, après la sigmoïde.
+Le neurone de sortie : la somme pondérée des sorties cachées, plus son biais, puis la sigmoïde. `p` est la réponse du réseau.
+Tout est rendu, pas seulement p.
+
+Dans ce chapitre, comme pour ton IA, « poids » désigne tous les nombres que l'entraînement règle, biais compris.
+
+Pour corriger les poids, il faut d'abord mesurer l'erreur du réseau. C'est celle du chapitre 0.2 : −ln de la chance donnée à la bonne réponse. Le réseau donne la chance p à la réponse 1, et donc 1 − p à la réponse 0. Si la bonne réponse y vaut 1, l'erreur vaut −ln p ; si elle vaut 0, −ln(1 − p). En une seule formule : −[y ln p + (1 − y) ln(1 − p)]. On l'appelle l'entropie croisée binaire.
+
+`erreur` reçoit la sortie p du réseau et la bonne réponse y, 0 ou 1.
+La formule, dans la description de la fonction. Avec y = 1, il n'en reste que −ln p ; avec y = 0, il n'en reste que −ln(1 − p).
+Le calcul, un cas ou l'autre : `math.log` est ln, le logarithme naturel du chapitre 0.2.
+
+La perte du réseau, c'est la moyenne de ces erreurs sur les points. C'est elle que l'entraînement fera baisser. Avec les poids tirés au hasard, elle vaut au départ.
+
+Un réseau qui répondrait 0,5 partout, sans rien savoir, aurait une erreur de ln 2 sur chaque point, environ .
+
+Pour descendre, il faut la pente de la perte pour chacun des poids : sa dérivée. Or le réseau est une chaîne de calculs : des sommes, des sigmoïdes, puis l'erreur. La règle de la chaîne du chapitre 0.2 donne ces pentes maillon par maillon, en multipliant les pentes, de la sortie vers l'entrée : l'erreur remonte le réseau. C'est la rétropropagation.
+
+Au bout de la chaîne, un calcul se simplifie. La pente de l'erreur par rapport à z2, la somme du neurone de sortie avant sa sigmoïde, vaut simplement p − y : la sortie, moins la bonne réponse.
+
+p − y = − = . La pente est plus grande que 0 : la sortie est trop haute. La descente retire à chaque poids le taux fois sa pente. Le biais de la sortie, dont la pente est ici p − y elle-même, recule donc ; z2 baisse, et p avec elle, vers la bonne réponse. Plus le réseau se trompe, plus la pente est grande ; s'il avait répondu exactement , elle serait nulle.
+
+Puis l'erreur continue de remonter, maillon par maillon :
+
+`retropropager` reçoit le réseau, le passage d'un point, le point et sa bonne réponse. Elle rend les dérivées de l'erreur par rapport aux poids.
+Le premier maillon : la pente de l'erreur par rapport à z2, p − y.
+Les poids de la sortie. Dans z2 = w2[0] × h[0] + w2[1] × h[1] + b2, la pente de z2 par rapport à `w2[j]` est `h[j]`, et par rapport à `b2`, 1. La règle de la chaîne les multiplie par `d_z2`.
+Un maillon de plus, vers les neurones cachés : la pente de z2 par rapport à `h[j]` est `w2[j]`. Chaque neurone caché reçoit sa part de l'erreur, selon son poids vers la sortie.
+Le maillon de la sigmoïde : sa pente vaut h × (1 − h).
+Les poids de la couche cachée, comme ceux de la sortie : la pente de `z1[j]` par rapport à `w1[j][i]` est l'entrée `x[i]`, et par rapport au biais, 1.
+Les dérivées, rangées comme les poids.
+`gradient_moyen` fait la moyenne des dérivées des points : c'est la pente de la perte moyenne. Les boucles additionnent, puis on divise par le nombre de points.
+
+Pourquoi p − y ? Avec y = 1, l'erreur −ln p a pour pente −1 ÷ p, et la sigmoïde, p × (1 − p). Multipliées, elles donnent −(1 − p), soit p − 1. Avec y = 0, la même règle donne p. Les deux cas s'écrivent p − y.
+
+Il ne reste qu'à répéter. À chaque pas, le réseau propage les points, mesure leur erreur, la remonte jusqu'au gradient moyen, puis recule chaque poids du taux fois sa dérivée : la descente du chapitre 0.2. Le projet fait pas, au taux de , depuis poids tirés au hasard avec la graine .
+
+`pas` reçoit le réseau, ses dérivées et le taux.
+Chaque poids recule du taux fois sa dérivée : le pas de descente du chapitre 0.2, pour poids à la fois. Un nouveau réseau est rendu ; l'ancien ne change pas.
+
+`Historique` garde les pertes, et le réseau après le dernier pas.
+`perte_moyenne` : la moyenne des erreurs des points, le nombre que l'entraînement fait baisser.
+`entrainer` note la perte au départ ; puis, à chaque pas, calcule le gradient moyen, fait le pas, et note la nouvelle perte. pas donnent pertes.
+`predictions` donne la réponse du réseau pour chaque point.
+
+Voici la perte du projet, pas après pas. Elle part de et finit à .
+
+Non : ses réponses vont de à . La sigmoïde s'approche de 0 et de 1 sans jamais les atteindre : il lui faudrait des sommes infiniment grandes. Arrondies, en revanche, ses réponses sont justes : le réseau a appris le OU exclusif.
+
+Entraîner, c'est cela : propager, mesurer l'erreur, remonter, corriger, et recommencer. Mais le départ compte.
+
+fois sur . Coincé, le réseau finit ses pas sans avoir appris : sa perte reste au-dessus de , ou l'une de ses réponses arrondies est fausse. La descente ne voit que la pente sous ses pieds. Selon le départ, elle peut s'enliser dans une région où cette pente ne la mène plus vers le fond, ou trop lentement pour pas.
+
+Changer de départ suffit souvent : ici, graines sur apprennent. Le projet part de la graine , avec laquelle il apprend ; son README raconte les graines essayées avant elle.
+
+Le notebook du chapitre, à ouvrir dans Colab (le lien est à l'étape 10), refait cet entraînement, puis en montre un qui reste coincé.
+
+PyTorch fait tout cela pour toi. `nn.Linear` fait les sommes pondérées d'une couche, `nn.Sigmoid` ses sigmoïdes, et `nn.BCELoss` l'erreur de l'étape 4, en moyenne sur les points. Surtout, autograd, son calcul automatique des dérivées, fait seul la rétropropagation de l'étape 5. Le projet construit le même réseau, avec les mêmes poids de départ, en `float64` : les nombres à virgule de Python.
+
+`construire` reçoit les poids d'un réseau de l'étape 3, et rend le même réseau dans PyTorch.
+`nn.Sequential` enchaîne quatre couches, dans l'ordre : nn.Linear(2, 2), deux entrées vers deux neurones, leurs sigmoïdes, puis nn.Linear(2, 1) et la sigmoïde de la sortie. `dtype=torch.float64` : des nombres sur 64 bits.
+On y recopie les poids de départ. `torch.no_grad()` dit à autograd de ne pas suivre ce calcul : recopier n'est pas à dériver. Les poids d'une couche forment un tenseur, rangé comme `w1[j][i]` : une ligne par neurone, une colonne par entrée.
+Le modèle est prêt.
+
+`gradients_pytorch` rend les dérivées de la perte moyenne par rapport aux poids, calculées par autograd.
+Les points, dans un tenseur de forme , et leurs bonnes réponses, de forme , sur l'appareil des poids.
+`zero_grad` efface les dérivées d'un calcul précédent : sinon, PyTorch les ajouterait aux nouvelles.
+Le modèle propage les points d'un coup, et `nn.BCELoss` fait la moyenne de leurs erreurs.
+`backward` : autograd remonte la chaîne des calculs, comme `retropropager`, et range la dérivée de chaque poids dans son `.grad`.
+Les dérivées, rangées comme celles de la main, pour les comparer.
+
+Sur ce PC, les dérivées de départ d'autograd et celles de la main diffèrent au plus de : ce sont les mêmes nombres, aux arrondis près. Les deux calculs ne s'y prennent pas exactement de la même façon, et chaque opération arrondit son résultat.
+
+`entrainer_pytorch` fait la descente de l'étape 6 avec PyTorch, sur l'appareil demandé, et la chronomètre.
+L'appareil, choisi par la fonction du chapitre 0.3 ; `.to` y range les poids, et les points y sont créés. L'étape 8 y revient.
+L'erreur de l'étape 4, et `torch.optim.SGD`, la descente de gradient : à chaque `step`, chaque poids recule du taux fois sa dérivée, comme dans `pas`.
+Le chronomètre part, après avoir attendu la fin des calculs en cours : le piège du chapitre 0.4.
+La boucle : effacer les dérivées, propager et mesurer l'erreur, la remonter avec `backward`, corriger avec `step`.
+La perte est gardée sur l'appareil : la lire à chaque pas ferait attendre la carte.
+La perte après le dernier pas, sans suivre le calcul.
+Attendre la fin des calculs, arrêter le chronomètre, puis rendre les pertes, les poids et la durée.
+
+La première fois, uv installe la version de PyTorch pour le processeur, comme au chapitre 0.3. Voici ce que le script affiche sur ce PC :
+
+Après ses pas, PyTorch arrive au même réseau que la main : leurs poids finaux diffèrent au plus de .
+
+BCE, pour binary cross-entropy en anglais : l'entropie croisée binaire de l'étape 4.
+
+SGD, pour stochastic gradient descent : la descente de gradient stochastique. Stochastique, parce que d'habitude chaque pas ne voit qu'un lot des données, tiré au hasard ; ici, chaque pas voit les points.
+
+Rien à changer pour calculer sur la carte graphique. `entrainer_pytorch` demande l'appareil à `choisir_appareil`, la fonction du chapitre 0.3, copiée telle quelle dans le projet, puis y range les poids avec `.to`, et y crée les points. Le calcul reste le même, en `float64`.
+
+Avec une carte NVIDIA, la version de PyTorch pour la carte lance le même script sur elle. La première fois, uv télécharge cette version : sous Windows, . S'il l'a déjà téléchargée au chapitre 0.3 ou 0.4, il la reprend dans son cache.
+
+Si PyTorch ne voit pas la carte, ou ne sait pas calculer dessus, le script ne plante pas : il dit quoi faire, et s'arrête. Sans , il suit la variable `FORGE_APPAREIL` du chapitre 0.3, et sans elle, il prend la carte si PyTorch la voit. Pour qu'il calcule sur le processeur, règle-la dans le même terminal, puis lance-le sans : dans PowerShell, ou sous Linux ou macOS.
+
+Voici la sortie du script sur la carte de ce PC :
+
+Les tests du projet le vérifient : sur la carte, les poids finaux restent tout près de ceux du processeur.
+
+Le mini-modèle de l'ouverture apprend de la même façon. Ses poids partent du hasard. À chaque pas, il propage un lot de prénoms, et mesure son erreur : −ln de la chance donnée à chaque bonne lettre, comme à l'étape 4, mais parmi caractères au lieu de deux réponses. Il la remonte jusqu'à chaque poids par une rétropropagation écrite à la main, comme à l'étape 5, puis corrige ses poids.
+
+Seule la correction est plus fine que la nôtre. Au lieu de reculer chaque poids du taux fois sa dérivée, il suit AdamW, la recette de ton IA, qui règle la longueur du pas de chaque poids d'après ses dérivées passées.
+
+Avant tout entraînement, il invente des prénoms comme et . Lance-le, et regarde ses nouveaux prénoms se ranger à droite.
+
+Le mini-modèle est un tout petit transformer, la sorte de réseau qu'utilisent les grands modèles de langage : il a les mêmes pièces qu'eux, en tout petit. Il tourne dans ton navigateur, sur le processeur.
+
+La boucle ne change pas quand le réseau grandit : seule l'échelle change.
+
+Ton réseau du OU exclusif a poids, et le mini-modèle . Ton IA, dans sa plus grande taille, en a . GPT-3, d'OpenAI, en a , et Llama 3 405B, de Meta, .
+
+Ton IA, GPT-3 et Llama 3 405B apprennent par la boucle de ce chapitre : propager un lot d'exemples, mesurer l'erreur, la remonter jusqu'à chaque poids, puis corriger, avec une recette plus fine, comme le mini-modèle. À chaque pas, Llama 3 405B corrige ainsi ses de poids à la fois.
+
+Le projet complet (le neurone, le réseau à la main, le même avec PyTorch, et leurs tests) est sur GitHub, avec un notebook à ouvrir dans Colab :
+
+### À suivre
+
+Tu sais ce que fait un neurone, pourquoi il en faut plusieurs, et comment un réseau apprend : propager, mesurer l'erreur, la remonter, corriger. La Partie 1 commence au chapitre 1.1, « », et s'en sert pour fabriquer ton IA.
+
+Un réseau de neurones fait des calculs. Pour qu'il puisse travailler sur « Le forgeron frappe le métal », il faut transformer cette phrase en une suite de nombres, puis savoir refaire le chemin inverse pour afficher sa réponse. L'outil qui fait cette traduction s'appelle un tokenizer, et les morceaux qu'il produit s'appellent des jetons (tokens en anglais).
+
+Le réseau ne voit que des nombres. Le tokenizer transforme le texte en numéros de jetons à l'entrée, et refait le chemin inverse à la sortie.
+
+Le mot anglais token veut dire jeton, comme ceux d'un jeu de société : un petit objet qui en représente un autre.
+
+Découper lettre par lettre est simple, mais les phrases deviennent très longues, et le modèle doit tout réapprendre à partir de briques minuscules. Découper mot par mot donne des suites courtes, mais le vocabulaire n'a pas de fin : forger, forgeron, forgeronne, reforgé…
+
+La méthode utilisée par presque tous les grands modèles, le BPE (Byte Pair Encoding, « encodage par paires »), choisit un entre-deux. On part des lettres. On cherche la paire de symboles voisins la plus fréquente dans un grand texte, on la fusionne en un nouveau symbole, et on recommence.
+
+Le BPE a été inventé en 1994 pour compresser des fichiers. Il a été repris en 2015 pour la traduction automatique, puis par les modèles de langage.
+
+Notre petit tokenizer a appris ses fusions sur un texte d'une quinzaine de lignes. Avant de le manipuler, parie.
+
+Avec fusions, « » donne jetons :
+
+Seules les paires très fréquentes du texte d'apprentissage sont déjà collées : . Le reste attend des fusions plus tardives. À toi de jouer : l'étape 4 est ouverte.
+
+Se tromper ici n'a aucune importance : un pari, même faux, fait mieux retenir la réponse qu'une lecture passive.
+
+Tape une phrase, puis augmente le nombre de fusions.
+
+À zéro fusion, chaque lettre est un jeton. Plus tu ajoutes de fusions, plus les morceaux fréquents (« es », « ent », « le ») deviennent des jetons entiers, et plus la suite raccourcit. Les mots rares, eux, restent découpés : c'est ce qui permet d'écrire n'importe quel mot fait de caractères déjà vus, avec un vocabulaire limité.
+
+Tout ce qui est jaune se manipule. Le nombre se fait glisser à la souris ou au doigt ; au clavier, atteins-le avec Tab, puis utilise les flèches.
+
+Même avec toutes les fusions, « » reste en morceaux :
+
+Le mot n'apparaît jamais dans le texte d'apprentissage : aucune fusion ne le colle en entier. Il s'écrit quand même, avec des morceaux connus.
+
+Le cœur de l'algorithme tient en quelques lignes de Python. Une première fonction compte toutes les paires de symboles voisins :
+
+La fonction reçoit les mots du texte : chaque mot, écrit comme une suite de symboles, est associé à son nombre d'apparitions. Par exemple `` dit que le mot « les », avec l'espace qui le précède, revient 8 fois.
+`Counter` compte les paires pour nous : une paire encore jamais vue part de zéro.
+`zip(symboles, symboles[1:])` donne chaque paire de voisins : `(' ', 'l')`, `('l', 'e')` puis `('e', 's')`.
+On ajoute la fréquence du mot : un mot vu 8 fois compte 8 fois.
+
+`zip` avance dans les deux suites en même temps et forme des couples. En décalant la suite d'un cran (`symboles[1:]`), chaque couple est une paire de voisins : (l, e), puis (e, s). Le « s » final n'a pas de voisin à droite : `zip` s'arrête dès que la plus courte des deux suites est épuisée.
+
+Une seconde fonction choisit, dans ce compte, la paire la plus fréquente. C'est elle qui décide de la prochaine fusion :
+
+La fonction reçoit le compte des paires et renvoie une seule paire, la gagnante.
+`min` renvoie la paire dont la clé est la plus petite. Ici, la clé est un couple : d'abord `-compte[paire]`, puis la paire elle-même.
+Le signe moins retourne l'ordre : une paire vue 12 fois a une clé qui commence par −12, plus petit que le −5 d'une paire vue 5 fois. `min` prend donc la plus fréquente.
+En cas d'égalité, on prend la paire la plus petite dans l'ordre des numéros des caractères (presque l'ordre alphabétique, sauf que « é » passe après « z ») : le résultat est ainsi toujours le même, sur ton PC comme dans cette page.
+
+Survole une explication, ou atteins-la avec Tab : ses lignes de code s'allument.
+
+`Counter` fait partie de la bibliothèque standard de Python : rien à installer.
+
+Tu as fait tourner un vrai tokenizer, de l'apprentissage au découpage. Voici ce que devient la même recette chez ceux qui entraînent les grands modèles.
+
+Les tokenizers des grands modèles comptent bien plus de morceaux que le tien : environ 128 000 pour Llama 3 de Meta, 151 669 pour Qwen3 d'Alibaba, 201 088 pour gpt-oss d'OpenAI et environ 262 000 pour Gemma 4 de Google. Ils sont appris sur beaucoup plus de texte, dans de nombreuses langues, et travaillent souvent sur les octets plutôt que sur les lettres : ils peuvent ainsi écrire n'importe quel caractère, emoji compris. Le principe reste exactement celui que tu viens de manipuler.
+
+Le projet complet (apprentissage, découpage, tests) est sur GitHub, avec un notebook à ouvrir dans Colab :
+
+### À suivre
+
+Ce découpeur pédagogique travaille sur les lettres. Celui de ton IA, que tu construiras dans la suite de ce chapitre, travaillera sur les octets, comme ceux des grands labos : il pourra écrire n'importe quel texte. Il prévoira aussi, dès le départ, les jetons spéciaux de la conversation et des outils : des jetons réservés qui marquent qui parle, et où commence l'appel d'un outil. Ils serviront quand ton IA apprendra à converser, puis à agir.
