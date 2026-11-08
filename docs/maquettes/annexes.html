@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Annexes, La Forge IA</title>
+<style>
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 500; font-display: swap; src: url('polices/gabarito-latin-500-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 600; font-display: swap; src: url('polices/gabarito-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 700; font-display: swap; src: url('polices/gabarito-latin-700-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Gabarito"; font-style: normal; font-weight: 800; font-display: swap; src: url('polices/gabarito-latin-800-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Newsreader Variable"; font-style: normal; font-weight: 200 800; font-display: swap; src: url('polices/newsreader-latin-opsz-normal.woff2') format('woff2'); }
+  @font-face { font-family: "Newsreader Variable"; font-style: italic; font-weight: 200 800; font-display: swap; src: url('polices/newsreader-latin-opsz-italic.woff2') format('woff2'); }
+  @font-face { font-family: "JetBrains Mono Variable"; font-style: normal; font-weight: 100 800; font-display: swap; src: url('polices/jetbrains-mono-latin-wght-normal.woff2') format('woff2'); }
+
+  /* Les jetons de site/src/styles/jetons.css, recopiés tels quels. */
+  :root {
+    --papier: #FFFFFF;
+    --indigo: #232057;
+    --indigo-doux: #5B5888;
+    --lavande: #8F8CB8;
+    --brume: #E6E5F0;
+    --brume-claire: #F5F4FA;
+    --indigo-survol: #34307A;
+    --soleil: #FFC93C;
+    --soleil-vif: #FFB800;
+    --soleil-pale: #FFF4D6;
+    --soleil-survol: #FFEDBC;
+    --menthe: #1C6E58;
+    --menthe-pale: #E2F5EF;
+    --corail: #B8342D;
+    --corail-pale: #FDECEA;
+    --teinte-a: #E4E2F4;
+    --teinte-b: #F2E9D8;
+    --teinte-a-trait: #C9C5EA;
+    --teinte-b-trait: #E2CFAA;
+    --titres: "Gabarito", system-ui, sans-serif;
+    --texte: "Newsreader Variable", "Newsreader", Georgia, serif;
+    --mono: "JetBrains Mono Variable", ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-padding-top: 5.5rem; }
+  body {
+    margin: 0;
+    background: var(--papier);
+    color: var(--indigo);
+    font-family: var(--texte);
+    font-size: 20px;
+    line-height: 1.6;
+    font-optical-sizing: auto;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: inherit; text-underline-offset: .2em; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--indigo); outline-offset: 3px; border-radius: 3px; }
+  p { margin: 0 0 1em; }
+  h1, h2, h3, h4 { font-family: var(--titres); line-height: 1.15; margin: 0; }
+  code { font-family: var(--mono); }
+  sup { line-height: 0; }
+  .vh { position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .evitement { position: absolute; left: 12px; top: -80px; z-index: 20; background: var(--indigo); color: var(--papier); font-family: var(--titres); font-weight: 700; padding: 10px 16px; border-radius: 8px; text-decoration: none; }
+  .evitement:focus { top: 12px; }
+
+  /* Bandeau de la maquette : il ne fait pas partie du site. */
+  .maquette { background: var(--brume-claire); border-bottom: 1px dashed var(--lavande); font-family: var(--titres); font-size: 14px; line-height: 1.3; color: var(--indigo-doux); }
+  .maquette-in { max-width: 1180px; margin: 0 auto; padding: 8px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .maquette p { margin: 0 6px 0 0; }
+  .maquette button { font-family: var(--titres); font-weight: 600; font-size: 14px; color: var(--indigo); background: var(--papier); border: 1px solid var(--lavande); border-radius: 999px; padding: 3px 12px; min-height: 26px; cursor: pointer; }
+  .maquette button[aria-pressed="true"] { background: var(--indigo); border-color: var(--indigo); color: var(--papier); }
+  .maquette .fige { margin-left: 6px; }
+
+  /* Barre du haut, la même sur toutes les pages hors chapitre ; au milieu, les annexes. */
+  .barre { position: sticky; top: 0; z-index: 5; background: var(--papier); border-bottom: 1px solid var(--brume); }
+  .barre-in { max-width: 1180px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 28px; font-family: var(--titres); line-height: 1.3; }
+  .marque { font-weight: 800; font-size: 19px; letter-spacing: -.01em; text-decoration: none; }
+  .annexes-nav { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 22px; font-size: 16px; font-weight: 600; }
+  .annexes-nav .ou { font-size: 15px; font-weight: 500; color: var(--indigo-doux); margin-right: -6px; }
+  .annexes-nav a { text-decoration: none; padding: 4px 0; }
+  .annexes-nav a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
+  .annexes-nav a[aria-current="page"] { text-decoration: underline; text-decoration-thickness: 3px; text-decoration-color: var(--lavande); text-underline-offset: .28em; }
+  .nav { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 24px; font-size: 16px; font-weight: 600; }
+  .nav a { text-decoration: none; padding: 4px 0; }
+  .nav a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
+  .nav svg { vertical-align: -3px; margin-right: 7px; }
+
+  /* Grille du gabarit : marge de gauche, colonne de lecture, marge de notes. */
+  .bloc {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 660px) 236px;
+    column-gap: 44px;
+    max-width: 1040px;
+    margin-inline: auto;
+    padding-inline: 24px;
+    box-sizing: content-box;
+  }
+  .bloc > .texte { grid-column: 2; min-width: 0; }
+  .bloc > .note { grid-column: 3; align-self: start; }
+  .bloc > .large { grid-column: 2 / 4; min-width: 0; }
+
+  /* Ouverture d'une page d'annexe */
+  .titre-page { padding-top: 64px; }
+  h1 { text-wrap: balance; font-weight: 800; font-size: clamp(44px, 7vw, 84px); line-height: .96; letter-spacing: -.03em; margin: 0 0 26px; }
+  .chapeau { font-size: 24px; line-height: 1.48; margin: 0 0 14px; }
+  .programme { font-family: var(--titres); font-size: 17px; font-weight: 500; color: var(--indigo-doux); margin: 0; }
+  .note { font-size: 16px; line-height: 1.5; color: var(--indigo-doux); padding-top: 8px; }
+  .note p { margin: 0 0 .8em; }
+  .note strong { font-family: var(--titres); font-weight: 600; color: var(--indigo); }
+  .note a { color: var(--indigo); }
+  .titre-page .note { padding-top: 112px; }
+  .titre-page .note.haute { padding-top: 14px; }
+
+  /* ---------- Le glossaire ---------- */
+  .filtre { margin: 0; }
+  .filtre label { display: block; font-family: var(--titres); font-weight: 600; font-size: 17px; color: var(--indigo-doux); margin-bottom: 6px; }
+  .filtre-ligne { position: relative; }
+  /* On y tape : il est donc jaune, comme le champ de l'atelier et celui de la recherche. */
+  .filtre input {
+    width: 100%; -webkit-appearance: none; appearance: none;
+    font-family: var(--texte); font-style: italic; font-size: 26px; line-height: 1.3; color: var(--indigo);
+    background: var(--soleil-pale);
+    border: 0; border-bottom: 4px solid var(--soleil);
+    border-radius: 8px 8px 0 0;
+    padding: 10px 104px 8px 16px;
+  }
+  .filtre input::-webkit-search-cancel-button { display: none; }
+  .filtre input::placeholder { color: #77738F; opacity: 1; }
+  .filtre input:hover { background: var(--soleil-survol); }
+  .filtre input:focus-visible { outline: none; background: var(--soleil-survol); border-bottom-color: var(--indigo); }
+  .effacer {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    font-family: var(--titres); font-weight: 600; font-size: 16px; color: var(--indigo);
+    background: none; border: 0; border-radius: 4px; padding: 2px 4px; min-height: 28px; cursor: pointer;
+    text-decoration: underline; text-decoration-color: var(--soleil-vif); text-decoration-thickness: 3px; text-underline-offset: 4px;
+  }
+  .effacer:hover { background: var(--papier); }
+  .effacer[hidden] { display: none; }
+  .compte { font-family: var(--titres); font-weight: 500; font-size: 16px; color: var(--indigo-doux); margin: 10px 0 0; min-height: 1.5em; }
+  .compte strong { color: var(--indigo); font-weight: 700; }
+
+  .corps-glossaire { padding-top: 40px; }
+  .corps-glossaire > .filtre { grid-column: 2; grid-row: 1; min-width: 0; }
+  .corps-glossaire > .index { grid-column: 3; grid-row: 1 / span 2; align-self: stretch; padding-top: 0; }
+  .corps-glossaire > .lettres { grid-row: 2; }
+  .index nav { position: sticky; top: 92px; padding-top: 2px; }
+  .index p { font-family: var(--titres); font-weight: 500; font-size: 15px; margin: 0 0 6px; }
+  .index ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, 34px); gap: 2px 4px; }
+  .index a {
+    display: grid; place-items: center; height: 34px;
+    font-family: var(--titres); font-weight: 700; font-size: 19px; color: var(--indigo);
+    text-decoration: none; border-radius: 6px; font-variant-numeric: tabular-nums;
+  }
+  .index a:hover { background: var(--brume-claire); text-decoration: underline; text-decoration-thickness: 2px; }
+  .index .legende-index { font-family: var(--texte); font-weight: 400; font-size: 15px; line-height: 1.45; margin: 18px 0 0; max-width: 15em; }
+  .index a.sans-mot { color: #A3A1C2; pointer-events: none; }
+
+  .lettre { position: relative; padding-top: 40px; margin-top: 12px; border-top: 1px solid var(--brume); }
+  .lettre:first-of-type { border-top: 0; margin-top: 0; padding-top: 44px; }
+  .lettre[hidden] { display: none; }
+  /* La lettre, en grand dans la marge de gauche, comme les numéros d'étape. */
+  .lettre h2 {
+    position: absolute; left: -100px; top: 30px; width: 56px; text-align: right;
+    font-weight: 800; font-size: 60px; line-height: 1; letter-spacing: -.02em;
+    color: var(--lavande);
+  }
+  .lettre:first-of-type h2 { top: 34px; }
+  .termes { margin: 0; }
+  .terme { padding: 0 0 30px; scroll-margin-top: 96px; }
+  .terme:last-child { padding-bottom: 34px; }
+  .terme[hidden] { display: none; }
+  .terme dt { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 14px; margin: 0 0 4px; }
+  dfn { font-style: normal; font-family: var(--titres); font-weight: 700; font-size: 26px; line-height: 1.25; letter-spacing: -.012em; }
+  .anglais { font-family: var(--titres); font-weight: 500; font-size: 15px; color: var(--indigo-doux); }
+  .anglais i { font-family: var(--texte); font-size: 18px; color: var(--indigo); }
+  .def { margin: 0 0 6px; font-size: 19px; line-height: 1.55; }
+  .renvois { margin: 0; display: flex; flex-wrap: wrap; gap: 0 26px; font-family: var(--titres); font-size: 15px; line-height: 1.5; color: var(--indigo-doux); }
+  .renvois a { display: inline-block; padding: 2px 0; color: var(--indigo); font-weight: 600; text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: var(--lavande); text-underline-offset: .24em; }
+  .renvois a:hover { text-decoration-color: var(--indigo); }
+  .a-paraitre { font-weight: 500; color: var(--indigo-doux); }
+  .terme:target dfn { box-shadow: inset 0 -.32em 0 var(--teinte-a); }
+  mark { color: var(--indigo); background: var(--teinte-a); border-radius: 4px; padding: 0 2px; box-shadow: inset 0 -2px 0 var(--teinte-a-trait); }
+
+  .vide-filtre { padding: 46px 0 20px; }
+  .vide-filtre[hidden] { display: none; }
+  .vide-filtre .vide-titre { font-family: var(--titres); font-weight: 700; font-size: 26px; line-height: 1.2; margin: 0 0 10px; }
+  .vide-filtre p { font-size: 19px; max-width: 34em; }
+
+  /* ---------- L'annuaire des données ---------- */
+  .acces-legende { margin: .2em 0 1em; }
+  .acces-legende dt { font-family: var(--titres); font-weight: 600; color: var(--indigo); }
+  .acces-legende dd { margin: 0 0 .5em; }
+
+  .groupe { padding-top: 72px; }
+  .groupe h2 { font-weight: 700; font-size: 31px; letter-spacing: -.012em; margin: 0 0 8px; }
+  .intro-groupe { font-size: 19px; line-height: 1.5; margin: 0 0 22px; max-width: 36em; }
+
+  .annuaire { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .annuaire col.c-nom { width: 19%; }
+  .annuaire col.c-quoi { width: 22%; }
+  .annuaire col.c-taille { width: 13%; }
+  .annuaire col.c-licence { width: 14%; }
+  .annuaire col.c-acces { width: 10%; }
+  .annuaire col.c-ton-ia { width: 13%; }
+  .annuaire col.c-releve { width: 9%; }
+  .annuaire thead th {
+    font-family: var(--titres); font-weight: 600; font-size: 14px; line-height: 1.3; color: var(--indigo-doux);
+    text-align: left; vertical-align: bottom; padding: 0 14px 8px 0; border-bottom: 2px solid var(--indigo);
+  }
+  .annuaire tbody tr { border-bottom: 1px solid var(--brume); }
+  .annuaire tbody th, .annuaire tbody td { text-align: left; vertical-align: top; padding: 15px 14px 16px 0; font-weight: 400; }
+  .annuaire thead th:last-child, .annuaire tbody td:last-child { padding-right: 0; }
+  .annuaire .nom a { font-family: var(--titres); font-weight: 700; font-size: 18px; line-height: 1.25; text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: var(--lavande); text-underline-offset: .22em; }
+  .annuaire .nom a:hover { text-decoration-color: var(--indigo); }
+  .annuaire .ns { white-space: nowrap; }
+  .annuaire .nom code { display: block; margin-top: 5px; font-size: 12px; line-height: 1.4; color: var(--indigo-doux); overflow-wrap: anywhere; }
+  .annuaire .quoi { font-size: 16.5px; line-height: 1.45; }
+  .annuaire .taille, .annuaire .licence, .annuaire .acces, .annuaire .ton-ia-col, .annuaire .releve-le { font-family: var(--titres); font-size: 15px; line-height: 1.4; }
+  .annuaire .taille .v > span:first-child { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .annuaire .taille small, .annuaire .licence small, .annuaire .ton-ia-col small { display: block; font-size: 14px; color: var(--indigo-doux); margin-top: 2px; }
+  .annuaire .licence a { color: var(--indigo); font-weight: 600; }
+  .annuaire .releve-le { font-variant-numeric: tabular-nums; color: var(--indigo-doux); white-space: nowrap; }
+  .annuaire .non, .annuaire .pas-releve { color: var(--indigo-doux); }
+  .annuaire .pas-releve { font-family: var(--texte); font-style: italic; font-size: 16px; }
+  .annuaire .ton-ia-col strong { font-weight: 700; }
+  .appel { font-family: var(--titres); font-size: 12px; font-weight: 700; line-height: 0; margin-left: 2px; }
+  .appel a { display: inline-block; min-width: 14px; padding: 6px 2px; text-decoration: none; color: var(--indigo-doux); }
+  .appel a:hover { color: var(--indigo); text-decoration: underline; }
+  /* Les jeux que lit ton IA : un trait indigo dans la marge, sans autre couleur. */
+  .annuaire tr.ton-ia th { position: relative; }
+  .annuaire tr.ton-ia th::before { content: ""; position: absolute; left: -26px; top: 15px; bottom: 16px; width: 4px; border-radius: 2px; background: var(--indigo); }
+  .notes-groupe { list-style: none; margin: 14px 0 0; padding: 0; font-family: var(--titres); font-size: 14px; line-height: 1.5; color: var(--indigo-doux); max-width: 52em; }
+  .notes-groupe li { display: grid; grid-template-columns: 1.6em minmax(0, 1fr); padding: 2px 0; scroll-margin-top: 96px; }
+  .notes-groupe li:target { color: var(--indigo); }
+  .notes-groupe a { color: var(--indigo); }
+
+  /* ---------- Le calculateur (le composant Calculateur.svelte, figé sur son réglage de départ) ---------- */
+  .corps-calculateur { padding-top: 52px; }
+  .calculateur { margin: 0; }
+  .phrase { font-size: 21px; line-height: 2.05; margin: 0 0 1em; }
+  .insecable { white-space: nowrap; }
+  .selecteur {
+    max-width: 100%;
+    font: inherit; font-family: var(--titres); font-weight: 600; font-size: .9em; line-height: 1.3; color: var(--indigo);
+    background-color: var(--soleil-pale);
+    border: 0; border-bottom: 3px solid var(--soleil); border-radius: 6px 6px 0 0;
+    padding: 1px 4px 2px 6px; min-height: 30px; vertical-align: baseline; cursor: pointer;
+  }
+  .selecteur:hover { background-color: var(--soleil-survol); }
+  .selecteur:focus-visible { background-color: var(--soleil-survol); border-bottom-color: var(--indigo); }
+  .reglable {
+    display: inline-block; min-width: 2.2ch; padding: 0 6px; margin: 0 4px;
+    font-family: var(--titres); font-weight: 800; font-size: .95em; line-height: 1.25;
+    color: var(--indigo); background: var(--soleil); border-radius: 6px; box-shadow: 0 2px 0 var(--indigo);
+    font-variant-numeric: tabular-nums; text-align: center; white-space: nowrap;
+  }
+  .calcule { font-family: var(--titres); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .calculateur table { border-collapse: collapse; font-family: var(--titres); font-variant-numeric: tabular-nums; }
+  .calculateur caption { caption-side: top; text-align: left; font-family: var(--titres); font-weight: 600; font-size: 15px; line-height: 1.35; color: var(--indigo-doux); padding: 0 0 6px; }
+  .releve { width: 100%; margin: 0 0 1em; border-top: 2px solid var(--indigo); }
+  .releve tr { border-bottom: 1px solid var(--brume); }
+  .releve th { width: 36%; text-align: left; vertical-align: top; font-weight: 600; font-size: 15px; line-height: 1.4; color: var(--indigo-doux); padding: 11px 16px 10px 0; }
+  .releve td { vertical-align: top; font-size: 17px; line-height: 1.45; font-weight: 500; padding: 9px 0; overflow-wrap: break-word; }
+  .repere { font-family: var(--titres); font-weight: 600; font-size: 17px; line-height: 1.45; margin: 0 0 1em; font-variant-numeric: tabular-nums; }
+  .voir { margin: 0 0 .6em; }
+  .bascule-soleil {
+    font: inherit; font-family: var(--titres); font-weight: 600; color: var(--indigo);
+    background: none; border: 0; border-radius: 4px; padding: 0 2px; min-height: 28px; cursor: pointer;
+    text-decoration: underline; text-decoration-color: var(--soleil); text-decoration-thickness: 5px; text-underline-offset: 4px; text-decoration-skip-ink: none;
+  }
+  .bascule-soleil:hover { background: var(--soleil-pale); text-decoration-color: var(--soleil-vif); }
+  .formules { display: none; margin: 0 0 1.4em; border-top: 1px solid var(--brume); }
+  .formules.ouvert { display: block; }
+  .formule { padding: 12px 0 2px; border-bottom: 1px solid var(--brume); }
+  .titre-formule { font-family: var(--titres); font-weight: 600; font-size: 15px; line-height: 1.35; color: var(--indigo-doux); margin: 0 0 4px; }
+  .calcul { font-family: var(--titres); font-weight: 600; font-size: 17px; line-height: 1.5; font-variant-numeric: tabular-nums; margin: 0 0 6px; overflow-wrap: break-word; }
+  .sens { font-size: 17px; line-height: 1.5; margin: 0 0 10px; }
+  .sources-formule { font-family: var(--titres); font-size: 14px; color: var(--indigo-doux); overflow-wrap: anywhere; }
+  .sources-formule a { color: var(--indigo); }
+  .titre-section { font-weight: 700; font-size: 20px; line-height: 1.25; margin: 1.4em 0 .35em; }
+  .intro-reperes { font-size: 17px; line-height: 1.5; margin: 0 0 8px; }
+  .zone-defilable { overflow-x: auto; margin: 0 0 .8em; }
+  .indice { display: none; font-family: var(--titres); font-size: 14px; color: var(--indigo-doux); margin: 0 0 6px; }
+  .reperes { min-width: 100%; font-size: 15px; border-top: 2px solid var(--indigo); }
+  .reperes thead th { font-weight: 600; font-size: 14px; color: var(--indigo-doux); text-align: right; white-space: nowrap; padding: 6px 0 4px 16px; }
+  .reperes thead th[scope="colgroup"] { text-align: left; color: var(--indigo); padding-bottom: 0; }
+  .reperes tbody tr { border-top: 1px solid var(--brume); }
+  .reperes th[scope="row"] { text-align: left; font-weight: 600; white-space: nowrap; padding: 6px 4px 6px 0; }
+  .parametres { display: block; font-weight: 400; font-size: 13px; color: var(--indigo-doux); }
+  .reperes td { text-align: right; white-space: nowrap; padding: 6px 0 6px 16px; vertical-align: top; }
+  .reperes .groupe-processeur { border-left: 1px solid var(--brume); }
+  .reperes tr.choisie { background: var(--brume-claire); font-weight: 700; }
+  .comme-les-grands { font-size: 17px; line-height: 1.5; margin: 0 0 6px; }
+  .sources-reperes { list-style: none; margin: 0 0 8px; padding: 0; }
+  .sources-reperes li { padding: 3px 0; }
+  .sources-reperes a, .source-mesures a, .liste-sources li a { color: var(--indigo); }
+  .source-mesures, .sources-reperes, .avertissement { font-family: var(--titres); font-size: 14px; line-height: 1.45; color: var(--indigo-doux); margin: 0; }
+  .liste-sources { margin: .4em 0 0; }
+  .liste-sources ul { list-style: none; margin: 0 0 8px; padding: 0; font-family: var(--titres); font-size: 14px; line-height: 1.5; color: var(--indigo-doux); overflow-wrap: anywhere; }
+  .liste-sources li { padding: 5px 0; border-top: 1px solid var(--brume); }
+  .liste-sources .precision { display: block; margin-top: 2px; }
+
+  /* Hors page : d'où l'on arrive au calculateur (seulement pour la maquette). */
+  .apercu { margin-top: 84px; border: 1px dashed var(--lavande); border-radius: 12px; background: var(--brume-claire); padding: 22px 26px 26px; }
+  .apercu > h2 { font-weight: 600; font-size: 15px; line-height: 1.4; color: var(--indigo-doux); margin: 0 0 18px; }
+  .apercu .ou-lien { font-family: var(--titres); font-weight: 600; font-size: 15px; color: var(--indigo-doux); margin: 0 0 8px; }
+  .apercu .extrait { background: var(--papier); border-radius: 8px; padding: 18px 22px; margin: 0 0 26px; }
+  .apercu .extrait p { margin: 0; font-size: 19px; }
+  .apercu .extrait a { text-decoration-thickness: 2px; text-decoration-color: var(--indigo); }
+  .labo { background: var(--indigo); color: var(--brume-claire); border-radius: 14px; padding: 30px 32px 32px; }
+  .labo h3 { color: var(--papier); font-weight: 700; font-size: 26px; line-height: 1.15; letter-spacing: -.012em; margin: 0 0 12px; }
+  .labo p { font-size: 19px; }
+  .labo a { color: var(--papier); }
+  .labo :focus-visible { outline-color: var(--papier); }
+  .labo .vers-calculateur { font-family: var(--titres); font-weight: 600; font-size: 18px; margin: 20px 0 0; }
+  .labo .vers-calculateur a { text-decoration-thickness: 2px; }
+  .labo .vers-calculateur span { display: block; font-weight: 500; font-size: 15px; color: var(--brume); margin-top: 2px; }
+  .labo .sources { font-family: var(--titres); font-size: 15px; line-height: 1.5; color: var(--brume); margin: 18px 0 0; }
+
+  /* Pied : annexes voisines */
+  .pied { padding-top: 88px; }
+  .voisins { display: flex; justify-content: space-between; gap: 24px; border-top: 2px solid var(--indigo); padding-top: 20px; }
+  .voisins a, .voisins .a-venir { text-decoration: none; display: block; max-width: 48%; }
+  .voisins > :last-child { text-align: right; margin-left: auto; }
+  .voisins span { display: block; font-family: var(--titres); font-size: 15px; color: var(--indigo-doux); }
+  .voisins strong { font-family: var(--titres); font-weight: 700; font-size: 24px; line-height: 1.2; }
+  .voisins .a-venir strong { color: var(--indigo-doux); font-weight: 600; }
+  .voisins a:hover strong { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; }
+
+  .pied-site { margin-top: 110px; border-top: 1px solid var(--brume); background: var(--brume-claire); }
+  .pied-in { max-width: 1180px; margin: 0 auto; padding: 30px 24px 48px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 40px; font-size: 16px; line-height: 1.5; color: var(--indigo-doux); }
+  .pied-in p { margin: 0; }
+  .pied-in strong { font-family: var(--titres); color: var(--indigo); }
+
+  @media (max-width: 1140px) {
+    .bloc { grid-template-columns: 56px minmax(0, 660px); max-width: 760px; }
+    .bloc > .note { grid-column: 2; margin-top: 16px; padding: 0 0 0 1.2em; font-size: 15px; }
+    .titre-page .note { padding-top: 0; }
+    .bloc > .large { grid-column: 2; }
+    .corps-glossaire > .filtre, .corps-glossaire > .index, .corps-glossaire > .lettres { grid-column: 2; grid-row: auto; }
+    .corps-glossaire > .index { margin-top: 0; padding: 0; }
+    .index nav { position: static; padding-top: 20px; }
+    .index ul { grid-template-columns: repeat(12, 34px); }
+
+    /* L'annuaire n'a plus la place d'un tableau : chaque ligne devient un bloc de définitions. */
+    .annuaire thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .annuaire, .annuaire tbody { display: block; }
+    .annuaire tbody { border-top: 2px solid var(--indigo); }
+    .annuaire tbody tr { display: block; position: relative; padding: 16px 0 14px; }
+    .annuaire tbody th { display: block; padding: 0 0 10px; }
+    .annuaire tbody td { display: grid; grid-template-columns: 7.6em minmax(0, 1fr); column-gap: 14px; padding: 4px 0; }
+    .annuaire tbody td::before { content: attr(data-col); font-family: var(--titres); font-weight: 600; font-size: 14px; line-height: 1.6; color: var(--indigo-doux); }
+    .annuaire .quoi .v { font-size: 17px; }
+    .annuaire tr.ton-ia th::before { content: none; }
+    .annuaire tbody tr.ton-ia::before { content: ""; position: absolute; left: -22px; top: 16px; bottom: 14px; width: 4px; border-radius: 2px; background: var(--indigo); }
+  }
+  @media (max-width: 720px) {
+    body { font-size: 18px; }
+    .maquette-in { padding: 8px 20px; }
+    .barre-in { padding: 10px 20px; gap: 6px 16px; }
+    .nav { gap: 4px 16px; font-size: 15px; }
+    .annexes-nav { order: 3; flex-basis: 100%; gap: 2px 20px; font-size: 15px; }
+    .annexes-nav .ou { display: none; }
+    .bloc { grid-template-columns: minmax(0, 1fr); padding-inline: 20px; }
+    .bloc > .texte, .bloc > .note, .bloc > .large, .corps-glossaire > .filtre, .corps-glossaire > .index, .corps-glossaire > .lettres { grid-column: 1; }
+    .titre-page { padding-top: 36px; }
+    .chapeau { font-size: 20px; }
+    .programme { font-size: 16px; }
+    .filtre input { font-size: 22px; padding-right: 92px; }
+    .corps-glossaire { padding-top: 32px; }
+    .index nav { padding-top: 14px; }
+    .index nav > p:first-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .index .legende-index { max-width: none; margin-top: 8px; }
+    .index ul { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 0 2px; }
+    .index a { height: 36px; font-size: 17px; }
+
+    /* La lettre passe au-dessus de ses mots, sur un filet. */
+    .lettre, .lettre:first-of-type { padding-top: 26px; margin-top: 8px; border-top: 0; }
+    .lettre h2, .lettre:first-of-type h2 { position: static; width: auto; text-align: left; display: flex; align-items: center; gap: 14px; font-size: 40px; margin: 0 0 12px; }
+    .lettre h2::after { content: ""; flex: 1; height: 1px; background: var(--brume); }
+    .terme { padding-bottom: 24px; }
+    dfn { font-size: 23px; }
+    .def { font-size: 18px; }
+    .renvois { gap: 0 18px; }
+
+    .groupe { padding-top: 56px; }
+    .groupe h2 { font-size: 26px; }
+    .intro-groupe { font-size: 18px; }
+    .annuaire tbody td { grid-template-columns: 6.4em minmax(0, 1fr); column-gap: 12px; }
+    .annuaire tbody tr.ton-ia::before { left: -13px; }
+
+    .phrase { font-size: 19px; }
+    .releve th { width: 40%; font-size: 14px; padding-right: 12px; }
+    .releve td, .repere, .calcul, .intro-reperes, .sens, .comme-les-grands { font-size: 16px; }
+    .apercu { margin-top: 64px; padding: 18px 16px 20px; margin-inline: -4px; }
+    .apercu .extrait { padding: 14px 16px; }
+    .apercu .extrait p { font-size: 17px; }
+    .labo { padding: 24px 20px; }
+    .labo h3 { font-size: 22px; }
+    .labo p { font-size: 17px; }
+
+    .voisins { flex-direction: column; }
+    .voisins a, .voisins .a-venir { max-width: none; }
+    .voisins > :last-child { text-align: left; margin-left: 0; }
+    .pied-in { grid-template-columns: minmax(0, 1fr); padding: 26px 20px 40px; }
+  }
+  @media (max-width: 600px) {
+    .indice { display: block; }
+  }
+</style>
+</head>
+<body>
+
+<div class="maquette" role="region" aria-label="Réglage de la maquette">
+  <div class="maquette-in">
+    <p>Maquette des annexes, trois pages&#8239;:</p>
+    <button type="button" data-page-bouton="glossaire" aria-pressed="true">glossaire</button>
+    <button type="button" data-page-bouton="annuaire" aria-pressed="false">annuaire des données</button>
+    <button type="button" data-page-bouton="calculateur" aria-pressed="false">calculateur</button>
+    <p class="fige">Le calculateur y est figé sur son réglage de départ.</p>
+  </div>
+</div>
+
+<a class="evitement" href="#contenu">Aller au contenu</a>
+
+<header class="barre">
+  <div class="barre-in">
+    <a class="marque" href="accueil-c.html">La Forge IA</a>
+    <nav class="annexes-nav" aria-label="Les annexes">
+      <span class="ou">Annexes</span>
+      <a href="#glossaire" data-lien-page="glossaire">Glossaire</a>
+      <a href="#annuaire" data-lien-page="annuaire">Données</a>
+      <a href="#calculateur" data-lien-page="calculateur">Calculateur</a>
+    </nav>
+    <nav class="nav" aria-label="Pages du site">
+      <a href="accueil-c.html#parcours">Le parcours</a>
+      <a href="recherche.html"><svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M11 11l4.6 4.6" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>Rechercher</a>
+    </nav>
+  </div>
+</header>
+
+<main id="contenu">
+
+<!-- ==================================================================== -->
+<!-- Le glossaire                                                          -->
+<!-- ==================================================================== -->
+<article class="page" id="page-glossaire" data-page="glossaire" data-titre="Le glossaire" aria-labelledby="t-glossaire">
+  <div class="bloc titre-page">
+    <div class="texte">
+      <h1 id="t-glossaire">Le glossaire</h1>
+      <p class="chapeau">Les mots du parcours, expliqués en deux phrases au plus. Chacun renvoie au chapitre où tu le manipules pour de vrai.</p>
+      <p class="programme">21 mots, de «&#8239;attention&#8239;» à «&#8239;vocabulaire&#8239;». La liste grandit à chaque chapitre paru.</p>
+    </div>
+    <aside class="note">
+      <p>Un mot manque&#8239;? <a href="recherche.html">La recherche</a> lit aussi le texte des chapitres.</p>
+    </aside>
+  </div>
+
+  <div class="bloc corps-glossaire">
+    <form class="filtre" role="search" id="filtre-form" aria-label="Filtrer le glossaire">
+      <label for="filtre">Filtrer les mots</label>
+      <div class="filtre-ligne">
+        <input type="search" id="filtre" autocomplete="off" spellcheck="false" placeholder="un mot, ou un chapitre&#8239;: 1.3">
+        <button type="button" class="effacer" id="effacer" hidden>effacer</button>
+      </div>
+      <p class="compte" id="compte" role="status"><strong>21</strong> mots.</p>
+    </form>
+
+    <aside class="note index">
+      <nav aria-label="Aller à une lettre">
+        <p>Aller à la lettre</p>
+        <ul id="index-lettres">
+          <li><a href="#lettre-a" data-lettre="a">A</a></li>
+          <li><a href="#lettre-b" data-lettre="b">B</a></li>
+          <li><a href="#lettre-d" data-lettre="d">D</a></li>
+          <li><a href="#lettre-f" data-lettre="f">F</a></li>
+          <li><a href="#lettre-g" data-lettre="g">G</a></li>
+          <li><a href="#lettre-j" data-lettre="j">J</a></li>
+          <li><a href="#lettre-l" data-lettre="l">L</a></li>
+          <li><a href="#lettre-p" data-lettre="p">P</a></li>
+          <li><a href="#lettre-r" data-lettre="r">R</a></li>
+          <li><a href="#lettre-s" data-lettre="s">S</a></li>
+          <li><a href="#lettre-t" data-lettre="t">T</a></li>
+          <li><a href="#lettre-v" data-lettre="v">V</a></li>
+        </ul>
+        <p class="legende-index">Un renvoi sans lien&#8239;: son chapitre n’est pas encore paru.</p>
+      </nav>
+    </aside>
+
+    <div class="texte lettres">
+      <section class="lettre" id="lettre-a" aria-labelledby="h-a">
+        <h2 id="h-a"><span class="vh">Lettre </span>A</h2>
+        <dl class="termes">
+          <div class="terme" id="mot-attention" data-chapitres="1.4">
+            <dt><dfn>attention</dfn></dt>
+            <dd class="def">Le mécanisme qui laisse chaque jeton puiser, dans les jetons qui le précèdent, ce qui l’aide à prédire la suite. Il les pèse par des produits scalaires, passés dans softmax.</dd>
+            <dd class="renvois"><span>expliqué en <span class="a-paraitre">1.4 Le transformer</span>, à paraître</span><span>voir aussi&#8239;: <a href="#mot-plongement">plongement</a>, <a href="#mot-produit-scalaire">produit scalaire</a>, <a href="#mot-softmax">softmax</a></span></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="lettre" id="lettre-b" aria-labelledby="h-b">
+        <h2 id="h-b"><span class="vh">Lettre </span>B</h2>
+        <dl class="termes">
+          <div class="terme" id="mot-bf16" data-chapitres="0.4">
+            <dt><dfn>bf16</dfn><span class="anglais">en anglais&#8239;: <i lang="en">bfloat16</i></span></dt>
+            <dd class="def">Une façon d’écrire les nombres à virgule sur 16 bits au lieu de 32&#8239;: chacun prend deux fois moins de place, au prix de la précision. Sur la carte, ton IA calcule en bf16 et garde ses poids en float32.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-4/">0.4 Tenseurs et calcul sur GPU</a></span><span>voir aussi&#8239;: <a href="#mot-tenseur">tenseur</a>, <a href="#mot-parametre">paramètre</a></span></dd>
+          </div>
+          <div class="terme" id="mot-bpe" data-chapitres="1.3">
+            <dt><dfn>BPE</dfn><span class="anglais">en anglais&#8239;: <i lang="en">byte pair encoding</i></span></dt>
+            <dd class="def">La méthode de découpage de presque tous les grands modèles&#8239;: on part des lettres, puis on fusionne, encore et encore, la paire de voisins la plus fréquente. Le nom veut dire «&#8239;encodage par paires&#8239;».</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-1/1-3/">1.3 Le tokenizer</a></span><span>voir aussi&#8239;: <a href="#mot-fusion">fusion</a>, <a href="#mot-tokenizer">tokenizer</a>, <a href="#mot-vocabulaire">vocabulaire</a></span></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="lettre" id="lettre-d" aria-labelledby="h-d">
+        <h2 id="h-d"><span class="vh">Lettre </span>D</h2>
+        <dl class="termes">
+          <div class="terme" id="mot-descente-de-gradient" data-chapitres="0.2">
+            <dt><dfn>descente de gradient</dfn><span class="anglais">en anglais&#8239;: <i lang="en">gradient descent</i></span></dt>
+            <dd class="def">La règle d’apprentissage&#8239;: à chaque pas, chaque poids recule du taux fois sa pente. Répétée assez longtemps, elle fait baisser la perte.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-2/">0.2 Les maths utiles</a></span><span>voir aussi&#8239;: <a href="#mot-gradient">gradient</a>, <a href="#mot-taux-d-apprentissage">taux d’apprentissage</a>, <a href="#mot-perte">perte</a></span></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="lettre" id="lettre-f" aria-labelledby="h-f">
+        <h2 id="h-f"><span class="vh">Lettre </span>F</h2>
+        <dl class="termes">
+          <div class="terme" id="mot-fusion" data-chapitres="1.3">
+            <dt><dfn>fusion</dfn><span class="anglais">en anglais&#8239;: <i lang="en">merge</i></span></dt>
+            <dd class="def">Une étape de l’apprentissage du BPE&#8239;: la paire de symboles voisins la plus fréquente devient un seul symbole. Chaque fusion apprise ajoute un morceau au vocabulaire.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-1/1-3/">1.3 Le tokenizer</a></span><span>voir aussi&#8239;: <a href="#mot-bpe">BPE</a>, <a href="#mot-vocabulaire">vocabulaire</a></span></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="lettre" id="lettre-g" aria-labelledby="h-g">
+        <h2 id="h-g"><span class="vh">Lettre </span>G</h2>
+        <dl class="termes">
+          <div class="terme" id="mot-gradient" data-chapitres="0.2 0.5">
+            <dt><dfn>gradient</dfn></dt>
+            <dd class="def">La liste des pentes de la perte, une par poids. Elle dit, pour chaque poids, dans quel sens il ferait monter l’erreur.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-2/">0.2 Les maths utiles</a>, calculé en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-5/">0.5 Premier réseau de neurones</a></span><span>voir aussi&#8239;: <a href="#mot-descente-de-gradient">descente de gradient</a>, <a href="#mot-retropropagation">rétropropagation</a></span></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="lettre" id="lettre-j" aria-labelledby="h-j">
+        <h2 id="h-j"><span class="vh">Lettre </span>J</h2>
+        <dl class="termes">
+          <div class="terme" id="mot-jeton" data-chapitres="1.3">
+            <dt><dfn>jeton</dfn><span class="anglais">en anglais&#8239;: <i lang="en">token</i></span></dt>
+            <dd class="def">Un morceau de texte, avec son numéro&#8239;: c’est ce que lit vraiment un modèle de langage. Un mot courant tient souvent en un seul jeton, un mot rare en plusieurs.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-1/1-3/">1.3 Le tokenizer</a></span><span>voir aussi&#8239;: <a href="#mot-tokenizer">tokenizer</a>, <a href="#mot-vocabulaire">vocabulaire</a>, <a href="#mot-plongement">plongement</a></span></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="lettre" id="lettre-l" aria-labelledby="h-l">
+        <h2 id="h-l"><span class="vh">Lettre </span>L</h2>
+        <dl class="termes">
+          <div class="terme" id="mot-lot" data-chapitres="0.5">
+            <dt><dfn>lot</dfn><span class="anglais">en anglais&#8239;: <i lang="en">batch</i></span></dt>
+            <dd class="def">Les exemples qu’un pas d’entraînement traite ensemble, tirés au hasard parmi les données. Rangés dans un tenseur, ils ajoutent une dimension&#8239;: un lot de matrices en a trois.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-5/">0.5 Premier réseau de neurones</a></span><span>voir aussi&#8239;: <a href="#mot-tenseur">tenseur</a>, <a href="#mot-descente-de-gradient">descente de gradient</a></span></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="lettre" id="lettre-p" aria-labelledby="h-p">
+        <h2 id="h-p"><span class="vh">Lettre </span>P</h2>
+        <dl class="termes">
+          <div class="terme" id="mot-parametre" data-chapitres="0.2">
+            <dt><dfn>paramètre</dfn><span class="anglais">en anglais&#8239;: <i lang="en">parameter</i></span></dt>
+            <dd class="def">Un des nombres que le modèle règle en apprenant&#8239;; on dit aussi un poids. Ton IA en compte 433,6 millions dans sa plus grande taille.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-2/">0.2 Les maths utiles</a></span><span>voir aussi&#8239;: <a href="#mot-gradient">gradient</a>, <a href="#mot-sauvegarde">sauvegarde</a></span></dd>
+          </div>
+          <div class="terme" id="mot-perplexite" data-chapitres="1.6">
+            <dt><dfn>perplexité</dfn><span class="anglais">en anglais&#8239;: <i lang="en">perplexity</i></span></dt>
+            <dd class="def">La perte, ramenée à une échelle plus parlante&#8239;: le nombre de jetons entre lesquels le modèle hésite, en moyenne. Plus elle est basse, mieux il prédit.</dd>
+            <dd class="renvois"><span>expliqué en <span class="a-paraitre">1.6 Évaluer son modèle</span>, à paraître</span><span>voir aussi&#8239;: <a href="#mot-perte">perte</a></span></dd>
+          </div>
+          <div class="terme" id="mot-perte" data-chapitres="0.5">
+            <dt><dfn>perte</dfn><span class="anglais">en anglais&#8239;: <i lang="en">loss</i></span></dt>
+            <dd class="def">Le nombre qui mesure à quel point le modèle se trompe, en moyenne sur les exemples. C’est lui que l’entraînement fait baisser.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-5/">0.5 Premier réseau de neurones</a></span><span>voir aussi&#8239;: <a href="#mot-gradient">gradient</a>, <a href="#mot-perplexite">perplexité</a></span></dd>
+          </div>
+          <div class="terme" id="mot-plongement" data-chapitres="1.4">
+            <dt><dfn>plongement</dfn><span class="anglais">en anglais&#8239;: <i lang="en">embedding</i></span></dt>
+            <dd class="def">La liste de nombres qui représente un jeton à l’entrée du modèle, apprise comme les autres poids. Des jetons de sens voisin finissent souvent avec des listes voisines.</dd>
+            <dd class="renvois"><span>expliqué en <span class="a-paraitre">1.4 Le transformer</span>, à paraître</span><span>voir aussi&#8239;: <a href="#mot-jeton">jeton</a>, <a href="#mot-produit-scalaire">produit scalaire</a></span></dd>
+          </div>
+          <div class="terme" id="mot-produit-scalaire" data-chapitres="0.2">
+            <dt><dfn>produit scalaire</dfn><span class="anglais">en anglais&#8239;: <i lang="en">dot product</i></span></dt>
+            <dd class="def">Multiplier deux listes de nombres case par case, puis tout additionner&#8239;: il en sort un seul nombre. L’essentiel des calculs d’une IA en est fait.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-2/">0.2 Les maths utiles</a></span><span>voir aussi&#8239;: <a href="#mot-attention">attention</a>, <a href="#mot-tenseur">tenseur</a></span></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="lettre" id="lettre-r" aria-labelledby="h-r">
+        <h2 id="h-r"><span class="vh">Lettre </span>R</h2>
+        <dl class="termes">
+          <div class="terme" id="mot-retropropagation" data-chapitres="0.5">
+            <dt><dfn>rétropropagation</dfn><span class="anglais">en anglais&#8239;: <i lang="en">backpropagation</i></span></dt>
+            <dd class="def">Le calcul qui remonte l’erreur du réseau, de la sortie vers l’entrée, pour trouver la pente de chaque poids. Il applique la règle de la chaîne, maillon par maillon.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-5/">0.5 Premier réseau de neurones</a></span><span>voir aussi&#8239;: <a href="#mot-gradient">gradient</a></span></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="lettre" id="lettre-s" aria-labelledby="h-s">
+        <h2 id="h-s"><span class="vh">Lettre </span>S</h2>
+        <dl class="termes">
+          <div class="terme" id="mot-sauvegarde" data-chapitres="1.5">
+            <dt><dfn>sauvegarde</dfn><span class="anglais">en anglais&#8239;: <i lang="en">checkpoint</i></span></dt>
+            <dd class="def">L’état de l’entraînement écrit sur le disque&#8239;: les poids, l’optimiseur et le numéro du pas. Elle permet de mettre l’entraînement en pause, puis de le reprendre au même point.</dd>
+            <dd class="renvois"><span>expliqué en <span class="a-paraitre">1.5 Le pré-entraînement</span>, à paraître</span><span>voir aussi&#8239;: <a href="#mot-parametre">paramètre</a></span></dd>
+          </div>
+          <div class="terme" id="mot-softmax" data-chapitres="0.2">
+            <dt><dfn>softmax</dfn></dt>
+            <dd class="def">Change des scores quelconques en probabilités qui font 1 ensemble. Elle prend l’exponentielle de chaque score, puis divise par leur somme.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-2/">0.2 Les maths utiles</a></span><span>voir aussi&#8239;: <a href="#mot-temperature">température</a>, <a href="#mot-attention">attention</a></span></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="lettre" id="lettre-t" aria-labelledby="h-t">
+        <h2 id="h-t"><span class="vh">Lettre </span>T</h2>
+        <dl class="termes">
+          <div class="terme" id="mot-taux-d-apprentissage" data-chapitres="0.2">
+            <dt><dfn>taux d’apprentissage</dfn><span class="anglais">en anglais&#8239;: <i lang="en">learning rate</i></span></dt>
+            <dd class="def">Le réglage qui fixe la longueur de chaque pas de descente. Trop grand, il fait sauter par-dessus le fond, ou s’en éloigner.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-2/">0.2 Les maths utiles</a></span><span>voir aussi&#8239;: <a href="#mot-descente-de-gradient">descente de gradient</a></span></dd>
+          </div>
+          <div class="terme" id="mot-temperature" data-chapitres="0.2">
+            <dt><dfn>température</dfn><span class="anglais">en anglais&#8239;: <i lang="en">temperature</i></span></dt>
+            <dd class="def">Le réglage qui divise les scores avant softmax. Sous 1, le mot le plus probable sort plus souvent&#8239;; au-dessus de 1, le modèle ose des mots moins probables.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-2/">0.2 Les maths utiles</a></span><span>voir aussi&#8239;: <a href="#mot-softmax">softmax</a></span></dd>
+          </div>
+          <div class="terme" id="mot-tenseur" data-chapitres="0.4">
+            <dt><dfn>tenseur</dfn><span class="anglais">en anglais&#8239;: <i lang="en">tensor</i></span></dt>
+            <dd class="def">Un tableau de nombres rangés selon un certain nombre de dimensions&#8239;: aucune pour un nombre seul, une pour un vecteur, deux pour une matrice. Tout ce que calcule ton IA passe par des tenseurs.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-4/">0.4 Tenseurs et calcul sur GPU</a></span><span>voir aussi&#8239;: <a href="#mot-lot">lot</a>, <a href="#mot-bf16">bf16</a></span></dd>
+          </div>
+          <div class="terme" id="mot-tokenizer" data-chapitres="1.3">
+            <dt><dfn>tokenizer</dfn><span class="anglais">en français, aussi&#8239;: découpeur</span></dt>
+            <dd class="def">L’outil qui découpe le texte en jetons numérotés, puis refait le chemin inverse pour afficher la réponse. Celui de ton IA est appris par BPE, sur les octets.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-1/1-3/">1.3 Le tokenizer</a></span><span>voir aussi&#8239;: <a href="#mot-jeton">jeton</a>, <a href="#mot-bpe">BPE</a></span></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="lettre" id="lettre-v" aria-labelledby="h-v">
+        <h2 id="h-v"><span class="vh">Lettre </span>V</h2>
+        <dl class="termes">
+          <div class="terme" id="mot-vocabulaire" data-chapitres="1.3">
+            <dt><dfn>vocabulaire</dfn><span class="anglais">en anglais&#8239;: <i lang="en">vocabulary</i></span></dt>
+            <dd class="def">La liste de tous les jetons que connaît un tokenizer, chacun avec son numéro. Celui de Llama 3 en compte environ 128&#8239;000, celui de Gemma 4 environ 262&#8239;000.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-1/1-3/">1.3 Le tokenizer</a></span><span>voir aussi&#8239;: <a href="#mot-jeton">jeton</a>, <a href="#mot-fusion">fusion</a></span></dd>
+          </div>
+        </dl>
+      </section>
+
+      <div class="vide-filtre" id="vide-filtre" hidden>
+        <p class="vide-titre">Aucun mot ne contient «&#8239;<span id="vide-q"></span>&#8239;».</p>
+        <p>Le glossaire ne garde que les mots des chapitres parus. La recherche du site lit aussi leur texte&#8239;: <a id="vide-lien" href="recherche.html">cherche ce mot partout</a>.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="bloc pied">
+    <nav class="texte voisins" aria-label="Annexes voisines">
+      <a href="accueil-c.html#annexes"><span>Retour</span><strong>Toutes les annexes</strong></a>
+      <a href="#annuaire"><span>Annexe suivante</span><strong>L’annuaire des données</strong></a>
+    </nav>
+  </footer>
+</article>
+
+<!-- ==================================================================== -->
+<!-- L'annuaire des données                                                -->
+<!-- ==================================================================== -->
+<article class="page" id="page-annuaire" data-page="annuaire" data-titre="L’annuaire des données" aria-labelledby="t-annuaire">
+  <div class="bloc titre-page">
+    <div class="texte">
+      <h1 id="t-annuaire">L’annuaire des données</h1>
+      <p class="chapeau">Où trouver des textes, du code et des tests pour entraîner une IA, ce que dit leur licence, et comment y accéder. Les jeux que lit ton IA ont un trait dans la marge.</p>
+      <p class="programme">11 jeux en trois groupes, relevés le 8 novembre 2026 sur leur page Hugging Face.</p>
+    </div>
+    <aside class="note haute">
+      <p><strong>Les trois accès</strong></p>
+      <dl class="acces-legende">
+        <dt>libre</dt>
+        <dd>se télécharge sans formulaire&#8239;;</dd>
+        <dt>conditions à accepter</dt>
+        <dd>connecte-toi à Hugging Face et accepte les conditions de la page&#8239;: l’accès s’ouvre aussitôt&#8239;;</dd>
+        <dt>accord manuel</dt>
+        <dd>les auteurs lisent chaque demande avant d’ouvrir l’accès.</dd>
+      </dl>
+      <p>Chaque taille est celle qu’annonce la page du jeu, dans son unité.</p>
+    </aside>
+  </div>
+
+  <section class="bloc groupe" aria-labelledby="g-francais">
+    <div class="large">
+      <h2 id="g-francais">Textes en français</h2>
+      <p class="intro-groupe">Le gros de ce que lit ton IA&#8239;: le web en français et Wikipédia font 85&#8239;% de son mélange.</p>
+      <table class="annuaire">
+        <caption class="vh">Textes en français</caption>
+        <colgroup><col class="c-nom"><col class="c-quoi"><col class="c-taille"><col class="c-licence"><col class="c-acces"><col class="c-ton-ia"><col class="c-releve"></colgroup>
+        <thead>
+          <tr><th scope="col">Nom</th><th scope="col">Ce que c’est</th><th scope="col">Taille annoncée</th><th scope="col">Licence</th><th scope="col">Accès</th><th scope="col">Ton IA</th><th scope="col">Relevé le</th></tr>
+        </thead>
+        <tbody>
+          <tr class="ton-ia">
+            <th scope="row" class="nom"><a href="https://huggingface.co/datasets/HuggingFaceFW/fineweb-2">FineWeb-2</a><code><span class="ns">HuggingFaceFW/</span><wbr><span class="ns">fineweb-2,</span> <span class="ns">fra_Latn</span></code></th>
+            <td class="quoi" data-col="Ce que c’est"><span class="v">Des pages web de Common Crawl, triées par langue, filtrées et dédoublonnées. Ici, la part en français.</span></td>
+            <td class="taille" data-col="Taille"><span class="v"><span>502,82&#160;GB</span><sup class="appel"><a href="#note-1" aria-label="note 1">1</a></sup><small>220,7 milliards de mots</small></span></td>
+            <td class="licence" data-col="Licence"><span class="v"><a href="https://opendatacommons.org/licenses/by/1-0/">ODC-By 1.0</a><small>et les <a href="https://commoncrawl.org/terms-of-use">conditions de Common Crawl</a></small></span></td>
+            <td class="acces" data-col="Accès"><span class="v">libre</span></td>
+            <td class="ton-ia-col" data-col="Ton IA"><span class="v"><strong>oui</strong>, 75&#8239;%<small>de son mélange, en 1.2</small></span></td>
+            <td class="releve-le" data-col="Relevé le"><span class="v">08/11/2026</span></td>
+          </tr>
+          <tr class="ton-ia">
+            <th scope="row" class="nom"><a href="https://huggingface.co/datasets/wikimedia/wikipedia">Wikipédia</a><code><span class="ns">wikimedia/</span><wbr><span class="ns">wikipedia,</span> <span class="ns">20231101.fr</span></code></th>
+            <td class="quoi" data-col="Ce que c’est"><span class="v">Les articles de Wikipédia en français, dans la copie du 1<sup>er</sup> novembre 2023, la seule proposée.</span></td>
+            <td class="taille" data-col="Taille"><span class="v"><span>4&#8239;614&#8239;488&#8239;286 octets</span><small>2,56 millions d’articles</small></span></td>
+            <td class="licence" data-col="Licence"><span class="v"><a href="https://creativecommons.org/licenses/by-sa/3.0/deed.fr">CC BY-SA 3.0</a> et <a href="https://www.gnu.org/licenses/fdl-1.3.html">GFDL</a><sup class="appel"><a href="#note-2" aria-label="note 2">2</a></sup></span></td>
+            <td class="acces" data-col="Accès"><span class="v">libre</span></td>
+            <td class="ton-ia-col" data-col="Ton IA"><span class="v"><strong>oui</strong>, 10&#8239;%<small>de son mélange, en 1.2</small></span></td>
+            <td class="releve-le" data-col="Relevé le"><span class="v">08/11/2026</span></td>
+          </tr>
+          <tr>
+            <th scope="row" class="nom"><a href="https://huggingface.co/datasets/PleIAs/common_corpus">Common Corpus</a><code><span class="ns">PleIAs/</span><wbr><span class="ns">common_corpus</span></code></th>
+            <td class="quoi" data-col="Ce que c’est"><span class="v">Des textes libres de droits ou sous licence libre, surtout en anglais et en français, code compris.</span></td>
+            <td class="taille" data-col="Taille"><span class="v"><span>2&#8239;267 milliards de jetons</span><small>dont 283 milliards de code</small></span></td>
+            <td class="licence" data-col="Licence"><span class="v"><a href="https://huggingface.co/datasets/PleIAs/common_corpus">libres, selon la carte</a></span></td>
+            <td class="acces" data-col="Accès"><span class="v">libre</span></td>
+            <td class="ton-ia-col" data-col="Ton IA"><span class="v non">non</span></td>
+            <td class="releve-le" data-col="Relevé le"><span class="v">08/11/2026</span></td>
+          </tr>
+          <tr>
+            <th scope="row" class="nom"><a href="https://huggingface.co/datasets/croissantllm/croissant_dataset">Croissant</a><code><span class="ns">croissantllm/</span><wbr><span class="ns">croissant_dataset</span></code></th>
+            <td class="quoi" data-col="Ce que c’est"><span class="v">Les données d’entraînement de CroissantLLM, un modèle français et anglais.</span></td>
+            <td class="taille" data-col="Taille"><span class="v pas-releve">pas relevée</span></td>
+            <td class="licence" data-col="Licence"><span class="v"><a href="https://arxiv.org/abs/2402.00786">celle de chaque source</a></span></td>
+            <td class="acces" data-col="Accès"><span class="v">libre</span></td>
+            <td class="ton-ia-col" data-col="Ton IA"><span class="v non">non</span></td>
+            <td class="releve-le" data-col="Relevé le"><span class="v">08/11/2026</span></td>
+          </tr>
+          <tr>
+            <th scope="row" class="nom"><a href="https://huggingface.co/datasets/uonlp/CulturaX">CulturaX</a><code><span class="ns">uonlp/</span><wbr><span class="ns">CulturaX</span></code></th>
+            <td class="quoi" data-col="Ce que c’est"><span class="v">Un corpus web en de nombreuses langues, dont le français.</span></td>
+            <td class="taille" data-col="Taille"><span class="v pas-releve">pas relevée</span></td>
+            <td class="licence" data-col="Licence"><span class="v pas-releve">pas relevée</span></td>
+            <td class="acces" data-col="Accès"><span class="v">conditions à accepter</span></td>
+            <td class="ton-ia-col" data-col="Ton IA"><span class="v non">non</span></td>
+            <td class="releve-le" data-col="Relevé le"><span class="v">08/11/2026</span></td>
+          </tr>
+          <tr>
+            <th scope="row" class="nom"><a href="https://huggingface.co/datasets/OpenLLM-France/Lucie-Training-Dataset">Lucie</a><code><span class="ns">OpenLLM-France/</span><wbr><span class="ns">Lucie-Training-Dataset</span></code></th>
+            <td class="quoi" data-col="Ce que c’est"><span class="v">Les données d’entraînement du modèle Lucie, d’OpenLLM France.</span></td>
+            <td class="taille" data-col="Taille"><span class="v pas-releve">pas relevée</span></td>
+            <td class="licence" data-col="Licence"><span class="v"><a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.fr">CC BY-NC-SA 4.0</a><small>pas d’usage commercial</small></span></td>
+            <td class="acces" data-col="Accès"><span class="v">libre</span></td>
+            <td class="ton-ia-col" data-col="Ton IA"><span class="v non">non</span></td>
+            <td class="releve-le" data-col="Relevé le"><span class="v">08/11/2026</span></td>
+          </tr>
+          <tr>
+            <th scope="row" class="nom"><a href="https://huggingface.co/datasets/oscar-corpus/OSCAR-2301">OSCAR 23.01</a><code><span class="ns">oscar-corpus/</span><wbr><span class="ns">OSCAR-2301</span></code></th>
+            <td class="quoi" data-col="Ce que c’est"><span class="v">Un corpus web en de nombreuses langues, tiré de Common Crawl.</span></td>
+            <td class="taille" data-col="Taille"><span class="v pas-releve">pas relevée</span></td>
+            <td class="licence" data-col="Licence"><span class="v pas-releve">pas relevée</span></td>
+            <td class="acces" data-col="Accès"><span class="v">accord manuel</span></td>
+            <td class="ton-ia-col" data-col="Ton IA"><span class="v non">non</span></td>
+            <td class="releve-le" data-col="Relevé le"><span class="v">08/11/2026</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <ol class="notes-groupe">
+        <li id="note-1"><span>1.</span><span>Les «&#8239;GB&#8239;» de la carte de FineWeb-2 sont des Gio, de 2³⁰ octets&#8239;: son arbre de fichiers donne 539&#8239;897&#8239;427&#8239;722 octets pour le français, soit 502,8&#160;Gio.</span></li>
+        <li id="note-2"><span>2.</span><span>Les licences annoncées par la page. Wikipédia publie en CC BY-SA 4.0 les modifications faites depuis juin 2023 (<a href="https://creativecommons.org/2023/06/29/wikipedia-moves-to-cc-4-0-licenses/">billet de Creative Commons</a>)&#8239;: à notre lecture, la copie de novembre 2023 mêle donc les deux versions.</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="bloc groupe" aria-labelledby="g-code">
+    <div class="large">
+      <h2 id="g-code">Code</h2>
+      <p class="intro-groupe">Ton IA lit aussi du Python, pour 15&#8239;% de son mélange.</p>
+      <table class="annuaire">
+        <caption class="vh">Code</caption>
+        <colgroup><col class="c-nom"><col class="c-quoi"><col class="c-taille"><col class="c-licence"><col class="c-acces"><col class="c-ton-ia"><col class="c-releve"></colgroup>
+        <thead>
+          <tr><th scope="col">Nom</th><th scope="col">Ce que c’est</th><th scope="col">Taille annoncée</th><th scope="col">Licence</th><th scope="col">Accès</th><th scope="col">Ton IA</th><th scope="col">Relevé le</th></tr>
+        </thead>
+        <tbody>
+          <tr class="ton-ia">
+            <th scope="row" class="nom"><a href="https://huggingface.co/datasets/codeparrot/github-code-clean">GitHub Code Clean</a><code><span class="ns">codeparrot/</span><wbr><span class="ns">github-code-clean</span></code></th>
+            <td class="quoi" data-col="Ce que c’est"><span class="v">Du code de GitHub, nettoyé&#8239;: lignes courtes en moyenne, assez de lettres et de chiffres, fichiers générés retirés.</span></td>
+            <td class="taille" data-col="Taille"><span class="v"><span>314&#160;Go</span></span></td>
+            <td class="licence" data-col="Licence"><span class="v"><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0</a><sup class="appel"><a href="#note-3" aria-label="note 3">3</a></sup><small>pour la compilation</small></span></td>
+            <td class="acces" data-col="Accès"><span class="v">libre</span></td>
+            <td class="ton-ia-col" data-col="Ton IA"><span class="v"><strong>oui</strong>, 15&#8239;%<small>le Python sous licence permissive, en 1.2</small></span></td>
+            <td class="releve-le" data-col="Relevé le"><span class="v">08/11/2026</span></td>
+          </tr>
+          <tr>
+            <th scope="row" class="nom"><a href="https://huggingface.co/datasets/bigcode/the-stack-v2">The Stack v2</a><code><span class="ns">bigcode/</span><wbr><span class="ns">the-stack-v2</span></code></th>
+            <td class="quoi" data-col="Ce que c’est"><span class="v">Le grand corpus de code source du projet BigCode.</span></td>
+            <td class="taille" data-col="Taille"><span class="v pas-releve">pas relevée</span></td>
+            <td class="licence" data-col="Licence"><span class="v pas-releve">pas relevée</span></td>
+            <td class="acces" data-col="Accès"><span class="v">conditions à accepter</span></td>
+            <td class="ton-ia-col" data-col="Ton IA"><span class="v non">non</span></td>
+            <td class="releve-le" data-col="Relevé le"><span class="v">08/11/2026</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <ol class="notes-groupe">
+        <li id="note-3"><span>3.</span><span>Chaque fichier garde aussi sa propre licence, dans la colonne <code>license</code>&#8239;: ton IA ne garde que le Python sous licence permissive. La carte ne parle pas de dédoublonnage et ne date pas les données.</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="bloc groupe" aria-labelledby="g-evaluation">
+    <div class="large">
+      <h2 id="g-evaluation">Évaluation</h2>
+      <p class="intro-groupe">Des tests tout prêts, pour mesurer ce que sait un modèle. Ils ne servent jamais à l’entraîner&#8239;: il les apprendrait par cœur.</p>
+      <table class="annuaire">
+        <caption class="vh">Évaluation</caption>
+        <colgroup><col class="c-nom"><col class="c-quoi"><col class="c-taille"><col class="c-licence"><col class="c-acces"><col class="c-ton-ia"><col class="c-releve"></colgroup>
+        <thead>
+          <tr><th scope="col">Nom</th><th scope="col">Ce que c’est</th><th scope="col">Taille annoncée</th><th scope="col">Licence</th><th scope="col">Accès</th><th scope="col">Ton IA</th><th scope="col">Relevé le</th></tr>
+        </thead>
+        <tbody>
+          <tr class="ton-ia">
+            <th scope="row" class="nom"><a href="https://huggingface.co/datasets/manu/french_bench_hellaswag">FrenchBench HellaSwag</a><code><span class="ns">manu/</span><wbr><span class="ns">french_bench_hellaswag</span></code></th>
+            <td class="quoi" data-col="Ce que c’est"><span class="v">Un test de FrenchBench&#8239;: choisir la suite la plus plausible d’un court texte.</span></td>
+            <td class="taille" data-col="Taille"><span class="v"><span>9,34 milliers de lignes</span><small>de validation</small></span></td>
+            <td class="licence" data-col="Licence"><span class="v">aucune <span class="ns">indiquée<sup class="appel"><a href="#note-4" aria-label="note 4">4</a></sup></span></span></td>
+            <td class="acces" data-col="Accès"><span class="v">libre</span></td>
+            <td class="ton-ia-col" data-col="Ton IA"><span class="v"><strong>oui</strong><small>pour l’évaluer, en 1.6</small></span></td>
+            <td class="releve-le" data-col="Relevé le"><span class="v">08/11/2026</span></td>
+          </tr>
+          <tr>
+            <th scope="row" class="nom"><a href="https://huggingface.co/datasets/openai/MMMLU">MMMLU</a><code><span class="ns">openai/</span><wbr><span class="ns">MMMLU,</span> <span class="ns">FR_FR</span></code></th>
+            <td class="quoi" data-col="Ce que c’est"><span class="v">Les questions à choix multiples de MMLU, traduites par des traducteurs professionnels.</span></td>
+            <td class="taille" data-col="Taille"><span class="v"><span>environ 14&#8239;000 lignes</span><small>en français</small></span></td>
+            <td class="licence" data-col="Licence"><span class="v"><a href="https://opensource.org/license/mit">MIT</a></span></td>
+            <td class="acces" data-col="Accès"><span class="v">libre</span></td>
+            <td class="ton-ia-col" data-col="Ton IA"><span class="v non">non</span></td>
+            <td class="releve-le" data-col="Relevé le"><span class="v">08/11/2026</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <ol class="notes-groupe">
+        <li id="note-4"><span>4.</span><span>Sa page n’indique aucune licence, et sa carte est vide. FrenchBench vient de l’article de CroissantLLM (<a href="https://arxiv.org/abs/2402.00786">arXiv 2402.00786</a>).</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <footer class="bloc pied">
+    <nav class="texte voisins" aria-label="Annexes voisines">
+      <a href="#glossaire"><span>Annexe précédente</span><strong>Le glossaire</strong></a>
+      <a href="#calculateur"><span>Annexe suivante</span><strong>Le calculateur de coût</strong></a>
+    </nav>
+  </footer>
+</article>
+
+<!-- ==================================================================== -->
+<!-- Le calculateur de coût                                                -->
+<!-- ==================================================================== -->
+<article class="page" id="page-calculateur" data-page="calculateur" data-titre="Le calculateur de coût" aria-labelledby="t-calculateur">
+  <div class="bloc titre-page">
+    <div class="texte">
+      <h1 id="t-calculateur">Le calculateur de coût</h1>
+      <p class="chapeau">Combien de calcul, de temps, de mémoire et d’argent demande un entraînement&#8239;: celui de ton IA, ou celui d’un grand modèle public. Règle la phrase, le relevé suit, chaque prix avec sa source et sa date.</p>
+      <p class="programme">Il compte comme les chapitres&#8239;: 6 opérations par paramètre et par jeton lu, et 1&#160;Go pour 2³⁰ octets.</p>
+    </div>
+    <aside class="note">
+      <p>Les nombres jaunes se règlent&#8239;: fais-les glisser, ou atteins-les avec Tab, puis utilise les flèches. Les menus jaunes changent le modèle et la carte.</p>
+      <p>Depuis 1.5, il s’ouvre réglé sur ton IA. Depuis un encadré «&#8239;Et chez un grand labo&#8239;?&#8239;», sur le modèle dont parle l’encadré.</p>
+    </aside>
+  </div>
+
+  <div class="bloc corps-calculateur">
+    <div class="texte">
+      <div class="calculateur" data-calculateur="calc">
+        <p class="phrase">Entraîner <select class="selecteur" aria-label="Le modèle à entraîner">
+            <optgroup label="Ton IA"><option>ton IA «&#8239;mini&#8239;»</option><option>ton IA «&#8239;petit&#8239;»</option><option>ton IA «&#8239;moyen&#8239;»</option><option>ton IA «&#8239;grand&#8239;»</option><option selected>ton IA «&#8239;très grand&#8239;»</option></optgroup>
+            <optgroup label="Modèles publics"><option>GPT-3 175B</option><option>Llama 3 8B</option><option>Llama 3 70B</option><option>Llama 3 405B</option></optgroup>
+          </select> en lui faisant lire <span class="reglable">20</span> jetons par paramètre, soit <span class="calcule">8,67 milliards</span> de jetons, avec <span class="insecable"><span class="reglable">1</span>&#160;×</span> <select class="selecteur" aria-label="La carte graphique">
+            <optgroup label="Chez toi"><option selected>RTX 5070 Ti</option><option>RTX 5080</option><option>RTX 5090</option><option>RTX 4090</option></optgroup>
+            <optgroup label="Colab"><option>T4 (Colab gratuit)</option><option>L4 (Colab)</option></optgroup>
+            <optgroup label="En location"><option>A100 80&#160;Go SXM</option><option>H100 SXM</option><option>H200 SXM</option><option>B200</option></optgroup>
+          </select>, à <span class="reglable">50&#8239;%</span> d’efficacité.</p>
+
+        <table class="releve">
+          <caption>Le relevé</caption>
+          <tbody>
+            <tr><th scope="row">Calcul</th><td>2,26 × 10¹⁹ opérations</td></tr>
+            <tr><th scope="row">Durée</th><td>5,9&#160;jours</td></tr>
+            <tr><th scope="row">Mémoire pour l’entraîner</th><td>8,1&#160;Go&#8239;: ça tient sur une carte de 16&#160;Go</td></tr>
+            <tr><th scope="row">Mémoire pour s’en servir</th><td>827&#160;Mo en bf16, 413&#160;Mo en int8 ou 207&#160;Mo en int4, plus 200&#160;Mo de cache pour 2&#8239;048 jetons (tout son contexte)</td></tr>
+            <tr><th scope="row">Génération, au plus</th><td>1&#8239;033 jetons par seconde en bf16, sur une carte</td></tr>
+            <tr><th scope="row">Électricité</th><td>42,8&#160;kWh, environ 8,56&#160;€</td></tr>
+            <tr><th scope="row">Location</th><td>pas de prix relevé pour cette carte</td></tr>
+          </tbody>
+        </table>
+
+        <p class="repere">Calcul&#8239;: 5,9&#160;jours. Mesuré&#8239;: 5,6&#160;jours (135&#160;h). L’écart vient de l’efficacité&#8239;: 52,8&#8239;% mesurés contre 50&#8239;% supposés.</p>
+
+        <p class="voir"><button type="button" class="bascule-soleil" id="voir-calcul" aria-expanded="false" aria-controls="formules">Voir le calcul</button></p>
+        <div class="formules" id="formules">
+          <div class="formule">
+            <p class="titre-formule">Le calcul</p>
+            <p class="calcul">6 × 433,6 millions × 8,67 milliards = 2,26 × 10¹⁹ opérations</p>
+            <p class="sens">Six opérations par paramètre et par jeton lu&#8239;: deux pour la passe avant, quatre pour la passe arrière. <span class="sources-formule">Sources&#8239;: <a href="https://arxiv.org/abs/2001.08361">Kaplan et al., «&#8239;Scaling Laws for Neural Language Models&#8239;» (arXiv 2001.08361), section 2.1</a>&#8239;; <a href="https://arxiv.org/abs/2203.15556">Hoffmann et al., «&#8239;Training Compute-Optimal Large Language Models&#8239;» (Chinchilla, arXiv 2203.15556), tableau 3</a>.</span></p>
+          </div>
+          <div class="formule">
+            <p class="titre-formule">La durée</p>
+            <p class="calcul">2,26 × 10¹⁹ ÷ (1 carte × 87,9 × 10¹² opérations par seconde × 50&#8239;%) = 5,9&#160;jours</p>
+            <p class="sens">87,9 × 10¹² opérations par seconde, c’est la crête de calcul en bf16 d’une RTX 5070 Ti, sans sparsité. L’efficacité dit quelle part de cette crête sert vraiment. <span class="sources-formule">Source&#8239;: <a href="https://images.nvidia.com/aem-dam/Solutions/geforce/blackwell/nvidia-rtx-blackwell-gpu-architecture.pdf">NVIDIA, livre blanc de l’architecture RTX Blackwell (v1.1), tableau 5</a>.</span></p>
+          </div>
+          <div class="formule">
+            <p class="titre-formule">La mémoire pour l’entraîner</p>
+            <p class="calcul">16 octets × 433,6 millions = 6,5&#160;Go, plus 34 × 2&#8239;048 × 1&#8239;280 × 20 octets = 1,7&#160;Go&#8239;: 8,1&#160;Go en tout</p>
+            <p class="sens">Les 16 octets par paramètre&#8239;: les poids et les gradients en 16 bits, plus une copie des poids, la moyenne et la variance d’AdamW en 32 bits. <span class="sources-formule">Sources&#8239;: <a href="https://arxiv.org/abs/1910.02054">Rajbhandari et al., ZeRO (arXiv 1910.02054), section 3.1</a>&#8239;; <a href="https://arxiv.org/abs/2205.05198">Korthikanti et al. (arXiv 2205.05198), équations 1 et 5</a>.</span></p>
+          </div>
+        </div>
+
+        <h2 class="titre-section">Repère mesuré&#8239;: ton IA sur ce PC</h2>
+        <p class="intro-reperes">Les débits de ton IA, mesurés pendant son entraînement sur la carte (une RTX 5070 Ti, celle de ce PC) et sur le processeur, et la durée qu’on en tire pour 20 jetons par paramètre.</p>
+        <p class="indice">Fais défiler le tableau vers la droite pour voir les autres colonnes.</p>
+        <div class="zone-defilable" role="region" aria-label="Débits mesurés, défilable" tabindex="0">
+          <table class="reperes">
+            <thead>
+              <tr><td rowspan="2"></td><th scope="colgroup" colspan="3">Sur la carte</th><th scope="colgroup" colspan="2" class="groupe-processeur">Sur le processeur</th></tr>
+              <tr><th scope="col">par seconde</th><th scope="col">durée</th><th scope="col">efficacité</th><th scope="col" class="groupe-processeur">par seconde</th><th scope="col">durée</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">mini<span class="parametres">23,2 millions</span></th><td>231&#8239;934 jetons</td><td>33&#160;min</td><td>36,7&#8239;%</td><td class="groupe-processeur">2&#8239;707 jetons</td><td>2,0&#160;jours</td></tr>
+              <tr><th scope="row">petit<span class="parametres">41,7 millions</span></th><td>138&#8239;433 jetons</td><td>1,7&#160;h</td><td>39,4&#8239;%</td><td class="groupe-processeur">1&#8239;749 jetons</td><td>5,5&#160;jours</td></tr>
+              <tr><th scope="row">moyen<span class="parametres">110,1 millions</span></th><td>62&#8239;368 jetons</td><td>9,8&#160;h</td><td>46,9&#8239;%</td><td class="groupe-processeur">776 jetons</td><td>33&#160;jours</td></tr>
+              <tr><th scope="row">grand<span class="parametres">236,0 millions</span></th><td>32&#8239;704 jetons</td><td>40&#160;h</td><td>52,7&#8239;%</td><td class="groupe-processeur">404 jetons</td><td>135&#160;jours</td></tr>
+              <tr class="choisie"><th scope="row">très grand<span class="parametres">433,6 millions</span></th><td>17&#8239;855 jetons</td><td>5,6&#160;jours</td><td>52,8&#8239;%</td><td class="groupe-processeur">235 jetons</td><td>1,2&#160;an</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="comme-les-grands">Pour comparer avec les grands entraînements, il faut compter les opérations comme eux. PaLM 540B (46,2&#8239;%) et Llama 3 405B (de 38&#8239;% à 43&#8239;%, avec la définition de PaLM) comptent aussi l’attention&#8239;: ton IA «&#8239;très grand&#8239;» fait alors 65,6&#8239;% sur ce PC. Avec 6N seulement, comme le calculateur, elle fait 52,8&#8239;%.</p>
+        <ul class="sources-reperes">
+          <li>PaLM 540B, 46,2&#8239;% (6&#8239;144 puces TPU v4)&#8239;: <a href="https://arxiv.org/abs/2204.02311">Chowdhery et al., «&#8239;PaLM: Scaling Language Modeling with Pathways&#8239;» (arXiv 2204.02311), section 4.1 et tableau 3</a>, relevé le 3 novembre 2026.</li>
+          <li>Llama 3 405B, de 38&#8239;% à 43&#8239;% (de 8&#8239;192 à 16&#8239;384 H100)&#8239;: <a href="https://arxiv.org/abs/2407.21783">Llama Team (Meta), «&#8239;The Llama 3 Herd of Models&#8239;» (arXiv 2407.21783), section 3.3.2 et tableau 4</a>, relevé le 3 novembre 2026.</li>
+        </ul>
+        <p class="source-mesures">Mesures du 3 novembre 2026&#8239;: <a href="https://github.com/chipat-neko/forge-ia/blob/main/docs/mesures/entrainement-2026-11.md">le rapport de mesure</a>, et <a href="https://github.com/chipat-neko/forge-ia/blob/main/projets/forge/configs/mini.toml">la configuration de la version courte</a> pour «&#8239;mini&#8239;».</p>
+
+        <div class="liste-sources">
+          <h2 class="titre-section">Les sources</h2>
+          <ul>
+            <li>La carte, RTX 5070 Ti&#8239;: <a href="https://images.nvidia.com/aem-dam/Solutions/geforce/blackwell/nvidia-rtx-blackwell-gpu-architecture.pdf">NVIDIA, livre blanc de l’architecture RTX Blackwell (v1.1), tableau 5&#8239;: GeForce RTX 5070 Ti</a>, relevé le 3 novembre 2026. <span class="precision">87,9 TFLOPS&#8239;: ligne «&#8239;Peak BF16 Tensor TFLOPS with FP32 Accumulate&#8239;» du tableau, sans sparsité (175,8 avec), calculée à l’horloge boost de 2&#8239;452&#160;MHz.</span></li>
+            <li>L’électricité&#8239;: 0,2001&#160;€ le kWh, <a href="https://particulier.edf.fr/content/dam/2-Actifs/Documents/Offres/Grille_prix_Tarif_Bleu.pdf">EDF, grille de prix de l’offre Tarif Bleu, applicable au 1<sup>er</sup> août 2026</a>, relevé le 3 novembre 2026.</li>
+          </ul>
+          <p class="avertissement">Les prix de location changent souvent&#8239;: ceux-ci sont ceux du jour de leur relevé, hors taxes.</p>
+        </div>
+      </div>
+
+      <section class="apercu" aria-labelledby="t-apercu">
+        <h2 id="t-apercu">Pour la maquette, hors de cette page&#8239;: les liens qui mènent ici.</h2>
+        <p class="ou-lien">Dans 1.5, après la durée de l’entraînement&#8239;:</p>
+        <div class="extrait">
+          <p>Ton IA «&#8239;très grand&#8239;» lit 8,67 milliards de jetons. Sur la carte de ce PC, cela a pris 5,6&#160;jours. Pour une autre taille, une autre carte ou un grand modèle public, <a href="#calculateur">le calculateur de coût</a> refait le calcul, déjà réglé sur ton IA.</p>
+        </div>
+        <p class="ou-lien">À la fin de chaque encadré «&#8239;Et chez un grand labo&#8239;?&#8239;» qui parle d’un entraînement&#8239;:</p>
+        <aside class="labo" aria-label="Exemple d’encadré">
+          <h3>Et chez un grand labo&#8239;?</h3>
+          <p>Llama 3 405B, de Meta, a lu environ 15&#8239;600 milliards de jetons, sur 16&#8239;384 cartes H100 au plus. Son entraînement a demandé 30,84 millions d’heures de carte.</p>
+          <p class="vers-calculateur"><a href="#calculateur">Refaire ce calcul dans le calculateur de coût</a><span>Il s’ouvre réglé sur Llama 3 405B.</span></p>
+          <p class="sources">Sources, vérifiées le 8 novembre 2026&#8239;: <a href="https://arxiv.org/abs/2407.21783">Llama 3 (Meta), article de présentation, section 3.3</a>, <a href="https://github.com/meta-llama/llama-models/blob/main/models/llama3_1/MODEL_CARD.md">Llama 3.1, fiche du modèle</a>.</p>
+        </aside>
+      </section>
+    </div>
+  </div>
+
+  <footer class="bloc pied">
+    <nav class="texte voisins" aria-label="Annexes voisines">
+      <a href="#annuaire"><span>Annexe précédente</span><strong>L’annuaire des données</strong></a>
+      <p class="a-venir"><span>Annexe suivante, à venir</span><strong>Le matériel</strong></p>
+    </nav>
+  </footer>
+</article>
+
+</main>
+
+<footer class="pied-site">
+  <div class="pied-in">
+    <p><strong>La Forge IA</strong>, un parcours en français pour construire une IA de zéro.</p>
+    <p>Code sous licence MIT, textes sous licence CC BY 4.0. Tout le code est sur GitHub.</p>
+    <p>Ta progression reste dans ce navigateur, sans compte.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (s, r = document) => r.querySelector(s);
+  const FINE = String.fromCharCode(0x202F);
+
+  /* ---------- Les trois pages : une seule visible, choisie par l'adresse ---------- */
+  const pages = [...document.querySelectorAll('[data-page]')];
+  const ids = pages.map(p => p.dataset.page);
+  function pageDe(hash) {
+    const id = decodeURIComponent((hash || '').slice(1));
+    if (ids.includes(id)) return id;
+    const cible = id && document.getElementById(id);
+    const page = cible && cible.closest('[data-page]');
+    return page ? page.dataset.page : ids[0];
+  }
+  function montrer() {
+    const id = pageDe(location.hash);
+    pages.forEach(p => { p.hidden = p.dataset.page !== id; });
+    document.querySelectorAll('[data-page-bouton]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.pageBouton === id)));
+    document.querySelectorAll('[data-lien-page]').forEach(a => {
+      if (a.dataset.lienPage === id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    const page = document.querySelector(`[data-page="${id}"]`);
+    document.title = page.dataset.titre + ', La Forge IA';
+    const cible = location.hash.slice(1);
+    if (!cible || ids.includes(cible)) window.scrollTo(0, 0);
+    else {
+      const el = document.getElementById(decodeURIComponent(cible));
+      if (el && el.hidden) effacerFiltre();
+      if (el) el.scrollIntoView();
+    }
+  }
+  document.querySelectorAll('[data-page-bouton]').forEach(b => b.addEventListener('click', () => { location.hash = b.dataset.pageBouton; }));
+  window.addEventListener('hashchange', montrer);
+
+  /* ---------- Le filtre du glossaire ---------- */
+  const champ = $('#filtre');
+  const termes = [...document.querySelectorAll('.terme')];
+  const lettres = [...document.querySelectorAll('.lettre')];
+  const total = termes.length;
+  // Sans accents ni capitales, caractère par caractère : les positions restent celles du texte d'origine.
+  const plat = s => [...s].map(c => c.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().charAt(0) || c).join('').replace(/\u2019/g, "'");
+  const echapper = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  termes.forEach(t => {
+    t._mot = $('dfn', t);
+    t._def = $('.def', t);
+    t._texteMot = t._mot.textContent;
+    t._texteDef = t._def.textContent;
+    t._cherche = plat(t._texteMot + ' ' + ($('.anglais', t) ? $('.anglais', t).textContent : '') + ' ' + t._texteDef);
+    t._chapitres = (t.dataset.chapitres || '').split(' ');
+  });
+  function souligner(texte, q) {
+    if (!q) return echapper(texte);
+    const p = plat(texte);
+    let sortie = '', i = 0, j;
+    while ((j = p.indexOf(q, i)) !== -1) {
+      sortie += echapper(texte.slice(i, j)) + '<mark>' + echapper(texte.slice(j, j + q.length)) + '</mark>';
+      i = j + q.length;
+    }
+    return sortie + echapper(texte.slice(i));
+  }
+  function filtrer() {
+    const brut = champ.value.trim();
+    const q = plat(brut);
+    const chapitre = /^\d\.\d+$/.test(brut);
+    let n = 0;
+    termes.forEach(t => {
+      const garde = !q || (chapitre ? t._chapitres.includes(brut) : t._cherche.includes(q));
+      t.hidden = !garde;
+      if (garde) n++;
+      t._mot.innerHTML = souligner(t._texteMot, chapitre ? '' : q);
+      t._def.innerHTML = souligner(t._texteDef, chapitre ? '' : q);
+    });
+    lettres.forEach(l => {
+      const vide = !l.querySelector('.terme:not([hidden])');
+      l.hidden = vide;
+      const lien = document.querySelector(`[data-lettre="${l.id.slice(-1)}"]`);
+      lien.classList.toggle('sans-mot', vide);
+      if (vide) lien.setAttribute('aria-disabled', 'true'); else lien.removeAttribute('aria-disabled');
+    });
+    // La première lettre visible n'a pas de filet au-dessus d'elle.
+    lettres.forEach(l => l.style.borderTop = '');
+    const premiere = lettres.find(l => !l.hidden);
+    if (premiere && premiere !== lettres[0]) premiere.style.borderTop = '0';
+    $('#effacer').hidden = !brut;
+    $('#vide-filtre').hidden = n > 0;
+    $('#vide-q').textContent = brut;
+    $('#vide-lien').href = 'recherche.html?q=' + encodeURIComponent(brut);
+    const compte = $('#compte');
+    if (!q) compte.innerHTML = `<strong>${total}</strong> mots.`;
+    else if (n === 0) compte.textContent = `Aucun mot sur ${total} pour «${FINE}${brut}${FINE}».`;
+    else compte.innerHTML = `<strong>${n}</strong> ${n > 1 ? 'mots' : 'mot'} sur ${total} pour «${FINE}${echapper(brut)}${FINE}»` + (chapitre ? `, ceux qu’explique ${echapper(brut)}.` : '.');
+  }
+  function effacerFiltre() { champ.value = ''; filtrer(); }
+  champ.addEventListener('input', filtrer);
+  $('#filtre-form').addEventListener('submit', e => e.preventDefault());
+  $('#effacer').addEventListener('click', () => { effacerFiltre(); champ.focus(); });
+  champ.addEventListener('keydown', e => { if (e.key === 'Escape' && champ.value) { effacerFiltre(); e.preventDefault(); } });
+  // Un renvoi vers un mot caché par le filtre efface le filtre.
+  document.querySelectorAll('.renvois a[href^="#mot-"]').forEach(a => a.addEventListener('click', () => {
+    const cible = document.getElementById(a.getAttribute('href').slice(1));
+    if (cible && cible.hidden) effacerFiltre();
+  }));
+
+  /* ---------- « Voir le calcul » ---------- */
+  const voir = $('#voir-calcul');
+  voir.addEventListener('click', () => {
+    const ouvert = voir.getAttribute('aria-expanded') !== 'true';
+    voir.setAttribute('aria-expanded', String(ouvert));
+    voir.textContent = ouvert ? 'Cacher le calcul' : 'Voir le calcul';
+    $('#formules').classList.toggle('ouvert', ouvert);
+  });
+
+  // Pour les captures : ?filtre=… préremplit le champ.
+  const prerempli = new URLSearchParams(location.search).get('filtre');
+  if (prerempli) { champ.value = prerempli; filtrer(); }
+  montrer();
+})();
+</script>
+</body>
+</html>
