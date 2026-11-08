@@ -151,7 +151,9 @@ test('recherche : les titres du parcours, un numéro, et rien de la page d’ess
   await champ.fill('images');
   // Le sommaire trouve les titres à venir qui en parlent ; le texte de 0.3 dit « image »
   // (même racine pour Pagefind), mais ce compte ne porte que sur les titres du sommaire.
-  await expect(page.locator('.sommaire-trouve [data-resultat]')).toHaveCount(6);
+  // Pendant un entraînement, le disque D: est occupé et astro preview sert Pagefind en plus
+  // d'une seconde (mesuré le 06/11/2026) ; ce test vérifie les résultats, pas la vitesse.
+  await expect(page.locator('.sommaire-trouve [data-resultat]')).toHaveCount(6, { timeout: 15_000 });
   await champ.fill('1.3');
   await expect(page.locator('[data-resultat]').first()).toContainText('Le tokenizer');
   // La page d'essai du gabarit (construite pour les tests) n'est jamais cherchée :

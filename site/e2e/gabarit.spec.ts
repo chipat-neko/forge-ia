@@ -304,3 +304,19 @@ test('sortie de commande absente : son texte « à mesurer », marqué data-a-me
   expect(await absente.textContent()).toBe('À mesurer\u202F: cette commande n\u2019a pas encore été lancée ici.');
   await expect(absente).toHaveCSS('font-style', 'italic');
 });
+
+test('extrait par symbole : Bloc.forward de forge, ses 3 lignes, deux additions allumées', async ({ page }) => {
+  await page.goto(PAGE);
+  const figure = page.locator('figure.code-explique', { hasText: 'transformer.py' });
+  await expect(figure).toHaveCount(1);
+  await expect(figure.locator('pre [data-l]')).toHaveCount(3);
+  await expect(figure.locator('pre [data-l]').first()).toContainText('def forward(self, x: Tensor, cos: Tensor, sin: Tensor) -> Tensor:');
+  // La docstring et les autres méthodes de la classe n'y sont pas.
+  await expect(figure.locator('pre')).not.toContainText('__init__');
+  const addition = figure.locator('.explications li[data-lignes="2-3"]');
+  await addition.hover();
+  await expect(figure.locator('pre [data-l].allumee')).toHaveCount(2);
+  await expect(figure.locator('pre [data-l="2"]')).toHaveClass(/\ballumee\b/);
+  await expect(figure.locator('pre [data-l="3"]')).toHaveClass(/\ballumee\b/);
+  await expect(figure.locator('pre [data-l="1"]')).not.toHaveClass(/\ballumee\b/);
+});

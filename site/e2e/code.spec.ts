@@ -7,6 +7,7 @@ import { extraireRegion } from '../src/lib/regions';
 import { verifierAxe, verifierSansDebordement } from './outils';
 
 const PAGE = '/forge-ia/essais/gabarit/';
+// La page d’essai montre aussi un extrait de forge (par symbole) : ces parcours visent celui de bpe.py.
 const FICHIER = 'projets/1.3-tokenizer/tokenizer_pedagogique/bpe.py';
 // Playwright tourne dans site/ : le dépôt est un dossier plus haut.
 const attendu = extraireRegion(readFileSync(`../${FICHIER}`, 'utf8'), 'choisir', FICHIER);
@@ -14,14 +15,14 @@ const NB_LIGNES = attendu.split('\n').length;
 
 /** Numéros des lignes allumées, dans l'ordre. */
 async function lignesAllumees(page: import('@playwright/test').Page): Promise<number[]> {
-  return page.$$eval('.code-explique [data-l].allumee', (els) => els.map((e) => Number(e.getAttribute('data-l'))));
+  return page.$$eval('.code-explique:has(a[href$="bpe.py"]) [data-l].allumee', (els) => els.map((e) => Number(e.getAttribute('data-l'))));
 }
 
 test('le code affiché est identique à la région du fichier testé', async ({ page }) => {
   await page.goto(PAGE);
-  await expect(page.locator('.code-explique pre')).toHaveText(attendu);
+  await expect(page.locator('.code-explique:has(a[href$="bpe.py"]) pre')).toHaveText(attendu);
   // À l'octet près : les numéros de ligne et la coloration ne s'ajoutent pas au texte.
-  const texte = await page.locator('.code-explique pre').evaluate((pre) => pre.textContent);
+  const texte = await page.locator('.code-explique:has(a[href$="bpe.py"]) pre').evaluate((pre) => pre.textContent);
   expect(texte).toBe(attendu);
   // Aucun marqueur de région ne doit apparaître.
   expect(texte).not.toMatch(/# region|# fin/);
@@ -30,7 +31,7 @@ test('le code affiché est identique à la région du fichier testé', async ({ 
 test('copier le code donne la région du fichier, lignes vides comprises', async ({ page }) => {
   await page.goto(PAGE);
   // Ce que le lecteur copie vers Colab : la sélection de tout le bloc, pas son textContent.
-  const copie = await page.locator('.code-explique pre').evaluate((pre) => {
+  const copie = await page.locator('.code-explique:has(a[href$="bpe.py"]) pre').evaluate((pre) => {
     const selection = getSelection()!;
     selection.removeAllRanges();
     selection.selectAllChildren(pre);
@@ -42,27 +43,27 @@ test('copier le code donne la région du fichier, lignes vides comprises', async
 
 test('chaque ligne porte son numéro, de 1 à N', async ({ page }) => {
   await page.goto(PAGE);
-  const numeros = await page.$$eval('.code-explique pre [data-l]', (els) => els.map((e) => e.getAttribute('data-l')));
+  const numeros = await page.$$eval('.code-explique:has(a[href$="bpe.py"]) pre [data-l]', (els) => els.map((e) => e.getAttribute('data-l')));
   expect(numeros).toEqual(Array.from({ length: NB_LIGNES }, (_, i) => String(i + 1)));
 });
 
 test('le chemin du fichier renvoie vers GitHub', async ({ page }) => {
   await page.goto(PAGE);
-  const lien = page.locator('.code-explique').getByRole('link', { name: FICHIER });
+  const lien = page.locator('.code-explique:has(a[href$="bpe.py"])').getByRole('link', { name: FICHIER });
   await expect(lien).toHaveAttribute('href', `https://github.com/chipat-neko/forge-ia/blob/main/${FICHIER}`);
 });
 
 test('au repos, aucune ligne n’est allumée', async ({ page }) => {
   await page.goto(PAGE);
-  await expect(page.locator('.code-explique [data-l]').first()).toBeVisible();
+  await expect(page.locator('.code-explique:has(a[href$="bpe.py"]) [data-l]').first()).toBeVisible();
   expect(await lignesAllumees(page)).toEqual([]);
 });
 
 test('survoler une explication allume ses lignes, la quitter les éteint', async ({ page }) => {
   await page.goto(PAGE);
-  const premiere = page.locator('.code-explique li').first();
+  const premiere = page.locator('.code-explique:has(a[href$="bpe.py"]) li').first();
   await premiere.hover();
-  await expect(page.locator('.code-explique [data-l].allumee')).not.toHaveCount(0);
+  await expect(page.locator('.code-explique:has(a[href$="bpe.py"]) [data-l].allumee')).not.toHaveCount(0);
   const voulues = (await premiere.getAttribute('data-lignes'))!;
   expect(voulues).toMatch(/^\d+(-\d+)?$/);
   const [debut, fin = debut] = voulues.split('-').map(Number);
@@ -70,12 +71,12 @@ test('survoler une explication allume ses lignes, la quitter les éteint', async
     Array.from({ length: fin - debut + 1 }, (_, i) => debut + i),
   );
   await page.mouse.move(0, 0);
-  await expect(page.locator('.code-explique [data-l].allumee')).toHaveCount(0);
+  await expect(page.locator('.code-explique:has(a[href$="bpe.py"]) [data-l].allumee')).toHaveCount(0);
 });
 
 test('une explication qui vise une plage allume toutes ses lignes', async ({ page }) => {
   await page.goto(PAGE);
-  const plage = page.locator('.code-explique li[data-lignes*="-"]').first();
+  const plage = page.locator('.code-explique:has(a[href$="bpe.py"]) li[data-lignes*="-"]').first();
   const [debut, fin] = (await plage.getAttribute('data-lignes'))!.split('-').map(Number);
   expect(fin).toBeGreaterThan(debut);
   await plage.hover();
@@ -84,20 +85,20 @@ test('une explication qui vise une plage allume toutes ses lignes', async ({ pag
 
 test('le focus clavier d’une explication allume ses lignes, le quitter les éteint', async ({ page }) => {
   await page.goto(PAGE);
-  const explications = page.locator('.code-explique li');
+  const explications = page.locator('.code-explique:has(a[href$="bpe.py"]) li');
   await explications.nth(1).focus();
   await expect(explications.nth(1)).toBeFocused();
-  await expect(page.locator('.code-explique [data-l].allumee')).not.toHaveCount(0);
+  await expect(page.locator('.code-explique:has(a[href$="bpe.py"]) [data-l].allumee')).not.toHaveCount(0);
   await page.keyboard.press('Tab');
   await expect(explications.nth(2)).toBeFocused();
-  await expect(page.locator('.code-explique [data-l].allumee')).not.toHaveCount(0);
+  await expect(page.locator('.code-explique:has(a[href$="bpe.py"]) [data-l].allumee')).not.toHaveCount(0);
   await explications.nth(2).blur();
-  await expect(page.locator('.code-explique [data-l].allumee')).toHaveCount(0);
+  await expect(page.locator('.code-explique:has(a[href$="bpe.py"]) [data-l].allumee')).toHaveCount(0);
 });
 
 test('focus, puis souris qui passe et repart : les lignes restent allumées tant que le focus y est', async ({ page }) => {
   await page.goto(PAGE);
-  const explication = page.locator('.code-explique li').nth(1);
+  const explication = page.locator('.code-explique:has(a[href$="bpe.py"]) li').nth(1);
   await explication.focus();
   await expect(explication).toBeFocused();
   const avant = await lignesAllumees(page);
@@ -109,12 +110,12 @@ test('focus, puis souris qui passe et repart : les lignes restent allumées tant
   expect(await lignesAllumees(page)).toEqual(avant);
   // Le focus parti, la lumière s'éteint.
   await explication.blur();
-  await expect(page.locator('.code-explique [data-l].allumee')).toHaveCount(0);
+  await expect(page.locator('.code-explique:has(a[href$="bpe.py"]) [data-l].allumee')).toHaveCount(0);
 });
 
 test('un clic donne le focus à l’explication : la souris qui repart n’éteint rien', async ({ page }) => {
   await page.goto(PAGE);
-  const explication = page.locator('.code-explique li').nth(1);
+  const explication = page.locator('.code-explique:has(a[href$="bpe.py"]) li').nth(1);
   await explication.click();
   await expect(explication).toBeFocused();
   const avant = await lignesAllumees(page);
@@ -126,7 +127,7 @@ test('un clic donne le focus à l’explication : la souris qui repart n’étei
 
 test('deux explications actives (focus sur l’une, souris sur l’autre) : les lignes des deux sont allumées', async ({ page }) => {
   await page.goto(PAGE);
-  const explications = page.locator('.code-explique li');
+  const explications = page.locator('.code-explique:has(a[href$="bpe.py"]) li');
   await explications.nth(1).focus(); // lignes 4 à 5
   await explications.nth(2).hover(); // ligne 8
   await expect.poll(() => lignesAllumees(page)).toEqual([4, 5, 8]);
@@ -136,7 +137,7 @@ test('deux explications actives (focus sur l’une, souris sur l’autre) : les 
 
 test('on atteint les explications au clavier, avec un focus visible', async ({ page }) => {
   await page.goto(PAGE);
-  const premiere = page.locator('.code-explique li').first();
+  const premiere = page.locator('.code-explique:has(a[href$="bpe.py"]) li').first();
   await expect(premiere).toHaveAttribute('tabindex', '0');
   await premiere.focus();
   await page.keyboard.press('Shift+Tab');
@@ -148,7 +149,7 @@ test('on atteint les explications au clavier, avec un focus visible', async ({ p
 
 test('chaque explication dit aux lecteurs d’écran quelles lignes elle vise', async ({ page }) => {
   await page.goto(PAGE);
-  const explications = page.locator('.code-explique li');
+  const explications = page.locator('.code-explique:has(a[href$="bpe.py"]) li');
   await expect(explications.first()).toContainText('Ligne 1. La fonction');
   await expect(explications.nth(1)).toContainText('Lignes 4 à 5. En cas');
   // Ce texte n'est pas montré à l'écran : une boîte d'un pixel.
@@ -158,9 +159,9 @@ test('chaque explication dit aux lecteurs d’écran quelles lignes elle vise', 
 
 test('la lumière d’une ligne est le soleil pâle', async ({ page }) => {
   await page.goto(PAGE);
-  await page.locator('.code-explique li').first().hover();
+  await page.locator('.code-explique:has(a[href$="bpe.py"]) li').first().hover();
   // Le fond s'allume en un instant : on attend la fin de la transition.
-  await expect(page.locator('.code-explique [data-l].allumee').first()).toHaveCSS(
+  await expect(page.locator('.code-explique:has(a[href$="bpe.py"]) [data-l].allumee').first()).toHaveCSS(
     'background-color',
     'rgb(255, 244, 214)', // #FFF4D6
   );
@@ -168,7 +169,7 @@ test('la lumière d’une ligne est le soleil pâle', async ({ page }) => {
 
 test('le bloc a le fond brume claire et le texte indigo', async ({ page }) => {
   await page.goto(PAGE);
-  const { fond, encre } = await page.locator('.code-explique pre').evaluate((pre) => {
+  const { fond, encre } = await page.locator('.code-explique:has(a[href$="bpe.py"]) pre').evaluate((pre) => {
     const s = getComputedStyle(pre);
     return { fond: s.backgroundColor, encre: s.color };
   });
@@ -178,7 +179,7 @@ test('le bloc a le fond brume claire et le texte indigo', async ({ page }) => {
 
 test('le code est en JetBrains Mono', async ({ page }) => {
   await page.goto(PAGE);
-  const famille = await page.locator('.code-explique pre').evaluate((pre) => getComputedStyle(pre).fontFamily);
+  const famille = await page.locator('.code-explique:has(a[href$="bpe.py"]) pre').evaluate((pre) => getComputedStyle(pre).fontFamily);
   expect(famille).toContain('JetBrains Mono Variable');
 });
 
@@ -204,8 +205,8 @@ test('sans JavaScript : le code et les explications restent lisibles', async ({ 
   const contexte = await browser.newContext({ javaScriptEnabled: false, baseURL });
   const page = await contexte.newPage();
   await page.goto(PAGE);
-  await expect(page.locator('.code-explique pre')).toHaveText(attendu);
-  await expect(page.locator('.code-explique li').first()).toBeVisible();
+  await expect(page.locator('.code-explique:has(a[href$="bpe.py"]) pre')).toHaveText(attendu);
+  await expect(page.locator('.code-explique:has(a[href$="bpe.py"]) li').first()).toBeVisible();
   await contexte.close();
 });
 
@@ -213,7 +214,7 @@ test('accessibilité et largeur : le code défile dans son bloc, pas dans la pag
   await page.goto(PAGE);
   await verifierAxe(page);
   await verifierSansDebordement(page);
-  const pre = page.locator('.code-explique pre');
+  const pre = page.locator('.code-explique:has(a[href$="bpe.py"]) pre');
   expect(await pre.evaluate((el) => getComputedStyle(el).overflowX)).toBe('auto');
   if (info.project.name === 'mobile') {
     // À 390 px, les lignes les plus longues ne tiennent pas : elles défilent dans le bloc.
@@ -223,7 +224,7 @@ test('accessibilité et largeur : le code défile dans son bloc, pas dans la pag
 
 test('accessibilité pendant qu’une explication est allumée', async ({ page }) => {
   await page.goto(PAGE);
-  await page.locator('.code-explique li').first().focus();
-  await expect(page.locator('.code-explique [data-l].allumee')).not.toHaveCount(0);
+  await page.locator('.code-explique:has(a[href$="bpe.py"]) li').first().focus();
+  await expect(page.locator('.code-explique:has(a[href$="bpe.py"]) [data-l].allumee')).not.toHaveCount(0);
   await verifierAxe(page);
 });

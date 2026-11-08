@@ -108,6 +108,8 @@ const FICHIERS_SEULS = [
   'site/src/lib/brouillons.ts',
   'site/src/lib/brouillons.test.ts',
   'site/src/lib/invisibles.test.ts',
+  'site/src/lib/symboles.ts',
+  'site/src/lib/symboles.test.ts',
   'site/src/lib/sorties.ts',
   'site/src/lib/sorties.test.ts',
   'site/src/components/gabarit/SortieCommande.astro',
@@ -120,13 +122,16 @@ const FICHIERS_SEULS = [
 
 const A_LIRE = [
   ...sous('site/src/brouillons', /\.mdx$/),
-  ...sous('site/src/content/chapitres', /^0-[^/]*\.mdx$/),
+  ...sous('site/src/content/chapitres', /^(0-[^/]*|1-[12456])\.mdx$/),
   ...sous('site/src/lib/partie-0'),
-  ...dossiers('site/src/components/chapitres', /^0-/).flatMap((d) => sous(d)),
-  ...sous('site/e2e', /^(chapitre-0-[^/]*|brouillons|parution|figures-0-2)\.spec\.ts$/),
-  ...dossiers('projets', /^0\./).flatMap((d) => sous(d, /\.py$|^pyproject\.toml$/)),
+  ...sous('site/src/lib/partie-1'),
+  ...sous('site/src/lib/annexes'),
+  ...dossiers('site/src/components/chapitres', /^(0-|1-[12456]$)/).flatMap((d) => sous(d)),
+  ...sous('site/src/pages/annexes'),
+  ...sous('site/e2e', /^(chapitre-0-[^/]*|chapitre-1-[12456]|annexes|brouillons|parution|figures-0-2)\.spec\.ts$/),
+  ...dossiers('projets', /^(0\.|1\.[12456]-)/).flatMap((d) => sous(d, /\.py$|^pyproject\.toml$/)),
   ...sous('outils', /^[^/]*\.py$/),
-  ...sous('notebooks', /^0\.[^/]*\.ipynb$/),
+  ...sous('notebooks', /^(0\.|1\.[12456]-)[^/]*\.ipynb$/),
   ...FICHIERS_SEULS.filter((f) => existsSync(join(RACINE, f))),
 ];
 

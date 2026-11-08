@@ -7,6 +7,12 @@
 // colore avec Shiki. Chaque ligne porte son numéro dans `data-l`, compté à
 // partir de 1 dans l'extrait.
 //
+// Au lieu d'une région, `symbole="Classe.methode"` (ou `symbole="fonction"`)
+// extrait une fonction, une méthode ou une classe sans marqueur dans le fichier
+// (voir lib/symboles.ts) : c'est ce qui sert pour forge, qu'on ne modifie pas.
+// Sa docstring est retirée, sauf avec `docstring`. Il faut exactement l'un des
+// deux : `region` ou `symbole`.
+//
 // Le contenu du composant est la liste des explications, une par <li> :
 //
 //   <CodeExplique fichier="projets/1.3-tokenizer/tokenizer_pedagogique/bpe.py" region="choisir">
@@ -25,22 +31,35 @@ import { fileURLToPath } from 'node:url';
 import { DEPOT } from '../../lib/depot';
 import { lignesVisees } from '../../lib/lignes';
 import { extraireRegion } from '../../lib/regions';
+import { extraireSymbole } from '../../lib/symboles';
 
 interface Props {
   /** Chemin du fichier depuis la racine du dépôt. */
   fichier: string;
   /** Nom de la région : `# region: <nom>` dans le fichier. */
-  region: string;
+  region?: string;
+  /** Ou un symbole Python : `nom` ou `Classe.methode`. */
+  symbole?: string;
+  /** Avec `symbole` : garde la docstring (retirée par défaut). */
+  docstring?: boolean;
   /** Langage de coloration (Shiki). */
   langue?: string;
 }
 
-const { fichier, region, langue = 'python' } = Astro.props;
+const { fichier, region, symbole, docstring = false, langue = 'python' } = Astro.props;
+
+if ((region === undefined) === (symbole === undefined)) {
+  throw new Error(`CodeExplique demande region ou symbole (pas les deux) pour ${fichier}.`);
+}
+const nom = (region ?? symbole) as string;
 
 // Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
 const racineDepot = new URL('../', root);
 const source = readFileSync(fileURLToPath(new URL(fichier, racineDepot)), 'utf8');
-const code = extraireRegion(source, region, fichier);
+const code =
+  region !== undefined
+    ? extraireRegion(source, region, fichier)
+    : extraireSymbole(source, symbole as string, fichier, { docstring });
 const nbLignes = code.split('\n').length;
 
 // Les explications : on vérifie que chaque ligne visée existe.
@@ -49,7 +68,7 @@ for (const [, spec] of explications.matchAll(/data-lignes="([^"]*)"/g)) {
   for (const n of lignesVisees(spec)) {
     if (n > nbLignes) {
       throw new Error(
-        `Ligne ${n} hors de l'extrait « ${region} » de ${fichier} (${nbLignes} lignes) : data-lignes="${spec}"`,
+        `Ligne ${n} hors de l'extrait « ${nom} » de ${fichier} (${nbLignes} lignes) : data-lignes="${spec}"`,
       );
     }
   }
