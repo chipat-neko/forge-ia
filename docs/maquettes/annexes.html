@@ -101,7 +101,7 @@
   .titre-page { padding-top: 64px; }
   h1 { text-wrap: balance; font-weight: 800; font-size: clamp(44px, 7vw, 84px); line-height: .96; letter-spacing: -.03em; margin: 0 0 26px; }
   .chapeau { font-size: 24px; line-height: 1.48; margin: 0 0 14px; }
-  .programme { font-family: var(--titres); font-size: 17px; font-weight: 500; color: var(--indigo-doux); margin: 0; }
+  .programme { font-family: var(--titres); font-size: 17px; font-weight: 500; color: var(--indigo-doux); margin: 0; max-width: 32em; }
   .note { font-size: 16px; line-height: 1.5; color: var(--indigo-doux); padding-top: 8px; }
   .note p { margin: 0 0 .8em; }
   .note strong { font-family: var(--titres); font-weight: 600; color: var(--indigo); }
@@ -123,7 +123,7 @@
     padding: 10px 104px 8px 16px;
   }
   .filtre input::-webkit-search-cancel-button { display: none; }
-  .filtre input::placeholder { color: #77738F; opacity: 1; }
+  .filtre input::placeholder { color: var(--indigo-doux); opacity: 1; }
   .filtre input:hover { background: var(--soleil-survol); }
   .filtre input:focus-visible { outline: none; background: var(--soleil-survol); border-bottom-color: var(--indigo); }
   .effacer {
@@ -151,7 +151,7 @@
   }
   .index a:hover { background: var(--brume-claire); text-decoration: underline; text-decoration-thickness: 2px; }
   .index .legende-index { font-family: var(--texte); font-weight: 400; font-size: 15px; line-height: 1.45; margin: 18px 0 0; max-width: 15em; }
-  .index a.sans-mot { color: #A3A1C2; pointer-events: none; }
+  .index a.sans-mot { color: var(--lavande); pointer-events: none; }
 
   .lettre { position: relative; padding-top: 40px; margin-top: 12px; border-top: 1px solid var(--brume); }
   .lettre:first-of-type { border-top: 0; margin-top: 0; padding-top: 44px; }
@@ -171,11 +171,12 @@
   dfn { font-style: normal; font-family: var(--titres); font-weight: 700; font-size: 26px; line-height: 1.25; letter-spacing: -.012em; }
   .anglais { font-family: var(--titres); font-weight: 500; font-size: 15px; color: var(--indigo-doux); }
   .anglais i { font-family: var(--texte); font-size: 18px; color: var(--indigo); }
-  .def { margin: 0 0 6px; font-size: 19px; line-height: 1.55; }
-  .renvois { margin: 0; display: flex; flex-wrap: wrap; gap: 0 26px; font-family: var(--titres); font-size: 15px; line-height: 1.5; color: var(--indigo-doux); }
+  /* 30em de 20 px : 80 caractères au plus par ligne, comme la prose des chapitres. */
+  .def { margin: 0 0 6px; font-size: 20px; line-height: 1.55; max-width: 30em; }
+  .renvois { margin: 0; max-width: 34em; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 26px; font-family: var(--titres); font-size: 15px; line-height: 1.5; color: var(--indigo-doux); }
   .renvois a { display: inline-block; padding: 2px 0; color: var(--indigo); font-weight: 600; text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: var(--lavande); text-underline-offset: .24em; }
   .renvois a:hover { text-decoration-color: var(--indigo); }
-  .a-paraitre { font-weight: 500; color: var(--indigo-doux); }
+  .chapitre-a-venir { font-weight: 500; color: var(--indigo-doux); }
   .terme:target dfn { box-shadow: inset 0 -.32em 0 var(--teinte-a); }
   mark { color: var(--indigo); background: var(--teinte-a); border-radius: 4px; padding: 0 2px; box-shadow: inset 0 -2px 0 var(--teinte-a-trait); }
 
@@ -191,7 +192,7 @@
 
   .groupe { padding-top: 72px; }
   .groupe h2 { font-weight: 700; font-size: 31px; letter-spacing: -.012em; margin: 0 0 8px; }
-  .intro-groupe { font-size: 19px; line-height: 1.5; margin: 0 0 22px; max-width: 36em; }
+  .intro-groupe { font-size: 19px; line-height: 1.5; margin: 0 0 22px; max-width: 30em; }
 
   .annuaire { width: 100%; border-collapse: collapse; table-layout: fixed; }
   .annuaire col.c-nom { width: 19%; }
@@ -222,7 +223,8 @@
   .annuaire .pas-releve { font-family: var(--texte); font-style: italic; font-size: 16px; }
   .annuaire .ton-ia-col strong { font-weight: 700; }
   .appel { font-family: var(--titres); font-size: 12px; font-weight: 700; line-height: 0; margin-left: 2px; }
-  .appel a { display: inline-block; min-width: 14px; padding: 6px 2px; text-decoration: none; color: var(--indigo-doux); }
+  /* Une cible de 24 px sur 24, qui n'écarte pas les lignes (marges négatives). */
+  .appel a { display: inline-block; min-width: 24px; height: 24px; line-height: 24px; text-align: left; padding-left: 1px; margin: -9px -10px -9px 0; text-decoration: none; color: var(--indigo-doux); }
   .appel a:hover { color: var(--indigo); text-decoration: underline; }
   /* Les jeux que lit ton IA : un trait indigo dans la marge, sans autre couleur. */
   .annuaire tr.ton-ia th { position: relative; }
@@ -301,7 +303,7 @@
   /* Hors page : d'où l'on arrive au calculateur (seulement pour la maquette). */
   .apercu { margin-top: 84px; border: 1px dashed var(--lavande); border-radius: 12px; background: var(--brume-claire); padding: 22px 26px 26px; }
   .apercu > h2 { font-weight: 600; font-size: 15px; line-height: 1.4; color: var(--indigo-doux); margin: 0 0 18px; }
-  .apercu .ou-lien { font-family: var(--titres); font-weight: 600; font-size: 15px; color: var(--indigo-doux); margin: 0 0 8px; }
+  .apercu .ou-lien { font-family: var(--titres); font-weight: 600; font-size: 15px; color: var(--indigo-doux); margin: 0 0 8px; max-width: 34em; }
   .apercu .extrait { background: var(--papier); border-radius: 8px; padding: 18px 22px; margin: 0 0 26px; }
   .apercu .extrait p { margin: 0; font-size: 19px; }
   .apercu .extrait a { text-decoration-thickness: 2px; text-decoration-color: var(--indigo); }
@@ -346,7 +348,7 @@
     .annuaire tbody { border-top: 2px solid var(--indigo); }
     .annuaire tbody tr { display: block; position: relative; padding: 16px 0 14px; }
     .annuaire tbody th { display: block; padding: 0 0 10px; }
-    .annuaire tbody td { display: grid; grid-template-columns: 7.6em minmax(0, 1fr); column-gap: 14px; padding: 4px 0; }
+    .annuaire tbody td { display: grid; grid-template-columns: 118px minmax(0, 1fr); column-gap: 14px; padding: 4px 0; }
     .annuaire tbody td::before { content: attr(data-col); font-family: var(--titres); font-weight: 600; font-size: 14px; line-height: 1.6; color: var(--indigo-doux); }
     .annuaire .quoi .v { font-size: 17px; }
     .annuaire tr.ton-ia th::before { content: none; }
@@ -384,7 +386,7 @@
     .groupe { padding-top: 56px; }
     .groupe h2 { font-size: 26px; }
     .intro-groupe { font-size: 18px; }
-    .annuaire tbody td { grid-template-columns: 6.4em minmax(0, 1fr); column-gap: 12px; }
+    .annuaire tbody td { grid-template-columns: 100px minmax(0, 1fr); column-gap: 12px; }
     .annuaire tbody tr.ton-ia::before { left: -13px; }
 
     .phrase { font-size: 19px; }
@@ -447,21 +449,21 @@
     <div class="texte">
       <h1 id="t-glossaire">Le glossaire</h1>
       <p class="chapeau">Les mots du parcours, expliqués en deux phrases au plus. Chacun renvoie au chapitre où tu le manipules pour de vrai.</p>
-      <p class="programme">21 mots, de «&#8239;attention&#8239;» à «&#8239;vocabulaire&#8239;». La liste grandit à chaque chapitre paru.</p>
+      <p class="programme">21 termes, de «&#8239;attention&#8239;» à «&#8239;vocabulaire&#8239;». La liste grandit à chaque chapitre paru.</p>
     </div>
     <aside class="note">
-      <p>Un mot manque&#8239;? <a href="recherche.html">La recherche</a> lit aussi le texte des chapitres.</p>
+      <p>Un terme manque&#8239;? <a href="recherche.html">La recherche</a> lit aussi le texte des chapitres.</p>
     </aside>
   </div>
 
   <div class="bloc corps-glossaire">
     <form class="filtre" role="search" id="filtre-form" aria-label="Filtrer le glossaire">
-      <label for="filtre">Filtrer les mots</label>
+      <label for="filtre">Filtrer les termes</label>
       <div class="filtre-ligne">
-        <input type="search" id="filtre" autocomplete="off" spellcheck="false" placeholder="un mot, ou un chapitre&#8239;: 1.3">
+        <input type="search" id="filtre" autocomplete="off" spellcheck="false" placeholder="un terme, ou un chapitre&#8239;: 1.3">
         <button type="button" class="effacer" id="effacer" hidden>effacer</button>
       </div>
-      <p class="compte" id="compte" role="status"><strong>21</strong> mots.</p>
+      <p class="compte" id="compte" role="status"><strong>21</strong> termes.</p>
     </form>
 
     <aside class="note index">
@@ -481,7 +483,7 @@
           <li><a href="#lettre-t" data-lettre="t">T</a></li>
           <li><a href="#lettre-v" data-lettre="v">V</a></li>
         </ul>
-        <p class="legende-index">Un renvoi sans lien&#8239;: son chapitre n’est pas encore paru.</p>
+        <p class="legende-index">Un renvoi sans lien&#8239;: son chapitre est à venir.</p>
       </nav>
     </aside>
 
@@ -491,8 +493,8 @@
         <dl class="termes">
           <div class="terme" id="mot-attention" data-chapitres="1.4">
             <dt><dfn>attention</dfn></dt>
-            <dd class="def">Le mécanisme qui laisse chaque jeton puiser, dans les jetons qui le précèdent, ce qui l’aide à prédire la suite. Il les pèse par des produits scalaires, passés dans softmax.</dd>
-            <dd class="renvois"><span>expliqué en <span class="a-paraitre">1.4 Le transformer</span>, à paraître</span><span>voir aussi&#8239;: <a href="#mot-plongement">plongement</a>, <a href="#mot-produit-scalaire">produit scalaire</a>, <a href="#mot-softmax">softmax</a></span></dd>
+            <dd class="def">Le mécanisme qui laisse chaque jeton puiser, dans les jetons qui le précèdent et en lui-même, ce qui l’aide à prédire la suite. Il les pèse par des produits scalaires, passés dans softmax.</dd>
+            <dd class="renvois"><span>expliqué en <span class="chapitre-a-venir">1.4 Le transformer</span>, à venir</span><span>voir aussi&#8239;: <a href="#mot-plongement">plongement</a>, <a href="#mot-produit-scalaire">produit scalaire</a>, <a href="#mot-softmax">softmax</a></span></dd>
           </div>
         </dl>
       </section>
@@ -560,10 +562,10 @@
       <section class="lettre" id="lettre-l" aria-labelledby="h-l">
         <h2 id="h-l"><span class="vh">Lettre </span>L</h2>
         <dl class="termes">
-          <div class="terme" id="mot-lot" data-chapitres="0.5">
+          <div class="terme" id="mot-lot" data-chapitres="0.5 0.4">
             <dt><dfn>lot</dfn><span class="anglais">en anglais&#8239;: <i lang="en">batch</i></span></dt>
             <dd class="def">Les exemples qu’un pas d’entraînement traite ensemble, tirés au hasard parmi les données. Rangés dans un tenseur, ils ajoutent une dimension&#8239;: un lot de matrices en a trois.</dd>
-            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-5/">0.5 Premier réseau de neurones</a></span><span>voir aussi&#8239;: <a href="#mot-tenseur">tenseur</a>, <a href="#mot-descente-de-gradient">descente de gradient</a></span></dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-5/">0.5 Premier réseau de neurones</a>, rangé en tenseur en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-4/">0.4 Tenseurs et calcul sur GPU</a></span><span>voir aussi&#8239;: <a href="#mot-tenseur">tenseur</a>, <a href="#mot-descente-de-gradient">descente de gradient</a></span></dd>
           </div>
         </dl>
       </section>
@@ -572,14 +574,14 @@
         <h2 id="h-p"><span class="vh">Lettre </span>P</h2>
         <dl class="termes">
           <div class="terme" id="mot-parametre" data-chapitres="0.2">
-            <dt><dfn>paramètre</dfn><span class="anglais">en anglais&#8239;: <i lang="en">parameter</i></span></dt>
-            <dd class="def">Un des nombres que le modèle règle en apprenant&#8239;; on dit aussi un poids. Ton IA en compte 433,6 millions dans sa plus grande taille.</dd>
-            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-2/">0.2 Les maths utiles</a></span><span>voir aussi&#8239;: <a href="#mot-gradient">gradient</a>, <a href="#mot-sauvegarde">sauvegarde</a></span></dd>
+            <dt><dfn>paramètre</dfn><span class="anglais">aussi&#8239;: poids&#8239;; en anglais&#8239;: <i lang="en">parameter</i></span></dt>
+            <dd class="def">Un des nombres que le modèle règle en apprenant. Les chapitres l’appellent un poids&#8239;; ton IA en compte 433,6 millions dans sa plus grande taille.</dd>
+            <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-2/">0.2 Les maths utiles</a>, sous le nom de poids</span><span>voir aussi&#8239;: <a href="#mot-gradient">gradient</a>, <a href="#mot-sauvegarde">sauvegarde</a></span></dd>
           </div>
           <div class="terme" id="mot-perplexite" data-chapitres="1.6">
             <dt><dfn>perplexité</dfn><span class="anglais">en anglais&#8239;: <i lang="en">perplexity</i></span></dt>
             <dd class="def">La perte, ramenée à une échelle plus parlante&#8239;: le nombre de jetons entre lesquels le modèle hésite, en moyenne. Plus elle est basse, mieux il prédit.</dd>
-            <dd class="renvois"><span>expliqué en <span class="a-paraitre">1.6 Évaluer son modèle</span>, à paraître</span><span>voir aussi&#8239;: <a href="#mot-perte">perte</a></span></dd>
+            <dd class="renvois"><span>expliqué en <span class="chapitre-a-venir">1.6 Évaluer son modèle</span>, à venir</span><span>voir aussi&#8239;: <a href="#mot-perte">perte</a></span></dd>
           </div>
           <div class="terme" id="mot-perte" data-chapitres="0.5">
             <dt><dfn>perte</dfn><span class="anglais">en anglais&#8239;: <i lang="en">loss</i></span></dt>
@@ -589,7 +591,7 @@
           <div class="terme" id="mot-plongement" data-chapitres="1.4">
             <dt><dfn>plongement</dfn><span class="anglais">en anglais&#8239;: <i lang="en">embedding</i></span></dt>
             <dd class="def">La liste de nombres qui représente un jeton à l’entrée du modèle, apprise comme les autres poids. Des jetons de sens voisin finissent souvent avec des listes voisines.</dd>
-            <dd class="renvois"><span>expliqué en <span class="a-paraitre">1.4 Le transformer</span>, à paraître</span><span>voir aussi&#8239;: <a href="#mot-jeton">jeton</a>, <a href="#mot-produit-scalaire">produit scalaire</a></span></dd>
+            <dd class="renvois"><span>expliqué en <span class="chapitre-a-venir">1.4 Le transformer</span>, à venir</span><span>voir aussi&#8239;: <a href="#mot-jeton">jeton</a>, <a href="#mot-produit-scalaire">produit scalaire</a></span></dd>
           </div>
           <div class="terme" id="mot-produit-scalaire" data-chapitres="0.2">
             <dt><dfn>produit scalaire</dfn><span class="anglais">en anglais&#8239;: <i lang="en">dot product</i></span></dt>
@@ -616,11 +618,11 @@
           <div class="terme" id="mot-sauvegarde" data-chapitres="1.5">
             <dt><dfn>sauvegarde</dfn><span class="anglais">en anglais&#8239;: <i lang="en">checkpoint</i></span></dt>
             <dd class="def">L’état de l’entraînement écrit sur le disque&#8239;: les poids, l’optimiseur et le numéro du pas. Elle permet de mettre l’entraînement en pause, puis de le reprendre au même point.</dd>
-            <dd class="renvois"><span>expliqué en <span class="a-paraitre">1.5 Le pré-entraînement</span>, à paraître</span><span>voir aussi&#8239;: <a href="#mot-parametre">paramètre</a></span></dd>
+            <dd class="renvois"><span>expliqué en <span class="chapitre-a-venir">1.5 Le pré-entraînement</span>, à venir</span><span>voir aussi&#8239;: <a href="#mot-parametre">paramètre</a></span></dd>
           </div>
           <div class="terme" id="mot-softmax" data-chapitres="0.2">
             <dt><dfn>softmax</dfn></dt>
-            <dd class="def">Change des scores quelconques en probabilités qui font 1 ensemble. Elle prend l’exponentielle de chaque score, puis divise par leur somme.</dd>
+            <dd class="def">Change des scores quelconques en probabilités qui font 1 ensemble. Elle prend l’exponentielle de chaque score, puis divise chacune par la somme de ces exponentielles.</dd>
             <dd class="renvois"><span>expliqué en <a href="https://chipat-neko.github.io/forge-ia/partie-0/0-2/">0.2 Les maths utiles</a></span><span>voir aussi&#8239;: <a href="#mot-temperature">température</a>, <a href="#mot-attention">attention</a></span></dd>
           </div>
         </dl>
@@ -664,8 +666,8 @@
       </section>
 
       <div class="vide-filtre" id="vide-filtre" hidden>
-        <p class="vide-titre">Aucun mot ne contient «&#8239;<span id="vide-q"></span>&#8239;».</p>
-        <p>Le glossaire ne garde que les mots des chapitres parus. La recherche du site lit aussi leur texte&#8239;: <a id="vide-lien" href="recherche.html">cherche ce mot partout</a>.</p>
+        <p class="vide-titre">Aucun terme ne contient «&#8239;<span id="vide-q"></span>&#8239;».</p>
+        <p>La recherche du site lit aussi le texte des chapitres&#8239;: <a id="vide-lien" href="recherche.html">cherche-le partout</a>.</p>
       </div>
     </div>
   </div>
@@ -686,7 +688,7 @@
     <div class="texte">
       <h1 id="t-annuaire">L’annuaire des données</h1>
       <p class="chapeau">Où trouver des textes, du code et des tests pour entraîner une IA, ce que dit leur licence, et comment y accéder. Les jeux que lit ton IA ont un trait dans la marge.</p>
-      <p class="programme">11 jeux en trois groupes, relevés le 8 novembre 2026 sur leur page Hugging Face.</p>
+      <p class="programme">12 jeux en trois groupes, relevés le 8 novembre 2026 sur Hugging Face.</p>
     </div>
     <aside class="note haute">
       <p><strong>Les trois accès</strong></p>
@@ -698,7 +700,7 @@
         <dt>accord manuel</dt>
         <dd>les auteurs lisent chaque demande avant d’ouvrir l’accès.</dd>
       </dl>
-      <p>Chaque taille est celle qu’annonce la page du jeu, dans son unité.</p>
+      <p>Chaque taille est celle qu’annonce Hugging Face, dans son unité. Dessous, sa valeur en Gio, de 2³⁰ octets&#8239;: c’est le Go de la mémoire, dans ce site.</p>
     </aside>
   </div>
 
@@ -716,7 +718,7 @@
           <tr class="ton-ia">
             <th scope="row" class="nom"><a href="https://huggingface.co/datasets/HuggingFaceFW/fineweb-2">FineWeb-2</a><code><span class="ns">HuggingFaceFW/</span><wbr><span class="ns">fineweb-2,</span> <span class="ns">fra_Latn</span></code></th>
             <td class="quoi" data-col="Ce que c’est"><span class="v">Des pages web de Common Crawl, triées par langue, filtrées et dédoublonnées. Ici, la part en français.</span></td>
-            <td class="taille" data-col="Taille"><span class="v"><span>502,82&#160;GB</span><sup class="appel"><a href="#note-1" aria-label="note 1">1</a></sup><small>220,7 milliards de mots</small></span></td>
+            <td class="taille" data-col="Taille"><span class="v"><span>502,82&#160;GB</span><small>soit 502,8&#160;Gio<sup class="appel"><a href="#note-1" aria-label="note 1">1</a></sup></small><small>220,7 milliards de mots</small></span></td>
             <td class="licence" data-col="Licence"><span class="v"><a href="https://opendatacommons.org/licenses/by/1-0/">ODC-By 1.0</a><small>et les <a href="https://commoncrawl.org/terms-of-use">conditions de Common Crawl</a></small></span></td>
             <td class="acces" data-col="Accès"><span class="v">libre</span></td>
             <td class="ton-ia-col" data-col="Ton IA"><span class="v"><strong>oui</strong>, 75&#8239;%<small>de son mélange, en 1.2</small></span></td>
@@ -725,7 +727,7 @@
           <tr class="ton-ia">
             <th scope="row" class="nom"><a href="https://huggingface.co/datasets/wikimedia/wikipedia">Wikipédia</a><code><span class="ns">wikimedia/</span><wbr><span class="ns">wikipedia,</span> <span class="ns">20231101.fr</span></code></th>
             <td class="quoi" data-col="Ce que c’est"><span class="v">Les articles de Wikipédia en français, dans la copie du 1<sup>er</sup> novembre 2023, la seule proposée.</span></td>
-            <td class="taille" data-col="Taille"><span class="v"><span>4&#8239;614&#8239;488&#8239;286 octets</span><small>2,56 millions d’articles</small></span></td>
+            <td class="taille" data-col="Taille"><span class="v"><span>4&#8239;614&#8239;488&#8239;286 octets</span><small>soit 4,30&#160;Gio</small><small>2,56 millions d’articles</small></span></td>
             <td class="licence" data-col="Licence"><span class="v"><a href="https://creativecommons.org/licenses/by-sa/3.0/deed.fr">CC BY-SA 3.0</a> et <a href="https://www.gnu.org/licenses/fdl-1.3.html">GFDL</a><sup class="appel"><a href="#note-2" aria-label="note 2">2</a></sup></span></td>
             <td class="acces" data-col="Accès"><span class="v">libre</span></td>
             <td class="ton-ia-col" data-col="Ton IA"><span class="v"><strong>oui</strong>, 10&#8239;%<small>de son mélange, en 1.2</small></span></td>
@@ -799,7 +801,7 @@
           <tr class="ton-ia">
             <th scope="row" class="nom"><a href="https://huggingface.co/datasets/codeparrot/github-code-clean">GitHub Code Clean</a><code><span class="ns">codeparrot/</span><wbr><span class="ns">github-code-clean</span></code></th>
             <td class="quoi" data-col="Ce que c’est"><span class="v">Du code de GitHub, nettoyé&#8239;: lignes courtes en moyenne, assez de lettres et de chiffres, fichiers générés retirés.</span></td>
-            <td class="taille" data-col="Taille"><span class="v"><span>314&#160;Go</span></span></td>
+            <td class="taille" data-col="Taille"><span class="v"><span>313&#8239;663&#8239;770&#8239;241 octets</span><small>soit 292,1&#160;Gio<sup class="appel"><a href="#note-3" aria-label="note 3">3</a></sup></small></span></td>
             <td class="licence" data-col="Licence"><span class="v"><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0</a><sup class="appel"><a href="#note-3" aria-label="note 3">3</a></sup><small>pour la compilation</small></span></td>
             <td class="acces" data-col="Accès"><span class="v">libre</span></td>
             <td class="ton-ia-col" data-col="Ton IA"><span class="v"><strong>oui</strong>, 15&#8239;%<small>le Python sous licence permissive, en 1.2</small></span></td>
@@ -817,7 +819,7 @@
         </tbody>
       </table>
       <ol class="notes-groupe">
-        <li id="note-3"><span>3.</span><span>Chaque fichier garde aussi sa propre licence, dans la colonne <code>license</code>&#8239;: ton IA ne garde que le Python sous licence permissive. La carte ne parle pas de dédoublonnage et ne date pas les données.</span></li>
+        <li id="note-3"><span>3.</span><span>Sa carte ne donne pas de taille&#8239;: celle-ci vient de l’API de Hugging Face, qui compte 313&#8239;663&#8239;770&#8239;241 octets, soit 314&#160;GB de 10⁹ octets, ou 292,1&#160;Gio. Chaque fichier garde aussi sa propre licence, dans la colonne <code>license</code>&#8239;: ton IA ne garde que le Python sous licence permissive. La carte ne parle pas de dédoublonnage et ne date pas les données.</span></li>
       </ol>
     </div>
   </section>
@@ -842,19 +844,28 @@
             <td class="ton-ia-col" data-col="Ton IA"><span class="v"><strong>oui</strong><small>pour l’évaluer, en 1.6</small></span></td>
             <td class="releve-le" data-col="Relevé le"><span class="v">08/11/2026</span></td>
           </tr>
-          <tr>
+          <tr class="ton-ia">
+            <th scope="row" class="nom"><a href="https://huggingface.co/datasets/manu/french_bench_arc_challenge">FrenchBench <span class="ns">ARC-Challenge</span></a><code><span class="ns">manu/</span><wbr><span class="ns">french_bench_</span><wbr><span class="ns">arc_challenge</span></code></th>
+            <td class="quoi" data-col="Ce que c’est"><span class="v">Un test de FrenchBench&#8239;: des questions de sciences à choix multiples.</span></td>
+            <td class="taille" data-col="Taille"><span class="v"><span>2&#8239;585 lignes</span><small>dont 1&#8239;169 de test</small></span></td>
+            <td class="licence" data-col="Licence"><span class="v">aucune <span class="ns">indiquée<sup class="appel"><a href="#note-4" aria-label="note 4">4</a></sup></span></span></td>
+            <td class="acces" data-col="Accès"><span class="v">libre</span></td>
+            <td class="ton-ia-col" data-col="Ton IA"><span class="v"><strong>oui</strong><small>pour l’évaluer, en 1.6</small></span></td>
+            <td class="releve-le" data-col="Relevé le"><span class="v">08/11/2026</span></td>
+          </tr>
+          <tr class="ton-ia">
             <th scope="row" class="nom"><a href="https://huggingface.co/datasets/openai/MMMLU">MMMLU</a><code><span class="ns">openai/</span><wbr><span class="ns">MMMLU,</span> <span class="ns">FR_FR</span></code></th>
             <td class="quoi" data-col="Ce que c’est"><span class="v">Les questions à choix multiples de MMLU, traduites par des traducteurs professionnels.</span></td>
             <td class="taille" data-col="Taille"><span class="v"><span>environ 14&#8239;000 lignes</span><small>en français</small></span></td>
             <td class="licence" data-col="Licence"><span class="v"><a href="https://opensource.org/license/mit">MIT</a></span></td>
             <td class="acces" data-col="Accès"><span class="v">libre</span></td>
-            <td class="ton-ia-col" data-col="Ton IA"><span class="v non">non</span></td>
+            <td class="ton-ia-col" data-col="Ton IA"><span class="v"><strong>oui</strong><small>quelques questions pour «&#8239;mini&#8239;», dans l’atelier de 1.6</small></span></td>
             <td class="releve-le" data-col="Relevé le"><span class="v">08/11/2026</span></td>
           </tr>
         </tbody>
       </table>
       <ol class="notes-groupe">
-        <li id="note-4"><span>4.</span><span>Sa page n’indique aucune licence, et sa carte est vide. FrenchBench vient de l’article de CroissantLLM (<a href="https://arxiv.org/abs/2402.00786">arXiv 2402.00786</a>).</span></li>
+        <li id="note-4"><span>4.</span><span>Les pages de HellaSwag et d’ARC-Challenge n’indiquent aucune licence, et la carte de HellaSwag est vide. FrenchBench vient de l’article de CroissantLLM (<a href="https://arxiv.org/abs/2402.00786">arXiv 2402.00786</a>). Ton IA passe les questions de validation de HellaSwag et celles de test d’ARC-Challenge.</span></li>
       </ol>
     </div>
   </section>
@@ -968,7 +979,7 @@
         <h2 id="t-apercu">Pour la maquette, hors de cette page&#8239;: les liens qui mènent ici.</h2>
         <p class="ou-lien">Dans 1.5, après la durée de l’entraînement&#8239;:</p>
         <div class="extrait">
-          <p>Ton IA «&#8239;très grand&#8239;» lit 8,67 milliards de jetons. Sur la carte de ce PC, cela a pris 5,6&#160;jours. Pour une autre taille, une autre carte ou un grand modèle public, <a href="#calculateur">le calculateur de coût</a> refait le calcul, déjà réglé sur ton IA.</p>
+          <p>Ton IA «&#8239;très grand&#8239;» lit 8,67 milliards de jetons. D’après ses débits mesurés sur la carte de ce PC, cela fait environ 5,6&#160;jours de calcul. Pour une autre taille, une autre carte ou un grand modèle public, <a href="#calculateur">le calculateur de coût</a> refait le calcul, déjà réglé sur ton IA.</p>
         </div>
         <p class="ou-lien">À la fin de chaque encadré «&#8239;Et chez un grand labo&#8239;?&#8239;» qui parle d’un entraînement&#8239;:</p>
         <aside class="labo" aria-label="Exemple d’encadré">
@@ -1061,7 +1072,8 @@
     }
     return sortie + echapper(texte.slice(i));
   }
-  function filtrer() {
+  let minuterie;
+  function filtrer(tout_de_suite) {
     const brut = champ.value.trim();
     const q = plat(brut);
     const chapitre = /^\d\.\d+$/.test(brut);
@@ -1078,7 +1090,9 @@
       l.hidden = vide;
       const lien = document.querySelector(`[data-lettre="${l.id.slice(-1)}"]`);
       lien.classList.toggle('sans-mot', vide);
-      if (vide) lien.setAttribute('aria-disabled', 'true'); else lien.removeAttribute('aria-disabled');
+      // Une lettre sans terme n'est plus atteignable, ni à la souris ni au clavier.
+      if (vide) { lien.setAttribute('aria-disabled', 'true'); lien.tabIndex = -1; }
+      else { lien.removeAttribute('aria-disabled'); lien.removeAttribute('tabindex'); }
     });
     // La première lettre visible n'a pas de filet au-dessus d'elle.
     lettres.forEach(l => l.style.borderTop = '');
@@ -1088,13 +1102,16 @@
     $('#vide-filtre').hidden = n > 0;
     $('#vide-q').textContent = brut;
     $('#vide-lien').href = 'recherche.html?q=' + encodeURIComponent(brut);
-    const compte = $('#compte');
-    if (!q) compte.innerHTML = `<strong>${total}</strong> mots.`;
-    else if (n === 0) compte.textContent = `Aucun mot sur ${total} pour «${FINE}${brut}${FINE}».`;
-    else compte.innerHTML = `<strong>${n}</strong> ${n > 1 ? 'mots' : 'mot'} sur ${total} pour «${FINE}${echapper(brut)}${FINE}»` + (chapitre ? `, ceux qu’explique ${echapper(brut)}.` : '.');
+    // Le compte est annoncé (role="status") : seulement quand la frappe s'arrête, pas à chaque lettre.
+    const message = !q ? `<strong>${total}</strong> termes.`
+      : n === 0 ? `Aucun terme sur ${total} pour «${FINE}${echapper(brut)}${FINE}».`
+      : `<strong>${n}</strong> ${n > 1 ? 'termes' : 'terme'} sur ${total} pour «${FINE}${echapper(brut)}${FINE}»` + (chapitre ? `, ceux qu’explique ${echapper(brut)}.` : '.');
+    clearTimeout(minuterie);
+    const poser = () => { $('#compte').innerHTML = message; };
+    if (tout_de_suite) poser(); else minuterie = setTimeout(poser, 150);
   }
-  function effacerFiltre() { champ.value = ''; filtrer(); }
-  champ.addEventListener('input', filtrer);
+  function effacerFiltre() { champ.value = ''; filtrer(true); }
+  champ.addEventListener('input', () => filtrer(false));
   $('#filtre-form').addEventListener('submit', e => e.preventDefault());
   $('#effacer').addEventListener('click', () => { effacerFiltre(); champ.focus(); });
   champ.addEventListener('keydown', e => { if (e.key === 'Escape' && champ.value) { effacerFiltre(); e.preventDefault(); } });
@@ -1115,7 +1132,7 @@
 
   // Pour les captures : ?filtre=… préremplit le champ.
   const prerempli = new URLSearchParams(location.search).get('filtre');
-  if (prerempli) { champ.value = prerempli; filtrer(); }
+  if (prerempli) { champ.value = prerempli; filtrer(true); }
   montrer();
 })();
 </script>
