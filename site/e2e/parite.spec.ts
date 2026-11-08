@@ -13,9 +13,10 @@
 // des flottants), au bit près. Les sections que le site lit sans les refaire
 // (SECTIONS_NON_REFAITES, src/lib/partie-0/fichiers.ts : softmax et −ln p de 0.2,
 // qui passent par exp et log, et ce qui ne sert qu'en Python) sont retirées du
-// fichier avant la comparaison. La troisième, ceux des jumeaux de la Partie 1
-// (jeu="partie-1", avec src/lib/partie-1/parite.ts) : le modèle à n-grammes de 1.1,
-// sans ses perplexités (CLES_NON_REFAITES, src/lib/partie-1/fichiers.ts). Il tourne dans les projets Chrome (ordinateur,
+// fichier avant la comparaison. La troisième refait ceux des jumeaux de la
+// Partie 1 (jeu="partie-1", avec src/lib/partie-1/parite.ts) : le modèle à
+// n-grammes de 1.1, sans ses perplexités (CLES_NON_REFAITES,
+// src/lib/partie-1/fichiers.ts). Il tourne dans les projets Chrome (ordinateur,
 // mobile) et, avec FORGE_TOUS_NAVIGATEURS=1, dans Firefox et WebKit (projets
 // parite-firefox et parite-webkit, voir playwright.config.ts) : c'est la seule
 // façon de voir qu'un moteur JavaScript s'écarte du Python.

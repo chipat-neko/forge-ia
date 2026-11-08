@@ -1,5 +1,6 @@
 """Le modèle à n-grammes : compter, lisser, tirer, mesurer la surprise."""
 
+import math
 from collections import Counter
 
 import pytest
@@ -8,6 +9,7 @@ from modele_de_langage.ngrammes import (
     alphabet,
     charger_texte,
     compter,
+    compter_par_ordre,
     couper,
     distribution,
     generer,
@@ -35,17 +37,34 @@ def test_contexte_jamais_vu_donne_l_uniforme():
 
 def test_temperatures():
     cc = Counter({"b": 3})
-    assert poids(cc, ["a", "b"], 1) == [1, 4] and poids(cc, ["a", "b"], 0.5) == [1, 16]
-    assert poids(cc, ["a", "b"], 2) == [1.0, 2.0] and poids(cc, ["a", "b"], 0) == [0, 1]
+    # Des comptes bruts : un caractère jamais vu après ce contexte a un poids nul.
+    assert poids(cc, ["a", "b"], 1) == [0, 3] and poids(cc, ["a", "b"], 0.5) == [0, 9]
+    assert poids(cc, ["a", "b"], 2) == [0.0, math.sqrt(3)] and poids(cc, ["a", "b"], 0) == [0, 1]
 
 
 def test_generer_reproductible_et_temperature_zero_tourne_en_rond():
     t = charger_texte()
     entr, _ = couper(t)
-    c = compter(entr, 3)
+    c = compter_par_ordre(entr, 3)
     a = alphabet(t)
     assert generer(c, a, 3, "Le ", 50, 1, 0) == generer(c, a, 3, "Le ", 50, 1, 0)
     assert tourne_en_rond(generer(c, a, 3, "Le ", 300, 0, 0))
+
+
+def test_generer_ne_tire_que_parmi_les_caracteres_deja_vus_et_recule():
+    t = charger_texte()
+    entr, _ = couper(t)
+    a = alphabet(t)
+    vus = set(entr)
+    for n in (4, 6):
+        c = compter_par_ordre(entr, n)
+        for temperature in (0.5, 1, 2):
+            suite = generer(c, a, n, "de la carte ", 400, temperature, 0)
+            assert set(suite) <= vus
+    # Le contexte « ZZ » est inconnu : le modèle recule à l'ordre 0, qui est toujours connu.
+    c = compter_par_ordre("abab", 2)
+    assert set(generer(c, ["a", "b", "z"], 2, "zz", 20, 1, 0)) <= {"a", "b", "z"}
+    assert "z" not in generer(c, ["a", "b", "z"], 2, "ab", 20, 1, 0)
 
 
 def test_texte_du_site_suffit():
@@ -80,12 +99,14 @@ def test_texte_vide():
     with pytest.raises(ValueError, match="Le texte est vide : il faut au moins un caractère."):
         distribution({}, alphabet(""), "", 0)
     with pytest.raises(ValueError, match="Le texte est vide"):
-        generer({}, [], 0, "", 5, 1, 0)
+        generer([{}], [], 0, "", 5, 1, 0)
+    with pytest.raises(ValueError, match="Le texte est vide"):
+        perplexite({}, [], 0, "abc")
 
 
 def test_poids_temperature_zero_depart_a_egalite():
-    # Aucun compte : le premier caractère de l'alphabet. Égalité : le plus petit point de code.
-    assert poids(Counter(), ["a", "b"], 0) == [1, 0]
+    # Aucun compte : aucun poids. Égalité : le plus petit point de code.
+    assert poids(Counter(), ["a", "b"], 0) == [0, 0]
     assert poids(Counter({"a": 2, "b": 2}), ["a", "b"], 0) == [1, 0]
     with pytest.raises(ValueError, match="température"):
         poids(Counter(), ["a"], 3)
@@ -103,12 +124,12 @@ def test_tirer_au_bord():
 
 
 def test_generer_cas_limites():
-    c = compter("abab", 1)
+    c = compter_par_ordre("abab", 1)
     assert generer(c, ["a", "b"], 1, "a", 0, 1, 0) == "a"
     assert generer(c, ["a", "b"], 1, "a", -3, 1, 0) == "a"
     assert generer(c, ["a", "b"], 1, "a", 4, 0, 0) == "ababa"
     with pytest.raises(ValueError, match="Il faut au moins n caractères de contexte."):
-        generer(c, ["a", "b"], 2, "a", 4, 1, 0)
+        generer(compter_par_ordre("abab", 2), ["a", "b"], 2, "a", 4, 1, 0)
 
 
 def test_part_jamais_vue_et_tourne_en_rond():

@@ -13,6 +13,7 @@ import { FICHIERS_PARTIE_1, partieRefaite } from './fichiers';
 import {
   alphabet,
   compter,
+  compterParOrdre,
   couper,
   distribution,
   generer,
@@ -103,7 +104,7 @@ describe('jumeau du Python : les attendus partagés de 1.1', () => {
   it('suites : le texte écrit, pour chaque ordre, chaque température et chaque graine', () => {
     expect(ATTENDUS.suites).toHaveLength(ORDRE_MAX * TEMPERATURES.length * 2);
     for (const s of ATTENDUS.suites) {
-      const comptes = compter(entrainement, s.n);
+      const comptes = compterParOrdre(entrainement, s.n);
       expect(s.depart).toBe(Array.from(validation).slice(0, s.n).join(''));
       expect(generer(comptes, lettres, s.n, s.depart, s.longueur, s.temperature, s.graine)).toBe(s.suite);
     }
@@ -125,7 +126,7 @@ describe('jumeau du Python : les attendus partagés de 1.1', () => {
       expect(erreur, c.nom).toBe(c.erreur);
       let suite: string | null = null;
       const erreurSuite = messageDErreur(() => {
-        suite = generer(comptes, lettresDuCas, c.n, c.contexte, 8, 1, 0);
+        suite = generer(compterParOrdre(c.texte, c.n), lettresDuCas, c.n, c.contexte, 8, 1, 0);
       });
       expect(suite, c.nom).toBe(c.suite);
       expect(erreurSuite, c.nom).toBe(c.erreur_suite);
@@ -182,12 +183,13 @@ describe('les mêmes exemples que les tests du Python', () => {
 
   it('les températures', () => {
     const cc = new Map([['b', 3]]);
-    expect(poids(cc, ['a', 'b'], 1)).toStrictEqual([1, 4]);
-    expect(poids(cc, ['a', 'b'], 0.5)).toStrictEqual([1, 16]);
-    expect(poids(cc, ['a', 'b'], 2)).toStrictEqual([1, 2]);
+    // Des comptes bruts : un caractère jamais vu après ce contexte a un poids nul.
+    expect(poids(cc, ['a', 'b'], 1)).toStrictEqual([0, 3]);
+    expect(poids(cc, ['a', 'b'], 0.5)).toStrictEqual([0, 9]);
+    expect(poids(cc, ['a', 'b'], 2)).toStrictEqual([0, Math.sqrt(3)]);
     expect(poids(cc, ['a', 'b'], 0)).toStrictEqual([0, 1]);
-    // Aucun compte, ou égalité : le plus petit point de code.
-    expect(poids(new Map(), ['a', 'b'], 0)).toStrictEqual([1, 0]);
+    // Aucun compte : aucun poids. Égalité : le plus petit point de code.
+    expect(poids(new Map(), ['a', 'b'], 0)).toStrictEqual([0, 0]);
     expect(poids(new Map([['a', 2], ['b', 2]]), ['a', 'b'], 0)).toStrictEqual([1, 0]);
     expect(() => poids(new Map(), ['a'], 3)).toThrow(MESSAGE_TEMPERATURE);
   });
@@ -206,16 +208,23 @@ describe('les mêmes exemples que les tests du Python', () => {
     expect(MESSAGE_TEXTE_VIDE).toBe('Le texte est vide : il faut au moins un caractère.');
     expect(MESSAGE_CONTEXTE_COURT).toBe('Il faut au moins n caractères de contexte.');
     expect(() => distribution(new Map(), alphabet(''), '', 0)).toThrow(new RangeError(MESSAGE_TEXTE_VIDE));
-    expect(() => generer(new Map(), [], 0, '', 5, 1, 0)).toThrow(MESSAGE_TEXTE_VIDE);
+    expect(() => generer([new Map()], [], 0, '', 5, 1, 0)).toThrow(MESSAGE_TEXTE_VIDE);
     expect(() => distribution(compter('abab', 2), ['a', 'b'], 'a', 2)).toThrow(MESSAGE_CONTEXTE_COURT);
   });
 
   it('generer : longueur nulle ou négative, température 0, départ trop court', () => {
-    const c = compter('abab', 1);
+    const c = compterParOrdre('abab', 1);
     expect(generer(c, ['a', 'b'], 1, 'a', 0, 1, 0)).toBe('a');
     expect(generer(c, ['a', 'b'], 1, 'a', -3, 1, 0)).toBe('a');
     expect(generer(c, ['a', 'b'], 1, 'a', 4, 0, 0)).toBe('ababa');
-    expect(() => generer(c, ['a', 'b'], 2, 'a', 4, 1, 0)).toThrow(MESSAGE_CONTEXTE_COURT);
+    expect(() => generer(compterParOrdre('abab', 2), ['a', 'b'], 2, 'a', 4, 1, 0)).toThrow(MESSAGE_CONTEXTE_COURT);
+  });
+
+  it('generer recule à un ordre connu, et ne tire que des caractères déjà vus', () => {
+    const c = compterParOrdre('abab', 2);
+    // « zz » est inconnu aux ordres 2 et 1 : le modèle recule à l'ordre 0.
+    expect(new Set(Array.from(generer(c, ['a', 'b', 'z'], 2, 'zz', 20, 1, 0)))).toStrictEqual(new Set(['z', 'a', 'b']));
+    expect(generer(c, ['a', 'b', 'z'], 2, 'ab', 20, 1, 0)).not.toContain('z');
   });
 
   it('les points de code, pas les unités UTF-16', () => {

@@ -35,8 +35,9 @@ MESSAGE_TEMPERATURE = "La température doit valoir 0, 0.5, 1 ou 2 : choisis l'un
 
 
 def charger_texte() -> str:
-    """Le texte d'apprentissage du projet, lu en UTF-8."""
-    return CHEMIN_TEXTE.read_text(encoding="utf-8")
+    """Le texte d'apprentissage du projet, lu en UTF-8, sans traduire les fins de ligne (comme le fait le site)."""
+    with open(CHEMIN_TEXTE, encoding="utf-8", newline="") as fichier:
+        return fichier.read()
 
 
 def couper(texte: str) -> tuple[str, str]:
@@ -64,6 +65,14 @@ def compter(texte: str, n: int) -> dict[str, Counter[str]]:
         comptes[contexte][texte[i]] += 1
     return comptes
 # fin: compter
+
+
+def compter_par_ordre(texte: str, n: int) -> list[dict[str, Counter[str]]]:
+    """Les comptes de tous les ordres de 0 à n : `[compter(texte, 0), …, compter(texte, n)]`.
+
+    `generer` s'en sert pour reculer d'un ordre quand un contexte est inconnu.
+    """
+    return [compter(texte, k) for k in range(n + 1)]
 
 
 def fin_du_contexte(contexte: str, n: int) -> str:
@@ -98,22 +107,23 @@ def distribution(
 def poids(comptes_du_contexte: Counter[str], alphabet: list[str], temperature: float) -> list[float]:
     """Le poids de chaque caractère de l'alphabet, dans l'ordre de l'alphabet, pour tirer au sort.
 
-    La température change la forme des probabilités : 1 les suit (compte + 1),
-    0,5 les durcit (le carré), 2 les adoucit (la racine carrée), et 0 ne garde
-    que le caractère le plus compté.
+    On part des comptes bruts : un caractère jamais vu après ce contexte a un poids nul,
+    il ne sort jamais. La température change la forme des probabilités : 1 les suit
+    (le compte), 0,5 les durcit (le carré), 2 les adoucit (la racine carrée), et 0 ne
+    garde que le caractère le plus compté.
     """
     if temperature == 1:
-        return [comptes_du_contexte[c] + 1 for c in alphabet]
+        return [comptes_du_contexte[c] for c in alphabet]
     if temperature == 0.5:
-        return [(comptes_du_contexte[c] + 1) * (comptes_du_contexte[c] + 1) for c in alphabet]
+        return [comptes_du_contexte[c] * comptes_du_contexte[c] for c in alphabet]
     if temperature == 2:
-        return [math.sqrt(comptes_du_contexte[c] + 1) for c in alphabet]
+        return [math.sqrt(comptes_du_contexte[c]) for c in alphabet]
     if temperature == 0:
         # Le premier des plus comptés : l'alphabet est trié, donc le plus petit point de code.
-        meilleur = 0
+        meilleur, record = -1, 0
         for i, c in enumerate(alphabet):
-            if comptes_du_contexte[c] > comptes_du_contexte[alphabet[meilleur]]:
-                meilleur = i
+            if comptes_du_contexte[c] > record:
+                meilleur, record = i, comptes_du_contexte[c]
         return [1 if i == meilleur else 0 for i in range(len(alphabet))]
     raise ValueError(MESSAGE_TEMPERATURE)
 # fin: poids
@@ -141,7 +151,7 @@ def tirer(poids: list[float], u: float) -> int:
 
 # region: generer
 def generer(
-    comptes: dict[str, Counter[str]],
+    comptes_par_ordre: list[dict[str, Counter[str]]],
     alphabet: list[str],
     n: int,
     depart: str,
@@ -151,8 +161,11 @@ def generer(
 ) -> str:
     """Le départ, suivi de `longueur` caractères tirés un à un d'après les n derniers.
 
-    Un tirage par caractère, avec le même hasard que le site : la même graine
-    donne le même texte, ici comme dans la page.
+    `comptes_par_ordre[k]` contient les comptes de l'ordre k, de 0 à n (compter_par_ordre).
+    Quand les n derniers caractères n'ont jamais été vus, le modèle recule : il regarde
+    les n − 1 derniers, puis n − 2, jusqu'à 0, qui est toujours connu. On ne tire que
+    parmi les caractères déjà vus après ce contexte. Un tirage par caractère, avec le
+    même hasard que le site : la même graine donne le même texte, ici comme dans la page.
     """
     if not alphabet:
         raise ValueError(MESSAGE_TEXTE_VIDE)
@@ -160,7 +173,13 @@ def generer(
     hasard = Hasard(graine)
     texte = depart
     for _ in range(longueur):
-        suivants = comptes.get(fin_du_contexte(texte, n), Counter())
+        suivants = None
+        for k in range(n, -1, -1):
+            suivants = comptes_par_ordre[k].get(texte[len(texte) - k :])
+            if suivants is not None:
+                break
+        if suivants is None:
+            raise ValueError(MESSAGE_TEXTE_VIDE)
         texte += alphabet[tirer(poids(suivants, alphabet, temperature), hasard.uniforme())]
     return texte
 # fin: generer
@@ -194,6 +213,8 @@ def perplexite(
     perplexité de 12 veut dire que le modèle hésite comme s'il choisissait,
     à chaque caractère, entre 12 possibilités également probables.
     """
+    if not alphabet:
+        raise ValueError(MESSAGE_TEXTE_VIDE)
     v = len(alphabet)
     somme = 0.0
     nombre = 0

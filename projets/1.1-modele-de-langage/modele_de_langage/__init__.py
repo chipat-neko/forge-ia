@@ -7,6 +7,7 @@ from modele_de_langage.ngrammes import (
     alphabet,
     charger_texte,
     compter,
+    compter_par_ordre,
     couper,
     distribution,
     generer,

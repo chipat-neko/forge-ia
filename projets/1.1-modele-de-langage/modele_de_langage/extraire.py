@@ -8,9 +8,13 @@ apprenne le français du site, et non son code, on ne garde que la prose :
 - les lignes `import` et `export`, avec leurs blocs `export const … = (() => { … })();` ;
 - les blocs de code (entre deux lignes « ``` ») ;
 - les balises JSX (ouvrantes, fermantes, auto-fermantes, sur une ou plusieurs
-  lignes) et les expressions `{…}` sont retirées ; le texte entre les balises reste.
+  lignes) et les expressions `{…}` sont retirées ; le texte entre les balises reste ;
+- les marques Markdown : les `**` du gras, les `#` des titres, et les liens
+  `[texte](adresse)`, qui deviennent `texte` ;
+- les accents graves du code en ligne : son contenu reste tel quel, accolades
+  comprises (le code en ligne est lu avant les `{…}`, pour ne pas y laisser de trou).
 
-`&#8239;` devient l'espace fine insécable (U+202F), et les paragraphes sont séparés
+Restent les puces « - » des listes. `&#8239;` devient l'espace fine insécable (U+202F), et les paragraphes sont séparés
 par une ligne vide. Pour refaire le fichier du projet (dans projets/1.1-modele-de-langage) :
 
     uv run python -m modele_de_langage extraire --commit ae8d9a4 --sortie donnees/texte-du-site.txt
@@ -170,11 +174,20 @@ def fin_de_la_balise(texte: str, debut: int) -> int | None:
 
 
 def retirer_balises_et_expressions(texte: str) -> str:
-    """Retire les balises JSX, les commentaires HTML et les expressions `{…}` ; le texte entre les balises reste."""
+    """Retire les balises JSX, les commentaires HTML et les expressions `{…}` ; le texte entre les balises reste.
+
+    Le code en ligne est lu en premier : ses accents graves tombent, son contenu reste tel quel.
+    """
     morceaux, i = [], 0
     while i < len(texte):
         c = texte[i]
         fin = None
+        if c == "`":
+            fermeture = texte.find("`", i + 1)
+            if fermeture != -1 and "\n" not in texte[i + 1 : fermeture]:
+                morceaux.append(texte[i + 1 : fermeture])
+                i = fermeture + 1
+                continue
         if texte.startswith("<!--", i):
             fin = texte.find("-->", i + 4)
             fin = None if fin == -1 else fin + 3
@@ -190,11 +203,19 @@ def retirer_balises_et_expressions(texte: str) -> str:
     return "".join(morceaux)
 
 
+def retirer_marques_markdown(texte: str) -> str:
+    """Retire les `**` du gras, les `#` des titres, et change `[texte](adresse)` en `texte`."""
+    texte = re.sub(r"\[([^\]\n]*)\]\([^)\n]*\)", r"\1", texte)
+    texte = texte.replace("**", "")
+    return re.sub(r"(?m)^[ \t]*#{1,6}[ \t]+", "", texte)
+
+
 def extraire_prose(mdx: str) -> str:
     """La prose d'un chapitre MDX : voir l'en-tête du module pour ce qui est retiré."""
     texte = retirer_frontmatter(mdx.replace("\r\n", "\n"))
     lignes = retirer_imports_et_exports(retirer_blocs_de_code(texte.split("\n")))
     texte = retirer_balises_et_expressions("\n".join(lignes))
+    texte = retirer_marques_markdown(texte)
     texte = texte.replace("&#8239;", "\u202f")
     paragraphes = []
     for brut in re.split(r"\n\s*\n", texte):

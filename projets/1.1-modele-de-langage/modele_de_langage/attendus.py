@@ -31,6 +31,7 @@ from modele_de_langage.ngrammes import (
     alphabet,
     charger_texte,
     compter,
+    compter_par_ordre,
     couper,
     distribution,
     generer,
@@ -127,7 +128,7 @@ def calculer_suites() -> list[dict]:
     lettres = alphabet(texte)
     suites = []
     for n in range(1, ORDRE_MAX + 1):
-        comptes = compter(entrainement, n)
+        comptes = compter_par_ordre(entrainement, n)
         depart = validation[:n]
         for temperature in TEMPERATURES:
             for graine in GRAINES:
@@ -156,7 +157,7 @@ def calculer_cas_limites() -> list[dict]:
         except ValueError as e:
             rangs, erreur = None, str(e)
         try:
-            suite = generer(comptes, lettres, n, contexte, 8, 1, 0)
+            suite = generer(compter_par_ordre(texte, n), lettres, n, contexte, 8, 1, 0)
             erreur_suite = None
         except ValueError as e:
             suite, erreur_suite = None, str(e)

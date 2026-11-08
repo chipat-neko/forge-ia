@@ -22,8 +22,8 @@
 // calculs : les comparaisons les retirent du fichier avant de comparer
 // (partieRefaite).
 //
-// Ce module importe les fichiers d'attendus (.json) et le texte du site (?raw),
-// par Vite : un parcours Playwright ne peut pas l'importer. Les parcours lisent
+// Ce module importe les fichiers d'attendus (.json) et, par texte-1-1.ts, le texte
+// du site (?raw), par Vite : un parcours Playwright ne peut pas l'importer. Les parcours lisent
 // ces fichiers par readFileSync, d'après FICHIERS_PARTIE_1.
 
 import fichierNgrammes from '../../../../projets/1.1-modele-de-langage/tests/attendus.json';
@@ -31,6 +31,7 @@ import type { Attendus } from '../mini-modele/parite';
 import {
   alphabet,
   compter,
+  compterParOrdre,
   couper,
   distribution,
   generer,
@@ -107,7 +108,7 @@ export function refaireNgrammes(texte: string, entrees: EntreesNgrammes): Attend
       graine,
       depart,
       longueur,
-      suite: generer(comptesDeLOrdre(n), lettres, n, depart, longueur, temperature, graine),
+      suite: generer(compterParOrdre(entrainement, n), lettres, n, depart, longueur, temperature, graine),
     })),
     cas_limites: entrees.cas_limites.map(({ nom, texte: texteDuCas, n, contexte }) => {
       const [apprendre, verifier] = couper(texteDuCas);
@@ -119,7 +120,7 @@ export function refaireNgrammes(texte: string, entrees: EntreesNgrammes): Attend
         rangs = distribution(comptes, lettresDuCas, contexte, n);
       });
       const erreurSuite = messageDe(() => {
-        suite = generer(comptes, lettresDuCas, n, contexte, 8, 1, 0);
+        suite = generer(compterParOrdre(texteDuCas, n), lettresDuCas, n, contexte, 8, 1, 0);
       });
       return {
         nom,

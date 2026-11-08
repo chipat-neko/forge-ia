@@ -1,4 +1,4 @@
-"""Le Hasard de ce projet est une copie exacte de celui du projet 0.2."""
+"""Le Hasard de ce projet est une copie exacte de celui du projet 0.2 (la région `hasard`, avec ENTIER_SUR_MAX)."""
 
 import pathlib
 
@@ -11,18 +11,17 @@ ORIGINAL = RACINE / "projets" / "0.2-maths" / "maths_utiles" / "tirage.py"
 COPIE = RACINE / "projets" / "1.1-modele-de-langage" / "modele_de_langage" / "hasard.py"
 
 
-def classe_hasard(source: str) -> str:
-    """Le texte de la classe Hasard : de « class Hasard: » à « # fin: hasard » (ou à la fin du fichier)."""
-    debut = source.index("class Hasard:")
-    marque = source.find("# fin: hasard", debut)
-    fin = len(source) if marque == -1 else marque
-    return source[debut:fin].rstrip() + "\n"
+def region_hasard(source: str) -> str:
+    """Le texte de la région `hasard` : de « # region: hasard » à « # fin: hasard », constante comprise."""
+    debut = source.index("# region: hasard")
+    fin = source.index("# fin: hasard", debut) + len("# fin: hasard")
+    return source[debut:fin]
 
 
 def test_la_copie_est_identique_a_l_original():
     if not ORIGINAL.exists():
         pytest.skip("Le projet 0.2 n'est pas là : rien à comparer.")
-    assert classe_hasard(COPIE.read_text(encoding="utf-8")) == classe_hasard(ORIGINAL.read_text(encoding="utf-8"))
+    assert region_hasard(COPIE.read_text(encoding="utf-8")) == region_hasard(ORIGINAL.read_text(encoding="utf-8"))
 
 
 def test_la_suite_est_reproductible():

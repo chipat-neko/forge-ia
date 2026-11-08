@@ -7,7 +7,8 @@ Exemples (dans projets/1.1-modele-de-langage) :
 
 `suite` apprend les comptes sur les 90 premiers % du texte du site, puis écrit
 `--longueur` caractères à la suite du départ (200 par défaut), en s'appuyant sur
-les `--n` derniers caractères, à la température demandée (0, 0.5, 1 ou 2). La même
+les `--n` derniers caractères (et sur moins quand ce groupe est inconnu), à la
+température demandée (0, 0.5, 1 ou 2), parmi les caractères déjà vus. La même
 graine donne toujours le même texte, ici comme dans la page du site.
 
 `extraire` relit les chapitres du site, au commit donné, et en écrit la prose.
@@ -25,7 +26,7 @@ from modele_de_langage.ngrammes import (
     TEMPERATURES,
     alphabet,
     charger_texte,
-    compter,
+    compter_par_ordre,
     couper,
     generer,
 )
@@ -69,7 +70,7 @@ def main(arguments: list[str] | None = None) -> None:
         arreter(MESSAGE_TEMPERATURE)
     texte = charger_texte()
     entrainement, _ = couper(texte)
-    comptes = compter(entrainement, choix.n)
+    comptes = compter_par_ordre(entrainement, choix.n)
     try:
         print(generer(comptes, alphabet(texte), choix.n, choix.depart, choix.longueur, choix.temperature, choix.graine))
     except ValueError as probleme:

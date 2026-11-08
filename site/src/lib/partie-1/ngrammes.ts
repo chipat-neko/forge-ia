@@ -8,8 +8,8 @@
 // doit suivre.
 //
 // Pourquoi le résultat est le même au bit près : les comptes sont des entiers,
-// les probabilités une seule division, et les poids des entiers ou une racine
-// carrée, que la norme IEEE 754 arrondit au plus juste dans les deux langages.
+// les probabilités une seule division, et les poids des comptes, leurs carrés ou
+// une racine carrée, que la norme IEEE 754 arrondit au plus juste dans les deux langages.
 // Les sommes se font dans une boucle, de gauche à droite, comme en Python. La
 // perplexité (exp et log) reste en Python : le site lit ses valeurs dans les
 // attendus (texte-1-1.ts).
@@ -76,6 +76,13 @@ export function compter(texte: string, n: number): Comptes {
   return comptes;
 }
 
+/** Les comptes de tous les ordres de 0 à n : [compter(texte, 0), …, compter(texte, n)]. generer s'en sert pour reculer d'un ordre. */
+export function compterParOrdre(texte: string, n: number): Comptes[] {
+  const comptes: Comptes[] = [];
+  for (let k = 0; k <= n; k++) comptes.push(compter(texte, k));
+  return comptes;
+}
+
 /** Les n derniers caractères du contexte (le texte vide pour n = 0). */
 export function finDuContexte(contexte: string, n: number): string {
   const points = Array.from(contexte);
@@ -107,8 +114,9 @@ export function distribution(
 
 /**
  * Le poids de chaque caractère de l'alphabet, dans l'ordre de l'alphabet, pour
- * tirer au sort : 1 suit les probabilités (compte + 1), 0,5 les durcit (le
- * carré), 2 les adoucit (la racine carrée), et 0 ne garde que le plus compté.
+ * tirer au sort. On part des comptes bruts : un caractère jamais vu après ce
+ * contexte a un poids nul. 1 suit les probabilités (le compte), 0,5 les durcit
+ * (le carré), 2 les adoucit (la racine carrée), et 0 ne garde que le plus compté.
  */
 export function poids(
   comptesDuContexte: ReadonlyMap<string, number>,
@@ -116,14 +124,18 @@ export function poids(
   temperature: number,
 ): number[] {
   const compte = (c: string): number => comptesDuContexte.get(c) ?? 0;
-  if (temperature === 1) return lettres.map((c) => compte(c) + 1);
-  if (temperature === 0.5) return lettres.map((c) => (compte(c) + 1) * (compte(c) + 1));
-  if (temperature === 2) return lettres.map((c) => Math.sqrt(compte(c) + 1));
+  if (temperature === 1) return lettres.map((c) => compte(c));
+  if (temperature === 0.5) return lettres.map((c) => compte(c) * compte(c));
+  if (temperature === 2) return lettres.map((c) => Math.sqrt(compte(c)));
   if (temperature === 0) {
     // Le premier des plus comptés : l'alphabet est trié, donc le plus petit point de code.
-    let meilleur = 0;
+    let meilleur = -1;
+    let record = 0;
     lettres.forEach((c, i) => {
-      if (compte(c) > compte(lettres[meilleur])) meilleur = i;
+      if (compte(c) > record) {
+        meilleur = i;
+        record = compte(c);
+      }
     });
     return lettres.map((_, i) => (i === meilleur ? 1 : 0));
   }
@@ -148,12 +160,15 @@ export function tirer(lesPoids: readonly number[], u: number): number {
 }
 
 /**
- * Le départ, suivi de `longueur` caractères tirés un à un d'après les n
- * derniers. Un tirage par caractère, avec le Hasard du mini-modèle : la même
- * graine donne le même texte que le Python.
+ * Le départ, suivi de `longueur` caractères tirés un à un d'après les n derniers.
+ * comptesParOrdre[k] contient les comptes de l'ordre k, de 0 à n (compterParOrdre).
+ * Quand les n derniers caractères n'ont jamais été vus, le modèle recule : les
+ * n − 1 derniers, puis n − 2, jusqu'à 0, toujours connu. On ne tire que parmi les
+ * caractères déjà vus. Un tirage par caractère, avec le Hasard du mini-modèle :
+ * la même graine donne le même texte que le Python.
  */
 export function generer(
-  comptes: ReadonlyMap<string, ReadonlyMap<string, number>>,
+  comptesParOrdre: readonly ReadonlyMap<string, ReadonlyMap<string, number>>[],
   lettres: readonly string[],
   n: number,
   depart: string,
@@ -165,9 +180,13 @@ export function generer(
   finDuContexte(depart, n); // lève l'erreur si le départ est trop court
   const hasard = new Hasard(graine);
   const texte = Array.from(depart);
-  for (let k = 0; k < longueur; k++) {
-    const contexte = texte.slice(texte.length - n).join('');
-    const suivants = comptes.get(contexte) ?? AUCUN_COMPTE;
+  for (let i = 0; i < longueur; i++) {
+    let suivants: ReadonlyMap<string, number> | undefined;
+    for (let k = n; k >= 0; k--) {
+      suivants = comptesParOrdre[k].get(texte.slice(texte.length - k).join(''));
+      if (suivants !== undefined) break;
+    }
+    if (suivants === undefined) throw new RangeError(MESSAGE_TEXTE_VIDE);
     texte.push(lettres[tirer(poids(suivants, lettres, temperature), hasard.uniforme())]);
   }
   return texte.join('');
