@@ -1,0 +1,26 @@
+# relevé le 2026-11-09
+Aperçu de forge.donnees.sources : 5,0 Mio de texte gardé par source, lus en flux depuis Hugging Face.
+
+web_fr (HuggingFaceFW/fineweb-2)
+  documents lus : 1 642
+  gardés : 1 642, soit 100,0 %
+  texte gardé : 5 259 799 octets (5,0 Mio)
+  mis de côté pour la validation : 14
+  durée : 21,9 s
+
+wikipedia_fr (wikimedia/wikipedia)
+  documents lus : 204
+  gardés : 204, soit 100,0 %
+  texte gardé : 5 249 401 octets (5,0 Mio)
+  mis de côté pour la validation : 1
+  durée : 13,7 s
+
+code_python (codeparrot/github-code-clean)
+  documents lus : 18 882
+  gardés : 726, soit 3,8 %
+  écartés, trop court : 33
+  écartés, licence : 455
+  écartés, langage : 17 668
+  texte gardé : 5 245 047 octets (5,0 Mio)
+  mis de côté pour la validation : 7
+  durée : 8,7 s

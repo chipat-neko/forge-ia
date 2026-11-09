@@ -1,0 +1,37 @@
+[project]
+name = "donnees-pas-a-pas"
+version = "0.1.0"
+description = "Les données de « ton IA » pas à pas : trier les textes avec le code de forge, et compter ce qui reste."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+# Le projet n'écrit pas son propre nettoyage : il appelle celui de forge, le moteur de « ton IA ».
+# Il n'installe pas PyTorch (c'est un extra de forge, que ce projet ne demande pas).
+dependencies = ["forge-ia"]
+
+[tool.uv.sources]
+forge-ia = { path = "../forge", editable = true }
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.4.0",
+    "nbclient>=0.11.0",
+    "nbformat>=5.11.1",
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["donnees_pas_a_pas"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Sous Windows, pyzmq (le lien entre nbclient et le noyau du notebook) prévient qu'il
+# ajoute un fil pour la boucle Proactor d'asyncio : sans effet sur les tests. Seul cet
+# avertissement est masqué.
+filterwarnings = [
+    "ignore:Proactor event loop does not implement add_reader family of methods required for zmq:RuntimeWarning",
+]

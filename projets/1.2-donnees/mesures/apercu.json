@@ -1,0 +1,48 @@
+{
+ "releve_le": "2026-11-09",
+ "octets_par_source": 5242880,
+ "sources": {
+  "web_fr": {
+   "lus": 1642,
+   "gardes": 1642,
+   "raisons": {
+    "gardé": 1642,
+    "trop court": 0,
+    "doublon": 0,
+    "licence": 0,
+    "langage": 0
+   },
+   "octets_gardes": 5259799,
+   "en_validation": 14,
+   "secondes": 21.9
+  },
+  "wikipedia_fr": {
+   "lus": 204,
+   "gardes": 204,
+   "raisons": {
+    "gardé": 204,
+    "trop court": 0,
+    "doublon": 0,
+    "licence": 0,
+    "langage": 0
+   },
+   "octets_gardes": 5249401,
+   "en_validation": 1,
+   "secondes": 13.7
+  },
+  "code_python": {
+   "lus": 18882,
+   "gardes": 726,
+   "raisons": {
+    "gardé": 726,
+    "trop court": 33,
+    "doublon": 0,
+    "licence": 455,
+    "langage": 17668
+   },
+   "octets_gardes": 5245047,
+   "en_validation": 7,
+   "secondes": 8.7
+  }
+ }
+}

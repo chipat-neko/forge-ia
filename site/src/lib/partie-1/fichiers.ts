@@ -3,8 +3,8 @@
 // chemins depuis la racine du dépôt. Chaque tâche qui ajoute un calcul ajoute
 // ici son fichier.
 //
-// Cette liste ne sert qu'aux attendus de parité. Les mesures et les sorties,
-// s'il en faut, iront dans un module à part (MESURES_PARTIE_1).
+// Cette liste ne sert qu'aux attendus de parité. Les mesures et les sorties sont
+// dans un module à part (MESURES_PARTIE_1, mesures.ts).
 //
 // Ce module n'importe rien (ni .json, ni ?raw) : une page le charge sans les
 // attendus, et un parcours Playwright peut l'importer.
@@ -12,6 +12,7 @@
 /** Le fichier d'attendus du Python que refait chaque calcul de la Partie 1. */
 export const FICHIERS_PARTIE_1: Readonly<Record<string, string>> = Object.freeze({
   ngrammes: 'projets/1.1-modele-de-langage/tests/attendus.json',
+  nettoyeur: 'projets/1.2-donnees/tests/attendus.json',
 });
 
 /**

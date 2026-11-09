@@ -26,6 +26,7 @@
 // du site (?raw), par Vite : un parcours Playwright ne peut pas l'importer. Les parcours lisent
 // ces fichiers par readFileSync, d'après FICHIERS_PARTIE_1.
 
+import fichierNettoyeur from '../../../../projets/1.2-donnees/tests/attendus.json';
 import fichierNgrammes from '../../../../projets/1.1-modele-de-langage/tests/attendus.json';
 import type { Attendus } from '../mini-modele/parite';
 import {
@@ -40,6 +41,20 @@ import {
   tirage,
   type Comptes,
 } from './ngrammes';
+import {
+  BLANCS_PYTHON,
+  coderTexte,
+  decoderTexte,
+  empreinte,
+  estValidation,
+  garderPythonPermissif,
+  longueurPointsDeCode,
+  nettoyer,
+  normaliser,
+  trier,
+  type Ligne,
+} from './nettoyeur';
+import type { NomSource } from './donnees';
 import { TEXTE_DU_SITE } from './texte-1-1';
 
 export { FICHIERS_PARTIE_1 } from './fichiers';
@@ -160,7 +175,54 @@ export function attendusNgrammes(): Attendus {
   return refaireNgrammes(TEXTE_DU_SITE, fichierNgrammes as unknown as EntreesNgrammes);
 }
 
+/** Les entrées du fichier d'attendus du nettoyage : tout ce que la page relit, et rien de ce qu'elle refait. */
+export interface EntreesNettoyeur {
+  textes: { nom: string; entree: unknown }[];
+  licences: { ligne: Ligne }[];
+  tris: { source: NomSource; lignes: Record<string, unknown>[] }[];
+}
+
+/**
+ * Les sections du fichier du nettoyage, refaites à partir de ses seules entrées : les blancs de
+ * Python, le texte nettoyé, la longueur, l'empreinte et la place (entraînement ou validation) de
+ * chaque texte de référence, le filtre des licences, et le verdict du tri sur les exemples.
+ * Asynchrone : l'empreinte passe par crypto.subtle.
+ */
+export async function refaireNettoyeur(entrees: EntreesNettoyeur): Promise<Attendus> {
+  const textes = [];
+  for (const { nom, entree } of entrees.textes) {
+    const texte = decoderTexte(entree) as string;
+    const nettoye = nettoyer(texte);
+    const digest = await empreinte(texte);
+    textes.push({
+      nom,
+      entree,
+      nettoye: nettoye === null ? null : coderTexte(nettoye),
+      longueur: longueurPointsDeCode(normaliser(texte)),
+      empreinte: digest,
+      validation: estValidation(digest),
+    });
+  }
+  const tris = [];
+  for (const { source, lignes } of entrees.tris) {
+    const decodees = lignes.map((ligne) => Object.fromEntries(Object.entries(ligne).map(([cle, v]) => [cle, decoderTexte(v)])));
+    tris.push({ source, lignes, verdicts: await trier(decodees, source) });
+  }
+  return {
+    blancs_python: [...BLANCS_PYTHON],
+    textes,
+    licences: entrees.licences.map(({ ligne }) => ({ ligne, garde: garderPythonPermissif(ligne) })),
+    tris,
+  };
+}
+
+/** Les attendus du nettoyage (FICHIERS_PARTIE_1.nettoyeur), refaits ici. */
+export function attendusNettoyeur(): Promise<Attendus> {
+  return refaireNettoyeur(fichierNettoyeur as unknown as EntreesNettoyeur);
+}
+
 /** Chaque calcul de parité de la Partie 1, sous le nom de son fichier dans FICHIERS_PARTIE_1. */
 export const CALCULS_PARTIE_1: Record<string, () => unknown | Promise<unknown>> = {
   ngrammes: attendusNgrammes,
+  nettoyeur: attendusNettoyeur,
 };

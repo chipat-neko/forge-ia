@@ -1,0 +1,18 @@
+{
+ "releve_le": "2026-11-09",
+ "dossier": "principal",
+ "jetons_train": 8841217367,
+ "jetons_val": 44490991,
+ "documents_train": 10302981,
+ "documents_val": 51916,
+ "octets": 38619056781,
+ "jetons_sans_fin": 8875353461,
+ "octets_par_jeton": 4.3512697213355525,
+ "tokenizer": "ton-ia-v1",
+ "fragments": 370,
+ "fragments_par_source": {
+  "web_fr": 277,
+  "wikipedia_fr": 37,
+  "code_python": 56
+ }
+}

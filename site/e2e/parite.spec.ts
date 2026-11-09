@@ -16,7 +16,8 @@
 // fichier avant la comparaison. La troisième refait ceux des jumeaux de la
 // Partie 1 (jeu="partie-1", avec src/lib/partie-1/parite.ts) : le modèle à
 // n-grammes de 1.1, sans ses perplexités (CLES_NON_REFAITES,
-// src/lib/partie-1/fichiers.ts). Il tourne dans les projets Chrome (ordinateur,
+// src/lib/partie-1/fichiers.ts), puis le nettoyage des textes de 1.2 (blancs de Python,
+// texte nettoyé, empreinte SHA-1 par crypto.subtle, verdicts du tri). Il tourne dans les projets Chrome (ordinateur,
 // mobile) et, avec FORGE_TOUS_NAVIGATEURS=1, dans Firefox et WebKit (projets
 // parite-firefox et parite-webkit, voir playwright.config.ts) : c'est la seule
 // façon de voir qu'un moteur JavaScript s'écarte du Python.
@@ -146,8 +147,8 @@ test('Partie 1 : le navigateur refait les attendus des jumeaux du Python, à l�
   await expect(etat(page)).toContainText(
     PAGES[2].fichiers.length === 1 ? 'le fichier d’attendus est refait' : 'fichiers d’attendus sont refaits',
   );
-  // Le fichier de 1.1 est bien dans la liste.
-  expect(PAGES[2].fichiers.map(([nom]) => nom)).toEqual(['ngrammes']);
+  // Les fichiers de 1.1 (n-grammes) et de 1.2 (nettoyage, dont l'empreinte est asynchrone) sont bien dans la liste.
+  expect(PAGES[2].fichiers.map(([nom]) => nom)).toEqual(['ngrammes', 'nettoyeur']);
   await comparerAuxFichiers(page, browserName, PAGES[2]);
 });
 
