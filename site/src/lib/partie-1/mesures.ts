@@ -19,6 +19,10 @@ export const MESURES_PARTIE_1 = Object.freeze({
   corpusPrincipal: 'projets/1.2-donnees/mesures/corpus-principal.json',
   /** 1.4 : ce que la commande `comparer` affiche, chaque pièce face à forge (la première ligne est « # relevé le AAAA-MM-JJ »). */
   sortieComparaison: 'projets/1.4-transformer/sorties/comparaison.txt',
+  /** 1.5 : ce que la commande `essai` affiche sur le processeur (la première ligne est « # relevé le AAAA-MM-JJ »). */
+  sortieEssaiProcesseur: 'projets/1.5-pre-entrainement/sorties/essai-processeur.txt',
+  /** 1.5 : le résultat de l'essai de pause et de reprise sur le processeur : les deux pertes finales, leur écart, les secondes. */
+  essaiProcesseur: 'projets/1.5-pre-entrainement/mesures/essai-processeur.json',
 } as const);
 
 export type NomMesuresPartie1 = keyof typeof MESURES_PARTIE_1;

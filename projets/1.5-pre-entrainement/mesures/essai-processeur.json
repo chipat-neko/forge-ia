@@ -1,0 +1,11 @@
+{
+ "releve_le": "2026-11-09",
+ "appareil": "cpu",
+ "pas_total": 60,
+ "pas_de_la_pause": 30,
+ "perte_un_trait": 7.6352643966674805,
+ "perte_reprise": 7.6352643966674805,
+ "ecart": 0.0,
+ "pertes_identiques": true,
+ "secondes": 103.06
+}

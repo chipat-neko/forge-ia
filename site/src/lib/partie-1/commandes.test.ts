@@ -9,12 +9,16 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CLONER_DEPOT, METTRE_A_JOUR_DEPOT } from '../partie-0/commandes';
 import * as commandes from './commandes';
+import { FICHIERS_ENTRAINEMENT } from './journal';
 import { MESURES_PARTIE_1 } from './mesures';
 import { GRAINE_INITIALE, LONGUEUR_SUITE, N_INITIAL, TEMPERATURE_INITIALE } from './paris-1-1';
 
 // Vitest est lancé depuis site/ : le dépôt est un dossier plus haut.
 const RACINE = '..';
-const TOUTES = Object.entries(commandes) as [string, string][];
+// Une constante est une commande, ou une suite de commandes (ENTRAINER_COURT) dont chaque élément en est une.
+const TOUTES: [string, string][] = Object.entries(commandes).flatMap(([nom, valeur]) =>
+  typeof valeur === 'string' ? [[nom, valeur]] : (valeur as readonly string[]).map((c, i): [string, string] => [`${nom}[${i}]`, c]),
+);
 /** Le dossier que crée le clonage, et que vise la mise à jour : le dernier morceau de l'adresse. */
 const DOSSIER = CLONER_DEPOT.split('/').at(-1)!;
 
@@ -169,5 +173,135 @@ describe('commandes du chapitre 1.4', () => {
     expect(README).toContain(`${commandes.TRANSFORMER_COMPARER}\n`);
     expect(README).toContain(`${commandes.TRANSFORMER_COMPTER}\n`);
     expect(README).toContain(`${commandes.TRANSFORMER_TESTS}\n`);
+  });
+});
+
+// Le chapitre 1.5 : les commandes du projet « pré-entraînement » (vérifiées contre son __main__.py, son
+// README et les fichiers qu'elles écrivent), puis celles de la version d'une heure de ton IA
+// (vérifiées contre docs/mesures/ton-ia-mini.md, le README et configs/mini.toml de forge).
+describe('commandes du chapitre 1.5, le projet', () => {
+  const PROJET = `${RACINE}/projets/1.5-pre-entrainement`;
+  const MAIN = readFileSync(`${PROJET}/pre_entrainement/__main__.py`, 'utf8').replace(/\r\n?/g, '\n');
+  const README = readFileSync(`${PROJET}/README.md`, 'utf8').replace(/\r\n?/g, '\n');
+  const PYPROJECT = readFileSync(`${PROJET}/pyproject.toml`, 'utf8').replace(/\r\n?/g, '\n');
+
+  it('les commandes, à l’identique', () => {
+    expect(commandes.ALLER_AU_PROJET_1_5).toBe('cd forge-ia/projets/1.5-pre-entrainement');
+    expect(commandes.PRE_ENTRAINEMENT_ESSAI).toBe(
+      'uv run --extra cpu python -m pre_entrainement essai --appareil cpu --enregistrer sorties/essai-processeur.txt --json mesures/essai-processeur.json',
+    );
+    expect(commandes.PRE_ENTRAINEMENT_COURBE).toBe(
+      'uv run --extra cpu python -m pre_entrainement courbe --journal D:\\forge-ia-donnees\\entrainements\\ton-ia-mini\\journal.jsonl --config ..\\forge\\configs\\mini.toml --json mesures/ton-ia-mini.json',
+    );
+    expect(commandes.PRE_ENTRAINEMENT_TESTS).toBe('uv run --extra cpu pytest -q');
+  });
+
+  it('essai et courbe sont des commandes du script, avec leurs options', () => {
+    expect(MAIN).toContain('add_parser("essai"');
+    expect(MAIN).toContain('add_parser("courbe"');
+    for (const option of ['--appareil', '--enregistrer', '--json']) {
+      expect(commandes.PRE_ENTRAINEMENT_ESSAI).toContain(`${option} `);
+      expect(MAIN, option).toMatch(new RegExp(`essai\\.add_argument\\(\\s*"${option}"`));
+    }
+    for (const option of ['--journal', '--config', '--json']) {
+      expect(commandes.PRE_ENTRAINEMENT_COURBE).toContain(`${option} `);
+      expect(MAIN, option).toMatch(new RegExp(`courbe\\.add_argument\\(\\s*"${option}"`));
+    }
+    // Le projet utilise PyTorch : chaque commande prend la version pour le processeur, un extra du projet.
+    expect(PYPROJECT).toContain('cpu = ["torch==');
+    for (const c of [commandes.PRE_ENTRAINEMENT_ESSAI, commandes.PRE_ENTRAINEMENT_COURBE, commandes.PRE_ENTRAINEMENT_TESTS]) {
+      expect(c.startsWith('uv run --extra cpu '), c).toBe(true);
+    }
+  });
+
+  it('l’essai écrit les fichiers que lit le chapitre (MESURES_PARTIE_1)', () => {
+    const projet = 'projets/1.5-pre-entrainement/';
+    expect(`${projet}${/--enregistrer (\S+)/.exec(commandes.PRE_ENTRAINEMENT_ESSAI)![1]}`).toBe(MESURES_PARTIE_1.sortieEssaiProcesseur);
+    expect(`${projet}${/--json (\S+)/.exec(commandes.PRE_ENTRAINEMENT_ESSAI)![1]}`).toBe(MESURES_PARTIE_1.essaiProcesseur);
+  });
+
+  it('la courbe écrit le relevé que lit le chapitre (FICHIERS_ENTRAINEMENT)', () => {
+    expect(`projets/1.5-pre-entrainement/${/--json (\S+)/.exec(commandes.PRE_ENTRAINEMENT_COURBE)![1]}`).toBe(
+      FICHIERS_ENTRAINEMENT['ton-ia-mini'],
+    );
+    // Le journal et la configuration sont ceux de la version d'une heure.
+    expect(commandes.PRE_ENTRAINEMENT_COURBE).toContain('entrainements\\ton-ia-mini\\journal.jsonl');
+    expect(existsSync(`${RACINE}/projets/forge/configs/mini.toml`)).toBe(true);
+  });
+
+  it('ce sont les commandes du README du projet', () => {
+    expect(README).toContain(`${commandes.ALLER_AU_PROJET_1_5}\n`);
+    expect(README).toContain(`${commandes.PRE_ENTRAINEMENT_ESSAI}\n`);
+    expect(README).toContain(`${commandes.PRE_ENTRAINEMENT_COURBE}\n`);
+    expect(README).toContain(`${commandes.PRE_ENTRAINEMENT_TESTS}\n`);
+  });
+});
+
+describe('commandes de la version d’une heure de ton IA', () => {
+  const FORGE = `${RACINE}/projets/forge`;
+  const MINI_MD = readFileSync(`${RACINE}/docs/mesures/ton-ia-mini.md`, 'utf8').replace(/\r\n?/g, '\n');
+  const README_FORGE = readFileSync(`${FORGE}/README.md`, 'utf8').replace(/\r\n?/g, '\n');
+  const MINI_TOML = readFileSync(`${FORGE}/configs/mini.toml`, 'utf8').replace(/\r\n?/g, '\n');
+  const PREFIXE = 'uv run --extra gpu ';
+  /** La partie « python -m forge … » d'une commande de la version courte. */
+  const partie = (c: string) => c.slice(PREFIXE.length);
+
+  it('ENTRAINER_COURT : donnees, encoder, entrainer, evaluer, dans cet ordre, en --extra gpu', () => {
+    expect(commandes.ENTRAINER_COURT).toStrictEqual([
+      commandes.COURT_DONNEES,
+      commandes.COURT_ENCODER,
+      commandes.COURT_ENTRAINER,
+      commandes.COURT_EVALUER,
+    ]);
+    expect(commandes.ENTRAINER_COURT.map((c) => /python -m forge (\S+)/.exec(c)![1])).toStrictEqual([
+      'donnees',
+      'encoder',
+      'entrainer',
+      'evaluer',
+    ]);
+    for (const c of commandes.ENTRAINER_COURT) expect(c.startsWith(`${PREFIXE}python -m forge `), c).toBe(true);
+  });
+
+  it('chaque commande se lit telle quelle dans docs/mesures/ton-ia-mini.md, dans le même ordre', () => {
+    const lignes = MINI_MD.split('\n');
+    let apres = -1;
+    for (const c of commandes.ENTRAINER_COURT) {
+      const rang = lignes.indexOf(partie(c));
+      expect(rang, partie(c)).toBeGreaterThan(apres);
+      apres = rang;
+    }
+  });
+
+  it('chaque commande a, dans le README de forge, son préfixe uv run --extra gpu', () => {
+    for (const c of commandes.ENTRAINER_COURT) {
+      const sous = /python -m forge (\S+)/.exec(c)![1];
+      expect(README_FORGE, sous).toContain(`${PREFIXE}python -m forge ${sous}`);
+    }
+  });
+
+  it('chaque option des commandes existe dans forge', () => {
+    const main = readFileSync(`${FORGE}/forge/__main__.py`, 'utf8');
+    for (const c of commandes.ENTRAINER_COURT) {
+      // Les options de forge, après « python -m forge <commande> » (--extra est celle de uv).
+      for (const [, option] of c.slice(c.indexOf('python -m forge')).matchAll(/ (--[a-z-]+)/g)) {
+        expect(main, `${option} (${c})`).toContain(`"${option}"`);
+      }
+    }
+  });
+
+  it('l’entraînement lance configs/mini.toml, qui existe', () => {
+    expect(commandes.COURT_ENTRAINER).toContain('--config configs/mini.toml');
+    expect(MINI_MD).toContain('--config configs/mini.toml');
+  });
+
+  it('PAUSE et REPRENDRE se lisent dans configs/mini.toml', () => {
+    expect(commandes.PAUSE).toBe('Ctrl+C met en pause');
+    expect(MINI_TOML).toContain(`# ${commandes.PAUSE} (`);
+    expect(MINI_TOML.split('\n')).toContain(`#   ${commandes.REPRENDRE}`);
+  });
+
+  it('REPRENDRE est la commande d’entraînement avec --reprendre', () => {
+    expect(commandes.REPRENDRE).toBe(`${commandes.COURT_ENTRAINER} --reprendre`);
+    expect(README_FORGE).toContain('`--reprendre`');
   });
 });

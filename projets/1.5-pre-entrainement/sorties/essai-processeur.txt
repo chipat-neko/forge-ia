@@ -1,0 +1,9 @@
+# relevé le 2026-11-09
+Pause et reprise exacte, sur le processeur (16 cœurs logiques)
+  modèle : dim 64, 2 couches, 4 têtes, contexte 64 (2 203 968 paramètres, PyTorch 2.15.0)
+  60 pas de 1 024 jetons, taux 0,001, validation tous les 20 pas
+  d’un trait : perte 7,635264 au pas 60
+  arrêté au pas 30 (comme Ctrl+C), puis repris : perte 7,635264 au pas 60
+  écart des deux pertes : 0
+  103,1 s pour les trois entraînements
+la reprise est exacte : oui
