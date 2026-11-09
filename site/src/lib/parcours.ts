@@ -59,6 +59,10 @@ export interface Partie {
 export interface Annexe {
   titre: string;
   resume: string;
+  /** Le titre de sa page, avec son article : « Le glossaire ». */
+  titrePage: string;
+  /** Son nom dans la barre des annexes, en haut de leurs pages : « Données ». */
+  court: string;
   /**
    * L'adresse de sa page, une fois qu'elle existe ; sans valeur avant. Les pages qui
    * renvoient à une annexe (le tableau des sources de 1.2 pour l'annuaire) lisent ce
@@ -260,30 +264,53 @@ export const PARCOURS: Partie[] = [
   },
 ];
 
-/** Les annexes de la spécification, dans son ordre. */
+// La base du site, écrite ici plutôt que lue dans import.meta.env : ANNEXES se lit
+// aussi hors de Vite, dans les parcours Playwright, où import.meta.env n'existe pas.
+// parcours.test.ts vérifie qu'elle est celle d'astro.config.mjs.
+const BASE_DES_ANNEXES = '/forge-ia';
+
+/**
+ * Les annexes de la spécification, dans son ordre. Celles qui ont leur page ont un
+ * `href` ; « Matériel » n'en a pas encore (vague 6). L'annuaire de la version 1 ne
+ * liste que des données : les modèles et les outils viendront avec les vagues suivantes.
+ */
 export const ANNEXES: Annexe[] = [
   {
     titre: 'Glossaire',
     resume: 'Les mots du parcours, expliqués simplement : jeton, fusion, gradient, attention…',
+    titrePage: 'Le glossaire',
+    court: 'Glossaire',
+    href: `${BASE_DES_ANNEXES}/annexes/glossaire/`,
   },
   {
-    titre: 'Annuaire des données, modèles et outils',
-    resume: 'Où trouver chaque jeu de données, chaque modèle ouvert et chaque outil, avec sa licence.',
+    titre: 'Annuaire des données',
+    resume: 'Où trouver des textes, du code et des tests pour entraîner une IA, avec leur licence et leur accès.',
+    titrePage: "L'annuaire des données",
+    court: 'Données',
+    href: `${BASE_DES_ANNEXES}/annexes/annuaire/`,
   },
   {
     titre: 'Calculateur de coût',
     resume:
       'Choisis une taille de modèle, une quantité de données et un matériel : il estime la mémoire, ' +
       'la durée et le prix.',
+    titrePage: 'Le calculateur de coût',
+    court: 'Calculateur',
+    href: `${BASE_DES_ANNEXES}/annexes/calculateur/`,
   },
   {
     titre: 'Matériel',
     resume: "Quoi acheter, quoi louer, et ce qu'une carte graphique de 16 Go permet vraiment.",
+    titrePage: 'Le matériel',
+    court: 'Matériel',
   },
 ];
 
 // Tous les chapitres dans l'ordre du parcours, de 0.1 à 3.4.
 const TOUS: Chapitre[] = PARCOURS.flatMap((partie) => partie.chapitres);
+
+/** Les numéros de tous les chapitres, dans l'ordre du parcours : « 0.1 », …, « 3.4 ». */
+export const NUMEROS_DU_PARCOURS: readonly string[] = Object.freeze(TOUS.map((c) => c.numero));
 
 // La base du site sans barre oblique finale : « /forge-ia », ou « » à la racine.
 function base(): string {

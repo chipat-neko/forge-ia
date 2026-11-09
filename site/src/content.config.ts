@@ -4,9 +4,9 @@
 import { defineCollection } from 'astro:content';
 import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
-import { PARCOURS } from './lib/parcours';
+import { NUMEROS_DU_PARCOURS } from './lib/parcours';
 
-const NUMEROS = new Set(PARCOURS.flatMap((partie) => partie.chapitres.map((c) => c.numero)));
+const NUMEROS = new Set(NUMEROS_DU_PARCOURS);
 
 /**
  * Données d'un chapitre (frontmatter). Les textes sont bruts : le gabarit

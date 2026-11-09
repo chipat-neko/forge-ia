@@ -1,7 +1,8 @@
 // Les textes bruts des démos n'entrent pas dans l'index de la recherche
 // (revue finale, m8) : les prénoms tirés au hasard de l'ouverture de 0.5, le
 // tableau avant/après de l'avant-goût, la grille de l'atelier des formes, le
-// dessin du neurone, et les jetons numérotés de l'atelier de 1.3. Chacun porte
+// dessin du neurone, et les jetons numérotés de l'atelier de 1.3. Les dates de
+// relevé de l'annuaire des données non plus. Chacun porte
 // data-pagefind-ignore, ou se trouve dans un élément qui le porte, comme les
 // textes de l'atelier de 0.1 depuis le plan 4.
 //
@@ -17,6 +18,8 @@ const ZONES: [string, string, string][] = [
   ['/forge-ia/partie-0/0-5/', '[data-test="neu-dessin"]', 'le dessin du neurone'],
   ['/forge-ia/partie-0/0-5/', '[data-test="mini-avant-apres"]', 'le tableau avant/après de l’avant-goût'],
   ['/forge-ia/partie-1/1-3/', '[data-test="jetons"]', 'les jetons numérotés de l’atelier de 1.3'],
+  // L'annuaire entre dans l'index, mais pas ses colonnes de dates (tâche 9 du plan 5).
+  ['/forge-ia/annexes/annuaire/', '[data-test="releve-le"]', 'les dates de relevé de l’annuaire'],
 ];
 
 test('les textes bruts des démos restent hors de l’index de la recherche', async ({ page }) => {

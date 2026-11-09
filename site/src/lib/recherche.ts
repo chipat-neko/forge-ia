@@ -3,7 +3,7 @@
 //
 // Pagefind indexe le site construit (npm run build lance `pagefind --site
 // dist`) : seules les pages marquées `data-pagefind-body`, c'est-à-dire les
-// chapitres publiés, sont dans l'index. Son script est chargé à la demande,
+// chapitres publiés, le glossaire et l'annuaire des données, sont dans l'index. Son script est chargé à la demande,
 // à la première recherche ; en développement (astro dev), il n'existe pas et
 // `chercher` lève une erreur que la page affiche simplement.
 import type { Chapitre } from './parcours';

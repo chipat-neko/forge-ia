@@ -1,0 +1,67 @@
+---
+// La page d'annexe du calculateur de coût (maquette docs/maquettes/annexes.html) : le
+// composant Calculateur du plan 3, ouvert d'office (c'est un outil de référence : ni pari
+// ni verrou), sous son titre et son chapeau. Il part de son réglage de départ, ton IA dans
+// sa plus grande taille sur la carte de ce PC (reglageDeDepart()).
+//
+// La page d'essai src/essais/calculateur.mdx reste, pour les parcours du plan 3. Cette
+// page-ci n'entre pas dans l'index de la recherche : ses nombres changent avec le réglage.
+import LayoutAnnexe from '../../layouts/LayoutAnnexe.astro';
+import Calculateur from '../../components/demos/Calculateur.svelte';
+import { OPERATIONS_PAR_PARAMETRE_ET_JETON } from '../../lib/calculateur/formules';
+import { ANNEXES } from '../../lib/parcours';
+import { typographier } from '../../lib/typo';
+
+const href = ANNEXES.find((a) => a.titre === 'Calculateur de coût')?.href;
+if (href === undefined) throw new Error('calculateur.astro : l’annexe « Calculateur de coût » n’a pas d’adresse dans ANNEXES.');
+---
+
+<LayoutAnnexe
+  href={href}
+  description="Combien de calcul, de temps, de mémoire et d'argent demande un entraînement : celui de ton IA, ou celui d'un grand modèle public."
+>
+  <Fragment slot="ouverture">
+    <p class="chapeau">
+      {
+        typographier(
+          "Combien de calcul, de temps, de mémoire et d'argent demande un entraînement : celui de ton IA, ou celui d'un grand modèle public. Règle la phrase, le relevé suit, chaque prix avec sa source et sa date.",
+        )
+      }
+    </p>
+    <p class="programme">
+      {
+        typographier(
+          `Il compte comme les chapitres : ${OPERATIONS_PAR_PARAMETRE_ET_JETON} opérations par paramètre et par jeton lu, et 1\u00A0Go pour 2³⁰ octets.`,
+        )
+      }
+    </p>
+  </Fragment>
+  <aside class="note" slot="note">
+    <p>
+      {
+        typographier(
+          'Les nombres jaunes se règlent : fais-les glisser, ou atteins-les avec Tab, puis utilise les flèches. Les menus jaunes changent le modèle et la carte.',
+        )
+      }
+    </p>
+    <p>{typographier('Il s’ouvre réglé sur ton IA, dans sa plus grande taille, et sur la carte de ce PC.')}</p>
+  </aside>
+
+  <div class="bloc corps-calculateur">
+    <div class="texte">
+      <Calculateur client:load />
+    </div>
+  </div>
+</LayoutAnnexe>
+
+<style>
+  .corps-calculateur {
+    padding-top: 52px;
+  }
+
+  /* La largeur de la colonne des chapitres, où le calculateur a été dessiné (page d'essai) :
+     ses lignes de prose y restent sous 80 caractères. */
+  .corps-calculateur > .texte {
+    max-width: 29.5em;
+  }
+</style>

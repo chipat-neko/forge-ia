@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ANNEXES,
+  NUMEROS_DU_PARCOURS,
   PARCOURS,
   chapitresDuGroupe,
   etatParution,
@@ -88,6 +89,14 @@ describe('PARCOURS', () => {
         expect(chapitre.groupe).toBeUndefined();
       }
     }
+  });
+});
+
+describe('NUMEROS_DU_PARCOURS', () => {
+  it('donne les numéros de tous les chapitres, dans l’ordre du parcours', () => {
+    expect(NUMEROS_DU_PARCOURS).toEqual(PARCOURS.flatMap((p) => p.chapitres.map((c) => c.numero)));
+    expect(NUMEROS_DU_PARCOURS[0]).toBe('0.1');
+    expect(NUMEROS_DU_PARCOURS.at(-1)).toBe('3.4');
   });
 });
 
@@ -210,11 +219,30 @@ describe('textes des maquettes validées (accueil C et page de partie)', () => {
   });
 
   it('annonce les quatre annexes de la spécification', () => {
+    // L'annuaire de la version 1 ne liste que des données : son titre le dit (plan 5, P13).
     expect(ANNEXES.map((a) => a.titre)).toEqual([
       'Glossaire',
-      'Annuaire des données, modèles et outils',
+      'Annuaire des données',
       'Calculateur de coût',
       'Matériel',
+    ]);
+  });
+
+  it('donne une adresse aux trois annexes construites, sous la base du site, et aucune au matériel', () => {
+    expect(ANNEXES.map((a) => a.href)).toEqual([
+      `${import.meta.env.BASE_URL}annexes/glossaire/`,
+      `${import.meta.env.BASE_URL}annexes/annuaire/`,
+      `${import.meta.env.BASE_URL}annexes/calculateur/`,
+      undefined,
+    ]);
+  });
+
+  it('nomme chaque annexe pour sa page et pour la barre des annexes', () => {
+    expect(ANNEXES.map((a) => [a.titrePage, a.court])).toEqual([
+      ['Le glossaire', 'Glossaire'],
+      ["L'annuaire des données", 'Données'],
+      ['Le calculateur de coût', 'Calculateur'],
+      ['Le matériel', 'Matériel'],
     ]);
   });
 });

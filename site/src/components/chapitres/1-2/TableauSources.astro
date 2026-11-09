@@ -18,7 +18,7 @@ import { typographier } from '../../../lib/typo';
 
 const annuaire = ANNEXES.find((a) => a.titre.startsWith('Annuaire des données'));
 if (annuaire === undefined) {
-  throw new Error('TableauSources : l’annexe « Annuaire des données, modèles et outils » manque dans ANNEXES (src/lib/parcours.ts).');
+  throw new Error('TableauSources : l’annexe « Annuaire des données » manque dans ANNEXES (src/lib/parcours.ts).');
 }
 
 // Une décimale, deux sous 10 Gio : « 502,8 Gio », « 4,30 Gio », comme docs/donnees.md.

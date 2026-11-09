@@ -2,7 +2,7 @@
 // parcours), les pages de partie, la recherche (Pagefind) et la page 404.
 import { test, expect } from '@playwright/test';
 import { existsSync, readFileSync } from 'node:fs';
-import { PARCOURS } from '../src/lib/parcours';
+import { ANNEXES, PARCOURS } from '../src/lib/parcours';
 import { typographier } from '../src/lib/typo';
 import { terminerChapitre13, verifierAxe, verifierSansDebordement } from './outils';
 
@@ -34,6 +34,23 @@ test('accueil : 34 chapitres, 1.3 disponible', async ({ page }) => {
   await page.waitForURL(/\/forge-ia\/partie-1\/1-3\/$/);
   await verifierAxe(page);
   await verifierSansDebordement(page);
+});
+
+test('accueil : les annexes construites sont des liens, « Matériel » reste à venir', async ({ page }) => {
+  await page.goto('/forge-ia/');
+  const annexes = page.locator('#annexes li');
+  await expect(annexes).toHaveCount(ANNEXES.length);
+  for (const [i, annexe] of ANNEXES.entries()) {
+    const carte = annexes.nth(i);
+    if (annexe.href === undefined) {
+      await expect(carte.getByRole('link')).toHaveCount(0);
+      await expect(carte).toContainText('à venir');
+    } else {
+      await expect(carte.getByRole('link', { name: typographier(annexe.titre) })).toHaveAttribute('href', annexe.href);
+      await expect(carte).not.toContainText('à venir');
+    }
+  }
+  expect(ANNEXES.filter((a) => a.href === undefined).map((a) => a.titre)).toEqual(['Matériel']);
 });
 
 test('page de partie', async ({ page }) => {

@@ -1,0 +1,529 @@
+---
+// L'annuaire des données (maquette docs/maquettes/annexes.html) : les fiches de ANNUAIRE
+// (src/lib/annexes/annuaire.ts), en trois tableaux typographiés, un par groupe. Les jeux
+// que lit ton IA ont un trait indigo dans la marge. Sous 1 140 px, chaque ligne devient
+// un bloc de définitions.
+//
+// Les notes de bas de tableau sont numérotées dans l'ordre de la page. La page est dans
+// l'index de la recherche, sauf ses colonnes de dates (data-pagefind-ignore).
+import LayoutAnnexe from '../../layouts/LayoutAnnexe.astro';
+import { ANNUAIRE, GROUPES, MOTS_DE_L_ACCES, NOTES, texteLicence, texteTaille, type Cellule, type Fiche } from '../../lib/annexes/annuaire';
+import { formaterDate } from '../../lib/calculateur/formats';
+import { pourcent } from '../../lib/nombres';
+import { ANNEXES } from '../../lib/parcours';
+import { typographier } from '../../lib/typo';
+
+const href = ANNEXES.find((a) => a.titre === 'Annuaire des données')?.href;
+if (href === undefined) throw new Error('annuaire.astro : l’annexe « Annuaire des données » n’a pas d’adresse dans ANNEXES.');
+
+// Les notes, numérotées dans l'ordre des groupes.
+const numeroDeNote = new Map(GROUPES.flatMap((g) => NOTES.filter((n) => n.groupe === g.id)).map((n, i) => [n.id, i + 1]));
+const appel = (fiche: Fiche, cellule: Cellule) => {
+  const id = fiche.appels?.[cellule];
+  return id === undefined ? undefined : numeroDeNote.get(id);
+};
+
+// « french_bench_arc_challenge » en « french_bench_ », « arc_challenge » : les endroits où le
+// nom d'un jeu peut passer à la ligne, après « _ » ou « - ». Un morceau de moins de 8
+// caractères reste collé au suivant (ou, en fin de nom, au précédent).
+function morceauxDuJeu(jeu: string): string[] {
+  const morceaux: string[] = [];
+  let enCours = '';
+  for (const bout of jeu.split(/(?<=[_-])/)) {
+    enCours += bout;
+    if (enCours.length >= 8) {
+      morceaux.push(enCours);
+      enCours = '';
+    }
+  }
+  if (enCours !== '') {
+    if (morceaux.length === 0) morceaux.push(enCours);
+    else morceaux[morceaux.length - 1] += enCours;
+  }
+  return morceaux;
+}
+
+// « 09/11/2026 » : la date courte, pour la colonne étroite des relevés.
+const dateCourte = (iso: string) => iso.split('-').reverse().join('/');
+const dates = [...new Set(ANNUAIRE.map((f) => f.releveLe))].sort();
+const quand = dates.length === 1 ? `le ${formaterDate(dates[0])}` : `du ${formaterDate(dates[0])} au ${formaterDate(dates.at(-1)!)}`;
+const programme = typographier(`${ANNUAIRE.length} jeux en ${GROUPES.length} groupes, relevés ${quand} sur Hugging Face.`);
+
+const COLONNES = ['Nom', 'Ce que c’est', 'Taille annoncée', 'Licence', 'Accès', 'Ton IA', 'Relevé le'];
+---
+
+<LayoutAnnexe
+  href={href}
+  description="Où trouver des textes, du code et des tests pour entraîner une IA, avec leur licence, leur accès et leur taille."
+  indexer
+>
+  <Fragment slot="ouverture">
+    <p class="chapeau">
+      {
+        typographier(
+          'Où trouver des textes, du code et des tests pour entraîner une IA, ce que dit leur licence, et comment y accéder. Les jeux que lit ton IA ont un trait dans la marge.',
+        )
+      }
+    </p>
+    <p class="programme">{programme}</p>
+  </Fragment>
+  <aside class="note haute" slot="note">
+    <p><strong>Les trois accès</strong></p>
+    <dl class="acces-legende">
+      <dt>{MOTS_DE_L_ACCES.libre}</dt>
+      <dd>{typographier('se télécharge sans formulaire ;')}</dd>
+      <dt>{MOTS_DE_L_ACCES.conditions}</dt>
+      <dd>{typographier("connecte-toi à Hugging Face et accepte les conditions de la page : l'accès s'ouvre aussitôt ;")}</dd>
+      <dt>{MOTS_DE_L_ACCES.accord}</dt>
+      <dd>{typographier("les auteurs lisent chaque demande avant d'ouvrir l'accès.")}</dd>
+    </dl>
+    <p>
+      {
+        typographier(
+          "Chaque taille est celle qu'annonce Hugging Face, dans son unité. Une taille en octets a dessous sa valeur en Gio, de 2³⁰ octets : c'est le Go de la mémoire, dans ce site.",
+        )
+      }
+    </p>
+  </aside>
+
+  {
+    GROUPES.map((groupe) => {
+      const fiches = ANNUAIRE.filter((f) => f.groupe === groupe.id);
+      const notes = NOTES.filter((n) => n.groupe === groupe.id);
+      return (
+        <section class="bloc groupe" aria-labelledby={`g-${groupe.id}`} data-groupe={groupe.id}>
+          <div class="large">
+            <h2 id={`g-${groupe.id}`}>{typographier(groupe.titre)}</h2>
+            <p class="intro-groupe">{typographier(groupe.intro)}</p>
+            <table class="annuaire">
+              <caption class="vh">{typographier(groupe.titre)}</caption>
+              <colgroup>
+                <col class="c-nom" />
+                <col class="c-quoi" />
+                <col class="c-taille" />
+                <col class="c-licence" />
+                <col class="c-acces" />
+                <col class="c-ton-ia" />
+                <col class="c-releve" />
+              </colgroup>
+              <thead>
+                <tr>
+                  {COLONNES.map((c, i) => (
+                    <th scope="col" data-pagefind-ignore={i === COLONNES.length - 1 ? '' : undefined}>
+                      {c}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {fiches.map((f) => {
+                  const [proprietaire, jeu] = f.depot.split('/');
+                  const nTaille = appel(f, 'taille');
+                  const nLicence = appel(f, 'licence');
+                  const nAcces = appel(f, 'acces');
+                  return (
+                    <tr class:list={[{ 'ton-ia': f.tonIA !== null }]} data-fiche={f.id}>
+                      <th scope="row" class="nom">
+                        {/* Le nom ne se coupe qu'entre ses mots (« ARC-Challenge » reste entier). */}
+                        <a href={f.url}>{f.nom.split(' ').map((mot, i) => <>{i > 0 && ' '}<span class="ns">{mot}</span></>)}</a>
+                        {/* Sur une seule ligne : aucun blanc entre le propriétaire, la barre et le nom. Le nom du
+                            jeu peut se couper après « _ » ou « - », jamais au milieu d'un mot. */}
+                        <code><span class="ns">{proprietaire}/</span><wbr />{morceauxDuJeu(jeu).map((m, i) => <>{i > 0 && <wbr />}<span class="ns">{m}</span></>)}{f.partie !== null && ','}{f.partie !== null && <> <span class="ns">{f.partie}</span></>}</code>
+                      </th>
+                      <td class="quoi" data-col="Ce que c’est">
+                        <span class="v">{typographier(f.description)}</span>
+                      </td>
+                      <td class="taille" data-col="Taille">
+                        <span class:list={['v', { 'pas-releve': f.taille === null }]}>
+                          <span class="valeur">{typographier(texteTaille(f))}{nTaille !== undefined && <sup class="appel"><a href={`#note-${nTaille}`} aria-label={`note ${nTaille}`}>{nTaille}</a></sup>}</span>
+                          {(f.tailleDetails ?? []).map((d) => (
+                            <small>{typographier(d)}</small>
+                          ))}
+                        </span>
+                      </td>
+                      <td class="licence" data-col="Licence">
+                        <span class="v">
+                          {/* Le nom, les autres licences et l'appel de note se suivent sans blanc parasite. */}
+                          {f.licence === null ? <span class="non">{texteLicence(f)}</span> : <a href={f.licence.url}>{typographier(f.licence.nom)}</a>}{(f.autresLicences ?? []).map((l) => <> et <a href={l.url}>{typographier(l.nom)}</a></>)}{nLicence !== undefined && <sup class="appel"><a href={`#note-${nLicence}`} aria-label={`note ${nLicence}`}>{nLicence}</a></sup>}
+                          {f.licencePrecision && <small>{typographier(f.licencePrecision)}</small>}
+                        </span>
+                      </td>
+                      <td class="acces" data-col="Accès">
+                        <span class="v">{MOTS_DE_L_ACCES[f.acces]}{nAcces !== undefined && <sup class="appel"><a href={`#note-${nAcces}`} aria-label={`note ${nAcces}`}>{nAcces}</a></sup>}</span>
+                      </td>
+                      <td class="ton-ia-col" data-col="Ton IA">
+                        {f.tonIA === null ? (
+                          <span class="v non">non</span>
+                        ) : (
+                          <span class="v">
+                            <strong>oui</strong>{f.tonIAPart !== undefined && `, ${pourcent(f.tonIAPart)}`}
+                            <small>{typographier(`${f.tonIAUsage}, en ${f.tonIA}`)}</small>
+                          </span>
+                        )}
+                      </td>
+                      <td class="releve-le" data-col="Relevé le" data-pagefind-ignore data-test="releve-le">
+                        <span class="v">
+                          <time datetime={f.releveLe}>{dateCourte(f.releveLe)}</time>
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {notes.length > 0 && (
+              <ol class="notes-groupe">
+                {notes.map((n) => (
+                  <li id={`note-${numeroDeNote.get(n.id)}`}>
+                    <span>{numeroDeNote.get(n.id)}.</span>
+                    <span>
+                      {n.morceaux.map((m) => (typeof m === 'string' ? typographier(m) : <a href={m.url}>{typographier(m.texte)}</a>))}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </section>
+      );
+    })
+  }
+</LayoutAnnexe>
+
+<style>
+  .acces-legende {
+    margin: 0.2em 0 1em;
+  }
+
+  .acces-legende dt {
+    font-family: var(--titres);
+    font-weight: 600;
+    color: var(--indigo);
+  }
+
+  .acces-legende dd {
+    margin: 0 0 0.5em;
+  }
+
+  .groupe {
+    padding-top: 72px;
+  }
+
+  .groupe h2 {
+    font-weight: 700;
+    font-size: 31px;
+    letter-spacing: -0.012em;
+    margin: 0 0 8px;
+  }
+
+  .intro-groupe {
+    font-size: 19px;
+    line-height: 1.5;
+    margin: 0 0 22px;
+    max-width: 30em;
+  }
+
+  .annuaire {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  .annuaire col.c-nom {
+    width: 19%;
+  }
+
+  .annuaire col.c-quoi {
+    width: 22%;
+  }
+
+  .annuaire col.c-taille {
+    width: 13%;
+  }
+
+  .annuaire col.c-licence {
+    width: 14%;
+  }
+
+  .annuaire col.c-acces {
+    width: 10%;
+  }
+
+  .annuaire col.c-ton-ia {
+    width: 13%;
+  }
+
+  .annuaire col.c-releve {
+    width: 9%;
+  }
+
+  .annuaire thead th {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 1.3;
+    color: var(--indigo-doux);
+    text-align: left;
+    vertical-align: bottom;
+    padding: 0 14px 8px 0;
+    border-bottom: 2px solid var(--indigo);
+  }
+
+  .annuaire tbody tr {
+    border-bottom: 1px solid var(--brume);
+  }
+
+  .annuaire tbody th,
+  .annuaire tbody td {
+    text-align: left;
+    vertical-align: top;
+    padding: 15px 14px 16px 0;
+    font-weight: 400;
+  }
+
+  .annuaire thead th:last-child,
+  .annuaire tbody td:last-child {
+    padding-right: 0;
+  }
+
+  .annuaire .nom a {
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 18px;
+    line-height: 1.25;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-decoration-color: var(--lavande);
+    text-underline-offset: 0.22em;
+  }
+
+  .annuaire .nom a:hover {
+    text-decoration-color: var(--indigo);
+  }
+
+  .annuaire .ns {
+    white-space: nowrap;
+  }
+
+  .annuaire .nom code {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--indigo-doux);
+    overflow-wrap: anywhere;
+  }
+
+  .annuaire .quoi {
+    font-size: 16.5px;
+    line-height: 1.45;
+  }
+
+  .annuaire .taille,
+  .annuaire .licence,
+  .annuaire .acces,
+  .annuaire .ton-ia-col,
+  .annuaire .releve-le {
+    font-family: var(--titres);
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  .annuaire .taille .valeur {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .annuaire small {
+    display: block;
+    font-size: 14px;
+    color: var(--indigo-doux);
+    margin-top: 2px;
+  }
+
+  .annuaire .licence a {
+    color: var(--indigo);
+    font-weight: 600;
+  }
+
+  .annuaire .releve-le {
+    font-variant-numeric: tabular-nums;
+    color: var(--indigo-doux);
+    white-space: nowrap;
+  }
+
+  .annuaire .non {
+    color: var(--indigo-doux);
+  }
+
+  .annuaire .pas-releve .valeur {
+    font-family: var(--texte);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 16px;
+    color: var(--indigo-doux);
+  }
+
+  .annuaire .ton-ia-col strong {
+    font-weight: 700;
+  }
+
+  .appel {
+    font-family: var(--titres);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 0;
+    margin-left: 2px;
+  }
+
+  /* Une cible de 24 px sur 24 : les marges verticales négatives n'écartent pas les lignes ;
+     aucune marge horizontale négative, pour ne jamais chevaucher le lien qui suit. */
+  .appel a {
+    display: inline-block;
+    min-width: 24px;
+    height: 24px;
+    line-height: 24px;
+    text-align: left;
+    padding-left: 1px;
+    margin: -9px 0;
+    text-decoration: none;
+    color: var(--indigo-doux);
+  }
+
+  .appel a:hover {
+    color: var(--indigo);
+    text-decoration: underline;
+  }
+
+  /* Les jeux que lit ton IA : un trait indigo dans la marge, sans autre couleur. */
+  .annuaire tr.ton-ia th {
+    position: relative;
+  }
+
+  .annuaire tr.ton-ia th::before {
+    content: '';
+    position: absolute;
+    left: -26px;
+    top: 15px;
+    bottom: 16px;
+    width: 4px;
+    border-radius: 2px;
+    background: var(--indigo);
+  }
+
+  .notes-groupe {
+    list-style: none;
+    margin: 14px 0 0;
+    padding: 0;
+    font-family: var(--titres);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--indigo-doux);
+    /* 80 caractères au plus par ligne, à 14 px. */
+    max-width: 35em;
+  }
+
+  .notes-groupe li {
+    display: grid;
+    grid-template-columns: 1.6em minmax(0, 1fr);
+    padding: 2px 0;
+    scroll-margin-top: 96px;
+  }
+
+  .notes-groupe li:target {
+    color: var(--indigo);
+  }
+
+  .notes-groupe a {
+    color: var(--indigo);
+  }
+
+  @media (max-width: 1140px) {
+    /* L'annuaire n'a plus la place d'un tableau : chaque ligne devient un bloc de définitions. */
+    .annuaire thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+    }
+
+    .annuaire,
+    .annuaire tbody {
+      display: block;
+    }
+
+    .annuaire tbody {
+      border-top: 2px solid var(--indigo);
+    }
+
+    .annuaire tbody tr {
+      display: block;
+      position: relative;
+      padding: 16px 0 14px;
+    }
+
+    .annuaire tbody th {
+      display: block;
+      padding: 0 0 10px;
+    }
+
+    .annuaire tbody td {
+      display: grid;
+      grid-template-columns: 118px minmax(0, 1fr);
+      column-gap: 14px;
+      padding: 4px 0;
+    }
+
+    .annuaire tbody td::before {
+      content: attr(data-col);
+      font-family: var(--titres);
+      font-weight: 600;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--indigo-doux);
+    }
+
+    .annuaire .quoi .v {
+      font-size: 17px;
+    }
+
+    .annuaire tr.ton-ia th::before {
+      content: none;
+    }
+
+    .annuaire tbody tr.ton-ia::before {
+      content: '';
+      position: absolute;
+      left: -22px;
+      top: 16px;
+      bottom: 14px;
+      width: 4px;
+      border-radius: 2px;
+      background: var(--indigo);
+    }
+  }
+
+  @media (max-width: 720px) {
+    .groupe {
+      padding-top: 56px;
+    }
+
+    .groupe h2 {
+      font-size: 26px;
+    }
+
+    .intro-groupe {
+      font-size: 18px;
+    }
+
+    .annuaire tbody td {
+      grid-template-columns: 100px minmax(0, 1fr);
+      column-gap: 12px;
+    }
+
+    .annuaire tbody tr.ton-ia::before {
+      left: -13px;
+    }
+  }
+</style>

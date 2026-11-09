@@ -1,7 +1,8 @@
 ---
 // L'accueil (maquette validée docs/maquettes/accueil-c.html) : le pari
 // d'ouverture, la présentation et le bouton de lecture qui suit la
-// progression, le plan du parcours, puis les annexes.
+// progression, le plan du parcours, puis les annexes : le titre d'une annexe
+// qui a sa page (`href` dans ANNEXES) y mène, les autres sont « à venir ».
 import LayoutSite from '../layouts/LayoutSite.astro';
 import PariAccueil from '../components/accueil/PariAccueil.astro';
 import CarteParcours from '../components/accueil/CarteParcours.astro';
@@ -60,10 +61,10 @@ const apres = typographier(parus.size === 1 ? `Le premier chapitre paru. ${VAGUE
     <ul>
       {
         ANNEXES.map((annexe) => (
-          <li>
-            <h3>{typographier(annexe.titre)}</h3>
+          <li data-annexe={annexe.court}>
+            <h3>{annexe.href ? <a href={annexe.href}>{typographier(annexe.titre)}</a> : typographier(annexe.titre)}</h3>
             <p>{typographier(annexe.resume)}</p>
-            <p class="a-venir">à venir</p>
+            {annexe.href === undefined && <p class="a-venir">à venir</p>}
           </li>
         ))
       }
@@ -183,6 +184,18 @@ const apres = typographier(parus.size === 1 ? `Le premier chapitre paru. ${VAGUE
     font-weight: 700;
     font-size: 22px;
     margin-bottom: 6px;
+  }
+
+  /* Une annexe construite : son titre mène à sa page. */
+  .annexes h3 a {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-decoration-color: var(--lavande);
+    text-underline-offset: 0.2em;
+  }
+
+  .annexes h3 a:hover {
+    text-decoration-color: var(--indigo);
   }
 
   .annexes li p {

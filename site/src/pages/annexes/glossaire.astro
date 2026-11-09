@@ -1,0 +1,791 @@
+---
+// Le glossaire (maquette docs/maquettes/annexes.html) : les termes de GLOSSAIRE
+// (src/lib/annexes/glossaire.ts), rangés par lettre, chacun avec sa définition, ses
+// renvois aux chapitres et ses « voir aussi ». Un renvoi vers un chapitre paru est un
+// lien ; vers un chapitre qui n'a pas paru, un texte suivi de « à venir », sans lien
+// (chapitresParus()).
+//
+// Le champ du haut filtre la liste dans la page : un mot (cherché dans le terme, ses
+// autres noms et sa définition, sans accents ni capitales), ou un numéro de chapitre,
+// qui garde les termes de ce chapitre. Sans JavaScript, le champ reste caché, et toute
+// la liste se lit.
+//
+// La page est dans l'index de la recherche : chaque terme a son titre et son ancre
+// (#<id>), que la recherche du site donne comme passage.
+import LayoutAnnexe from '../../layouts/LayoutAnnexe.astro';
+import { chapitresParus } from '../../lib/chapitres-parus';
+import { GLOSSAIRE, lettreDuTerme, type Terme } from '../../lib/annexes/glossaire';
+import { ANNEXES, NUMEROS_DU_PARCOURS, hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
+import { typographier } from '../../lib/typo';
+
+const parus = await chapitresParus();
+const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
+const href = ANNEXES.find((a) => a.titre === 'Glossaire')?.href;
+if (href === undefined) throw new Error('glossaire.astro : l’annexe « Glossaire » n’a pas d’adresse dans ANNEXES.');
+
+// Les termes rangés par lettre, dans l'ordre du glossaire.
+const lettres: { lettre: string; termes: Terme[] }[] = [];
+for (const terme of GLOSSAIRE) {
+  const lettre = lettreDuTerme(terme.terme);
+  const derniere = lettres.at(-1);
+  if (derniere?.lettre === lettre) derniere.termes.push(terme);
+  else lettres.push({ lettre, termes: [terme] });
+}
+
+// « 0.5 Premier réseau de neurones » : le numéro et le titre court, sans sa précision.
+const titreDuChapitre = (numero: string) =>
+  typographier(`${numero} ${titreCourt(trouverChapitre(numero).chapitre.titre).split(', ')[0]}`);
+const nomDe = (id: string) => GLOSSAIRE.find((t) => t.id === id)?.terme ?? id;
+const premier = GLOSSAIRE[0].terme;
+const dernier = GLOSSAIRE[GLOSSAIRE.length - 1].terme;
+const numeros = GLOSSAIRE.flatMap((t) => t.renvois.map((r) => r.chapitre));
+const plusLoin = [...new Set(numeros)].sort((a, b) => NUMEROS_DU_PARCOURS.indexOf(a) - NUMEROS_DU_PARCOURS.indexOf(b)).at(-1);
+const programme = typographier(
+  `${GLOSSAIRE.length} termes, de « ${premier} » à « ${dernier} », de la Partie 0 au chapitre ${plusLoin}.`,
+);
+const VOIR_AUSSI = typographier('voir aussi : ');
+---
+
+<LayoutAnnexe
+  href={href}
+  description="Les mots du parcours de La Forge IA, expliqués en deux phrases au plus, avec les chapitres où tu les manipules."
+  indexer
+>
+  <Fragment slot="ouverture">
+    <p class="chapeau">
+      {typographier('Les mots du parcours, expliqués en deux phrases au plus. Chacun renvoie au chapitre où tu le manipules pour de vrai.')}
+    </p>
+    <p class="programme">{programme}</p>
+  </Fragment>
+  <aside class="note" slot="note" data-pagefind-ignore>
+    <p>
+      {typographier('Un terme manque ? ')}<a href={`${base}/recherche/`}>La recherche</a> lit aussi le texte des chapitres.
+    </p>
+  </aside>
+
+  <div class="bloc corps-glossaire">
+    <form class="filtre" role="search" aria-label="Filtrer le glossaire" data-filtre hidden data-pagefind-ignore>
+      <label for="filtre">Filtrer les termes</label>
+      <div class="filtre-ligne">
+        <input
+          type="search"
+          id="filtre"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder={typographier('un terme, ou un chapitre : 1.3')}
+        />
+        <button type="button" class="effacer" data-effacer hidden>effacer</button>
+      </div>
+      <p class="compte" role="status" data-compte><strong>{GLOSSAIRE.length}</strong> termes.</p>
+    </form>
+
+    <aside class="note index" data-pagefind-ignore>
+      <nav aria-label="Aller à une lettre">
+        <p class="aller">Aller à la lettre</p>
+        <ul style={`--lettres-par-ligne: ${Math.ceil(lettres.length / 2)}`}>
+          {
+            lettres.map(({ lettre }) => (
+              <li>
+                <a href={`#lettre-${lettre.toLowerCase()}`} data-lettre={lettre}>
+                  {lettre}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+        <p class="legende-index">{typographier('Un renvoi sans lien : son chapitre est à venir.')}</p>
+      </nav>
+    </aside>
+
+    <div class="texte lettres">
+      {
+        lettres.map(({ lettre, termes }) => (
+          <section class="lettre" data-section-lettre={lettre} aria-labelledby={`lettre-${lettre.toLowerCase()}`}>
+            <h2 id={`lettre-${lettre.toLowerCase()}`}>
+              <span class="vh">Lettre </span>
+              {lettre}
+            </h2>
+            {termes.map((t) => (
+              <div class="terme" data-terme={t.id} data-chapitres={t.renvois.map((r) => r.chapitre).join(' ')}>
+                <div class="tete-terme">
+                  <h3 id={t.id}>
+                    <dfn>{typographier(t.terme)}</dfn>
+                  </h3>
+                  {(t.anglais || t.aussi || t.enFrancais) && (
+                    <p class="anglais">
+                      {t.aussi && typographier(`aussi : ${t.aussi}`)}
+                      {t.aussi && t.anglais && typographier(' ; ')}
+                      {t.enFrancais && typographier(`en français, aussi : ${t.enFrancais}`)}
+                      {t.anglais && (
+                        <>
+                          {typographier('en anglais : ')}
+                          <i lang="en">{t.anglais}</i>
+                        </>
+                      )}
+                    </p>
+                  )}
+                </div>
+                <p class="def">{typographier(t.definition)}</p>
+                <p class="renvois">
+                  <span>
+                    {t.renvois.map((r, i) => (
+                      <>
+                        {i > 0 && ', '}
+                        {`${r.verbe} en `}
+                        {parus.has(r.chapitre) ? (
+                          <a href={hrefChapitre(r.chapitre)}>{titreDuChapitre(r.chapitre)}</a>
+                        ) : (
+                          <>
+                            <span class="chapitre-a-venir">{titreDuChapitre(r.chapitre)}</span>, à venir
+                          </>
+                        )}
+                      </>
+                    ))}
+                  </span>
+                  {t.voirAussi && t.voirAussi.length > 0 && (
+                    <span>
+                      {VOIR_AUSSI}
+                      {t.voirAussi.map((v, i) => (
+                        <>
+                          {i > 0 && ', '}
+                          <a href={`#${v}`} data-voir-aussi>
+                            {typographier(nomDe(v))}
+                          </a>
+                        </>
+                      ))}
+                    </span>
+                  )}
+                </p>
+              </div>
+            ))}
+          </section>
+        ))
+      }
+
+      <div class="vide-filtre" data-vide hidden data-pagefind-ignore>
+        <p class="vide-titre">
+          {typographier('Aucun terme ne contient « ')}<span data-vide-q></span>{typographier(' ».')}
+        </p>
+        <p>
+          {typographier('La recherche du site lit aussi le texte des chapitres : ')}<a
+            data-vide-lien
+            href={`${base}/recherche/`}>cherche-le partout</a
+          >.
+        </p>
+      </div>
+    </div>
+  </div>
+</LayoutAnnexe>
+
+<script>
+  // Le filtre du glossaire. Il garde les termes qui contiennent le texte tapé (dans le
+  // mot, ses autres noms ou sa définition, sans accents ni capitales), ou, pour un numéro
+  // de chapitre (« 1.3 »), ceux que ce chapitre explique. Les passages trouvés sont
+  // surlignés. Le compte est annoncé (role="status") quand la frappe s'arrête.
+  const FINE = '\u202F';
+  const formulaire = document.querySelector<HTMLFormElement>('[data-filtre]')!;
+  const champ = document.querySelector<HTMLInputElement>('#filtre')!;
+  const effacer = document.querySelector<HTMLButtonElement>('[data-effacer]')!;
+  const compte = document.querySelector<HTMLElement>('[data-compte]')!;
+  const vide = document.querySelector<HTMLElement>('[data-vide]')!;
+  const videQ = document.querySelector<HTMLElement>('[data-vide-q]')!;
+  const videLien = document.querySelector<HTMLAnchorElement>('[data-vide-lien]')!;
+  const sections = [...document.querySelectorAll<HTMLElement>('[data-section-lettre]')];
+  const base = videLien.pathname;
+
+  // Sans accents ni capitales, caractère par caractère : les positions restent celles du
+  // texte d'origine, pour surligner au bon endroit. Les espaces fines et insécables
+  // comptent comme des espaces, l'apostrophe courbe comme une droite.
+  const plat = (s: string) =>
+    [...s]
+      .map((c) => c.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().charAt(0) || c)
+      .join('')
+      .replace(/[\u00A0\u202F]/g, ' ')
+      .replace(/’/g, "'");
+
+  interface TermeDeLaPage {
+    element: HTMLElement;
+    mot: HTMLElement;
+    def: HTMLElement;
+    texteMot: string;
+    texteDef: string;
+    cherche: string;
+    chapitres: string[];
+  }
+
+  const termes: TermeDeLaPage[] = [...document.querySelectorAll<HTMLElement>('[data-terme]')].map((element) => {
+    const mot = element.querySelector<HTMLElement>('dfn')!;
+    const def = element.querySelector<HTMLElement>('.def')!;
+    const autres = element.querySelector('.anglais')?.textContent ?? '';
+    return {
+      element,
+      mot,
+      def,
+      texteMot: mot.textContent ?? '',
+      texteDef: def.textContent ?? '',
+      cherche: plat(`${mot.textContent} ${autres} ${def.textContent}`),
+      chapitres: (element.dataset.chapitres ?? '').split(' '),
+    };
+  });
+  const total = termes.length;
+
+  /** Le texte, ses passages trouvés dans des <mark>. */
+  function souligner(cible: HTMLElement, texte: string, q: string): void {
+    if (!q) {
+      cible.textContent = texte;
+      return;
+    }
+    const p = plat(texte);
+    const morceaux: (string | HTMLElement)[] = [];
+    let i = 0;
+    for (let j = p.indexOf(q); j !== -1; j = p.indexOf(q, i)) {
+      morceaux.push(texte.slice(i, j));
+      const marque = document.createElement('mark');
+      marque.textContent = texte.slice(j, j + q.length);
+      morceaux.push(marque);
+      i = j + q.length;
+    }
+    morceaux.push(texte.slice(i));
+    cible.replaceChildren(...morceaux);
+  }
+
+  const pluriel = (n: number) => (n > 1 ? 'termes' : 'terme');
+  let minuterie: number | undefined;
+
+  function filtrer(toutDeSuite: boolean): void {
+    const brut = champ.value.trim();
+    const q = plat(brut);
+    const chapitre = /^\d\.\d+$/.test(brut);
+    let n = 0;
+    for (const t of termes) {
+      const garde = !q || (chapitre ? t.chapitres.includes(brut) : t.cherche.includes(q));
+      t.element.hidden = !garde;
+      if (garde) n++;
+      souligner(t.mot, t.texteMot, chapitre ? '' : q);
+      souligner(t.def, t.texteDef, chapitre ? '' : q);
+    }
+    let premiere = true;
+    for (const section of sections) {
+      const sansTerme = section.querySelector('[data-terme]:not([hidden])') === null;
+      section.hidden = sansTerme;
+      section.classList.toggle('premiere', !sansTerme && premiere);
+      if (!sansTerme) premiere = false;
+      const lien = document.querySelector<HTMLAnchorElement>(`[data-lettre="${section.dataset.sectionLettre}"]`);
+      if (lien === null) continue;
+      // Une lettre sans terme n'est plus atteignable, ni à la souris ni au clavier.
+      lien.classList.toggle('sans-terme', sansTerme);
+      if (sansTerme) {
+        lien.setAttribute('aria-disabled', 'true');
+        lien.tabIndex = -1;
+      } else {
+        lien.removeAttribute('aria-disabled');
+        lien.removeAttribute('tabindex');
+      }
+    }
+    effacer.hidden = brut === '';
+    vide.hidden = n > 0;
+    videQ.textContent = brut;
+    videLien.href = brut ? `${base}?q=${encodeURIComponent(brut)}` : base;
+
+    const guillemets = `«${FINE}${brut}${FINE}»`;
+    const message = (): (string | HTMLElement)[] => {
+      const fort = (texte: string) => Object.assign(document.createElement('strong'), { textContent: texte });
+      if (!q) return [fort(String(total)), ' termes.'];
+      if (n === 0) return [`Aucun terme sur ${total} pour ${guillemets}.`];
+      const fin = chapitre ? `, ceux qu’explique ${brut}.` : '.';
+      return [fort(String(n)), ` ${pluriel(n)} sur ${total} pour ${guillemets}${fin}`];
+    };
+    window.clearTimeout(minuterie);
+    const poser = () => compte.replaceChildren(...message());
+    if (toutDeSuite) poser();
+    else minuterie = window.setTimeout(poser, 150);
+  }
+
+  function toutMontrer(): void {
+    champ.value = '';
+    filtrer(true);
+  }
+
+  formulaire.hidden = false;
+  champ.addEventListener('input', () => filtrer(false));
+  formulaire.addEventListener('submit', (e) => e.preventDefault());
+  effacer.addEventListener('click', () => {
+    toutMontrer();
+    champ.focus();
+  });
+  champ.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && champ.value) {
+      toutMontrer();
+      e.preventDefault();
+    }
+  });
+
+  // Un lien vers un terme caché par le filtre (« voir aussi », lettre, adresse) efface le filtre.
+  function montrerLaCible(): void {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const cible = id ? document.getElementById(id) : null;
+    if (cible?.closest('[hidden]')) {
+      toutMontrer();
+      cible.scrollIntoView();
+    }
+  }
+  for (const lien of document.querySelectorAll<HTMLAnchorElement>('[data-voir-aussi]')) {
+    lien.addEventListener('click', () => {
+      const cible = document.getElementById(decodeURIComponent(lien.hash.slice(1)));
+      if (cible?.closest('[hidden]')) toutMontrer();
+    });
+  }
+  window.addEventListener('hashchange', montrerLaCible);
+</script>
+
+<style>
+  .corps-glossaire {
+    padding-top: 40px;
+  }
+
+  .corps-glossaire > .filtre {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .corps-glossaire > .index {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-self: stretch;
+    padding-top: 0;
+  }
+
+  .corps-glossaire > .lettres {
+    grid-row: 2;
+  }
+
+  /* ---------- Le filtre : on y tape, il est donc jaune, comme le champ de la recherche. ---------- */
+  .filtre[hidden] {
+    display: none;
+  }
+
+  .filtre label {
+    display: block;
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 17px;
+    color: var(--indigo-doux);
+    margin-bottom: 6px;
+  }
+
+  .filtre-ligne {
+    position: relative;
+  }
+
+  .filtre input {
+    width: 100%;
+    appearance: none;
+    font-family: var(--texte);
+    font-style: italic;
+    font-size: 26px;
+    line-height: 1.3;
+    color: var(--indigo);
+    background: var(--soleil-pale);
+    border: 0;
+    border-bottom: 4px solid var(--soleil);
+    border-radius: 8px 8px 0 0;
+    padding: 10px 104px 8px 16px;
+  }
+
+  .filtre input::-webkit-search-cancel-button {
+    display: none;
+  }
+
+  .filtre input::placeholder {
+    color: var(--indigo-doux);
+    opacity: 1;
+  }
+
+  .filtre input:hover {
+    background: var(--soleil-survol);
+  }
+
+  .filtre input:focus-visible {
+    outline: none;
+    background: var(--soleil-survol);
+    border-bottom-color: var(--indigo);
+  }
+
+  .effacer {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--indigo);
+    background: none;
+    border: 0;
+    border-radius: 4px;
+    padding: 2px 4px;
+    min-height: 28px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: var(--soleil-vif);
+    text-decoration-thickness: 3px;
+    text-underline-offset: 4px;
+  }
+
+  .effacer:hover {
+    background: var(--papier);
+  }
+
+  .effacer[hidden] {
+    display: none;
+  }
+
+  .compte {
+    font-family: var(--titres);
+    font-weight: 500;
+    font-size: 16px;
+    color: var(--indigo-doux);
+    margin: 10px 0 0;
+    min-height: 1.5em;
+  }
+
+  .compte :global(strong) {
+    color: var(--indigo);
+    font-weight: 700;
+  }
+
+  /* ---------- L'index des lettres, dans la marge de droite ---------- */
+  .index nav {
+    position: sticky;
+    top: 92px;
+    padding-top: 2px;
+  }
+
+  .index .aller {
+    font-family: var(--titres);
+    font-weight: 500;
+    font-size: 15px;
+    margin: 0 0 6px;
+  }
+
+  .index ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(6, 34px);
+    gap: 2px 4px;
+  }
+
+  .index a {
+    display: grid;
+    place-items: center;
+    height: 34px;
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 19px;
+    color: var(--indigo);
+    text-decoration: none;
+    border-radius: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .index a:hover {
+    background: var(--brume-claire);
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+  }
+
+  .index a:global(.sans-terme) {
+    color: var(--lavande);
+    pointer-events: none;
+  }
+
+  .index .legende-index {
+    font-family: var(--texte);
+    font-weight: 400;
+    font-size: 15px;
+    line-height: 1.45;
+    margin: 18px 0 0;
+    max-width: 15em;
+  }
+
+  /* ---------- Les lettres et les termes ---------- */
+  .lettre {
+    position: relative;
+    padding-top: 40px;
+    margin-top: 12px;
+    border-top: 1px solid var(--brume);
+  }
+
+  /* La première lettre affichée n'a pas de filet au-dessus d'elle (le filtre la marque). */
+  .lettre:first-of-type,
+  .lettre.premiere {
+    border-top: 0;
+  }
+
+  .lettre:first-of-type {
+    margin-top: 0;
+    padding-top: 44px;
+  }
+
+  .lettre[hidden],
+  .terme[hidden] {
+    display: none;
+  }
+
+  /* La lettre, en grand dans la marge de gauche, comme les numéros d'étape. */
+  .lettre h2 {
+    position: absolute;
+    left: -100px;
+    top: 30px;
+    width: 56px;
+    text-align: right;
+    font-weight: 800;
+    font-size: 60px;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--lavande);
+    margin: 0;
+  }
+
+  .lettre:first-of-type h2 {
+    top: 34px;
+  }
+
+  .terme {
+    padding: 0 0 30px;
+  }
+
+  .terme:last-child {
+    padding-bottom: 34px;
+  }
+
+  .tete-terme {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 14px;
+    margin: 0 0 4px;
+  }
+
+  .tete-terme h3 {
+    margin: 0;
+    scroll-margin-top: 96px;
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 1.25;
+    letter-spacing: -0.012em;
+  }
+
+  dfn {
+    font-style: normal;
+  }
+
+  .anglais {
+    margin: 0;
+    font-family: var(--titres);
+    font-weight: 500;
+    font-size: 15px;
+    line-height: 1.4;
+    color: var(--indigo-doux);
+  }
+
+  .anglais i {
+    font-family: var(--texte);
+    font-size: 18px;
+    color: var(--indigo);
+  }
+
+  /* 29,5em, comme la colonne des chapitres : 80 caractères au plus par ligne. */
+  .def {
+    margin: 0 0 6px;
+    font-size: 20px;
+    line-height: 1.55;
+    max-width: 29.5em;
+  }
+
+  .renvois {
+    margin: 0;
+    max-width: 34em;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 26px;
+    font-family: var(--titres);
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--indigo-doux);
+  }
+
+  .renvois a {
+    display: inline-block;
+    padding: 2px 0;
+    color: var(--indigo);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-decoration-color: var(--lavande);
+    text-underline-offset: 0.24em;
+  }
+
+  .renvois a:hover {
+    text-decoration-color: var(--indigo);
+  }
+
+  .chapitre-a-venir {
+    font-weight: 500;
+    color: var(--indigo-doux);
+  }
+
+  /* Le titre d'un chapitre ne se coupe pas (« Le pré-entraînement » restait coupé au trait d'union). */
+  .renvois a,
+  .chapitre-a-venir {
+    white-space: nowrap;
+  }
+
+  .terme:has(h3:target) dfn {
+    box-shadow: inset 0 -0.32em 0 var(--teinte-a);
+  }
+
+  .terme :global(mark) {
+    color: var(--indigo);
+    background: var(--teinte-a);
+    border-radius: 4px;
+    padding: 0 2px;
+    box-shadow: inset 0 -2px 0 var(--teinte-a-trait);
+  }
+
+  .vide-filtre {
+    padding: 46px 0 20px;
+  }
+
+  .vide-filtre[hidden] {
+    display: none;
+  }
+
+  .vide-titre {
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 1.2;
+    margin: 0 0 10px;
+  }
+
+  .vide-filtre p:not(.vide-titre) {
+    font-size: 19px;
+    max-width: 29.5em;
+  }
+
+  @media (max-width: 1140px) {
+    .corps-glossaire > .filtre,
+    .corps-glossaire > .index,
+    .corps-glossaire > .lettres {
+      grid-column: 2;
+      grid-row: auto;
+    }
+
+    .corps-glossaire > .index {
+      margin-top: 0;
+      padding: 0;
+    }
+
+    .index nav {
+      position: static;
+      padding-top: 20px;
+    }
+
+    .index ul {
+      grid-template-columns: repeat(var(--lettres-par-ligne), 34px);
+    }
+  }
+
+  @media (max-width: 720px) {
+    .corps-glossaire > .filtre,
+    .corps-glossaire > .index,
+    .corps-glossaire > .lettres {
+      grid-column: 1;
+    }
+
+    .corps-glossaire {
+      padding-top: 32px;
+    }
+
+    .filtre input {
+      font-size: 22px;
+      padding-right: 92px;
+    }
+
+    .index nav {
+      padding-top: 14px;
+    }
+
+    .index .aller {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+    }
+
+    .index .legende-index {
+      max-width: none;
+      margin-top: 8px;
+    }
+
+    .index ul {
+      grid-template-columns: repeat(var(--lettres-par-ligne), minmax(0, 1fr));
+      gap: 0 2px;
+    }
+
+    .index a {
+      height: 36px;
+      font-size: 17px;
+    }
+
+    /* La lettre passe au-dessus de ses termes, sur un filet. */
+    .lettre,
+    .lettre:first-of-type {
+      padding-top: 26px;
+      margin-top: 8px;
+      border-top: 0;
+    }
+
+    .lettre h2,
+    .lettre:first-of-type h2 {
+      position: static;
+      width: auto;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 40px;
+      margin: 0 0 12px;
+    }
+
+    .lettre h2::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--brume);
+    }
+
+    .terme {
+      padding-bottom: 24px;
+    }
+
+    .tete-terme h3 {
+      font-size: 23px;
+    }
+
+    .def {
+      font-size: 18px;
+    }
+
+    .renvois {
+      gap: 0 18px;
+    }
+  }
+</style>

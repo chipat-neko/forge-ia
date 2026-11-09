@@ -34,12 +34,16 @@ export function contraste(couleurA: string, couleurB: string): number {
 /**
  * Longueur, en caractères, de la plus longue ligne affichée dans les
  * paragraphes de la colonne de lecture. Le plancher de qualité demande des
- * lignes de moins de 80 caractères environ.
+ * lignes de moins de 80 caractères environ. `selecteur` choisit d'autres blocs
+ * de prose (les pages d'annexe) ; par défaut, ceux d'un chapitre.
  */
-export async function plusLongueLigne(page: Page): Promise<{ longueur: number; ligne: string }> {
-  return page.evaluate(() => {
+export async function plusLongueLigne(
+  page: Page,
+  selecteur = '.chapitre .texte p, .chapitre .texte li',
+): Promise<{ longueur: number; ligne: string }> {
+  return page.evaluate((blocs) => {
     let plusLongue = '';
-    for (const bloc of document.querySelectorAll('.chapitre .texte p, .chapitre .texte li')) {
+    for (const bloc of document.querySelectorAll(blocs)) {
       // On regroupe les caractères par ligne, d'après leur position verticale.
       const lignes = new Map<number, string>();
       const marcheur = document.createTreeWalker(bloc, NodeFilter.SHOW_TEXT);
@@ -65,7 +69,7 @@ export async function plusLongueLigne(page: Page): Promise<{ longueur: number; l
       }
     }
     return { longueur: plusLongue.length, ligne: plusLongue };
-  });
+  }, selecteur);
 }
 
 /**
