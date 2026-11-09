@@ -8,7 +8,7 @@
 // L'éventail est caché aux lecteurs d'écran (des lettres isolées et des
 // pourcentages s'écoutent mal) : la légende dit la même chose en une phrase.
 import { pourcent } from '../../../lib/nombres';
-import { nomDuBlanc, ouvertureDuChapitre, unBlanc, visible } from '../../../lib/partie-1/paris-1-1';
+import { nomDuBlanc, ouvertureDuChapitre, unBlanc } from '../../../lib/partie-1/paris-1-1';
 import { typographier } from '../../../lib/typo';
 
 interface Props {
@@ -49,7 +49,8 @@ const constat = typographier(
       {
         suites.map(([c, p]) => (
           <li data-caractere={c}>
-            <span class:list={['car', { blanc: nomDuBlanc(c) !== null }]}>{visible(c)}</span>
+            {/* Un blanc ne se voit pas : son nom, en petit, plutôt qu'un signe qui se lirait comme une case vide. */}
+            <span class:list={['car', { nom: nomDuBlanc(c) !== null }]}>{nomDuBlanc(c) ?? c}</span>
             <span class="piste">
               <span class="barre" style={`width: ${(p * 100).toFixed(2)}%`} />
             </span>
@@ -73,7 +74,7 @@ const constat = typographier(
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
-    gap: 0 6px;
+    gap: 0 8px;
     font-size: 34px;
     line-height: 1.2;
     font-variation-settings: 'opsz' 48;
@@ -81,7 +82,6 @@ const constat = typographier(
 
   .debut {
     margin: 0;
-    padding-top: 4px;
   }
 
   /* La lettre que le modèle regarde : soulignée, comme les morceaux découpés de 1.3. */
@@ -94,38 +94,41 @@ const constat = typographier(
     margin: 0;
     padding: 0;
     display: grid;
-    grid-template-columns: auto 6em auto;
-    align-items: baseline;
-    column-gap: 12px;
+    grid-template-columns: auto 120px auto;
+    align-items: center;
+    gap: 4px 12px;
+    /* La première suite au niveau de la phrase. */
+    padding-top: 2px;
   }
 
   .suites li {
     display: contents;
   }
 
+  /* Des cases de même taille, aux teintes alternées, comme les jetons de 1.3. */
   .car {
+    min-width: 1.4em;
     padding: 0 6px;
     background: var(--teinte-a);
     border-radius: 4px;
     text-align: center;
+    font-size: 0.72em;
+    line-height: 1.3;
   }
 
   .suites li:nth-child(even) .car {
     background: var(--teinte-b);
   }
 
-  /* Les blancs se voient (« ␣ »), plus discrètement que les lettres. */
-  .car.blanc {
+  /* Un blanc : son nom, plus petit, dans une case de la même hauteur. */
+  .car.nom {
+    font-family: var(--titres);
+    font-size: 15px;
+    line-height: calc(0.72 * 34px * 1.3);
     color: var(--indigo-doux);
   }
 
-  /* Les suites moins probables s'effacent un peu : la première est celle qu'on lit. */
-  .suites li:not(:first-child) .car {
-    font-size: 0.72em;
-  }
-
   .piste {
-    align-self: center;
     height: 10px;
     background: var(--brume-claire);
     border-radius: 2px;
@@ -147,6 +150,11 @@ const constat = typographier(
     text-align: right;
   }
 
+  /* La première suite, celle qu'on lit, en encre pleine. */
+  .suites li:first-child .chance {
+    color: var(--indigo);
+  }
+
   figcaption {
     font-family: var(--titres);
     font-size: 15px;
@@ -158,14 +166,29 @@ const constat = typographier(
     margin: 18px 0 0;
   }
 
+  /* Sur un téléphone, l'éventail reste à côté de la phrase : tout est plus petit. */
   @media (max-width: 720px) {
     .eventail {
-      font-size: 26px;
+      font-size: 22px;
+      gap: 0 6px;
     }
 
     .suites {
-      grid-template-columns: auto 4em auto;
-      column-gap: 8px;
+      grid-template-columns: auto 40px auto;
+      gap: 4px 6px;
+    }
+
+    .car {
+      font-size: 0.8em;
+    }
+
+    .car.nom {
+      font-size: 13px;
+      line-height: calc(0.8 * 22px * 1.3);
+    }
+
+    .chance {
+      font-size: 15px;
     }
   }
 </style>

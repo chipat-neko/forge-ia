@@ -15,6 +15,7 @@ import { trouverChapitre } from '../src/lib/parcours';
 import { alphabet, compterParOrdre, couper, generer, tirage } from '../src/lib/partie-1/ngrammes';
 import {
   BARRES_MONTREES,
+  caracteres,
   choixContexte,
   choixPerplexite,
   choixSuivant,
@@ -171,14 +172,14 @@ test('les choix des paris viennent du jumeau', async ({ page }) => {
   }
   // L'ouverture : les cinq caractères du jumeau, dans l'ordre.
   const o = ouvertureDuChapitre(TEXTE);
-  const caracteres = await page
+  const suitesOuverture = await page
     .locator('[data-test="ouverture"] [data-caractere]')
     .evaluateAll((li) => li.map((e) => e.getAttribute('data-caractere') ?? ''));
-  expect(caracteres).toEqual(o.suites.map(([c]) => c));
+  expect(suitesOuverture).toEqual(o.suites.map(([c]) => c));
   // La phrase du minimum : le n et la perplexité du Python.
   const { n, valeur } = minimumDesPerplexites(PERPLEXITES);
   expect(await texteExact(page, '[data-test="minimum"]')).toContain(
-    `la plus basse avec ${n} caractères de contexte${FINE}: ${nombre(valeur, 1)}`,
+    `la plus basse avec ${caracteres(n)} de contexte${FINE}: ${nombre(valeur, 1)}`,
   );
   // Le tableau : une ligne par n, le minimum marqué.
   const lignes = page.locator('[data-test="perplexites"] tbody tr');

@@ -32,7 +32,8 @@ def test_compter_et_laplace():
 # region: test-uniforme
 def test_contexte_jamais_vu_donne_l_uniforme():
     c = compter("abab", 2)
-    assert {p for _, p in distribution(c, ["a", "b"], "bb", 2)} == {0.5}
+    d = distribution(c, ["a", "b"], "bb", 2)
+    assert {p for _, p in d} == {0.5}
 # fin: test-uniforme
 
 

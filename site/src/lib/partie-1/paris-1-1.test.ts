@@ -15,14 +15,12 @@ import {
   tourneEnRond,
 } from './ngrammes';
 import {
-  blancsDuPariSuivant,
   choixContexte,
   choixPerplexite,
   choixSuivant,
   choixTemperature,
   CONTEXTE_DU_PARI,
   CONTEXTE_INITIAL,
-  contexteDuPari,
   etatDeLAtelier,
   etatDuDefi,
   faitsDuPariContexte,
@@ -44,48 +42,42 @@ import {
   trancheDeLaPart,
   visible,
 } from './paris-1-1';
-import { ALPHABET, PERPLEXITES, TEXTE_DU_SITE } from './texte-1-1';
+import { PERPLEXITES } from './perplexites-1-1';
+import { ALPHABET, TEXTE_DU_SITE } from './texte-1-1';
 
 const FINE = '\u202F';
 
 describe('le pari « suivant »', () => {
-  it('la bonne réponse est le premier caractère de la distribution du jumeau', () => {
+  it('la bonne réponse est « environ une fois sur N », N calculé sur la distribution du jumeau', () => {
     const c = compter(couper(TEXTE_DU_SITE)[0], N_DU_PARI);
-    expect(choixSuivant(TEXTE_DU_SITE).find((x) => x.juste)?.texte).toBe(
-      `« ${visible(distribution(c, ALPHABET, CONTEXTE_DU_PARI, N_DU_PARI)[0][0])} »`,
-    );
+    const n = Math.round(1 / distribution(c, ALPHABET, CONTEXTE_DU_PARI, N_DU_PARI)[0][1]);
+    expect(choixSuivant(TEXTE_DU_SITE).find((x) => x.juste)?.texte).toBe(`Environ une fois sur ${n}`);
+    expect(choixSuivant(TEXTE_DU_SITE).map((x) => x.texte)).toStrictEqual([
+      `À chaque fois${FINE}: 100${FINE}%`,
+      'Environ une fois sur deux',
+      `Environ une fois sur ${n}`,
+    ]);
   });
 
-  it('« ton I » passe les gardes : vu dans le texte d’apprentissage, son premier suivant seul en tête', () => {
-    expect(contexteDuPari(TEXTE_DU_SITE)).toBe(CONTEXTE_DU_PARI);
+  it('« ton I » passe les gardes : un seul suivant vu, « A », et N ≥ 3', () => {
     const f = faitsDuPariSuivant(TEXTE_DU_SITE);
     expect(f.contexte).toBe(CONTEXTE_DU_PARI);
-    expect(f.total).toBeGreaterThan(0);
-    expect(f.premier[1]).toBeGreaterThan(f.deuxieme[1]);
-    // Le troisième choix ne suit jamais le contexte, et les trois choix sont distincts.
-    expect(f.suivants.map(([c]) => c)).not.toContain(f.troisieme.caractere);
-    const textes = choixSuivant(TEXTE_DU_SITE).map((x) => x.texte);
-    expect(new Set(textes).size).toBe(3);
+    expect(f.caractere).toBe('A');
+    expect(f.fois).toBeGreaterThan(0);
+    // Le lissage : (compte + 1) ÷ (total + V), et 1 ÷ (total + V) pour chacun des autres.
+    expect(f.p).toBe((f.fois + 1) / (f.fois + f.v));
+    expect(f.pAutre).toBe(1 / (f.fois + f.v));
+    expect(f.uneSur).toBe(Math.round(1 / f.p));
+    expect(f.uneSur).toBeGreaterThanOrEqual(3);
   });
 
-  it('si le contexte du pari ne convient plus, le premier contexte de 5 caractères qui passe les gardes', () => {
-    // « abcab » : « abcab » n'y est suivi que de « c », seul en tête ; « ton I » n'y est pas.
-    const texte = 'abcabcabcabcabdabcabcabcabcabc'.repeat(2);
-    const contexte = contexteDuPari(texte);
-    expect(contexte).not.toBe(CONTEXTE_DU_PARI);
-    expect(Array.from(contexte)).toHaveLength(N_DU_PARI);
-    expect(choixSuivant(texte).filter((x) => x.juste)).toHaveLength(1);
-    // Aucun contexte ne passe les gardes : la construction s'arrête.
-    expect(() => contexteDuPari('aaaaaaaaaaaaaaaaaaaa')).toThrow(/Exemple devenu faux/);
-  });
-
-  it('ce que sont les choix qui ne se voient pas', () => {
-    const f = faitsDuPariSuivant(TEXTE_DU_SITE);
-    const blancs = [f.premier[0], f.deuxieme[0], f.troisieme.caractere].filter((c) => nomDuBlanc(c) !== null);
-    const phrase = blancsDuPariSuivant(TEXTE_DU_SITE);
-    if (blancs.length === 0) expect(phrase).toBeNull();
-    for (const c of blancs) expect(phrase).toContain(`« ${visible(c)} »`);
-    expect(blancsDuPariSuivant('abcabcabcabcabdabcabcabcabcabc'.repeat(2))).toBeNull();
+  it('une garde qui tombe arrête la construction', () => {
+    // « ton I » suivi de deux caractères différents.
+    expect(() => faitsDuPariSuivant('ton IA, ton IB. '.repeat(20))).toThrow(/Exemple devenu faux/);
+    // « ton I » toujours suivi de « A », sur un alphabet si petit que A gagne plus d'une fois sur trois.
+    expect(() => faitsDuPariSuivant('ton IA '.repeat(40))).toThrow(/Exemple devenu faux/);
+    // Pas de « ton I » du tout.
+    expect(() => faitsDuPariSuivant('abcdefghij'.repeat(10))).toThrow(/Exemple devenu faux/);
   });
 
   it('visible écrit les blancs comme le chapitre 1.3, et nomDuBlanc les nomme', () => {

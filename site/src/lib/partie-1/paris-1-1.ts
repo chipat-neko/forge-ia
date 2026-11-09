@@ -8,14 +8,13 @@
 //
 // Les fonctions qui lisent le texte le reçoivent en argument, et
 // choixPerplexite reçoit les perplexités : ce module n'importe ni ?raw, ni
-// .json, ni astro:* (P8). Le chapitre leur passe TEXTE_DU_SITE et PERPLEXITES
-// (texte-1-1.ts), les parcours de test le texte et les attendus lus sur le
+// .json, ni astro:* (P8). Le chapitre leur passe TEXTE_DU_SITE (texte-1-1.ts)
+// et PERPLEXITES (perplexites-1-1.ts), les parcours de test le texte et les attendus lus sur le
 // disque. L'atelier (AtelierModeleDeLangage.svelte) y prend ses réglages, ses
 // messages et son défi.
 
 import type { Choix } from '../choix';
 import { exigeur } from '../exiger';
-import { comparerPointsDeCode } from '../points-de-code';
 import {
   alphabet,
   compter,
@@ -201,122 +200,64 @@ export function ouvertureDuChapitre(texte: string): {
 export const CONTEXTE_DU_PARI = 'ton I';
 export const N_DU_PARI = 5;
 
-/** Ce que le pari « suivant » montre d'un contexte. */
+/** Ce que le pari « suivant » montre : le seul suivant de « ton I », ses comptes et sa chance lissée. */
 export interface FaitsDuPariSuivant {
   contexte: string;
-  /** Les caractères qui suivent le contexte dans le texte d'apprentissage, et leurs comptes, du plus fréquent au moins fréquent. */
-  suivants: [string, number][];
-  /** Le nombre de fois que le contexte est suivi d'un caractère. */
-  total: number;
+  /** Le seul caractère qui suit le contexte dans le texte d'entraînement. */
+  caractere: string;
+  /** Combien de fois il le suit : toutes les fois où le contexte est suivi d'un caractère. */
+  fois: number;
   /** Le nombre de caractères de l'alphabet. */
   v: number;
-  /** Les deux premiers caractères de la distribution lissée, avec leur probabilité. */
-  premier: [string, number];
-  deuxieme: [string, number];
-  /** Le caractère le plus fréquent du texte d'apprentissage qui ne suit jamais le contexte, et son compte. */
-  troisieme: { caractere: string; fois: number };
-}
-
-/** Les faits du pari pour un contexte, ou null s'il ne passe pas les gardes. */
-function faitsDuContexte(
-  contexte: string,
-  comptes: Comptes,
-  frequences: Map<string, number>,
-  lettres: readonly string[],
-): FaitsDuPariSuivant | null {
-  // Garde 1 : le contexte apparaît dans le texte d'apprentissage.
-  const vus = comptes.get(contexte);
-  if (vus === undefined) return null;
-  const d = distribution(comptes, lettres, contexte, N_DU_PARI);
-  // Garde 2 : le premier caractère de la distribution est seul en tête.
-  if (d.length < 2 || !(d[0][1] > d[1][1])) return null;
-  const premier = d[0];
-  const deuxieme = d[1];
-  // Le troisième choix : le plus fréquent du texte qui ne suit jamais le contexte (à égalité, le plus petit point de code).
-  const candidats = [...frequences]
-    .filter(([c]) => !vus.has(c) && c !== premier[0] && c !== deuxieme[0])
-    .sort(([a, na], [b, nb]) => nb - na || comparerPointsDeCode(a, b));
-  if (candidats.length === 0) return null;
-  let total = 0;
-  for (const k of vus.values()) total += k;
-  return {
-    contexte,
-    suivants: [...vus].sort(([a, na], [b, nb]) => nb - na || comparerPointsDeCode(a, b)),
-    total,
-    v: lettres.length,
-    premier,
-    deuxieme,
-    troisieme: { caractere: candidats[0][0], fois: candidats[0][1] },
-  };
-}
-
-function faitsDuTexte(texte: string): FaitsDuPariSuivant {
-  const { entrainement, lettres } = modele(texte);
-  const comptes = compter(entrainement, N_DU_PARI);
-  const frequences = compter(entrainement, 0).get('') ?? new Map<string, number>();
-  const faits = faitsDuContexte(CONTEXTE_DU_PARI, comptes, frequences, lettres);
-  if (faits !== null) return faits;
-  // CONTEXTE_DU_PARI ne passe plus les gardes (le texte a changé) : on prend le
-  // premier contexte de N_DU_PARI caractères du texte d'apprentissage qui les
-  // passe toutes. La page reste juste, avec un autre contexte ; ses phrases
-  // propres à « ton I » sont gardées par exiger dans le chapitre.
-  const points = Array.from(entrainement);
-  for (let i = N_DU_PARI; i <= points.length; i++) {
-    const autre = faitsDuContexte(points.slice(i - N_DU_PARI, i).join(''), comptes, frequences, lettres);
-    if (autre !== null) return autre;
-  }
-  exiger(false, `aucun contexte de ${N_DU_PARI} caractères n’a un premier suivant seul en tête, avec un troisième choix`);
-  throw new Error('jamais atteint : exiger a levé l’erreur');
-}
-
-/** Le contexte du pari « suivant » : CONTEXTE_DU_PARI s'il passe les gardes, sinon le premier qui les passe. */
-export function contexteDuPari(texte: string): string {
-  return faitsDuTexte(texte).contexte;
-}
-
-/** Les faits du pari « suivant », pour son explication. */
-export function faitsDuPariSuivant(texte: string): FaitsDuPariSuivant {
-  return faitsDuTexte(texte);
+  /** Sa chance lissée (distribution), et celle de chacun des autres caractères. */
+  p: number;
+  pAutre: number;
+  /** « Environ une fois sur N » : N = round(1 / p). */
+  uneSur: number;
 }
 
 /**
- * Le pari « Quel caractère suit le plus souvent « ton I » ? ». Les choix : le
- * premier caractère de la distribution (le juste), le deuxième, et le
- * caractère le plus fréquent du texte qui ne suit jamais ce contexte. Ils sont
- * rangés par point de code : la bonne réponse n'a pas de place fixe.
+ * Les faits du pari « suivant ». Gardes : CONTEXTE_DU_PARI est vu dans le
+ * texte d'entraînement, suivi d'un seul caractère (« A ») ; et N = round(1 / p)
+ * vaut au moins 3, pour que la bonne réponse ne se confonde pas avec « environ
+ * une fois sur deux ».
+ */
+export function faitsDuPariSuivant(texte: string): FaitsDuPariSuivant {
+  const { entrainement, lettres } = modele(texte);
+  const comptes = compter(entrainement, N_DU_PARI);
+  const suivants = comptes.get(CONTEXTE_DU_PARI);
+  exiger(
+    suivants !== undefined && suivants.size === 1,
+    `« ${CONTEXTE_DU_PARI} » n’est plus suivi d’un seul caractère dans le texte d’entraînement : le pari « suivant » est à revoir`,
+  );
+  const [[caractere, fois]] = [...suivants!];
+  const d = distribution(comptes, lettres, CONTEXTE_DU_PARI, N_DU_PARI);
+  exiger(d[0][0] === caractere, 'le premier caractère de la distribution n’est plus le seul suivant vu');
+  const p = d[0][1];
+  const uneSur = Math.round(1 / p);
+  exiger(uneSur >= 3, `la chance lissée de « ${caractere} » vaut environ une fois sur ${uneSur} : le pari « suivant » est à revoir`);
+  return { contexte: CONTEXTE_DU_PARI, caractere, fois, v: lettres.length, p, pAutre: d[1][1], uneSur };
+}
+
+/**
+ * Le pari « Avec le lissage, quelle chance le modèle donne-t-il à « A » après
+ * « ton I » ? ». La réponse naïve (« A » le suit à chaque fois : 100 %), une
+ * autre fausse (une fois sur deux), et la juste, calculée : environ une fois
+ * sur N.
  */
 export function choixSuivant(texte: string): Choix[] {
-  const { premier, deuxieme, troisieme } = faitsDuTexte(texte);
-  const choix = [premier[0], deuxieme[0], troisieme.caractere]
-    .sort(comparerPointsDeCode)
-    .map((c) => ({ texte: `« ${visible(c)} »`, juste: c === premier[0] }));
-  exiger(new Set(choix.map((c) => c.texte)).size === 3, 'deux choix du pari « suivant » s’affichent de la même façon');
-  return choix;
+  const { uneSur } = faitsDuPariSuivant(texte);
+  return [
+    // Pas « 100 % » en tête : Pari.astro afficherait « 100 » en grand, séparé de « % » par une espace ordinaire.
+    { texte: `À chaque fois${FINE}: 100${FINE}%`, juste: false },
+    { texte: 'Environ une fois sur deux', juste: false },
+    { texte: `Environ une fois sur ${uneSur}`, juste: true },
+  ];
 }
 
 /** « un retour à la ligne », « une espace » : le nom d'un blanc avec son article. */
 export function unBlanc(nom: string): string {
   return `${nom === 'retour à la ligne' ? 'un' : 'une'} ${nom}`;
-}
-
-/**
- * Ce que sont les choix du pari « suivant » qui ne se voient pas, dans l'ordre
- * des choix : « « ↵ » est un retour à la ligne, et « ␣ » une espace. », ou
- * null s'il n'y en a pas. Le texte est brut : la page le typographie.
- */
-export function blancsDuPariSuivant(texte: string): string | null {
-  const { premier, deuxieme, troisieme } = faitsDuTexte(texte);
-  const blancs = [premier[0], deuxieme[0], troisieme.caractere]
-    .sort(comparerPointsDeCode)
-    .flatMap((c) => {
-      const nom = nomDuBlanc(c);
-      return nom === null ? [] : [`« ${visible(c)} »`, unBlanc(nom)];
-    });
-  if (blancs.length === 0) return null;
-  const [premierBlanc, premierNom, ...autres] = blancs;
-  let phrase = `${premierBlanc} est ${premierNom}`;
-  for (let i = 0; i < autres.length; i += 2) phrase += `${i === autres.length - 2 ? ', et' : ','} ${autres[i]} ${autres[i + 1]}`;
-  return `${phrase}.`;
 }
 
 // ---------- Étape 3 : le pari « temperature » ----------
@@ -381,7 +322,7 @@ export function choixContexte(texte: string): Choix[] {
 
 // ---------- Étape 7 : le pari « perplexite » ----------
 
-/** Une ligne des perplexités du Python (PERPLEXITES, texte-1-1.ts). */
+/** Une ligne des perplexités du Python (PERPLEXITES, perplexites-1-1.ts). */
 interface Perplexite {
   n: number;
   entrainement: number;

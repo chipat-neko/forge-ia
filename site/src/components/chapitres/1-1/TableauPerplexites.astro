@@ -2,7 +2,7 @@
 // Le tableau des perplexités du chapitre 1.1 : pour chaque nombre de
 // caractères de contexte (n = 0 à 6), la part des contextes du texte de
 // validation que le modèle n'a jamais vus, puis sa perplexité sur le texte
-// appris et sur le texte jamais lu.
+// d'entraînement et sur le texte de validation.
 //
 // Les perplexités sont celles du Python (PERPLEXITES, lues dans les attendus :
 // elles passent par exp et log, que le site ne refait pas). La part des
@@ -14,7 +14,7 @@
 import { nombre, pourcent } from '../../../lib/nombres';
 import { compter, couper, partJamaisVue } from '../../../lib/partie-1/ngrammes';
 import { minimumDesPerplexites } from '../../../lib/partie-1/paris-1-1';
-import type { PerplexiteDOrdre } from '../../../lib/partie-1/texte-1-1';
+import type { PerplexiteDOrdre } from '../../../lib/partie-1/perplexites-1-1';
 import { typographier } from '../../../lib/typo';
 
 interface Props {
@@ -45,8 +45,9 @@ const lignes = perplexites.map((p) => {
   };
 });
 const legende = typographier(
-  'La perplexité du modèle selon son nombre de caractères de contexte, calculée par le projet (Python). ' +
-    'En gras, la plus basse sur le texte jamais lu.',
+  'Pour chaque nombre de caractères de contexte : la part des contextes du texte de validation que le modèle ' +
+    'n’a jamais vus, puis la perplexité du modèle lissé sur le texte d’entraînement et sur le texte de validation, ' +
+    'calculée par le projet (Python). En gras, la plus basse sur le texte de validation.',
 );
 ---
 
@@ -57,8 +58,8 @@ const legende = typographier(
       <tr>
         <th scope="col" class="nombre">{typographier('Contexte')}</th>
         <th scope="col" class="nombre">{typographier('Contextes jamais vus')}</th>
-        <th scope="col" class="nombre">{typographier('Sur le texte appris')}</th>
-        <th scope="col" class="nombre">{typographier('Sur le texte jamais lu')}</th>
+        <th scope="col" class="nombre">{typographier('Perplexité, entraînement')}</th>
+        <th scope="col" class="nombre">{typographier('Perplexité, validation')}</th>
       </tr>
     </thead>
     <tbody>

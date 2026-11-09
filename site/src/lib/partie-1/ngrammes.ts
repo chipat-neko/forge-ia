@@ -12,7 +12,7 @@
 // une racine carrée, que la norme IEEE 754 arrondit au plus juste dans les deux langages.
 // Les sommes se font dans une boucle, de gauche à droite, comme en Python. La
 // perplexité (exp et log) reste en Python : le site lit ses valeurs dans les
-// attendus (texte-1-1.ts).
+// attendus (perplexites-1-1.ts).
 //
 // Les caractères sont des points de code Unicode, comme les `str` de Python :
 // Array.from les sépare (« 😀 » compte pour un, et non deux), et les tris
@@ -119,25 +119,27 @@ export function distribution(
  * (le carré), 2 les adoucit (la racine carrée), et 0 ne garde que le plus compté.
  */
 export function poids(
-  comptesDuContexte: ReadonlyMap<string, number>,
+  suivants: ReadonlyMap<string, number>,
   lettres: readonly string[],
   temperature: number,
 ): number[] {
-  const compte = (c: string): number => comptesDuContexte.get(c) ?? 0;
-  if (temperature === 1) return lettres.map((c) => compte(c));
-  if (temperature === 0.5) return lettres.map((c) => compte(c) * compte(c));
-  if (temperature === 2) return lettres.map((c) => Math.sqrt(compte(c)));
+  const comptes = lettres.map((c) => suivants.get(c) ?? 0);
+  if (temperature === 1) return comptes;
+  if (temperature === 0.5) return comptes.map((k) => k * k);
+  if (temperature === 2) return comptes.map((k) => Math.sqrt(k));
   if (temperature === 0) {
     // Le premier des plus comptés : l'alphabet est trié, donc le plus petit point de code.
     let meilleur = -1;
     let record = 0;
-    lettres.forEach((c, i) => {
-      if (compte(c) > record) {
+    comptes.forEach((k, i) => {
+      if (k > record) {
         meilleur = i;
-        record = compte(c);
+        record = k;
       }
     });
-    return lettres.map((_, i) => (i === meilleur ? 1 : 0));
+    const gagnant = comptes.map(() => 0);
+    if (meilleur >= 0) gagnant[meilleur] = 1;
+    return gagnant;
   }
   throw new RangeError(MESSAGE_TEMPERATURE);
 }
@@ -187,7 +189,8 @@ export function generer(
       if (suivants !== undefined) break;
     }
     if (suivants === undefined) throw new RangeError(MESSAGE_TEXTE_VIDE);
-    texte.push(lettres[tirer(poids(suivants, lettres, temperature), hasard.uniforme())]);
+    const p = poids(suivants, lettres, temperature);
+    texte.push(lettres[tirer(p, hasard.uniforme())]);
   }
   return texte.join('');
 }

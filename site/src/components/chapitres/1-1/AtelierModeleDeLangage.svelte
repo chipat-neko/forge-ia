@@ -33,6 +33,7 @@
     etatDuDefi,
     GRAINE_INITIALE,
     LONGUEUR_SUITE,
+    messageBoucle,
     N_DU_DEFI,
     N_INITIAL,
     N_MAX,
@@ -82,6 +83,9 @@
   const barres = $derived(etat.chances.slice(0, BARRES_MONTREES));
   const autres = $derived(etat.chances.length - barres.length);
   const defi = $derived(etatDuDefi(etat, $n));
+  // Le message de la boucle décrit la suite : il va sous elle ; les autres décrivent le contexte.
+  const boucle = $derived(etat.messages.includes(messageBoucle()));
+  const messagesDuContexte = $derived(etat.messages.filter((m) => m !== messageBoucle()));
   // La suite écrite après le contexte : generer rend le contexte, puis les caractères tirés.
   const tires = $derived(etat.suite.slice(contexte.length));
 
@@ -187,12 +191,13 @@
           aria-pressed={t === temperature}
           onclick={() => choisirTemperature(t)}>{texteT(t)}</button
         >
-      {/each}
-    </span>{FINE}:
+      {/each}</span
+    >
   </p>
 
+  <!-- Les messages sur le contexte, au-dessus des barres ; celui de la boucle, sous la suite qu'il décrit. -->
   <div class="messages" role="status">
-    {#each etat.messages as message (message)}
+    {#each messagesDuContexte as message (message)}
       <p class="message" data-test="ml-message">{message}</p>
     {/each}
   </div>
@@ -230,6 +235,11 @@
     <p class="suite" data-test="ml-suite" data-pagefind-ignore><span class="depart">{contexte}</span>{tires}</p>
     <p class="graine">Graine du hasard{FINE}: {nombre(graine)}.</p>
   {/if}
+  <div class="messages" role="status">
+    {#if boucle}
+      <p class="message" data-test="ml-message">{messageBoucle()}</p>
+    {/if}
+  </div>
 
   {#if children}
     <div class="texte-atelier">{@render children()}</div>

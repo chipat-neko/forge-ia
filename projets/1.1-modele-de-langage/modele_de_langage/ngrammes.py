@@ -53,10 +53,8 @@ def alphabet(texte: str) -> list[str]:
 
 # region: compter
 def compter(texte: str, n: int) -> dict[str, Counter[str]]:
-    """Pour chaque contexte de n caractères, combien de fois chaque caractère le suit.
-
-    Pour n = 0, le contexte est le texte vide : on compte les caractères tout court.
-    """
+    """Ce qui suit chaque contexte de n caractères, compté."""
+    # Pour n = 0, le contexte est vide : on compte tout.
     comptes: dict[str, Counter[str]] = {}
     for i in range(n, len(texte)):
         contexte = texte[i - n : i]
@@ -84,47 +82,51 @@ def fin_du_contexte(contexte: str, n: int) -> str:
 
 # region: distribution
 def distribution(
-    comptes: dict[str, Counter[str]], alphabet: list[str], contexte: str, n: int
+    comptes: dict[str, Counter[str]],
+    alphabet: list[str],
+    contexte: str,
+    n: int,
 ) -> list[tuple[str, float]]:
-    """La probabilité de chaque caractère après ce contexte, du plus probable au moins probable.
-
-    Lissage de Laplace : on ajoute 1 au compte de chaque caractère de l'alphabet,
-    pour qu'aucun ne soit jamais impossible. Un contexte jamais vu donne donc la
-    même probabilité à tous.
-    """
+    """La chance de chaque caractère, lissée (Laplace)."""
     if not alphabet:
         raise ValueError(MESSAGE_TEXTE_VIDE)
-    suivants = comptes.get(fin_du_contexte(contexte, n), Counter())
+    fin = fin_du_contexte(contexte, n)
+    suivants = comptes.get(fin, Counter())
     total = sum(suivants.values())
     v = len(alphabet)
-    probabilites = [(c, (suivants[c] + 1) / (total + v)) for c in alphabet]
-    # Du plus probable au moins probable ; à égalité, le plus petit point de code d'abord.
-    return sorted(probabilites, key=lambda cp: (-cp[1], cp[0]))
+    chances = [
+        (c, (suivants[c] + 1) / (total + v)) for c in alphabet
+    ]
+    # Du plus probable au moins probable ; à égalité,
+    # le plus petit point de code d'abord.
+    return sorted(chances, key=lambda cp: (-cp[1], cp[0]))
 # fin: distribution
 
 
 # region: poids
-def poids(comptes_du_contexte: Counter[str], alphabet: list[str], temperature: float) -> list[float]:
-    """Le poids de chaque caractère de l'alphabet, dans l'ordre de l'alphabet, pour tirer au sort.
-
-    On part des comptes bruts : un caractère jamais vu après ce contexte a un poids nul,
-    il ne sort jamais. La température change la forme des probabilités : 1 les suit
-    (le compte), 0,5 les durcit (le carré), 2 les adoucit (la racine carrée), et 0 ne
-    garde que le caractère le plus compté.
-    """
+def poids(
+    suivants: Counter[str],
+    alphabet: list[str],
+    temperature: float,
+) -> list[float]:
+    """Le poids de chaque caractère, à cette température."""
+    comptes = [suivants[c] for c in alphabet]
     if temperature == 1:
-        return [comptes_du_contexte[c] for c in alphabet]
+        return comptes
     if temperature == 0.5:
-        return [comptes_du_contexte[c] * comptes_du_contexte[c] for c in alphabet]
+        return [k * k for k in comptes]
     if temperature == 2:
-        return [math.sqrt(comptes_du_contexte[c]) for c in alphabet]
+        return [math.sqrt(k) for k in comptes]
     if temperature == 0:
-        # Le premier des plus comptés : l'alphabet est trié, donc le plus petit point de code.
+        # Le premier des plus comptés : l'alphabet est trié.
         meilleur, record = -1, 0
-        for i, c in enumerate(alphabet):
-            if comptes_du_contexte[c] > record:
-                meilleur, record = i, comptes_du_contexte[c]
-        return [1 if i == meilleur else 0 for i in range(len(alphabet))]
+        for i, k in enumerate(comptes):
+            if k > record:
+                meilleur, record = i, k
+        gagnant = [0] * len(comptes)
+        if meilleur >= 0:
+            gagnant[meilleur] = 1
+        return gagnant
     raise ValueError(MESSAGE_TEMPERATURE)
 # fin: poids
 
@@ -159,28 +161,23 @@ def generer(
     temperature: float,
     graine: int,
 ) -> str:
-    """Le départ, suivi de `longueur` caractères tirés un à un d'après les n derniers.
-
-    `comptes_par_ordre[k]` contient les comptes de l'ordre k, de 0 à n (compter_par_ordre).
-    Quand les n derniers caractères n'ont jamais été vus, le modèle recule : il regarde
-    les n − 1 derniers, puis n − 2, jusqu'à 0, qui est toujours connu. On ne tire que
-    parmi les caractères déjà vus après ce contexte. Un tirage par caractère, avec le
-    même hasard que le site : la même graine donne le même texte, ici comme dans la page.
-    """
+    """Le départ, suivi de `longueur` caractères tirés."""
     if not alphabet:
         raise ValueError(MESSAGE_TEXTE_VIDE)
-    fin_du_contexte(depart, n)  # lève l'erreur si le départ est trop court
+    fin_du_contexte(depart, n)  # départ trop court : erreur
     hasard = Hasard(graine)
     texte = depart
     for _ in range(longueur):
         suivants = None
         for k in range(n, -1, -1):
-            suivants = comptes_par_ordre[k].get(texte[len(texte) - k :])
+            fin = texte[len(texte) - k :]
+            suivants = comptes_par_ordre[k].get(fin)
             if suivants is not None:
                 break
         if suivants is None:
             raise ValueError(MESSAGE_TEXTE_VIDE)
-        texte += alphabet[tirer(poids(suivants, alphabet, temperature), hasard.uniforme())]
+        p = poids(suivants, alphabet, temperature)
+        texte += alphabet[tirer(p, hasard.uniforme())]
     return texte
 # fin: generer
 
@@ -240,28 +237,32 @@ def tourne_en_rond(texte: str, longueur: int = 20) -> bool:
     return texte.find(fin) < len(texte) - longueur
 
 
+def trop_court(n: int) -> str:
+    """Le message d'un texte trop court pour mesurer la perplexité."""
+    return f"Le texte est trop court : il faut au moins {n + 1} caractères pour mesurer la perplexité."
+
+
 # region: perplexite
 def perplexite(
-    comptes: dict[str, Counter[str]], alphabet: list[str], n: int, validation: str
+    comptes: dict[str, Counter[str]],
+    alphabet: list[str],
+    n: int,
+    validation: str,
 ) -> float:
-    """La surprise moyenne du modèle sur un texte : exp de la moyenne des −ln p.
-
-    p est la probabilité (lissée) que le modèle donnait au vrai caractère. Une
-    perplexité de 12 veut dire que le modèle hésite comme s'il choisissait,
-    à chaque caractère, entre 12 possibilités également probables.
-    """
+    """La surprise moyenne : exp de la moyenne des −ln p."""
     if not alphabet:
         raise ValueError(MESSAGE_TEXTE_VIDE)
     v = len(alphabet)
     somme = 0.0
     nombre = 0
     for i in range(n, len(validation)):
-        suivants = comptes.get(validation[i - n : i], Counter())
+        contexte = validation[i - n : i]
+        suivants = comptes.get(contexte, Counter())
         total = sum(suivants.values())
         p = (suivants[validation[i]] + 1) / (total + v)
         somme += -math.log(p)
         nombre += 1
     if nombre == 0:
-        raise ValueError(f"Le texte est trop court : il faut au moins {n + 1} caractères pour mesurer la perplexité.")
+        raise ValueError(trop_court(n))
     return math.exp(somme / nombre)
 # fin: perplexite

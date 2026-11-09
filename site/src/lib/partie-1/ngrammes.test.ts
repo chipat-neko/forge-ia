@@ -5,7 +5,7 @@
 // `uv run python -m modele_de_langage.attendus`. Le jumeau doit retrouver les
 // mêmes caractères, les mêmes comptes et les mêmes probabilités, au bit près
 // (toStrictEqual). Seules les perplexités ne sont pas refaites : le site les lit
-// telles quelles (PERPLEXITES, texte-1-1.ts).
+// telles quelles (PERPLEXITES, perplexites-1-1.ts).
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -29,7 +29,8 @@ import {
   tourneEnRond,
 } from './ngrammes';
 import { CALCULS_PARTIE_1, refaireNgrammes, type EntreesNgrammes } from './parite';
-import { ALPHABET, PERPLEXITES, TEXTE_DU_SITE } from './texte-1-1';
+import { PERPLEXITES } from './perplexites-1-1';
+import { ALPHABET, TEXTE_DU_SITE } from './texte-1-1';
 
 interface AttendusNgrammes extends EntreesNgrammes {
   alphabet: string[];
