@@ -10,6 +10,10 @@ Les données ne sont jamais copiées dans ce dépôt ; seuls les modèles entr
 Les tailles des trois sources ont été relevées le 09/11/2026 à l'API de Hugging Face (la liste
 des fichiers parquet du dossier lu et la somme de leurs tailles) ; elles sont écrites en Gio
 (2³⁰ octets, comme le site), alors que Hugging Face les affiche en GB décimaux (10⁹ octets).
+Les adresses de l'API, lues le 09/11/2026 :
+[FineWeb-2](https://huggingface.co/api/datasets/HuggingFaceFW/fineweb-2/tree/main/data/fra_Latn/train),
+[Wikipédia](https://huggingface.co/api/datasets/wikimedia/wikipedia/tree/main/20231101.fr) et
+[github-code-clean](https://huggingface.co/api/datasets/codeparrot/github-code-clean/tree/main/data).
 `projets/1.2-donnees` refait le tri de ces sources pas à pas, et en relève un aperçu.
 
 ## Le mélange
@@ -27,7 +31,7 @@ Le téléchargement et l'apprentissage du tokenizer les lisent là ; l'encodag
 ## Français du web (`web_fr`)
 
 - **Dépôt :** [HuggingFaceFW/fineweb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2),
-  dossier `data/fra_Latn/train` (135 fichiers parquet d'environ 3,7 Gio chacun, 539 897 427 722
+  dossier `data/fra_Latn/train` (135 fichiers parquet d'environ 3,7 Gio chacun, 539 897 427 722
   octets en tout, soit 502,8 Gio ; Hugging Face affiche 539,9 GB décimaux ; sans formulaire
   d'accès).
 - **Licence :** [ODC-By 1.0](https://opendatacommons.org/licenses/by/1-0/) (Open Data Commons
@@ -39,7 +43,7 @@ Le téléchargement et l'apprentissage du tokenizer les lisent là ; l'encodag
 ## Wikipédia en français (`wikipedia_fr`)
 
 - **Dépôt :** [wikimedia/wikipedia](https://huggingface.co/datasets/wikimedia/wikipedia),
-  configuration `20231101.fr` (17 fichiers, 4 614 488 286 octets en tout, soit 4,30 Gio ;
+  configuration `20231101.fr` (17 fichiers, 4 614 488 286 octets en tout, soit 4,30 Gio ;
   Hugging Face affiche 4,61 GB décimaux ; sans formulaire d'accès).
 - **Licence :** [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/deed.fr) (le jeu
   est aussi publié sous GFDL).
@@ -49,8 +53,8 @@ Le téléchargement et l'apprentissage du tokenizer les lisent là ; l'encodag
 ## Code Python (`code_python`)
 
 - **Dépôt :** [codeparrot/github-code-clean](https://huggingface.co/datasets/codeparrot/github-code-clean)
-  (880 fichiers parquet dans `data`, 313 663 761 086 octets en tout, soit 292,1 Gio ; Hugging
-  Face affiche 313,7 GB décimaux, et 313 663 770 241 octets pour le dépôt entier, avec ses trois
+  (880 fichiers parquet dans `data`, 313 663 761 086 octets en tout, soit 292,1 Gio ; Hugging
+  Face affiche 313,7 GB décimaux, et 313 663 770 241 octets pour le dépôt entier, avec ses trois
   petits fichiers ; sans formulaire d'accès). On lit ses fichiers parquet directement, car son
   script de chargement n'est plus accepté par les versions récentes de `datasets`.
 - **Licence :** la compilation est sous [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0),

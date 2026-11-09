@@ -2,7 +2,7 @@
 
 import os
 
-from donnees_pas_a_pas.__main__ import lever_le_mode_hors_ligne
+from donnees_pas_a_pas.__main__ import afficher_apercu, lever_le_mode_hors_ligne
 from donnees_pas_a_pas.apercu import apercu, en_octets
 
 
@@ -53,3 +53,10 @@ def test_le_mode_hors_ligne_est_leve_pour_la_commande(monkeypatch, capsys):
     lever_le_mode_hors_ligne()
     assert os.environ["HF_HUB_OFFLINE"] == "0" and os.environ["HF_DATASETS_OFFLINE"] == "0"
     assert "HF_HUB_OFFLINE est à 1" in capsys.readouterr().err
+
+
+def test_une_source_sans_document_ne_donne_pas_un_pourcentage():
+    vide = apercu(1000, lecteur=lambda _source: iter(()))
+    texte = afficher_apercu(vide, 1000)
+    assert texte.count("aucun document lu") == 3
+    assert "%" not in texte

@@ -41,7 +41,7 @@ def test_blancs_python_sont_ceux_de_isspace():
 
 def test_les_pieges_sont_dans_les_textes_de_reference():
     noms = [t["nom"] for t in lire()["textes"]]
-    for attendu in ["199 caractères", "200 caractères", "100 000 x", "U+3000 en fin", "U+2028 en fin", "U+00A0 en fin", "U+FEFF en fin"]:
+    for attendu in ["199 caractères", "200 caractères", "100 000 x", "199 caractères et U+3000 en fin", "200 caractères et U+3000 en fin", "U+3000 en fin", "U+2028 en fin", "U+00A0 en fin", "U+FEFF en fin"]:
         assert attendu in noms, attendu
 
 

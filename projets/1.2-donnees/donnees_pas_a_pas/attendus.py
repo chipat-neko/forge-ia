@@ -51,6 +51,8 @@ TEXTES_PIEGES: dict[str, str] = {
     "200 caractères": "a" * 200,
     "199 caractères et une espace en fin": "a" * 199 + " ",
     "200 caractères et une espace en fin": "a" * 200 + " ",
+    "199 caractères et U+3000 en fin": "a" * 199 + "\u3000",
+    "200 caractères et U+3000 en fin": "a" * 200 + "\u3000",
     "U+3000 en fin": _BASE + "\u3000",
     "U+2028 en fin": _BASE + "\u2028",
     "U+00A0 en fin": _BASE + "\u00a0",

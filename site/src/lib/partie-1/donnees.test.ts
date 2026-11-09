@@ -5,7 +5,7 @@
 // licences permissives sont les mêmes. Si forge change, ce test échoue tant que donnees.ts
 // ne suit pas.
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { LICENCES_PERMISSIVES, MELANGE, NOMS_DES_SOURCES, PART_VALIDATION } from './donnees';
 import { MESURES_PARTIE_1 } from './mesures';
@@ -58,7 +58,10 @@ describe('les licences permissives', () => {
 });
 
 describe('les fichiers de mesures', () => {
-  it('sont sous le projet 1.2', () => {
-    for (const chemin of Object.values(MESURES_PARTIE_1)) expect(chemin.startsWith('projets/1.2-donnees/')).toBe(true);
+  it('sont sous le projet 1.2, et existent', () => {
+    for (const chemin of Object.values(MESURES_PARTIE_1)) {
+      expect(chemin.startsWith('projets/1.2-donnees/')).toBe(true);
+      expect(existsSync(`../${chemin}`), chemin).toBe(true);
+    }
   });
 });

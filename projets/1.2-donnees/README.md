@@ -134,6 +134,13 @@ Le fichier `tests/attendus.json` contient les résultats du Python :
 - `licences` : des lignes de code, et ce que le filtre en dit ;
 - `tris` : les lignes des exemples et le verdict sur chacune.
 
+Le jumeau est exact, sauf pour un cas : deux moitiés de paire de substitution collées, haute
+puis basse. En JavaScript, elles forment une paire valide, donc un seul caractère (un emoji) que
+le jumeau garde, alors que Python les retire. Aucun fichier JSON ne peut les produire : le
+décodeur de `json` recolle `\ud83d\ude00` en un seul point de code, en Python comme en
+JavaScript. Seule une chaîne fabriquée à la main dans un programme Python l'atteint. Les
+moitiés seules sont retirées des deux côtés.
+
 Un texte avec une moitié de paire de substitution s'écrit dans le fichier en liste
 de points de code (`[97, 55357, 98]`), un très long texte d'un seul caractère en
 `{"repete": "x", "fois": 100000}`. Le jumeau TypeScript doit tout retrouver à

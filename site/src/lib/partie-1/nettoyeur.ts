@@ -15,6 +15,14 @@
 // - la longueur se compte en points de code, comme len() de Python : « 😀 » compte pour un,
 //   alors que .length en compte deux.
 //
+// Une limite, la seule : deux moitiés de paire de substitution collées, haute puis basse
+// (deux points de code dans une chaîne Python), sont pour JavaScript une paire valide, donc
+// un seul caractère (un emoji) que le jumeau garde, alors que Python les retire. JavaScript
+// ne distingue pas les deux cas, et aucun fichier JSON ne peut les produire : le décodeur de
+// json recolle \ud83d\ude00 en un seul point de code, en Python comme en JavaScript. Seule
+// une chaîne fabriquée à la main dans un programme Python l'atteint. Les moitiés seules (une
+// haute sans basse, ou l'inverse) sont, elles, retirées des deux côtés.
+//
 // L'empreinte passe par crypto.subtle (SHA-1), donc elle est asynchrone. Ce module n'importe
 // que donnees.ts, qui n'importe rien : un parcours de test peut l'importer.
 

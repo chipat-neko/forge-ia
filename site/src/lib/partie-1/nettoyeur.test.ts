@@ -86,6 +86,9 @@ describe('nettoyer', () => {
     expect(nettoyer('a'.repeat(199))).toBeNull();
     expect(nettoyer(`${'a'.repeat(199)}\u00A0`)).toBeNull();
     expect(nettoyer(`${'a'.repeat(200)} `)).toBe('a'.repeat(200));
+    // La frontière avec U+3000 (un blanc de Python) en fin de texte.
+    expect(nettoyer(`${'a'.repeat(199)}\u3000`)).toBeNull();
+    expect(nettoyer(`${'a'.repeat(200)}\u3000`)).toBe('a'.repeat(200));
   });
 
   it('compte en points de code : 200 emojis suffisent, alors que .length en voit 400', () => {

@@ -130,8 +130,12 @@ def afficher_apercu(resultat: dict, octets: int) -> str:
     for nom, r in resultat.items():
         source = SOURCES[nom]
         lignes.append(f"{nom} ({source.depot})")
+        if r["lus"] == 0:
+            lignes.append(f"  aucun document lu{FINE}: la source n'a rien donné, vérifie ta connexion")
+            lignes.append("")
+            continue
         lignes.append(f"  documents lus{FINE}: {nombre(r['lus'])}")
-        part = 100 * r["gardes"] / r["lus"] if r["lus"] else 0
+        part = 100 * r["gardes"] / r["lus"]
         lignes.append(f"  gardés{FINE}: {nombre(r['gardes'])}, soit {virgule(part, 1)}{FINE}%")
         for raison, n in r["raisons"].items():
             if raison != "gardé" and n:
