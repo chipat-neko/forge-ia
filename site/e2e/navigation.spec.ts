@@ -170,7 +170,11 @@ test('recherche : les titres du parcours, un numéro, et rien de la page d’ess
 
 test('recherche : « jeux » et « mots » trouvent « jeu » et « mot », comme Pagefind', async ({ page }) => {
   await page.goto('/forge-ia/recherche/?q=jeux');
-  await expect(page.locator('[data-resultat]').first()).toContainText('tokenizer');
+  // Depuis la parution de 1.2 (« jeux de données »), « jeux » est dans l'index :
+  // Pagefind ne le cherche plus en morceaux, et le « jeu de société » de 1.3
+  // n'en sort plus. Les mots surlignés commencent toujours par « jeu ». Le
+  // pluriel ramené au singulier reste vérifié par « mots » ci-dessous.
+  await expect(page.locator('[data-resultat]')).not.toHaveCount(0);
   await expect(page.locator('[data-resultat] mark').first()).toHaveText(/^jeu/);
   await page.getByRole('searchbox').fill('mots');
   await expect(page.locator('[role="status"]')).toContainText('mots');
