@@ -25,6 +25,7 @@ import {
   lignesDeLaCourbe,
   lignesDesSessions,
   lireEssaiDeReprise,
+  lirePertesRecentes,
   lireReglages,
   pasTotalDesReglages,
   reponseDuDefi,
@@ -246,23 +247,42 @@ describe('les réglages des configurations de forge', () => {
   });
 });
 
+describe('la fenêtre de la perte finale', () => {
+  it('PERTES_RECENTES de forge/suivi.py, celle que le relevé du projet 1.5 utilise pour perte_finale', () => {
+    expect(lirePertesRecentes()).toBe(20);
+    const journal = readFileSync('../projets/1.5-pre-entrainement/pre_entrainement/journal.py', 'utf8');
+    expect(journal).toContain('from forge.suivi import _FINS_DE_SESSION, PERTES_RECENTES, lire_journal');
+    expect(journal).toContain('PERTES_RECENTES');
+  });
+
+  it('une racine sans forge est une erreur qui dit quoi donner', () => {
+    const vide = mkdtempSync(join(tmpdir(), 'forge-suivi-'));
+    try {
+      expect(() => lirePertesRecentes(vide)).toThrow(/racine du dépôt/);
+    } finally {
+      rmSync(vide, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('les sessions', () => {
   it('dureeDeCalcul : des secondes, des minutes et des secondes, puis des heures et des minutes', () => {
-    expect(dureeDeCalcul(0.4)).toBe('0 s');
-    expect(dureeDeCalcul(42.4)).toBe('42 s');
-    expect(dureeDeCalcul(59.6)).toBe('1 min 0 s');
-    expect(dureeDeCalcul(3617.312)).toBe('60 min 17 s');
-    expect(dureeDeCalcul(7199.4)).toBe('119 min 59 s');
-    expect(dureeDeCalcul(7200)).toBe('2 h 0 min');
-    expect(dureeDeCalcul(486_123)).toBe('135 h 2 min');
-    expect(dureeDeCalcul(3_600_000)).toBe(`1${FINE}000 h 0 min`);
+    // Une espace fine insécable lie chaque nombre à son unité.
+    expect(dureeDeCalcul(0.4)).toBe(`0${FINE}s`);
+    expect(dureeDeCalcul(42.4)).toBe(`42${FINE}s`);
+    expect(dureeDeCalcul(59.6)).toBe(`1${FINE}min 0${FINE}s`);
+    expect(dureeDeCalcul(3617.312)).toBe(`60${FINE}min 17${FINE}s`);
+    expect(dureeDeCalcul(7199.4)).toBe(`119${FINE}min 59${FINE}s`);
+    expect(dureeDeCalcul(7200)).toBe(`2${FINE}h 0${FINE}min`);
+    expect(dureeDeCalcul(486_123)).toBe(`135${FINE}h 2${FINE}min`);
+    expect(dureeDeCalcul(3_600_000)).toBe(`1${FINE}000${FINE}h 0${FINE}min`);
     expect(() => dureeDeCalcul(-1)).toThrow(RangeError);
     expect(() => dureeDeCalcul(Number.NaN)).toThrow(RangeError);
   });
 
   it('mini : une seule session, du départ à la fin, sans pause', () => {
     expect(lignesDesSessions(MINI.sessions)).toStrictEqual([
-      { numero: 1, debut: 'départ', fin: 'fin', pas: `1 à 6${FINE}370`, duree: '60 min 17 s' },
+      { numero: 1, debut: 'départ', fin: 'fin', pas: `1 à 6${FINE}370`, duree: `60${FINE}min 17${FINE}s` },
     ]);
     expect(arretsDeLaCourbe(MINI.sessions)).toStrictEqual([]);
   });
@@ -275,10 +295,10 @@ describe('les sessions', () => {
       { depart: 'reprise', premier_pas: 901, dernier_pas: 1000, secondes: 230, fin: 'fin' },
     ];
     expect(lignesDesSessions(sessions)).toStrictEqual([
-      { numero: 1, debut: 'départ', fin: 'pause', pas: '1 à 500', duree: '20 min 0 s' },
-      { numero: 2, debut: 'reprise', fin: 'coupée', pas: 'aucun', duree: '0 s' },
-      { numero: 3, debut: 'reprise', fin: 'perte non finie', pas: '501 à 900', duree: '15 min 50 s' },
-      { numero: 4, debut: 'reprise', fin: 'fin', pas: `901 à 1${FINE}000`, duree: '3 min 50 s' },
+      { numero: 1, debut: 'départ', fin: 'pause', pas: '1 à 500', duree: `20${FINE}min 0${FINE}s` },
+      { numero: 2, debut: 'reprise', fin: 'coupée', pas: 'aucun', duree: `0${FINE}s` },
+      { numero: 3, debut: 'reprise', fin: 'perte non finie', pas: '501 à 900', duree: `15${FINE}min 50${FINE}s` },
+      { numero: 4, debut: 'reprise', fin: 'fin', pas: `901 à 1${FINE}000`, duree: `3${FINE}min 50${FINE}s` },
     ]);
     // Les arrêts : la fin de chaque session, sauf la dernière, au dernier pas fait jusque-là.
     expect(arretsDeLaCourbe(sessions)).toStrictEqual([

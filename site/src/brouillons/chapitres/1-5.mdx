@@ -2,7 +2,7 @@
 partie: 1
 numero: "1.5"
 titre: "Le pré-entraînement sur ton GPU"
-chapeau: "Ton IA naît ici : elle lit ses textes, pas après pas, et apprend à prédire le jeton suivant. Un petit modèle apprend la même recette sous tes yeux, tu mets un entraînement en pause puis le reprends au même nombre près, et tu suis la version d'une heure de ton IA jusqu'à son dernier pas."
+chapeau: "Ton IA naît ici : elle lit ses textes, pas après pas, et apprend à prédire le jeton suivant. Un petit modèle apprend la même recette sous tes yeux, tu mets un entraînement en pause, puis tu le reprends, et tu suis la version d'une heure de ton IA jusqu'à son dernier pas."
 programme: "10 étapes, 4 paris, environ 35 minutes."
 acquis:
   - cle: depart
@@ -38,6 +38,7 @@ import { chapitresParus } from '../../lib/chapitres-parus';
 import { exigeur } from '../../lib/exiger';
 import { etatInitial } from '../../lib/mini-modele/apercu';
 import { choixTauxTropGrand, explicationTauxTropGrand, questionTauxTropGrand, TAUX_GRAND } from '../../lib/mini-modele/paris';
+import { PAS_PAR_SECONDE_NORMAL } from '../../lib/mini-modele/boucle-travailleur';
 import { PRESETS_MINI } from '../../lib/mini-modele/reglages';
 import { decimalesUtiles, formaterPerte, nombre, pourcent } from '../../lib/nombres';
 import { ANNEXES, hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
@@ -61,6 +62,7 @@ import {
   faitsDuPariDebit,
   faitsDuPariDepart,
   lireEssaiDeReprise,
+  lirePertesRecentes,
   lireReglages,
   pasTotalDesReglages,
   TEXTES_REPRISE,
@@ -165,6 +167,8 @@ export const ATELIER = (() => {
     'le mini-modèle n’a plus la recette de ton IA (betas, décroissance des poids, écrêtage, fin du taux)',
   );
   exiger(c.echauffement < c.pasTotal, 'le mini-modèle n’a plus d’échauffement suivi d’une descente');
+  // « En moins d'une minute » (étape 4) : même au rythme normal de la démo, au plus PAS_PAR_SECONDE_NORMAL pas par seconde.
+  exiger(c.pasTotal / PAS_PAR_SECONDE_NORMAL < 60, 'au rythme normal, l’entraînement de la démo dépasse une minute');
   return {
     parametres: nombre(depart.nbParametres),
     pas: nombre(c.pasTotal),
@@ -181,6 +185,13 @@ export const DEFI = (() => {
   // Le défi de l'atelier : ses pertes viennent du moteur du mini-modèle (defi-1-5.ts).
   const d = resultatDuDefi();
   const ecart = (x) => nombre(x - d.defaut.fin, 3);
+  // « Trois fois le taux habituel … dix fois, non » : des rapports entiers.
+  const fois = (taux) => {
+    const r = taux / d.defaut.taux;
+    exiger(Math.abs(r - Math.round(r)) < 1e-9 * r, `le taux ${taux} n’est plus un multiple entier du taux habituel`);
+    return Math.round(r);
+  };
+  const enLettres = (n) => ({ 3: 'trois', 10: 'dix', 30: 'trente', 100: 'cent' })[n] ?? nombre(n);
   exiger(Number.isFinite(d.suivant.fin), 'le taux qui suit la réponse du défi explose : son explication est à revoir');
   exiger(d.suivant.fin > d.defaut.fin, 'le taux qui suit la réponse du défi finit plus bas que le défaut');
   return {
@@ -194,6 +205,9 @@ export const DEFI = (() => {
     suivant: reglage(d.suivant.taux),
     finSuivant: formaterPerte(d.suivant.fin),
     ecartSuivant: ecart(d.suivant.fin),
+    // En tête de phrase : une capitale.
+    foisReponse: enLettres(fois(d.reponse.taux)).replace(/^./, (c) => c.toUpperCase()),
+    foisSuivant: enLettres(fois(d.suivant.taux)),
   };
 })();
 
@@ -232,6 +246,7 @@ export const COURTE = (() => {
   // « Un peu plus haut » : à moins d'un demi-point.
   exiger(r.validation_finale - r.perte_finale < 0.5, 'à la fin, la perte de validation n’est plus « un peu » au-dessus de celle d’entraînement');
   return {
+    recentes: nombre(lirePertesRecentes(RACINE)),
     choix: choixDebitCourte(MINI),
     carte: materiel(MATERIEL_DES_MESURES).nom,
     debit: nombre(f.debit),
@@ -382,7 +397,7 @@ Le taux ne dépend que du numéro du pas. Après une pause, il repart donc au bo
 
 <Etape numero={4} titre="L'atelier : un petit modèle apprend">
 
-Ton IA met une heure à apprendre dans sa plus petite taille. Ce petit modèle-là apprend dans ta page, en quelques secondes : un transformer minuscule, qui invente des prénoms, caractère par caractère. C'est la même recette que ton IA, en {ATELIER.parametres} paramètres : le même optimiseur, le même écrêtage, le même planning du taux. À chaque pas, il lit {ATELIER.lot} prénoms.
+Ton IA met une heure à apprendre dans sa plus petite taille. Ce petit modèle-là apprend dans ta page, en moins d'une minute : un transformer minuscule, qui invente des prénoms, caractère par caractère. C'est la même recette que ton IA, en {ATELIER.parametres} paramètres : le même optimiseur, le même écrêtage, le même planning du taux. À chaque pas, il lit {ATELIER.lot} prénoms.
 
 Son taux maximal est réglable. D'habitude, il vaut {ATELIER.taux}.
 
@@ -409,7 +424,7 @@ Essaie-le : lance un entraînement au taux habituel, puis règle le taux sur {AT
 <details class="reponse-defi">
 <summary><span class="bascule-soleil">La réponse du défi</span></summary>
 
-{DEFI.reponse} : au pas {ATELIER.pas}, son erreur de validation vaut {DEFI.finReponse}, contre {DEFI.finDefaut} au taux habituel, {DEFI.plusBas ? 'plus bas encore' : `${DEFI.ecartReponse} de plus`}. À {DEFI.suivant}, elle finit à {DEFI.finSuivant}, {DEFI.ecartSuivant} de plus : c'est trop. Un taux un peu plus grand apprend presque aussi bien ; un taux bien plus grand, non. Ces erreurs sont celles que la démo affiche : la page les a calculées avec le même moteur, les mêmes prénoms et la même graine.
+{DEFI.reponse} : au pas {ATELIER.pas}, son erreur de validation vaut {DEFI.finReponse}, contre {DEFI.finDefaut} au taux habituel, {DEFI.plusBas ? 'plus bas encore' : `${DEFI.ecartReponse} de plus`}. À {DEFI.suivant}, elle finit à {DEFI.finSuivant}, {DEFI.ecartSuivant} de plus : c'est trop. {DEFI.foisReponse} fois le taux habituel apprend presque aussi bien ; {DEFI.foisSuivant} fois, non. Ces erreurs sont celles que la démo affiche : la page les a calculées avec le même moteur, les mêmes prénoms et la même graine.
 
 </details>
 
@@ -528,7 +543,7 @@ Voici sa courbe, relevée dans son journal :
 
 <CourbeEntrainement nom="ton-ia-mini" titre="La courbe de la version d'une heure" />
 
-La perte part du hasard et chute très vite : à la première validation, au pas {COURTE.pasVal1}, la perte de validation est déjà à {COURTE.val1}. Plus de la moitié de la descente est faite, en {COURTE.partDesPas} des pas. Ensuite, elle baisse de plus en plus lentement. La perte d'entraînement finit à {COURTE.finale}, en moyenne sur ses 20 derniers pas. La perte de validation, mesurée sur des textes que ton IA ne lit jamais pendant l'entraînement, finit un peu plus haut, à {COURTE.validation} : ce qu'elle a appris vaut aussi, presque autant, pour des textes nouveaux.
+La perte part du hasard et chute très vite : à la première validation, au pas {COURTE.pasVal1}, la perte de validation est déjà à {COURTE.val1}. Plus de la moitié de la descente est faite, en {COURTE.partDesPas} des pas. Ensuite, elle baisse de plus en plus lentement. La perte d'entraînement finit à {COURTE.finale}, en moyenne sur ses {COURTE.recentes} derniers pas. La perte de validation, mesurée sur des textes que ton IA ne lit jamais pendant l'entraînement, finit un peu plus haut, à {COURTE.validation} : ce qu'elle a appris vaut aussi, presque autant, pour des textes nouveaux.
 
 <TableauSessions nom="ton-ia-mini" titre="Les sessions de la version d'une heure" />
 
@@ -559,7 +574,7 @@ Il ne s'est pas fait d'un trait. Quand le PC servait à autre chose, l'entraîne
 {RESUME_15 === null ? (
   <p data-a-mesurer>{typographier('Son résumé en nombres, ses pas, ses jetons, sa durée de calcul et ses pertes : à mesurer, quand son entraînement sera fini.')}</p>
 ) : (
-  <p>{typographier(`En tout, ${RESUME_15.pas} pas et ${RESUME_15.jetons} jetons, en ${RESUME_15.duree} de calcul, sur ${RESUME_15.sessions} sessions. Sa perte part de ${RESUME_15.premier} au premier pas, et finit à ${RESUME_15.finale}, en moyenne sur ses 20 derniers pas ; sa perte de validation, à ${RESUME_15.validation}.`)}</p>
+  <p>{typographier(`En tout, ${RESUME_15.pas} pas et ${RESUME_15.jetons} jetons, en ${RESUME_15.duree} de calcul, sur ${RESUME_15.sessions} sessions. Sa perte part de ${RESUME_15.premier} au premier pas, et finit à ${RESUME_15.finale}, en moyenne sur ses ${COURTE.recentes} derniers pas ; sa perte de validation, à ${RESUME_15.validation}.`)}</p>
 )}
 
 </Etape>
@@ -572,7 +587,7 @@ Ton IA s'entraîne sur une seule carte. Les grands labos en font travailler des 
 
 Llama 3.1 405B, de Meta, a demandé {LABO.heures} d'heures de calcul de cartes H100, des cartes de centre de données bien plus puissantes que celle de l'auteur. La version d'une heure de ton IA a pris {LABO.heuresMini} de calcul, sur une seule carte : environ {LABO.foisHeures} de fois moins. Meta l'a entraîné avec jusqu'à {LABO.cartes} cartes à la fois. Son pré-entraînement a compté {LABO.operations} opérations, environ {LABO.foisOps} de fois les {LABO.opsMini} de la version d'une heure, comptées comme le calculateur : {LABO.parJeton} par paramètre et par jeton lu.
 
-Avec autant de cartes, les pannes sont ordinaires. Sur une période de {LABO.jours} jours de son pré-entraînement, Meta a compté {LABO.interruptions} interruptions : {LABO.prevues} prévues, pour de la maintenance, et {LABO.imprevues} imprévues. Comme toutes les cartes calculent ensemble, une seule en panne peut obliger à relancer tout le calcul, depuis une sauvegarde : la pause et la reprise de l'étape 6, des centaines de fois.
+Avec autant de cartes, les pannes sont ordinaires. Sur une période de {LABO.jours} jours de son pré-entraînement, Meta a compté {LABO.interruptions} interruptions : {LABO.prevues} prévues, pour de la maintenance automatique ou des opérations lancées par l'équipe, et {LABO.imprevues} imprévues. Comme toutes les cartes calculent ensemble, une seule en panne peut obliger à relancer tout le calcul, depuis une sauvegarde : la pause et la reprise de l'étape 6, des centaines de fois.
 
 Pour estimer la mémoire, la durée et le prix d'un entraînement, à la taille et sur la carte de ton choix, ouvre le <a href={LIENS.calculateur}>calculateur de coût</a>, en annexe.
 
@@ -580,7 +595,7 @@ Pour estimer la mémoire, la durée et le prix d'un entraînement, à la taille 
 
 <Fragment slot="note">
 
-L'article de Meta appelle ce modèle Llama 3 405B ; ses heures de calcul sont dans la carte de modèle de Llama 3.1. Les 54 jours sont une période observée par Meta, pas toute la durée du pré-entraînement.
+L'article de Meta appelle ce modèle Llama 3 405B ; ses heures de calcul sont dans la carte de modèle de Llama 3.1. Les {LABO.jours} jours sont une période observée par Meta, pas toute la durée du pré-entraînement.
 
 </Fragment>
 
@@ -600,7 +615,7 @@ Il doit finir sur « la reprise est exacte : oui ». Si tu as entraîné la vers
 
 <BlocCommande commandes={[PRE_ENTRAINEMENT_COURBE]} ou="un terminal, dans le dossier du projet" />
 
-Les chemins en `D:\` sont ceux du PC de l'auteur : remplace-les par les tiens, le `journal.jsonl` de ton entraînement. Le projet utilise PyTorch, comme ceux des chapitres 0.3 à 0.5 et 1.4 : `--extra cpu` prend sa version pour le processeur, qui suffit ici. Pour lancer les tests :
+Le chemin en `D:\` est celui du PC de l'auteur : remplace-le par celui du `journal.jsonl` de ton entraînement. Le projet utilise PyTorch, comme ceux des chapitres 0.3 à 0.5 et 1.4 : `--extra cpu` prend sa version pour le processeur, qui suffit ici. Pour lancer les tests :
 
 <BlocCommande commandes={[PRE_ENTRAINEMENT_TESTS]} ou="un terminal, dans le dossier du projet" />
 

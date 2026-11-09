@@ -227,6 +227,15 @@ test('les choix des paris viennent des relevés du projet', async ({ page }) => 
     expect(await page.locator(`[data-pari="${id}"] button[data-choix]`).allTextContents(), id).toEqual(choix.map(affiche));
     expect(await page.locator(`[data-pari="${id}"] [data-juste]`).textContent(), id).toBe(affiche(choix.find((c) => c.juste)!));
   }
+  // Le chapeau, lu avant tout pari, ne donne aucune bonne réponse : aucun morceau de trois mots ou plus d'un
+  // choix juste (« au même nombre près », par exemple) ne s'y retrouve.
+  const chapeau = ((await page.locator('.chapeau').textContent()) ?? '').replace(/\s+/g, ' ').toLowerCase();
+  expect(chapeau.length).toBeGreaterThan(50);
+  for (const juste of await page.locator('.pari[data-pari] [data-juste]').allTextContents()) {
+    for (const morceau of juste.split(/[,:;]/).map((m) => m.replace(/\s+/g, ' ').trim().toLowerCase())) {
+      if (morceau.split(' ').length >= 3) expect(chapeau, morceau).not.toContain(morceau);
+    }
+  }
   // Les questions, telles que la fiche les donne.
   await expect(page.locator('[data-pari="depart"] .q')).toContainText(typographier('Avant d’avoir rien appris, quelle perte a ton IA au premier pas ?'));
   await expect(page.locator('[data-pari="reprise"] .q')).toContainText('Après une pause, la perte du pas repris…');
@@ -296,11 +305,13 @@ test('le défi : la réponse affichée est le plus grand taux à 0,05 près, et 
   expect(TAUX_PROPOSES[TAUX_PROPOSES.indexOf(tauxReponse) + 1]).toBe(tauxSuivant);
   expect(finReponse - finDefaut).toBeLessThanOrEqual(ECART_DU_DEFI + 0.0005);
   expect(finSuivant - finDefaut).toBeGreaterThan(ECART_DU_DEFI - 0.0005);
+  // Le rapport de la réponse au taux habituel est dit en mots : trois fois.
+  expect(texte).toContain('fois le taux habituel apprend presque aussi bien');
   // L'énoncé : le taux habituel, l'écart permis.
   await expect(page.locator('#etape-4')).toContainText(`ne dépasse pas de plus de ${nombre(ECART_DU_DEFI, 2)} celle du taux habituel`);
 });
 
-test('l’encadré du labo : les chiffres de sources-1-5, leurs sources, et le lien vers le calculateur', async ({ page }) => {
+test('l’encadré du labo et sa note : les chiffres de sources-1-5, leurs sources, et le lien vers le calculateur', async ({ page }) => {
   await page.goto(PAGE);
   const labo = page.locator('#etape-9 .labo');
   const l = LLAMA_31_405B;
@@ -311,6 +322,14 @@ test('l’encadré du labo : les chiffres de sources-1-5, leurs sources, et le l
   await expect(labo).toContainText(`3,8${FINE}×${FINE}10²⁵ opérations`);
   for (const s of SOURCES_LABO_1_5) await expect(labo.locator(`a[href="${s.url}"]`)).toHaveCount(1);
   await expect(labo.locator('a[href="/forge-ia/annexes/calculateur/"]')).toHaveText('calculateur de coût');
+  // La note de l'étape, hors de l'encadré : ses seuls nombres, en dehors des noms des modèles, viennent de sources-1-5.
+  const note = (await page.locator('#etape-9 .note').textContent()) ?? '';
+  expect(note).toContain(`Les ${nombre(l.joursObserves.valeur)} jours`);
+  const horsNoms = note.replace(/Llama 3(\.1)?( 405B)?/g, '');
+  expect(horsNoms.match(/\d[\d\u202F,]*/g)).toStrictEqual([nombre(l.joursObserves.valeur)]);
+  // Et le texte de l'étape, hors de l'encadré, n'en tape aucun.
+  const avant = (await page.locator('#etape-9 .texte > p').first().textContent()) ?? '';
+  expect(avant).not.toMatch(/\d/);
 });
 
 test('sans JavaScript, tout se lit : les explications, la perte du premier pas, les courbes', async ({ browser, baseURL }) => {

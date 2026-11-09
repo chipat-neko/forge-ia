@@ -313,6 +313,24 @@ export function lireReglages(nom: keyof typeof FICHIERS_REGLAGES, racineDepot: s
   return analyserReglages(readFileSync(join(racine, fichier), 'utf8'), fichier, Number(ratio[1]));
 }
 
+/** Le module de forge qui fixe la fenêtre de la perte finale (PERTES_RECENTES), depuis la racine du dépôt. */
+const SUIVI = 'projets/forge/forge/suivi.py';
+
+/**
+ * Le nombre de derniers pas dont `perte_finale` fait la moyenne : PERTES_RECENTES de forge/suivi.py, que le
+ * relevé du projet 1.5 (journal.py) importe. Lu dans le dépôt dont on donne la racine, comme ratio_min dans
+ * planning.py : le chapitre ne l'écrit pas à la main.
+ */
+export function lirePertesRecentes(racineDepot: string | URL = '..'): number {
+  const chemin = join(enChemin(racineDepot), SUIVI);
+  if (!existsSync(chemin)) {
+    throw new Error(`La racine du dépôt donnée à lirePertesRecentes n’a pas ${SUIVI}. Donne la racine du dépôt, le dossier au-dessus de site/.`);
+  }
+  const m = /^PERTES_RECENTES = (\d+)$/m.exec(readFileSync(chemin, 'utf8').replace(/\r\n?/g, '\n'));
+  if (m === null) throw new Error(`${SUIVI}${FINE}: PERTES_RECENTES = … ne se lit plus. Revois lirePertesRecentes.`);
+  return Number(m[1]);
+}
+
 /** Le nombre de pas d'un entraînement : jetons_total divisé par le lot, arrondi au-dessus (pas_total de forge). */
 export function pasTotalDesReglages(r: ReglagesEntrainement): number {
   return Math.ceil(r.jetons_total / r.taille_lot_jetons);
@@ -320,15 +338,18 @@ export function pasTotalDesReglages(r: ReglagesEntrainement): number {
 
 // ---------- Étapes 7 et 8 : les sessions, la courbe en tableau ----------
 
-/** Une durée de calcul : « 42 s », « 60 min 17 s » sous deux heures, puis « 135 h 2 min ». */
+/**
+ * Une durée de calcul : « 42 s », « 60 min 17 s » sous deux heures, puis « 135 h 2 min ». Une espace fine
+ * insécable lie chaque nombre à son unité : « 60 » et « min » ne se séparent jamais en fin de ligne.
+ */
 export function dureeDeCalcul(secondes: number): string {
   if (!Number.isFinite(secondes) || secondes < 0) {
     throw new RangeError(`dureeDeCalcul : ${String(secondes)} n’est pas une durée. Vérifie les secondes du relevé.`);
   }
   const s = Math.round(secondes);
-  if (s < 60) return `${s} s`;
-  if (s < 2 * 3600) return `${Math.floor(s / 60)} min ${s % 60} s`;
-  return `${nombre(Math.floor(s / 3600))} h ${Math.floor((s % 3600) / 60)} min`;
+  if (s < 60) return `${s}${FINE}s`;
+  if (s < 2 * 3600) return `${Math.floor(s / 60)}${FINE}min ${s % 60}${FINE}s`;
+  return `${nombre(Math.floor(s / 3600))}${FINE}h ${Math.floor((s % 3600) / 60)}${FINE}min`;
 }
 
 /** Une ligne du tableau des sessions. */
@@ -428,8 +449,8 @@ export function reponseDuDefi(defaut: FinAuTaux, plusGrands: readonly FinAuTaux[
   ranges.forEach((f, i) => {
     if (Number.isFinite(f.fin) && f.fin <= defaut.fin + ECART_DU_DEFI) rang = i;
   });
-  exiger(rang >= 0, `aucun taux plus grand que ${String(defaut.taux)} ne finit à ${ECART_DU_DEFI} près : le défi n’a plus de réponse`);
+  exiger(rang >= 0, `aucun taux plus grand que ${String(defaut.taux)} ne finit à ${nombre(ECART_DU_DEFI, 2)} près : le défi n’a plus de réponse`);
   const suivant = ranges[rang + 1] ?? null;
-  exiger(suivant !== null, 'même le plus grand taux finit à 0,05 près du défaut : le défi n’a plus de taux qui échoue');
+  exiger(suivant !== null, `même le plus grand taux finit à ${nombre(ECART_DU_DEFI, 2)} près du défaut : le défi n’a plus de taux qui échoue`);
   return { defaut, reponse: ranges[rang], suivant };
 }

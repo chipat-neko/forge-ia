@@ -12,7 +12,8 @@
 //     8 192 cartes, puis 16 384 (le « 16K » du texte) ;
 //   - section 3.3.4 : « During a 54-day snapshot period of pre-training, we experienced a total of
 //     466 job interruptions. Of these, 47 were planned interruptions due to automated maintenance
-//     operations », les 419 autres imprévues. Les 54 jours sont une période observée du
+//     operations such as firmware upgrades or operator-initiated operations like configuration or dataset
+//     updates », les 419 autres imprévues. Les 54 jours sont une période observée du
 //     pré-entraînement, pas sa durée entière : le chapitre le dit ainsi.
 //
 // La fiche du plan écrivait « jusqu'à 16 000 cartes » : la source dit « 16K », et son tableau 4
@@ -66,7 +67,10 @@ export const LLAMA_31_405B = Object.freeze({
   joursObserves: chiffre(54, ARTICLE_LLAMA_3, 'section 3.3.4 (« a 54-day snapshot period of pre-training »)'),
   /** Les interruptions pendant cette période. */
   interruptions: chiffre(466, ARTICLE_LLAMA_3, 'section 3.3.4 (« 466 job interruptions »)'),
-  /** Celles qui étaient prévues : de la maintenance automatique. */
+  /**
+   * Celles qui étaient prévues : de la maintenance automatique (des mises à jour de micrologiciel), ou des
+   * opérations lancées par l'équipe (un changement de configuration, une mise à jour des données).
+   */
   interruptionsPrevues: chiffre(47, ARTICLE_LLAMA_3, 'section 3.3.4 (« 47 were planned interruptions »)'),
   /** Celles qui ne l'étaient pas. */
   interruptionsImprevues: chiffre(419, ARTICLE_LLAMA_3, 'section 3.3.4 (« 419 were unexpected interruptions »)'),

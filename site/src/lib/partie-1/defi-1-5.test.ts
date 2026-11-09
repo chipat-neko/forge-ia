@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { Entraineur, PRESETS_MINI, TAUX_PROPOSES } from '../mini-modele/entrainement';
+import { SEUIL_VERDICT } from '../mini-modele/paris';
 import { resultatDuDefi, TAUX_DU_DEFI } from './defi-1-5';
 import { ECART_DU_DEFI } from './paris-1-5';
 
@@ -13,6 +14,10 @@ describe('le défi de l’atelier', () => {
     expect(TAUX_DU_DEFI.defaut).toBe(defaut);
     expect(TAUX_DU_DEFI.plusGrands).toStrictEqual(TAUX_PROPOSES.filter((t) => t > defaut));
     expect(TAUX_DU_DEFI.plusGrands.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('sa tolérance est le seuil « à peu près pareil » du pari sur le taux du mini-modèle', () => {
+    expect(ECART_DU_DEFI).toBe(SEUIL_VERDICT);
   });
 
   it(
