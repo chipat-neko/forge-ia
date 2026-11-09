@@ -1,7 +1,7 @@
 """Comparer chaque pièce au module correspondant de forge.
 
 Le modèle de forge est construit en float64 sur le processeur, puis ses poids sont tirés de
-nouveau avec un écart-type de 0,2 (ceux de départ, 0,02, rendraient chaque pièce presque nulle :
+nouveau avec un écart-type de 0,2 (ceux de départ, 0,02, rendraient l'attention presque uniforme et SwiGLU presque nul :
 l'égalité ne prouverait presque rien). Les deux versions reçoivent les mêmes poids et le même lot.
 """
 

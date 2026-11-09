@@ -1,4 +1,4 @@
-﻿# Le transformer pièce par pièce
+# Le transformer pièce par pièce
 
 Le transformer de « ton IA » (le paquet `forge`, dans `projets/forge`) est un
 décodeur seul : des plongements, des blocs d'attention et de MLP SwiGLU, une
@@ -88,8 +88,8 @@ forge calcule deux choses en float32, **même dans un modèle en float64** :
   cosinus et sinus aussi, et la rotation de `appliquer_rope` se fait en
   float32 (`x.float()`) avant de reprendre le type de l'entrée.
 
-Si `pieces.py` calculait tout en float64, il s'écarterait de forge d'environ
-10⁻⁷, l'erreur d'arrondi du float32, et l'égalité à 10⁻¹² serait fausse
+Si `pieces.py` calculait tout en float64, il s'écarterait de forge de plus de
+10⁻⁹ (un test le mesure : `test_sans_float32_l_ecart_depasse_le_seuil`), l'erreur d'arrondi du float32, et l'égalité à 10⁻¹² serait fausse
 alors qu'il n'y a aucune erreur de formule. Il refait donc ces passages aux
 mêmes endroits, dans le même ordre d'opérations (`torch.rsqrt` et non
 `1 / sqrt`, par exemple : ils diffèrent d'un bit de float32). Une conséquence :
@@ -100,8 +100,8 @@ restent en float64 : la figure montre le calcul, forge fait celui du modèle.
 
 ### Les poids du modèle de comparaison
 
-Ceux de départ de forge (écart-type 0,02) rendraient chaque pièce presque
-nulle, et l'égalité ne prouverait presque rien. `comparer.preparer_forge` les
+Ceux de départ de forge (écart-type 0,02) rendraient l'attention presque
+uniforme et SwiGLU presque nul : le masque, l'échelle 1/√d et RoPE seraient presque invisibles, et l'égalité ne prouverait presque rien. `comparer.preparer_forge` les
 tire donc de nouveau (écart-type 0,2, et 1 plus un bruit de 0,2 pour les
 RMSNorm), avec une graine fixée. C'est le `Transformer` de forge lui-même qui
 est construit : le projet ne touche à aucun fichier de forge.
@@ -119,8 +119,7 @@ change aucune sortie d'avant), les poids d'attention (ils totalisent 1 et
 redonnent la sortie), la softmax à la main, le comptage des paramètres, les
 attendus, les régions du paquet et le notebook.
 
-Un test marqué `gpu` serait sauté sans carte (« CUDA absente ») ; ce projet
-n'en a pas besoin.
+Aucun test n'a besoin de la carte graphique.
 
 ## Compter les paramètres
 
@@ -143,7 +142,7 @@ RoPE n'a aucun paramètre et il n'y a aucun biais. La somme vaut
 uv run --extra cpu python -m transformer_pas_a_pas comparer --enregistrer sorties/comparaison.txt
 ```
 
-Les écarts sont de l'ordre de 10⁻¹⁶ ; leur dernier chiffre peut changer d'une
+Les écarts sont de 10⁻¹⁴ au plus (certaines pièces sortent à 0) ; leur dernier chiffre peut changer d'une
 machine à l'autre, et aucun test ne le fige : le test exige seulement qu'ils
 restent sous 10⁻¹².
 

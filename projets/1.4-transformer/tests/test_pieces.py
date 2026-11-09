@@ -139,3 +139,61 @@ def test_regions_de_pieces():
     fermees = [m.group(1) for ligne in lignes if (m := re.match(r"\s*# fin: (\S+)", ligne))]
     assert ouvertes == ["plongement", "rmsnorm", "rope", "attention", "masque", "swiglu", "bloc", "modele"]
     assert fermees == ouvertes
+
+
+# --- Le seuil de 10⁻¹² attrape une pièce fausse -----------------------------------------------
+
+
+def lot_de_comparaison(graine: int = 0):
+    """Le lot d'attention de `ecarts` : le bloc 0 de forge, son entrée, et la sortie attendue."""
+    from forge.modele.transformer import rope_cos_sin
+
+    modele = preparer_forge(CONFIG, graine)
+    p = poids_de_forge(modele)["blocs"][0]
+    n, dim = CONFIG.longueur_contexte, CONFIG.dim
+    x = torch.randn(2, n, dim, generator=torch.Generator().manual_seed(graine + 1), dtype=torch.float64) * 3
+    cos, sin = rope_cos_sin(n, dim // CONFIG.tetes, CONFIG.base_rope, "cpu")
+    with torch.no_grad():
+        attendu = modele.blocs[0].attention(x, cos, sin)
+    return p, x, attendu
+
+
+def ecart_attention(p, x, attendu) -> float:
+    sortie = pieces.attention(x, p["w_qkv"], p["w_sortie"], CONFIG.tetes, CONFIG.base_rope)
+    return float((sortie - attendu).abs().max())
+
+
+def test_les_poids_d_attention_du_lot_ne_sont_pas_uniformes():
+    p, x, _ = lot_de_comparaison()
+    poids = pieces.poids_attention(x, p["w_qkv"], CONFIG.tetes, CONFIG.base_rope)
+    n = CONFIG.longueur_contexte
+    # Sur la dernière ligne, des poids uniformes vaudraient 1/n partout : le plus grand est bien au-dessus.
+    assert poids[..., -1, :].max() > 2 / n
+    assert poids[..., -1, :].min() < 0.5 / n
+
+
+def test_le_seuil_attrape_une_attention_sans_rope(monkeypatch):
+    p, x, attendu = lot_de_comparaison()
+    assert ecart_attention(p, x, attendu) <= 1e-12
+    monkeypatch.setattr(pieces, "tourner", lambda x, angles: x)
+    assert ecart_attention(p, x, attendu) > 1e-3
+
+
+def test_le_seuil_attrape_une_mauvaise_echelle(monkeypatch):
+    from types import SimpleNamespace
+
+    p, x, attendu = lot_de_comparaison()
+    # √d oublié : les scores ne sont plus divisés.
+    monkeypatch.setattr(pieces, "math", SimpleNamespace(sqrt=lambda d: 1.0))
+    assert ecart_attention(p, x, attendu) > 1e-3
+
+
+def test_sans_float32_l_ecart_depasse_le_seuil():
+    # RMSNorm entièrement en float64 : sans le passage par float32 de forge, l'égalité à 10⁻¹² est perdue.
+    p, x, _ = lot_de_comparaison()
+    modele = preparer_forge(CONFIG, 0)
+    attendu = modele.blocs[0].norme_attention(x).detach()
+    normalise = x * torch.rsqrt(x.pow(2).mean(dim=-1, keepdim=True) + 1e-5)
+    en_float64 = normalise * p["norme_attention"]
+    assert float((en_float64 - attendu).abs().max()) > 1e-9
+    assert float((pieces.rmsnorm(x, p["norme_attention"]) - attendu).abs().max()) <= 1e-12

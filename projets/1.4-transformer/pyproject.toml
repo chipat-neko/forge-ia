@@ -66,9 +66,6 @@ packages = ["transformer_pas_a_pas"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = [
-    "gpu: test qui a besoin de la carte graphique (sauté quand CUDA est absente)",
-]
 # Sous Windows, pyzmq (le lien entre nbclient et le noyau du notebook) prévient qu'il
 # ajoute un fil pour la boucle Proactor d'asyncio : sans effet sur les tests. Seul cet
 # avertissement est masqué.
