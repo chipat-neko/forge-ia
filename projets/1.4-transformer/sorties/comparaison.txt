@@ -1,0 +1,13 @@
+# relevé le 2026-11-09
+Le transformer de ton IA refait pièce par pièce, comparé au module correspondant de forge
+  modèle de comparaison : 2 couches, dim 32, 4 têtes, contexte 16, vocabulaire 50 (graine 0, poids tirés avec un écart-type de 0,2)
+  calculé en float64 sur le processeur, avec PyTorch 2.15.0, 16 cœurs logiques
+  forge calcule RMSNorm et RoPE en float32, même dans un modèle en float64 : les pièces le refont aux mêmes endroits
+Plus grand écart avec forge, pièce par pièce
+  RMSNorm          : 0
+  RoPE             : 0
+  attention        : 8,9e-15
+  SwiGLU           : 3,6e-15
+  un bloc          : 1,8e-15
+  le modèle entier : 0
+identique à forge à 10⁻¹² près : oui
