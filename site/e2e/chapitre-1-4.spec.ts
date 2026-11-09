@@ -39,6 +39,7 @@ import { lireSortie } from '../src/lib/sorties';
 import { extraireSymbole } from '../src/lib/symboles';
 import { typographier } from '../src/lib/typo';
 import {
+  attendreHydratation as attendreLesIlots,
   plusLongueLigne,
   texteHorsCode,
   verifierAxe,
@@ -73,15 +74,14 @@ const BRUT = '[data-attention], [data-test="schema"] svg';
 
 /**
  * Attend que les trois îlots de la page (l'animation de l'attention, la figure de RoPE et
- * l'atelier) soient hydratés, comme attendreHydratation (outils.ts), mais jusqu'à 20 s. Juste
- * après la construction, la première visite lit des fichiers neufs, et leur premier
- * chargement a pris jusqu'à 5,4 s sur ce PC, pour toutes les pages (1.1 et 1.2 comprises) ;
- * ensuite, la page se charge en 0,3 s et ses îlots s'hydratent en moins de 0,1 s
- * (mesuré le 9 novembre 2026, quatre pages à la fois). Trois îlots à charger, au lieu d'un,
- * dépassaient parfois les 5 s de l'aide commune.
+ * l'atelier) soient hydratés, avec l'aide commune, mais jusqu'à 20 s au lieu de 5. Juste après
+ * la construction, la première visite lit des fichiers neufs, et leur premier chargement a pris
+ * jusqu'à 5,4 s sur ce PC, pour toutes les pages (1.1 et 1.2 comprises) ; ensuite, la page se
+ * charge en 0,3 s et ses îlots s'hydratent en moins de 0,1 s (mesuré le 9 novembre 2026, quatre
+ * pages à la fois). Trois îlots à charger, au lieu d'un, dépassaient parfois les 5 s.
  */
 async function attendreHydratation(page: Page): Promise<void> {
-  await expect(page.locator('astro-island[ssr]')).toHaveCount(0, { timeout: 20_000 });
+  await attendreLesIlots(page, 20_000);
 }
 
 /** Le texte exact d'un élément (textContent : toHaveText ramènerait U+202F à une espace ordinaire). */
@@ -222,7 +222,9 @@ test('les choix des paris viennent des jumeaux et des attendus', async ({ page }
     expect(await page.locator(`[data-pari="${id}"] [data-juste]`).textContent(), id).toBe(affiche(choix.find((c) => c.juste)!));
   }
   // Le pari residus : sans le x +, les deux textes sortent pareils.
-  await expect(page.locator('[data-pari="residus"] [data-juste]')).toContainText('les deux textes sortent pareils');
+  await expect(page.locator('[data-pari="residus"] [data-juste]')).toContainText('les deux suites sortent pareilles');
+  // L'acquis du x + : le récapitulatif n'écrit pas de code, l'espace y est insécable.
+  expect(await page.locator('#recap [data-acquis="residus"]').textContent()).toContain('x\u00A0+');
   await expect(page.locator('[data-pari="parametres"] [data-juste]')).toHaveText('Les MLP');
 });
 

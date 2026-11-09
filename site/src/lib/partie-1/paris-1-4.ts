@@ -154,7 +154,7 @@ export function faitsDuPariParametres(preset: CleForge = 'tres_grand'): {
 
 // ---------- Étape 7 : le pari « residus » ----------
 
-/** Ce que deviennent deux textes après un bloc : la ressemblance de leurs sorties, avec et sans le `x +`. */
+/** Ce que deviennent deux suites de jetons après un bloc : la ressemblance de leurs sorties, avec et sans le `x +`. */
 export interface RessemblanceParBloc {
   bloc: number;
   avec: number;
@@ -180,7 +180,7 @@ export interface ResidusDuPari {
 export const TRANCHES_RESIDUS: readonly string[] = Object.freeze([
   `Elle passe${FINE}: on voit toujours quel jeton c’était`,
   'Elle s’estompe, sans disparaître',
-  `Elle se perd${FINE}: les deux textes sortent pareils`,
+  `Elle se perd${FINE}: les deux suites sortent pareilles`,
 ]);
 
 /** La tranche d'une ressemblance : 0 sous 0,5 ; 1 de 0,5 (compris) à 0,999 ; 2 à partir de 0,999. */
@@ -218,9 +218,9 @@ export function faitsDuPariResidus(residus: ResidusDuPari): {
   const premier = blocs[0];
   const dernier = blocs.at(-1)!;
   exiger(Math.abs(residus.entrees) < 0.5, 'les vecteurs des deux derniers jetons se ressemblent déjà à l’entrée');
-  exiger(dernier.sans >= 0.999, 'sans le x +, les deux textes ne sortent plus pareils');
-  exiger(premier.sans < 0.999, 'sans le x +, les deux textes sortent déjà pareils après le premier bloc');
-  exiger(dernier.avec < 0.999, 'avec le x +, les deux textes sortent pareils eux aussi');
+  exiger(dernier.sans >= 0.999, 'sans le x +, les deux suites ne sortent plus pareilles');
+  exiger(premier.sans < 0.999, 'sans le x +, les deux suites sortent déjà pareilles après le premier bloc');
+  exiger(dernier.avec < 0.999, 'avec le x +, les deux suites sortent pareilles elles aussi');
   const uniforme = 1 / jetons;
   exiger(
     residus.poids_attention_min > uniforme / 2 && residus.poids_attention_max < 2 * uniforme,
@@ -240,6 +240,11 @@ export const COUCHES_MIN = 1;
 export const COUCHES_MAX = 48;
 /** Le défi : une taille sous 100 millions de paramètres. */
 export const SEUIL_DU_DEFI = 100_000_000;
+if (!Number.isInteger(SEUIL_DU_DEFI / 1_000_000)) {
+  throw new Error('SEUIL_DU_DEFI doit être un nombre entier de millions : SEUIL_DU_DEFI_TEXTE l’écrit en millions (paris-1-4.ts).');
+}
+/** Le seuil du défi, tel que l'atelier l'écrit : « 100 millions ». */
+export const SEUIL_DU_DEFI_TEXTE = `${nombre(SEUIL_DU_DEFI / 1_000_000)} millions`;
 
 /** Ce que l'atelier sait d'un réglage. */
 export interface EtatDeLAtelier {
@@ -311,7 +316,7 @@ export function etatDuDefi(etat: EtatDeLAtelier): { reussi: boolean; texte: stri
   const { mlp, plongement } = etat.repartition;
   const quantite = formaterQuantite(etat.total);
   if (etat.total >= SEUIL_DU_DEFI) {
-    return { reussi: false, texte: `Pas encore${FINE}: ${quantite} de paramètres, c’est plus de 100 millions.` };
+    return { reussi: false, texte: `Pas encore${FINE}: ${quantite} de paramètres, c’est plus de ${SEUIL_DU_DEFI_TEXTE}.` };
   }
   if (mlp <= plongement) {
     return {

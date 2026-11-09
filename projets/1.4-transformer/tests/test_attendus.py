@@ -9,11 +9,19 @@ Les angles passent par `**` (pow) : la bibliothèque mathématique de Windows (U
 Linux (glibc) peuvent différer d'un bit. Ils se comparent donc à 10⁻⁹ près en relatif, comme le
 projet 0.5. Les répartitions, des entiers, se comparent exactement.
 
-La section `residus` (le pari « sans le `x +`, que devient l'entrée ? » du chapitre) passe par
-les pièces du transformer, dont RMSNorm et RoPE calculent en float32, comme forge : d'un
-processeur à l'autre, une somme en float32 peut changer d'un bit. Ses ressemblances se
-comparent donc à 10⁻⁶ près ; le chapitre n'en montre que deux ou trois chiffres après la
-virgule.
+La section `residus` (le pari « sans le `x +`, que devient l'entrée ? » du chapitre) passe
+toute par le float32 de forge : les poids sont tirés en float32 (le `Transformer` est construit,
+puis passé en float64), et RMSNorm et RoPE calculent en float32. D'un processeur à l'autre, un
+calcul en float32 peut changer d'un bit. Toutes ses valeurs (la ressemblance des entrées, celles
+des sorties bloc par bloc, et les poids d'attention) se comparent donc à 10⁻⁶ près (P1 l'emporte
+sur P9 pour elles). Mesuré sur ce PC (Windows, PyTorch 2.15.0 pour le processeur), le
+9 novembre 2026 : AVX2 contre AVX-512, 1 fil contre 16, au plus 2,2 × 10⁻¹⁶ d'écart ; sans
+instructions vectorielles (ATEN_CPU_CAPABILITY=default), jusqu'à 4,4 × 10⁻⁸, et 2,4 × 10⁻⁸ pour la
+ressemblance des entrées, qui passe par les poids tirés en float32. Le chapitre montre deux ou
+trois chiffres après la virgule, et dit qu'après le dernier bloc, sans le `x +`, la ressemblance
+vaut 1 à moins d'un milliardième près (8,3 × 10⁻¹¹ d'écart à 1, quel que soit le réglage) :
+`test_sans_residus_un_milliardieme_sur_cette_machine` le recalcule sur chaque machine, et la
+garde `faitsDuPariResidus` du site le vérifie sur le fichier à chaque construction.
 """
 
 import inspect
@@ -43,7 +51,7 @@ from transformer_pas_a_pas.attendus import (
 REGENERER = "Régénère-le avec « uv run --extra cpu python -m transformer_pas_a_pas.attendus » (dans projets/1.4-transformer)."
 TOLERANCE_RELATIVE = 1e-9
 TOLERANCE_ABSOLUE = 1e-12
-# Les ressemblances de la section residus passent par float32 (RMSNorm, RoPE) : à 10⁻⁶ près.
+# Les valeurs de la section residus passent par le float32 de forge (poids tirés, RMSNorm, RoPE) : à 10⁻⁶ près.
 TOLERANCE_RESIDUS = 1e-6
 CLES_RESIDUS = ["preset", "couches", "dim", "jetons", "graine", "entrees", "poids_attention_min", "poids_attention_max", "par_bloc"]
 
@@ -63,7 +71,7 @@ def comparer_angles(calcule: list, lu: list) -> None:
 
 
 def comparer_residus(calcule: dict, lu: dict) -> None:
-    """La section residus : le nom et les entiers exactement, les ressemblances à 10⁻⁶ près.
+    """La section residus : le nom et les entiers exactement, les flottants à 10⁻⁶ près.
 
     Nomme le premier écart (« residus.par_bloc[3].sans »)."""
     assert list(calcule) == list(lu), "residus : les clés ont changé"
@@ -170,7 +178,7 @@ def test_la_tolerance_des_residus_attrape_une_vraie_difference():
         comparer_residus(copie, lu)
 
 
-def test_les_deux_textes_ne_different_que_par_le_dernier_jeton():
+def test_les_deux_suites_ne_different_que_par_le_dernier_jeton():
     a, b = textes_du_pari_residus()
     assert a.shape == b.shape == (JETONS_RESIDUS,)
     assert torch.equal(a[:-1], b[:-1])
@@ -206,8 +214,16 @@ def test_les_residus_disent_ce_que_dit_le_chapitre():
     dernier = r["par_bloc"][-1]
     # Deux jetons différents : leurs vecteurs d'entrée ne se ressemblent pas.
     assert abs(r["entrees"]) < 0.5
-    # Sans le x +, les deux textes finissent par sortir pareils ; avec, ils restent distincts.
+    # Sans le x +, les deux suites finissent par sortir pareilles ; avec, elles restent distinctes.
     assert dernier["sans"] >= 0.999
     assert dernier["avec"] < 0.999
     # Au départ, l'attention répartit presque également : autour de 1/16 par jeton.
     assert 0.5 / JETONS_RESIDUS < r["poids_attention_min"] <= 1 / JETONS_RESIDUS <= r["poids_attention_max"] < 2 / JETONS_RESIDUS
+
+
+def test_sans_residus_un_milliardieme_sur_cette_machine():
+    # Le chapitre dit : après le dernier bloc, sans le x +, la ressemblance vaut 1 à moins d'un
+    # milliardième près. La tolérance de 10⁻⁶ ne suffirait pas à le garantir : on le recalcule ici.
+    from transformer_pas_a_pas.attendus import residus
+
+    assert 1 - residus()["par_bloc"][-1]["sans"] < 1e-9

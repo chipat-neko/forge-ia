@@ -71,10 +71,12 @@ export async function plusLongueLigne(page: Page): Promise<{ longueur: number; l
 /**
  * Attend que tous les îlots Svelte de la page soient hydratés : tant qu'ils
  * ne le sont pas, la saisie, les boutons et le clavier ne font rien. Astro
- * retire l'attribut ssr d'un îlot une fois hydraté.
+ * retire l'attribut ssr d'un îlot une fois hydraté. `delai` (en ms) remplace
+ * le délai par défaut des attentes de Playwright, pour une page à plusieurs
+ * îlots ; sans lui, rien ne change.
  */
-export async function attendreHydratation(page: Page): Promise<void> {
-  await expect(page.locator('astro-island[ssr]')).toHaveCount(0);
+export async function attendreHydratation(page: Page, delai?: number): Promise<void> {
+  await expect(page.locator('astro-island[ssr]')).toHaveCount(0, delai === undefined ? undefined : { timeout: delai });
 }
 
 /**

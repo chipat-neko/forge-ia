@@ -45,6 +45,7 @@
     nomDeLaFamille,
     PAS_DIM,
     phraseDeLAtelier,
+    SEUIL_DU_DEFI_TEXTE,
     placeParmiLesTailles,
     tetesVoisines,
   } from '../../../lib/partie-1/paris-1-4';
@@ -271,7 +272,7 @@
 
   <div class="defi" class:reussi={defi.reussi} data-defi>
     <h3>Défi</h3>
-    <p>Trouve une taille sous 100 millions de paramètres où les MLP pèsent plus que le plongement.</p>
+    <p>Trouve une taille sous {SEUIL_DU_DEFI_TEXTE} de paramètres où les MLP pèsent plus que le plongement.</p>
     <p class="etat" data-test="par-defi">{defi.texte}</p>
     <p class="vh" role="status">{annonceDefi}</p>
   </div>

@@ -15,7 +15,7 @@ acquis:
     texte: "RoPE tourne chaque paire de valeurs selon la position : les premières paires vite, les dernières lentement."
     ou: "à l'étape 5"
   - cle: residus
-    texte: "Grâce au x +, chaque bloc ajoute une correction au vecteur au lieu de le remplacer."
+    texte: "Grâce au x\u00A0+, chaque bloc ajoute une correction au vecteur au lieu de le remplacer."
     ou: "à l'étape 7"
   - cle: parametres
     texte: "Dans ton IA, les MLP portent la plupart des paramètres."
@@ -83,7 +83,7 @@ export const TON_IA = (() => {
   const racine = Math.sqrt(dimTete);
   exiger(Number.isInteger(racine), `une tête de ${dimTete} nombres n’a plus une racine entière : l’étape 4 la donne`);
   const cachee = largeurCachee(f.dim);
-  // « Les 8/3 de la largeur, arrondis à un multiple de 64 » (étape 6).
+  // « Les 8/3 de la largeur, arrondis à un multiple de 64 » (étape 6), PAS_LARGEUR_CACHEE de forge.
   exiger(cachee % PAS_LARGEUR_CACHEE === 0 && Math.abs(cachee - (8 * f.dim) / 3) <= PAS_LARGEUR_CACHEE / 2, 'la largeur cachée du MLP n’est plus les 8/3 de dim, arrondis à un multiple de 64');
   // « Chaque tête a les siens » (étape 10) : ton IA n'a pas d'attention groupée.
   exiger(f.tetesKv === f.tetes, 'ton IA partage maintenant ses clés et ses valeurs entre têtes : l’étape 10 est à revoir');
@@ -106,6 +106,7 @@ export const TON_IA = (() => {
     total: nombre(total),
     quantite: formaterQuantite(total),
     cachee: nombre(cachee),
+    pas: nombre(PAS_LARGEUR_CACHEE),
     lies: nombre(f.vocabulaire * f.dim),
   };
 })();
@@ -182,6 +183,7 @@ export const RES = (() => {
   exiger(nombre(deuxieme, 3) !== nombre(1, 3), 'après le deuxième bloc, sans le x +, la ressemblance s’écrit déjà 1');
   return {
     jetons: nombre(RESIDUS.jetons),
+    graine: String(RESIDUS.graine),
     couches: nombre(f.couches),
     entrees: nombre(RESIDUS.entrees, 2),
     premier: nombre(f.premier.sans, 2),
@@ -330,7 +332,7 @@ Ton IA fait de même : un jeton ne voit que lui-même et ceux d'avant. Sans le m
 
 <Etape numero={4} titre="Plusieurs têtes">
 
-Une tête ne pose qu'une sorte de question à la fois. Ton IA en a {TON_IA.tetes} par bloc : elle coupe chaque vecteur de {TON_IA.dim} nombres en {TON_IA.tetes} tranches de {TON_IA.dimTete}, et chaque tranche fait son attention de son côté, avec ses propres requêtes, clés et valeurs. Les {TON_IA.tetes} résultats se recollent en un vecteur de {TON_IA.dim} nombres, et une dernière matrice les mélange. Dans le projet, tout tient en trois fonctions :
+Une tête ne pose qu'une sorte de question à la fois. Ton IA en a {TON_IA.tetes} par bloc : elle coupe chaque vecteur de {TON_IA.dim} nombres en {TON_IA.tetes} tranches de {TON_IA.dimTete}, et chaque tranche fait son attention de son côté, avec ses propres requêtes, clés et valeurs. Les {TON_IA.tetes} résultats se recollent en un vecteur de {TON_IA.dim} nombres, et une dernière matrice les mélange. Voici tout ce calcul dans le projet :
 
 <CodeExplique fichier="projets/1.4-transformer/transformer_pas_a_pas/pieces.py" region="attention">
   <li data-lignes="1-6">`softmax`, écrite à la main. Soustraire le plus grand score ne change pas le résultat, mais empêche `exp` de déborder sur un nombre trop grand.</li>
@@ -394,7 +396,7 @@ Après l'attention, chaque jeton passe seul par un petit réseau, le MLP. Comme 
   <li data-lignes="2">Deux projections partent de `x`, chacune vers {TON_IA.cachee} nombres : la porte, `proj_porte`, passée par SiLU, et la voie haute, `proj_haute`. Leur produit terme à terme laisse la porte décider, nombre par nombre, ce qui passe de la voie haute. SiLU est une courbe douce : elle laisse passer les valeurs positives et étouffe les négatives. Enfin, `proj_basse` ramène le tout à {TON_IA.dim} nombres.</li>
 </CodeExplique>
 
-Trois matrices au lieu de deux : pour garder à peu près les paramètres d'un MLP ordinaire, qui élargit le vecteur à quatre fois sa taille, la couche cachée de SwiGLU n'en fait que les 8/3, arrondis à un multiple de 64 : {TON_IA.cachee} pour {TON_IA.dim}.
+Trois matrices au lieu de deux : pour garder à peu près les paramètres d'un MLP ordinaire, qui élargit le vecteur à quatre fois sa taille, la couche cachée de SwiGLU n'en fait que les 8/3, arrondis à un multiple de {TON_IA.pas} : {TON_IA.cachee} pour {TON_IA.dim}.
 
 Cette porte vient d'une famille d'idées qu'a essayée Noam Shazeer en 2020. Le résumé de son article la décrit ainsi : une unité linéaire à porte, ou GLU, est le produit, composante par composante, de deux projections, dont l'une passe d'abord par une sigmoïde ; et l'on peut mettre une autre fonction à la place de la sigmoïde. Essayées dans le MLP du transformer, certaines de ces variantes y font mieux, dit le résumé, que les fonctions ReLU ou GELU qu'on y mettait d'habitude. Il ne donne aucun chiffre. Le SwiGLU de forge est une variante de ce genre : sa porte passe par SiLU au lieu d'une sigmoïde.
 
@@ -423,14 +425,14 @@ Le <code class="insecable">x +</code> s'appelle une connexion résiduelle. Il a 
 <Pari
   id="residus"
   question={`Sans le \`x\u00A0+\`, que devient l’entrée ?`}
-  precision={`Deux textes de ${RES.jetons} jetons ne diffèrent que par leur dernier jeton. Ils traversent les ${RES.couches} blocs de ton IA en taille mini, avec les poids tirés au départ de son entraînement, mais sans le \`x\u00A0+\`. À la dernière position, que reste-t-il de leur différence ?`}
+  precision={`Deux suites de ${RES.jetons} jetons tirés au hasard ne diffèrent que par leur dernier jeton. Elles traversent les ${RES.couches} blocs d’un transformer de la taille mini, aux poids tirés au hasard comme forge les tire au départ, avant tout entraînement, mais sans le \`x\u00A0+\`. À la dernière position, que reste-t-il de leur différence ?`}
   choix={CHOIX.residus}
   acquis="residus"
 >
 
-Elle se perd. À l'entrée, les vecteurs des deux derniers jetons ne se ressemblent pas : leur cosinus, la mesure de ressemblance du {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : 'chapitre 0.2'}, vaut {RES.entrees}. Sans le <code class="insecable">x +</code>, les deux sorties de la dernière position se ressemblent à {RES.premier} après le premier bloc, à {RES.deuxieme} après le deuxième, et après le dernier, leur cosinus vaut 1 à moins d'un milliardième près. Ton IA ne saurait plus quel était le dernier jeton.
+Elle se perd. À l'entrée, les vecteurs des deux derniers jetons ne se ressemblent pas : leur cosinus, la mesure de ressemblance du {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : 'chapitre 0.2'}, vaut {RES.entrees}. Sans le <code class="insecable">x +</code>, les deux sorties de la dernière position se ressemblent à {RES.premier} après le premier bloc, à {RES.deuxieme} après le deuxième, et après le dernier, leur cosinus vaut 1 à moins d'un milliardième près. Au départ de l'entraînement, un tel modèle ne saurait plus quel était le dernier jeton.
 
-Au départ de l'entraînement, l'attention répartit presque également : dans chaque tête du premier bloc, la dernière position donne à chacun des {RES.jetons} jetons entre {RES.min} et {RES.max} de son attention, autour de 1 sur {RES.jetons}, soit {RES.uniforme}. Sans le <code class="insecable">x +</code>, le vecteur du dernier jeton n'est plus qu'une part de ce mélange, puis une part d'un mélange de mélanges au bloc suivant : sa trace s'efface. Avec le <code class="insecable">x +</code>, il traverse tous les blocs, et les deux sorties restent distinctes : leur cosinus vaut {RES.avec} après le dernier bloc.
+Avec ces poids de départ, l'attention répartit presque également : dans chaque tête du premier bloc, la dernière position donne à chacun des {RES.jetons} jetons entre {RES.min} et {RES.max} de son attention, autour de 1 sur {RES.jetons}, soit {RES.uniforme}. Sans le <code class="insecable">x +</code>, le vecteur du dernier jeton n'est plus qu'une part de ce mélange, puis une part d'un mélange de mélanges au bloc suivant : sa trace s'efface. Avec le <code class="insecable">x +</code>, il traverse tous les blocs, et les deux sorties restent distinctes : leur cosinus vaut {RES.avec} après le dernier bloc.
 
 C'est le trait épais du schéma de l'étape 1 : chaque pièce y écrit sa correction, et le vecteur continue sa route.
 
@@ -438,7 +440,7 @@ C'est le trait épais du schéma de l'étape 1 : chaque pièce y écrit sa corre
 
 <Fragment slot="note">
 
-Le calcul vient du projet : `attendus.py` passe les deux textes par `pieces.bloc`, puis par `bloc_sans_residus`, le même code sans ses deux <code class="insecable">x +</code>, et écrit les ressemblances dans `tests/attendus.json`. La page les lit sans les refaire.
+Le calcul vient du projet : `attendus.py` passe les deux suites par `pieces.bloc`, puis par `bloc_sans_residus`, le même code sans ses deux <code class="insecable">x +</code>, et écrit les ressemblances dans `tests/attendus.json`. La page les lit sans les refaire. Ses poids sont tirés avec la graine {RES.graine} : ce ne sont pas ceux du départ de ton IA, que son entraînement tire avec sa propre graine.
 
 Comme RoPE, la RMSNorm de forge calcule en float32, même dans un modèle en float64 ; le projet refait ce passage au même endroit.
 
@@ -513,7 +515,7 @@ Ton IA est un petit transformer. Les grands labos en construisent de bien plus g
 
 Llama 3 405B, de Meta, empile {LABO.couches} blocs, contre {TON_IA.couches} pour ton IA. Ses vecteurs ont {LABO.dim} nombres, contre {TON_IA.dim}, et chacun de ses blocs a {LABO.tetes} têtes de {LABO.dimTete} nombres, contre {TON_IA.tetes} de {TON_IA.dimTete}. Mais ses {LABO.tetes} têtes ne calculent que {LABO.tetesKv} jeux de clés et de valeurs, chacun partagé par {LABO.parGroupe} têtes ; dans ton IA, chaque tête a les siens.
 
-Il s'est entraîné sur des passages de {LABO.contexte} jetons, {LABO.fois} fois les {TON_IA.contexte} de ton IA, et choisit parmi {LABO.vocabulaire} jetons, contre {TON_IA.vocabulaire}. En tout, {LABO.parametres} de paramètres, environ {LABO.rapport} fois ceux de ton IA.
+Il s'est d'abord entraîné sur des passages de {LABO.contexte} jetons, {LABO.fois} fois les {TON_IA.contexte} de ton IA, et choisit parmi {LABO.vocabulaire} jetons, contre {TON_IA.vocabulaire}. En tout, {LABO.parametres} de paramètres, environ {LABO.rapport} fois ceux de ton IA.
 
 </EncadreLabo>
 

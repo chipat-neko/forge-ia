@@ -158,19 +158,26 @@ Le fichier `tests/attendus.json` a trois sections :
   les 4 paires d'une tête de 8, avec la base de `ConfigModele` (10 000).
   Le jumeau (`site/src/lib/partie-1/rope.ts`) les retrouve à 10⁻¹² près ;
 - `residus` : le pari « sans le `x +`, que devient l'entrée ? » du chapitre.
-  Deux textes de 16 jetons, pareils sauf leur dernier jeton, traversent les
-  6 blocs de ton IA en taille mini, avec les poids que forge tire au départ
-  (graine 0) : une fois avec `pieces.bloc`, une fois sans ses deux `x +`
-  (`bloc_sans_residus`, dans `attendus.py`). Après chaque bloc, la section
-  donne la ressemblance (le cosinus du chapitre 0.2) des deux sorties de la
-  dernière position. Sans le `x +`, elles deviennent les mêmes : le dernier
-  jeton est oublié. Le site lit ces nombres sans les refaire.
+  Deux suites de 16 jetons tirés au hasard, pareilles sauf leur dernier jeton,
+  traversent les 6 blocs d'un transformer de la taille mini, aux poids tirés
+  au hasard comme forge les tire au départ, avant tout entraînement, avec la
+  graine 0. Ce ne sont pas les poids de départ de ton IA : son entraînement
+  tire les siens avec sa propre graine. Elles passent une fois par
+  `pieces.bloc`, une fois sans ses deux `x +` (`bloc_sans_residus`, dans
+  `attendus.py`). Après chaque bloc, la section donne la ressemblance (le
+  cosinus du chapitre 0.2) des deux sorties de la dernière position, et elle
+  donne aussi les poids d'attention de la dernière position au premier bloc.
+  Sans le `x +`, les deux sorties deviennent les mêmes : le dernier jeton est
+  oublié. Le site lit ces nombres sans les refaire.
 
 Les angles passent par `**`, `cos` et `sin`, dont le dernier chiffre peut
 changer d'un système à l'autre (Windows, Linux) : le test du Python les compare
-à 10⁻⁹ près, et les répartitions exactement. Les ressemblances de `residus`
-passent par RMSNorm et RoPE, qui calculent en float32 comme forge : elles se
-comparent à 10⁻⁶ près. Pour régénérer le fichier :
+à 10⁻⁹ près, et les répartitions exactement. Toutes les valeurs de
+`residus` (ressemblances et poids d'attention) passent par le float32 de forge :
+les poids sont tirés en float32, et RMSNorm et RoPE calculent en float32. Elles
+se comparent à 10⁻⁶ près ; sur ce PC, elles changent au plus de 4,4 × 10⁻⁸ d'un
+jeu d'instructions à l'autre. Un test recalcule à part ce que le chapitre en
+dit au milliardième près. Pour régénérer le fichier :
 
 ```bash
 uv run --extra cpu python -m transformer_pas_a_pas.attendus

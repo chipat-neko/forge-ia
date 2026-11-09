@@ -2,8 +2,8 @@
 
 Le site refait deux calculs en TypeScript : la répartition des paramètres
 (site/src/lib/partie-1/parametres.ts) et les angles de RoPE (site/src/lib/partie-1/rope.ts).
-Il lit aussi, sans le refaire, ce que deviennent deux textes sans le `x +` des blocs (le pari
-« residus » du chapitre). Ce fichier produit `tests/attendus.json`, dans l'ordre :
+Il lit aussi, sans le refaire, ce que deviennent deux suites de jetons sans le `x +` des blocs
+(le pari « residus » du chapitre). Ce fichier produit `tests/attendus.json`, dans l'ordre :
 
 - `repartitions` : pour chaque preset de `forge.modele.config.PRESETS`, ses dimensions et le
   nombre de paramètres de chaque famille (des entiers, comparés exactement) ;
@@ -12,12 +12,14 @@ Il lit aussi, sans le refaire, ce que deviennent deux textes sans le `x +` des b
   par `**`, pour l'affichage : forge, lui, les calcule en float32 (voir `pieces.angles_rope`). Ils
   passent par `pow`, `cos` et `sin` des bibliothèques mathématiques du système, qui peuvent
   différer d'un bit : les tests les comparent à 10⁻⁹ près ;
-- `residus` : deux textes de `JETONS_RESIDUS` jetons qui ne diffèrent que par leur dernier jeton
-  traversent les blocs de « ton IA » en taille mini, avec les poids que forge tire au départ
-  (graine fixée), une fois avec `pieces.bloc`, une fois sans ses `x +` (`bloc_sans_residus`).
+- `residus` : deux suites de `JETONS_RESIDUS` jetons tirés au hasard, qui ne diffèrent que par
+  leur dernier jeton, traversent les blocs d'un transformer de la taille mini, aux poids tirés au
+  hasard comme forge les tire au départ, avant tout entraînement (graine `GRAINE_RESIDUS`, 0).
+  Ce ne sont pas les poids de départ de « ton IA » : son entraînement tire les siens avec sa
+  propre graine. Une fois avec `pieces.bloc`, une fois sans ses `x +` (`bloc_sans_residus`).
   Après chaque bloc, la ressemblance (le cosinus du chapitre 0.2) entre les deux sorties de la
-  dernière position. RMSNorm et RoPE y calculent en float32, comme forge : les tests les
-  comparent à 10⁻⁶ près.
+  dernière position. Les poids sont tirés en float32, et RMSNorm et RoPE calculent en float32,
+  comme forge : les tests comparent toute la section à 10⁻⁶ près.
 
 Pour régénérer le fichier (dans projets/1.4-transformer) :
 
@@ -43,8 +45,9 @@ BASE = ConfigModele(dim=8, couches=1, tetes=1, longueur_contexte=1).base_rope
 DIM_TETE = 8
 POSITIONS = 33
 
-# Le pari « residus » : ton IA en taille mini, ses poids de départ tirés avec la graine 0, et
-# deux textes de 16 jetons.
+# Le pari « residus » : un transformer de la taille mini, des poids tirés comme forge les tire au
+# départ, avec la graine 0 (pas ceux de ton IA, que son entraînement tire avec sa propre graine),
+# et deux suites de 16 jetons tirés au hasard.
 PRESET_RESIDUS = "mini"
 GRAINE_RESIDUS = 0
 JETONS_RESIDUS = 16
@@ -67,18 +70,20 @@ def ressemblance(a: Tensor, b: Tensor) -> float:
 
 
 def textes_du_pari_residus() -> tuple[Tensor, Tensor]:
-    """Deux textes de `JETONS_RESIDUS` jetons tirés au hasard, pareils sauf leur dernier jeton."""
+    """Deux suites de `JETONS_RESIDUS` jetons tirés au hasard, pareilles sauf leur dernier jeton."""
     tirage = torch.Generator().manual_seed(GRAINE_RESIDUS)
     ids = torch.randint(0, PRESETS[PRESET_RESIDUS].taille_vocabulaire, (JETONS_RESIDUS + 1,), generator=tirage)
     return ids[:-1], torch.cat((ids[:-2], ids[-1:]))
 
 
 def residus() -> dict:
-    """Ce que deviennent deux textes qui ne diffèrent que par leur dernier jeton, avec et sans le `x +`.
+    """Ce que deviennent deux suites de jetons qui ne diffèrent que par leur dernier jeton, avec et
+    sans le `x +`.
 
-    Le modèle est le `Transformer` de forge en taille mini, avec les poids que forge tire au départ
-    (`Transformer._initialiser`, graine `GRAINE_RESIDUS`), passé en float64. Les poids d'attention
-    sont ceux de la dernière position dans le premier bloc, toutes têtes comprises.
+    Le modèle est le `Transformer` de forge en taille mini, aux poids tirés au hasard comme forge les
+    tire au départ, avant tout entraînement (`Transformer._initialiser`, graine `GRAINE_RESIDUS`),
+    puis passé en float64. Les poids d'attention sont ceux de la dernière position dans le premier
+    bloc, toutes têtes comprises.
     """
     config = PRESETS[PRESET_RESIDUS]
     with torch.random.fork_rng():  # la graine ne touche pas le hasard du reste du programme

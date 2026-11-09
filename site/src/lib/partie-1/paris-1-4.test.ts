@@ -29,6 +29,7 @@ import {
   placeParmiLesTailles,
   POSITION_INITIALE,
   SEUIL_DU_DEFI,
+  SEUIL_DU_DEFI_TEXTE,
   tetesVoisines,
   texteDegres,
   trancheDeLaRessemblance,
@@ -139,7 +140,7 @@ describe('le pari « residus »', () => {
     expect(choix.map((c) => c.texte)).toStrictEqual([...TRANCHES_RESIDUS]);
     const dernier = RESIDUS.par_bloc.at(-1)!;
     expect(juste(choix)).toBe(TRANCHES_RESIDUS[trancheDeLaRessemblance(dernier.sans)]);
-    expect(juste(choix)).toBe(`Elle se perd${FINE}: les deux textes sortent pareils`);
+    expect(juste(choix)).toBe(`Elle se perd${FINE}: les deux suites sortent pareilles`);
   });
 
   it('les tranches : moins de 0,5 ; de 0,5 à 0,999 ; au moins 0,999', () => {
@@ -164,7 +165,7 @@ describe('le pari « residus »', () => {
     expect(f.premier).toStrictEqual(RESIDUS.par_bloc[0]);
     expect(f.milliardieme).toBe(1 - RESIDUS.par_bloc.at(-1)!.sans < 1e-9);
     expect(f.uniforme).toBe(1 / RESIDUS.jetons);
-    // Avec le x +, les deux textes restent distincts ; sans, ils sortent pareils.
+    // Avec le x +, les deux suites restent distinctes ; sans, elles sortent pareilles.
     const avecPareil = copie();
     avecPareil.par_bloc.at(-1)!.avec = 0.9999;
     expect(() => faitsDuPariResidus(avecPareil)).toThrow(/Exemple devenu faux/);
@@ -252,6 +253,7 @@ describe('l’atelier des paramètres', () => {
 
   it('le défi : sous 100 millions, le MLP plus lourd que le plongement', () => {
     expect(SEUIL_DU_DEFI).toBe(100_000_000);
+    expect(SEUIL_DU_DEFI_TEXTE).toBe('100 millions');
     const verifier = (dim: number, couches: number, tetes: number) => {
       const e = etatDeLAtelier(dim, couches, tetes);
       return e.total < SEUIL_DU_DEFI && e.repartition.mlp > e.repartition.plongement;
