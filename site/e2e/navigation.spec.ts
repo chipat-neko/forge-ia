@@ -1,8 +1,9 @@
 // Parcours des pages hors chapitre : l'accueil (pari d'ouverture et plan du
 // parcours), les pages de partie, la recherche (Pagefind) et la page 404.
 import { test, expect } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { PARCOURS } from '../src/lib/parcours';
+import { typographier } from '../src/lib/typo';
 import { terminerChapitre13, verifierAxe, verifierSansDebordement } from './outils';
 
 const CLE_PROGRESSION = 'forge-ia:progression:v1';
@@ -190,9 +191,17 @@ test('recherche : la requête de l’adresse est cherchée d’emblée', async (
 });
 
 test('404 : un chapitre à venir est reconnu, et le pari se joue', async ({ page }) => {
-  const r = await page.goto('/forge-ia/partie-1/1-4/');
+  // Le premier chapitre de la Partie 1 qui n'est ni paru ni en brouillon : un brouillon est
+  // construit à son adresse pour les parcours (FORGE_ESSAIS=1), il n'y donne donc pas de 404.
+  // Playwright tourne dans site/.
+  const aVenir = PARCOURS.find((p) => p.numero === 1)!.chapitres.find((c) => {
+    const fichier = `${c.numero.replace('.', '-')}.mdx`;
+    return !existsSync(`src/content/chapitres/${fichier}`) && !existsSync(`src/brouillons/chapitres/${fichier}`);
+  });
+  expect(aVenir, 'aucun chapitre de la Partie 1 n’est à venir').toBeDefined();
+  const r = await page.goto(`/forge-ia/partie-1/${aVenir!.numero.replace('.', '-')}/`);
   expect(r?.status()).toBe(404);
-  await expect(page.locator('main')).toContainText('1.4, Le transformer, pièce par pièce');
+  await expect(page.locator('main')).toContainText(typographier(`${aVenir!.numero}, ${aVenir!.titre}`));
   await expect(page.locator('main')).toContainText('pas encore paru');
   const pari = page.locator('[data-pari="introuvable"]');
   await expect(pari.locator('button[data-choix]')).toHaveText([/^1\s*jeton/, /^8\s*jetons/, /^11\s*jetons/]);

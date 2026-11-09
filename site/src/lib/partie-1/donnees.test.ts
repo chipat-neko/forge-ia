@@ -58,9 +58,9 @@ describe('les licences permissives', () => {
 });
 
 describe('les fichiers de mesures', () => {
-  it('sont sous le projet 1.2, et existent', () => {
+  it('sont sous un projet de la Partie 1, et existent', () => {
     for (const chemin of Object.values(MESURES_PARTIE_1)) {
-      expect(chemin.startsWith('projets/1.2-donnees/')).toBe(true);
+      expect(chemin, chemin).toMatch(/^projets\/1\.\d-[a-z-]+\//);
       expect(existsSync(`../${chemin}`), chemin).toBe(true);
     }
   });

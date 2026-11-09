@@ -31,3 +31,20 @@ export const DONNEES_TRIER = 'uv run python -m donnees_pas_a_pas trier exemples/
 /** L'aperçu des trois sources, lu en flux sur Hugging Face : la commande qui a écrit la sortie montrée par le chapitre. */
 export const DONNEES_APERCU =
   'uv run python -m donnees_pas_a_pas apercu --octets 5M --enregistrer sorties/apercu.txt --json mesures/apercu.json';
+
+// ---------- Chapitre 1.4 : le transformer pièce par pièce ----------
+// Les sous-commandes comparer et compter, et leurs options, sont celles de
+// projets/1.4-transformer/transformer_pas_a_pas/__main__.py ; ces commandes sont
+// celles du README du projet, et comparer écrit la sortie de MESURES_PARTIE_1 :
+// commandes.test.ts le vérifie. Le projet utilise PyTorch : ses commandes
+// prennent la version pour le processeur (--extra cpu), qui suffit à tous ses
+// calculs.
+
+/** Entrer dans le projet du chapitre 1.4, depuis le dossier où le dépôt a été cloné. */
+export const ALLER_AU_PROJET_1_4 = 'cd forge-ia/projets/1.4-transformer';
+/** Comparer chaque pièce refaite à forge, et enregistrer la sortie : la commande qui a écrit la sortie montrée par le chapitre. */
+export const TRANSFORMER_COMPARER = 'uv run --extra cpu python -m transformer_pas_a_pas comparer --enregistrer sorties/comparaison.txt';
+/** Les paramètres de ton IA dans sa plus grande taille, famille par famille. */
+export const TRANSFORMER_COMPTER = 'uv run --extra cpu python -m transformer_pas_a_pas compter --preset tres_grand';
+/** Lancer les tests du projet 1.4, avec la version de PyTorch pour le processeur. */
+export const TRANSFORMER_TESTS = 'uv run --extra cpu pytest -q';

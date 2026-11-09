@@ -148,7 +148,7 @@ restent sous 10⁻¹².
 
 ## Les attendus de référence
 
-Le fichier `tests/attendus.json` a deux sections :
+Le fichier `tests/attendus.json` a trois sections :
 
 - `repartitions` : pour chacun des cinq presets de forge, ses dimensions et le
   nombre de paramètres de chaque famille. Le jumeau TypeScript
@@ -156,11 +156,21 @@ Le fichier `tests/attendus.json` a deux sections :
   (ce sont des entiers) ;
 - `rope` : les angles de la figure du chapitre, pour les positions 0 à 32 et
   les 4 paires d'une tête de 8, avec la base de `ConfigModele` (10 000).
-  Le jumeau (`site/src/lib/partie-1/rope.ts`) les retrouve à 10⁻¹² près.
+  Le jumeau (`site/src/lib/partie-1/rope.ts`) les retrouve à 10⁻¹² près ;
+- `residus` : le pari « sans le `x +`, que devient l'entrée ? » du chapitre.
+  Deux textes de 16 jetons, pareils sauf leur dernier jeton, traversent les
+  6 blocs de ton IA en taille mini, avec les poids que forge tire au départ
+  (graine 0) : une fois avec `pieces.bloc`, une fois sans ses deux `x +`
+  (`bloc_sans_residus`, dans `attendus.py`). Après chaque bloc, la section
+  donne la ressemblance (le cosinus du chapitre 0.2) des deux sorties de la
+  dernière position. Sans le `x +`, elles deviennent les mêmes : le dernier
+  jeton est oublié. Le site lit ces nombres sans les refaire.
 
 Les angles passent par `**`, `cos` et `sin`, dont le dernier chiffre peut
 changer d'un système à l'autre (Windows, Linux) : le test du Python les compare
-à 10⁻⁹ près, et les répartitions exactement. Pour régénérer le fichier :
+à 10⁻⁹ près, et les répartitions exactement. Les ressemblances de `residus`
+passent par RMSNorm et RoPE, qui calculent en float32 comme forge : elles se
+comparent à 10⁻⁶ près. Pour régénérer le fichier :
 
 ```bash
 uv run --extra cpu python -m transformer_pas_a_pas.attendus

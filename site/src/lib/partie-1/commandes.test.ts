@@ -128,3 +128,46 @@ describe('commandes du chapitre 1.2', () => {
     expect(README).toContain(`${commandes.DONNEES_APERCU}\n`);
   });
 });
+
+// Le chapitre 1.4 : la comparaison à forge et le comptage des paramètres, vérifiés contre le
+// __main__.py et le README du projet, et contre la sortie que montre le chapitre.
+describe('commandes du chapitre 1.4', () => {
+  const PROJET = `${RACINE}/projets/1.4-transformer`;
+  const MAIN = readFileSync(`${PROJET}/transformer_pas_a_pas/__main__.py`, 'utf8').replace(/\r\n?/g, '\n');
+  const README = readFileSync(`${PROJET}/README.md`, 'utf8').replace(/\r\n?/g, '\n');
+  const PYPROJECT = readFileSync(`${PROJET}/pyproject.toml`, 'utf8').replace(/\r\n?/g, '\n');
+
+  it('les commandes, à l’identique', () => {
+    expect(commandes.ALLER_AU_PROJET_1_4).toBe('cd forge-ia/projets/1.4-transformer');
+    expect(commandes.TRANSFORMER_COMPARER).toBe(
+      'uv run --extra cpu python -m transformer_pas_a_pas comparer --enregistrer sorties/comparaison.txt',
+    );
+    expect(commandes.TRANSFORMER_COMPTER).toBe('uv run --extra cpu python -m transformer_pas_a_pas compter --preset tres_grand');
+    expect(commandes.TRANSFORMER_TESTS).toBe('uv run --extra cpu pytest -q');
+  });
+
+  it('comparer et compter sont des commandes du script, avec leurs options', () => {
+    expect(MAIN).toContain('add_parser("comparer"');
+    expect(MAIN).toContain('add_parser("compter"');
+    expect(MAIN).toContain('comparer.add_argument("--enregistrer"');
+    expect(MAIN).toContain('compter.add_argument("--preset"');
+    // Le projet utilise PyTorch : chaque commande prend la version pour le processeur, un extra du projet.
+    expect(PYPROJECT).toContain('cpu = ["torch==');
+    for (const commande of [commandes.TRANSFORMER_COMPARER, commandes.TRANSFORMER_COMPTER, commandes.TRANSFORMER_TESTS]) {
+      expect(commande.startsWith('uv run --extra cpu '), commande).toBe(true);
+    }
+  });
+
+  it('comparer écrit la sortie que montre le chapitre (MESURES_PARTIE_1)', () => {
+    expect(`projets/1.4-transformer/${/--enregistrer (\S+)/.exec(commandes.TRANSFORMER_COMPARER)![1]}`).toBe(
+      MESURES_PARTIE_1.sortieComparaison,
+    );
+  });
+
+  it('ce sont les commandes du README du projet', () => {
+    expect(README).toContain(`${commandes.ALLER_AU_PROJET_1_4}\n`);
+    expect(README).toContain(`${commandes.TRANSFORMER_COMPARER}\n`);
+    expect(README).toContain(`${commandes.TRANSFORMER_COMPTER}\n`);
+    expect(README).toContain(`${commandes.TRANSFORMER_TESTS}\n`);
+  });
+});

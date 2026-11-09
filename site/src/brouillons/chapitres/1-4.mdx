@@ -1,0 +1,544 @@
+---
+partie: 1
+numero: "1.4"
+titre: "Le transformer, pièce par pièce"
+chapeau: "Ton IA est un transformer : une pile de blocs qui retravaillent les vecteurs des jetons. Tu le démontes ici pièce par pièce, de l'attention aux résidus, puis tu comptes ses paramètres, et tu vérifies que les pièces refaites calculent comme forge."
+programme: "11 étapes, 5 paris, environ 35 minutes."
+acquis:
+  - cle: attention
+    texte: "L'attention donne à chaque jeton une moyenne des valeurs des jetons qu'il voit, pesée par des poids qui font 1."
+    ou: "à l'étape 3"
+  - cle: masque
+    texte: "Le masque empêche un jeton de regarder ceux qui viennent après lui."
+    ou: "à l'étape 3"
+  - cle: rope
+    texte: "RoPE tourne chaque paire de valeurs selon la position : les premières paires vite, les dernières lentement."
+    ou: "à l'étape 5"
+  - cle: residus
+    texte: "Grâce au x +, chaque bloc ajoute une correction au vecteur au lieu de le remplacer."
+    ou: "à l'étape 7"
+  - cle: parametres
+    texte: "Dans ton IA, les MLP portent la plupart des paramètres."
+    ou: "à l'étape 8"
+  - cle: atelier
+    texte: "Le nombre de têtes ne change pas le nombre de paramètres ; la largeur et le nombre de blocs, si."
+    ou: "à l'étape 8, en réglant l'atelier"
+---
+
+import AnimationAttention from '../../components/demos/AnimationAttention.svelte';
+import AtelierParametres from '../../components/chapitres/1-4/AtelierParametres.svelte';
+import FigureRope from '../../components/chapitres/1-4/FigureRope.svelte';
+import SchemaTransformer from '../../components/chapitres/1-4/SchemaTransformer.astro';
+import BlocCommande from '../../components/gabarit/BlocCommande.astro';
+import RecupererProjet from '../../components/gabarit/RecupererProjet.astro';
+import SortieCommande from '../../components/gabarit/SortieCommande.astro';
+import { modelePublic } from '../../lib/calculateur/donnees';
+import { formaterDate, formaterQuantite } from '../../lib/calculateur/formats';
+import { largeurCachee, nombreParametres, PRESETS_FORGE, PAS_LARGEUR_CACHEE } from '../../lib/calculateur/ton-ia';
+import { chapitresParus } from '../../lib/chapitres-parus';
+import { exigeur } from '../../lib/exiger';
+import { classement, pourcentPoids } from '../../lib/mini-modele/animation-attention';
+import { detaillerExemple, exempleAttention } from '../../lib/mini-modele/exemple-attention';
+import { choixMasque, choixRegardDeIl, MOT_FORGERON, MOT_IL, TETE_DE_QUI_ON_PARLE } from '../../lib/mini-modele/paris-attention';
+import { nombre, pourcent } from '../../lib/nombres';
+import { hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
+import { TRANSFORMER_COMPARER, TRANSFORMER_COMPTER, TRANSFORMER_TESTS } from '../../lib/partie-1/commandes';
+import { MESURES_PARTIE_1 } from '../../lib/partie-1/mesures';
+import { repartitionParametres } from '../../lib/partie-1/parametres';
+import {
+  BASE_ROPE,
+  choixOuSontLesParametres,
+  choixResidus,
+  choixRopeRapide,
+  faitsDuPariParametres,
+  faitsDuPariResidus,
+  faitsDuPariRope,
+  FIGURE_ROPE,
+  texteDegres,
+  TRANCHES_RESIDUS,
+} from '../../lib/partie-1/paris-1-4';
+import { RESIDUS } from '../../lib/partie-1/projet-1-4';
+import { anglesRope } from '../../lib/partie-1/rope';
+import { SHAZEER_2020, SU_2021, VASWANI_2017, ZHANG_SENNRICH_2019 } from '../../lib/partie-1/sources-1-4';
+import { typographier } from '../../lib/typo';
+
+export const exiger = exigeur('le texte du chapitre 1.4 (1-4.mdx)');
+
+export const PARUS = await chapitresParus();
+
+export const LIENS = {
+  // Les chapitres 0.2, 0.5, 1.1 et 1.3 ont paru : un lien ne vise qu'un chapitre paru.
+  l02: PARUS.has('0.2') ? hrefChapitre('0.2') : null,
+  l05: PARUS.has('0.5') ? hrefChapitre('0.5') : null,
+  l11: PARUS.has('1.1') ? hrefChapitre('1.1') : null,
+  l13: PARUS.has('1.3') ? hrefChapitre('1.3') : null,
+};
+
+export const TON_IA = (() => {
+  // Ton IA dans sa plus grande taille : les nombres du schéma, du texte et de l'atelier.
+  const f = PRESETS_FORGE.tres_grand;
+  const total = nombreParametres({ tailleVocabulaire: f.vocabulaire, dim: f.dim, couches: f.couches, tetes: f.tetes, longueurContexte: f.contexte });
+  exiger(total === f.parametres, 'le nombre de paramètres de très grand n’est plus celui de nombreParametres');
+  const dimTete = f.dim / f.tetes;
+  const racine = Math.sqrt(dimTete);
+  exiger(Number.isInteger(racine), `une tête de ${dimTete} nombres n’a plus une racine entière : l’étape 4 la donne`);
+  const cachee = largeurCachee(f.dim);
+  // « Les 8/3 de la largeur, arrondis à un multiple de 64 » (étape 6).
+  exiger(cachee % PAS_LARGEUR_CACHEE === 0 && Math.abs(cachee - (8 * f.dim) / 3) <= PAS_LARGEUR_CACHEE / 2, 'la largeur cachée du MLP n’est plus les 8/3 de dim, arrondis à un multiple de 64');
+  // « Chaque tête a les siens » (étape 10) : ton IA n'a pas d'attention groupée.
+  exiger(f.tetesKv === f.tetes, 'ton IA partage maintenant ses clés et ses valeurs entre têtes : l’étape 10 est à revoir');
+  // « Le nombre de têtes ne change rien au total » (étape 8, et l'acquis de l'atelier).
+  for (const t of [1, 2, 4, 5, 8, 10]) {
+    exiger(
+      JSON.stringify(repartitionParametres({ ...f, tetes: t })) === JSON.stringify(repartitionParametres(f)),
+      'le nombre de têtes change maintenant le nombre de paramètres : l’étape 8 est à revoir',
+    );
+  }
+  return {
+    couches: nombre(f.couches),
+    dim: nombre(f.dim),
+    tetes: nombre(f.tetes),
+    dimTete: nombre(dimTete),
+    racine: nombre(racine),
+    vocabulaire: nombre(f.vocabulaire),
+    vocabMax: nombre(f.vocabulaire - 1),
+    contexte: nombre(f.contexte),
+    total: nombre(total),
+    quantite: formaterQuantite(total),
+    cachee: nombre(cachee),
+    lies: nombre(f.vocabulaire * f.dim),
+  };
+})();
+
+export const EXEMPLE = (() => {
+  // L'exemple de l'animation de l'attention (plan 3), écrit à la main : ses tailles, et le pari « regard ».
+  const e = exempleAttention;
+  exiger(e.tetes.length === 2, 'l’exemple de l’attention n’a plus deux têtes : « dans les deux têtes » (pari « masque ») est à revoir');
+  const d = detaillerExemple(e)[TETE_DE_QUI_ON_PARLE];
+  const poidsDeIl = d.poids[MOT_IL];
+  const deuxieme = classement(d, MOT_IL)[1];
+  return {
+    phrase: e.phrase,
+    mots: nombre(e.jetons.length),
+    tetes: nombre(e.tetes.length),
+    traits: nombre(e.traits.length),
+    tailleTete: nombre(e.tetes[0].wq[0].length),
+    forgeron: pourcentPoids(poidsDeIl[MOT_FORGERON]),
+    deuxieme: pourcentPoids(poidsDeIl[deuxieme]),
+    motDeuxieme: e.jetons[deuxieme],
+  };
+})();
+
+export const ROPE = (() => {
+  // Le pari « rope » et la figure : le pas de chaque paire, et la dernière paire d'une tête de ton IA.
+  const f = faitsDuPariRope();
+  const pas = anglesRope(1, FIGURE_ROPE.dimTete, BASE_ROPE);
+  const suivante = pas[0] / pas[1];
+  exiger(Math.abs(suivante - Math.round(suivante)) < 1e-9, 'une paire ne tourne plus un nombre entier de fois moins vite que la précédente');
+  const derniere = PRESETS_FORGE.tres_grand.contexte - 1;
+  const fin = anglesRope(derniere, f.dimTeteTonIA, BASE_ROPE).at(-1);
+  exiger(fin < 2 * Math.PI, 'la dernière paire d’une tête de ton IA fait maintenant un tour complet dans son contexte : l’étape 5 est à revoir');
+  exiger(f.rapportTonIA > 1000, 'la dernière paire de ton IA ne tourne plus mille fois moins vite que la première');
+  return {
+    degres1: nombre(f.degresPaire1),
+    suivante: nombre(Math.round(suivante)),
+    rapport: nombre(f.rapport),
+    paires: nombre(FIGURE_ROPE.dimTete / 2),
+    dimTete: nombre(f.dimTeteTonIA),
+    pairesTonIA: nombre(f.pairesTonIA),
+    rapportTonIA: nombre(Math.round(f.rapportTonIA / 100) * 100),
+    derniere: nombre(derniere),
+    fin: texteDegres(fin),
+    base: nombre(BASE_ROPE),
+  };
+})();
+
+export const PARAMS = (() => {
+  // Le pari « parametres » : la répartition de très grand, famille par famille.
+  const f = faitsDuPariParametres('tres_grand');
+  const r = f.repartition;
+  const d = PRESETS_FORGE.tres_grand.dim;
+  exiger(r.mlp > r.attention && r.attention > r.plongement, 'les familles de très grand ne sont plus dans l’ordre MLP, attention, plongement');
+  return {
+    mlp: nombre(r.mlp),
+    partMlp: pourcent(r.mlp / f.total),
+    partAttention: pourcent(r.attention / f.total),
+    partPlongement: pourcent(r.plongement / f.total),
+    mlpBloc: nombre(3 * d * f.largeurCachee),
+    attentionBloc: nombre(4 * d * d),
+  };
+})();
+
+export const RES = (() => {
+  // Le pari « residus » : la section residus des attendus du projet (pieces.bloc, avec et sans ses x +).
+  const f = faitsDuPariResidus(RESIDUS);
+  exiger(
+    choixResidus(RESIDUS).find((c) => c.juste)?.texte === TRANCHES_RESIDUS[2],
+    'sans le x +, la bonne réponse du pari « residus » n’est plus « elle se perd »',
+  );
+  exiger(f.milliardieme, 'après le dernier bloc, sans le x +, la ressemblance ne vaut plus 1 à moins d’un milliardième près');
+  exiger(RESIDUS.preset === 'mini', 'le pari « residus » ne porte plus sur la taille mini');
+  const deuxieme = RESIDUS.par_bloc[1].sans;
+  exiger(nombre(deuxieme, 3) !== nombre(1, 3), 'après le deuxième bloc, sans le x +, la ressemblance s’écrit déjà 1');
+  return {
+    jetons: nombre(RESIDUS.jetons),
+    couches: nombre(f.couches),
+    entrees: nombre(RESIDUS.entrees, 2),
+    premier: nombre(f.premier.sans, 2),
+    deuxieme: nombre(deuxieme, 3),
+    avec: nombre(f.dernier.avec, 2),
+    min: pourcent(RESIDUS.poids_attention_min),
+    max: pourcent(RESIDUS.poids_attention_max),
+    uniforme: pourcent(f.uniforme, 2),
+  };
+})();
+
+export const CHOIX = (() => {
+  const parametres = choixOuSontLesParametres();
+  // Le pari « parametres » : son explication et l'acquis disent « les MLP ».
+  exiger(parametres.find((c) => c.juste)?.texte === 'Les MLP', 'dans ton IA, les MLP ne portent plus la plupart des paramètres');
+  return { regard: choixRegardDeIl(), masque: choixMasque(), rope: choixRopeRapide(), residus: choixResidus(RESIDUS), parametres };
+})();
+
+export const LABO = (() => {
+  // Llama 3 405B (modèles publics du calculateur, sourcés), face à ton IA.
+  const l = modelePublic('llama-3-405b');
+  const t = PRESETS_FORGE.tres_grand;
+  exiger(l.tetes % l.tetesKv === 0 && l.tetesKv < l.tetes, 'Llama 3 405B ne partage plus ses clés et ses valeurs entre têtes');
+  const fois = l.contexte / t.contexte;
+  exiger(Number.isInteger(fois), 'le contexte de Llama 3 405B n’est plus un multiple de celui de ton IA');
+  return {
+    couches: nombre(l.couches),
+    dim: nombre(l.dim),
+    tetes: nombre(l.tetes),
+    dimTete: nombre(l.dim / l.tetes),
+    tetesKv: nombre(l.tetesKv),
+    parGroupe: nombre(l.tetes / l.tetesKv),
+    contexte: nombre(l.contexte),
+    fois: nombre(fois),
+    vocabulaire: nombre(l.vocabulaire),
+    parametres: formaterQuantite(l.parametres),
+    rapport: nombre(Math.round(l.parametres / t.parametres / 100) * 100),
+    sources: [{ titre: l.source.titre, url: l.source.url, verifieLe: l.source.releveLe }],
+  };
+})();
+
+export const SOURCES = {
+  vaswani: VASWANI_2017.url,
+  vaswaniLe: formaterDate(VASWANI_2017.verifieLe),
+  su: SU_2021.url,
+  suLe: formaterDate(SU_2021.verifieLe),
+  shazeer: SHAZEER_2020.url,
+  shazeerLe: formaterDate(SHAZEER_2020.verifieLe),
+  zhang: ZHANG_SENNRICH_2019.source.url,
+  zhangLe: formaterDate(ZHANG_SENNRICH_2019.source.verifieLe),
+  gainMin: pourcent(ZHANG_SENNRICH_2019.tempsGagne.min),
+  gainMax: pourcent(ZHANG_SENNRICH_2019.tempsGagne.max),
+};
+
+export const SUITE = (() => {
+  // L'« À suivre » : le chapitre 1.5, un lien s'il a paru.
+  const { chapitre } = trouverChapitre('1.5');
+  return { titre: typographier(`« ${titreCourt(chapitre.titre)} »`), lien: PARUS.has(chapitre.numero) ? hrefChapitre(chapitre.numero) : null };
+})();
+
+<Etape numero={1} titre="Le plan d'ensemble">
+
+<SchemaTransformer />
+
+Voici ton IA dans sa plus grande taille, la taille « très grand ». Elle lit des jetons, les morceaux du {LIENS.l13 ? <a href={LIENS.l13}>chapitre 1.3</a> : 'chapitre 1.3'}, et rend pour chacun un score par jeton possible : sa réponse à la question du {LIENS.l11 ? <a href={LIENS.l11}>chapitre 1.1</a> : 'chapitre 1.1'}, « quel morceau vient ensuite ? ». Entre les deux, {TON_IA.couches} blocs identiques, empilés.
+
+Tout ce qu'elle saura tiendra dans ses paramètres, les nombres que l'entraînement règle un à un. Elle en a {TON_IA.total}, environ {TON_IA.quantite}. Ce chapitre les range pièce par pièce, et l'étape 8 te laisse les compter.
+
+Cette architecture s'appelle le transformer. Elle vient d'un article de 2017, signé par Ashish Vaswani et sept coauteurs, qui la disait fondée seulement sur l'attention, sans les réseaux récurrents ni les convolutions des modèles d'alors. L'article l'essayait sur la traduction ; ton IA n'en garde que la partie qui écrit la suite d'un texte, un « décodeur seul », comme dit forge. Trois de ses pièces sont venues après lui : RoPE, SwiGLU et RMSNorm, aux étapes 5 à 7.
+
+<Fragment slot="note">
+
+Ashish Vaswani et al., <a href={SOURCES.vaswani} lang="en">« Attention Is All You Need »</a>, arXiv 1706.03762, 2017. Ce chapitre ne s'appuie que sur son résumé, lu le {SOURCES.vaswaniLe}.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={2} titre="Des jetons aux vecteurs">
+
+Un jeton n'est qu'un numéro, de 0 à {TON_IA.vocabMax}. Un numéro ne dit rien de ce qu'il désigne : le jeton 500 n'est pas « plus » que le jeton 499. Le plongement donne donc à chaque jeton un vecteur de {TON_IA.dim} nombres, sa ligne dans une table de {TON_IA.vocabulaire} lignes. Au départ, ces nombres sont tirés au hasard ; c'est l'entraînement qui leur donnera un sens.
+
+<CodeExplique fichier="projets/1.4-transformer/transformer_pas_a_pas/pieces.py" region="plongement">
+  <li data-lignes="1">`plongement` reçoit les numéros des jetons, `ids`, et la table : {TON_IA.vocabulaire} lignes de {TON_IA.dim} nombres pour ton IA.</li>
+  <li data-lignes="3">`table[ids]` prend la ligne de chaque numéro : un texte de n jetons devient n vecteurs de {TON_IA.dim} nombres.</li>
+</CodeExplique>
+
+Puis le modèle entier, de bout en bout :
+
+<CodeExplique fichier="projets/1.4-transformer/transformer_pas_a_pas/pieces.py" region="modele">
+  <li data-lignes="1">`modele` reçoit les numéros des jetons et tous les poids, rangés dans un dictionnaire `p`.</li>
+  <li data-lignes="4">Le plongement.</li>
+  <li data-lignes="5-6">Les blocs, l'un après l'autre : chacun reçoit les vecteurs du précédent, et en rend autant, de la même taille.</li>
+  <li data-lignes="7">Une dernière RMSNorm, puis `@ p["plongement"].T` : chaque vecteur est multiplié par chaque ligne de la table. Le score d'un jeton est le produit scalaire du vecteur avec sa ligne : plus ils vont dans le même sens, plus le score est haut.</li>
+</CodeExplique>
+
+La même table sert deux fois : à l'entrée, pour donner son vecteur à chaque jeton ; à la sortie, pour noter chaque jeton possible. Ce sont des poids liés : une table à part pour la sortie coûterait {TON_IA.lies} paramètres de plus. Softmax, au {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : 'chapitre 0.2'}, change ensuite ces scores en probabilités.
+
+<Fragment slot="note">
+
+Les extraits viennent de `pieces.py`, dans le projet du chapitre : chaque pièce de ton IA y est refaite en une fonction, sans `nn.Module`, pour se lire d'un bloc. L'étape 9 vérifie qu'elles calculent comme forge.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={3} titre="L'attention">
+
+Dans un bloc, une seule pièce fait se parler les jetons : l'attention. Chaque jeton y calcule trois vecteurs. Sa requête dit ce qu'il cherche, sa clé ce qu'il propose, et sa valeur ce qu'il transmet. Le produit scalaire de sa requête avec chaque clé dit à quel point elles vont ensemble ; softmax en fait des poids qui font 1 ; et le jeton reçoit la moyenne des valeurs, pesée par ces poids.
+
+Avant ton IA, un exemple qu'on suit de bout en bout : « {EXEMPLE.phrase} », {EXEMPLE.mots} mots et {EXEMPLE.tetes} têtes. Chaque mot y est un vecteur de {EXEMPLE.traits} nombres écrits à la main : c'est un exemple fabriqué pour se lire, pas un modèle entraîné, et la légende de l'animation le dit.
+
+<Pari
+  id="regard"
+  question="Dans la tête « de qui on parle », vers quel mot « il » regarde-t-il le plus ?"
+  choix={CHOIX.regard}
+  acquis="attention"
+  ouvre="attention"
+>
+
+« forgeron » : « il » lui donne {EXEMPLE.forgeron} de son attention, et seulement {EXEMPLE.deuxieme} au deuxième mot le plus regardé, « {EXEMPLE.motDeuxieme} ». Le calcul complet est juste en dessous : avance d'une étape à la fois, et regarde d'où viennent ces nombres.
+
+</Pari>
+
+<Verrou nom="attention" message="Fais le pari sur « il » : l'animation s'ouvre juste après.">
+  <AnimationAttention client:load verrou="attention" />
+</Verrou>
+
+Ce n'est pas ton IA. Ses vecteurs à elle ne sont pas écrits à la main : ils sont appris. Chacun de ses blocs a {TON_IA.tetes} têtes de {TON_IA.dimTete} nombres, et non {EXEMPLE.tetes} têtes de {EXEMPLE.tailleTete} comme l'exemple. Et avant de comparer requêtes et clés, elle les fait tourner selon leur position : c'est RoPE, à l'étape 5. L'exemple montre le calcul ; les cartes d'attention de ton IA, une fois entraînée, viendront au chapitre 1.6.
+
+<Pari
+  id="masque"
+  question="Combien vaut le poids de « forgeron » vers « il » ?"
+  precision="Quand « forgeron » pose la question, quelle part de son attention va à « il » ?"
+  choix={CHOIX.masque}
+  acquis="masque"
+>
+
+0 : « forgeron » vient avant « il », et le masque l'empêche de regarder la suite. Dans la carte, c'est la case de la ligne « forgeron » et de la colonne « il » : elle est masquée, dans les deux têtes.
+
+Ton IA fait de même : un jeton ne voit que lui-même et ceux d'avant. Sans le masque, pendant l'entraînement, il lui suffirait de lire le jeton qu'elle doit deviner.
+
+</Pari>
+
+</Etape>
+
+<Etape numero={4} titre="Plusieurs têtes">
+
+Une tête ne pose qu'une sorte de question à la fois. Ton IA en a {TON_IA.tetes} par bloc : elle coupe chaque vecteur de {TON_IA.dim} nombres en {TON_IA.tetes} tranches de {TON_IA.dimTete}, et chaque tranche fait son attention de son côté, avec ses propres requêtes, clés et valeurs. Les {TON_IA.tetes} résultats se recollent en un vecteur de {TON_IA.dim} nombres, et une dernière matrice les mélange. Dans le projet, tout tient en trois fonctions :
+
+<CodeExplique fichier="projets/1.4-transformer/transformer_pas_a_pas/pieces.py" region="attention">
+  <li data-lignes="1-6">`softmax`, écrite à la main. Soustraire le plus grand score ne change pas le résultat, mais empêche `exp` de déborder sur un nombre trop grand.</li>
+  <li data-lignes="12">Une seule multiplication donne les requêtes, les clés et les valeurs de tous les jetons ; `chunk` les sépare en trois.</li>
+  <li data-lignes="13">`unflatten` coupe chaque vecteur en têtes de `dim // tetes` nombres, et `transpose` range les têtes devant les positions : chaque tête calcule à part.</li>
+  <li data-lignes="14-15">RoPE tourne les requêtes et les clés selon leur position : c'est l'étape 5.</li>
+  <li data-lignes="16">Les scores, produits scalaires des requêtes et des clés, divisés par la racine de la taille d'une tête : √{TON_IA.dimTete} = {TON_IA.racine} pour ton IA. Sans cette division, plus une tête est large, plus ses scores grandissent, et softmax donne presque tout à un seul jeton.</li>
+  <li data-lignes="17">Le masque met `-inf` au-dessus de la diagonale, là où un jeton regarderait la suite. Comme exp(−∞) vaut 0, softmax y met un poids nul.</li>
+  <li data-lignes="25-29">`attention` : les poids multiplient les valeurs, les têtes se recollent (`flatten`), et `w_sortie` mélange le tout.</li>
+</CodeExplique>
+
+Les tests du projet le vérifient : les poids de chaque ligne font 1, et changer le dernier jeton ne change aucune sortie des positions d'avant.
+
+</Etape>
+
+<Etape numero={5} titre="Les positions">
+
+Le produit scalaire d'une requête et d'une clé ne dépend que des deux vecteurs, pas de leur place dans le texte. Sans rien d'autre, le premier bloc verrait deux jetons de la même façon, qu'ils soient voisins ou à cent jetons l'un de l'autre.
+
+RoPE donne la position sans aucun paramètre de plus. Chaque tête est coupée en paires de valeurs, et chaque paire est vue comme une aiguille, tournée d'un angle proportionnel à la position du jeton. Une requête et une clé tournées ainsi donnent un score qui dépend de l'écart entre leurs positions, et plus de leur place exacte. Reste à savoir à quelle vitesse tourne chaque aiguille.
+
+<Pari
+  id="rope"
+  question="Quelle aiguille tourne le plus vite quand le jeton avance ?"
+  precision={`Une tête de ${FIGURE_ROPE.dimTete} valeurs, soit ${FIGURE_ROPE.dimTete / 2} paires, chacune son aiguille. Le jeton avance d'une position.`}
+  choix={CHOIX.rope}
+  acquis="rope"
+  ouvre="rope"
+>
+
+La paire 1 : elle tourne d'un radian à chaque position, environ {ROPE.degres1} degrés. Chaque paire suivante va {ROPE.suivante} fois moins vite que la précédente, et la paire {ROPE.paires}, {ROPE.rapport} fois moins vite que la première. Comme les aiguilles d'une horloge : les rapides distinguent deux jetons voisins, les lentes deux jetons éloignés. À toi de jouer : la figure est ouverte.
+
+</Pari>
+
+<Verrou nom="rope" message="Fais le pari juste au-dessus : la position du jeton se débloque juste après.">
+  <FigureRope client:load verrou="rope" />
+</Verrou>
+
+Dans ton IA, une tête a {ROPE.dimTete} valeurs, soit {ROPE.pairesTonIA} paires, et la dernière tourne environ {ROPE.rapportTonIA} fois moins vite que la première. Même à la position {ROPE.derniere}, la dernière de son contexte, elle n'a tourné que de {ROPE.fin} : aucune position n'y revient au même angle.
+
+RoPE vient d'un article de 2021, de Jianlin Su et cinq coauteurs. Son résumé le dit en une phrase : la position absolue est codée par une rotation, et l'attention y gagne la position relative.
+
+<Fragment slot="note">
+
+Tout ce qui est jaune se manipule. Le nombre se fait glisser à la souris ou au doigt ; au clavier, atteins-le avec Tab, puis utilise les flèches.
+
+La figure calcule ses angles en float64, avec la base de forge, {ROPE.base}. Forge, lui, les calcule en float32, même dans un modèle en float64 : le projet refait ce passage au même endroit.
+
+Jianlin Su et al., <a href={SOURCES.su} lang="en">« RoFormer: Enhanced Transformer with Rotary Position Embedding »</a>, arXiv 2104.09864, 2021 (résumé lu le {SOURCES.suLe}).
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={6} titre="Le MLP">
+
+Après l'attention, chaque jeton passe seul par un petit réseau, le MLP. Comme celui du {LIENS.l05 ? <a href={LIENS.l05}>chapitre 0.5</a> : 'chapitre 0.5'}, il a une couche cachée entre son entrée et sa sortie. Ici, une matrice élargit le vecteur, une fonction le plie, puis une autre matrice le ramène à sa taille. Celui de ton IA est un SwiGLU. Voici son calcul, tel qu'il est dans forge :
+
+<CodeExplique fichier="projets/forge/forge/modele/transformer.py" symbole="MLP.forward">
+  <li data-lignes="1">`forward` reçoit les vecteurs des jetons, {TON_IA.dim} nombres chacun.</li>
+  <li data-lignes="2">Deux projections partent de `x`, chacune vers {TON_IA.cachee} nombres : la porte, `proj_porte`, passée par SiLU, et la voie haute, `proj_haute`. Leur produit terme à terme laisse la porte décider, nombre par nombre, ce qui passe de la voie haute. SiLU est une courbe douce : elle laisse passer les valeurs positives et étouffe les négatives. Enfin, `proj_basse` ramène le tout à {TON_IA.dim} nombres.</li>
+</CodeExplique>
+
+Trois matrices au lieu de deux : pour garder à peu près les paramètres d'un MLP ordinaire, qui élargit le vecteur à quatre fois sa taille, la couche cachée de SwiGLU n'en fait que les 8/3, arrondis à un multiple de 64 : {TON_IA.cachee} pour {TON_IA.dim}.
+
+Cette porte vient d'une famille d'idées qu'a essayée Noam Shazeer en 2020. Le résumé de son article la décrit ainsi : une unité linéaire à porte, ou GLU, est le produit, composante par composante, de deux projections, dont l'une passe d'abord par une sigmoïde ; et l'on peut mettre une autre fonction à la place de la sigmoïde. Essayées dans le MLP du transformer, certaines de ces variantes y font mieux, dit le résumé, que les fonctions ReLU ou GELU qu'on y mettait d'habitude. Il ne donne aucun chiffre. Le SwiGLU de forge est une variante de ce genre : sa porte passe par SiLU au lieu d'une sigmoïde.
+
+<Fragment slot="note">
+
+Noam Shazeer, <a href={SOURCES.shazeer} lang="en">« GLU Variants Improve Transformer »</a>, arXiv 2002.05202, 2020 (résumé lu le {SOURCES.shazeerLe}).
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={7} titre="Le bloc">
+
+Reste à assembler. Un bloc fait passer chaque vecteur par l'attention, puis par le MLP, chacun précédé d'une normalisation. Voici le bloc de forge :
+
+<CodeExplique fichier="projets/forge/forge/modele/transformer.py" symbole="Bloc.forward">
+  <li data-lignes="1">`forward` reçoit les vecteurs, et `cos` et `sin`, les tables de RoPE, calculées une fois pour tous les blocs.</li>
+  <li data-lignes="2">La normalisation, l'attention, et son résultat ajouté à `x` : <code class="insecable">x + …</code>. L'attention n'écrit qu'une correction.</li>
+  <li data-lignes="3">Même chose pour le MLP : la normalisation, le MLP, et l'ajout.</li>
+</CodeExplique>
+
+La normalisation est une RMSNorm : elle divise chaque vecteur par la racine de la moyenne de ses carrés, puis multiplie chacun de ses nombres par un poids appris. Après elle, tous les vecteurs ont à peu près la même échelle, quelle que soit leur taille avant, et forge en attend un entraînement stable. Biao Zhang et Rico Sennrich l'ont proposée en 2019. D'après le résumé de leur article, elle fait aussi bien que LayerNorm, la normalisation dont elle part, avec un calcul plus simple : le temps de calcul baisse de {SOURCES.gainMin} à {SOURCES.gainMax} selon les modèles.
+
+Le <code class="insecable">x +</code> s'appelle une connexion résiduelle. Il a l'air d'un détail. Voici ce qu'il garde.
+
+<Pari
+  id="residus"
+  question={`Sans le \`x\u00A0+\`, que devient l’entrée ?`}
+  precision={`Deux textes de ${RES.jetons} jetons ne diffèrent que par leur dernier jeton. Ils traversent les ${RES.couches} blocs de ton IA en taille mini, avec les poids tirés au départ de son entraînement, mais sans le \`x\u00A0+\`. À la dernière position, que reste-t-il de leur différence ?`}
+  choix={CHOIX.residus}
+  acquis="residus"
+>
+
+Elle se perd. À l'entrée, les vecteurs des deux derniers jetons ne se ressemblent pas : leur cosinus, la mesure de ressemblance du {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : 'chapitre 0.2'}, vaut {RES.entrees}. Sans le <code class="insecable">x +</code>, les deux sorties de la dernière position se ressemblent à {RES.premier} après le premier bloc, à {RES.deuxieme} après le deuxième, et après le dernier, leur cosinus vaut 1 à moins d'un milliardième près. Ton IA ne saurait plus quel était le dernier jeton.
+
+Au départ de l'entraînement, l'attention répartit presque également : dans chaque tête du premier bloc, la dernière position donne à chacun des {RES.jetons} jetons entre {RES.min} et {RES.max} de son attention, autour de 1 sur {RES.jetons}, soit {RES.uniforme}. Sans le <code class="insecable">x +</code>, le vecteur du dernier jeton n'est plus qu'une part de ce mélange, puis une part d'un mélange de mélanges au bloc suivant : sa trace s'efface. Avec le <code class="insecable">x +</code>, il traverse tous les blocs, et les deux sorties restent distinctes : leur cosinus vaut {RES.avec} après le dernier bloc.
+
+C'est le trait épais du schéma de l'étape 1 : chaque pièce y écrit sa correction, et le vecteur continue sa route.
+
+</Pari>
+
+<Fragment slot="note">
+
+Le calcul vient du projet : `attendus.py` passe les deux textes par `pieces.bloc`, puis par `bloc_sans_residus`, le même code sans ses deux <code class="insecable">x +</code>, et écrit les ressemblances dans `tests/attendus.json`. La page les lit sans les refaire.
+
+Comme RoPE, la RMSNorm de forge calcule en float32, même dans un modèle en float64 ; le projet refait ce passage au même endroit.
+
+Biao Zhang et Rico Sennrich, <a href={SOURCES.zhang} lang="en">« Root Mean Square Layer Normalization »</a>, arXiv 1910.07467, 2019 (résumé lu le {SOURCES.zhangLe}).
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={8} titre="L'atelier des paramètres">
+
+Chaque pièce a ses paramètres : la table du plongement, les matrices de l'attention et du MLP, les poids des RMSNorm. RoPE n'en a aucun, et il n'y a de biais nulle part.
+
+<Pari
+  id="parametres"
+  question="Dans ton IA, où sont la plupart des paramètres ?"
+  precision={`Ses ${TON_IA.total} paramètres se partagent surtout entre le plongement, l'attention et les MLP de ses ${TON_IA.couches} blocs.`}
+  choix={CHOIX.parametres}
+  acquis="parametres"
+  ouvre="atelier"
+>
+
+Dans les MLP : {PARAMS.mlp} paramètres, {PARAMS.partMlp} du total. Chaque bloc a trois matrices de {TON_IA.dim} × {TON_IA.cachee} dans son MLP, soit {PARAMS.mlpBloc} paramètres, contre quatre de {TON_IA.dim} × {TON_IA.dim} dans son attention, soit {PARAMS.attentionBloc}. L'attention porte {PARAMS.partAttention} du total ; le plongement, qui n'existe qu'une fois, {PARAMS.partPlongement}. À toi de jouer : l'atelier est ouvert.
+
+</Pari>
+
+<Verrou nom="atelier" message="Fais ton pari juste au-dessus : la phrase et ses trois nombres jaunes se débloquent juste après.">
+
+Règle la largeur des vecteurs, le nombre de blocs et le nombre de têtes. Le vocabulaire reste celui de ton IA, {TON_IA.vocabulaire} jetons. Les têtes ne prennent que les nombres que forge accepte : ceux qui coupent le vecteur en tranches égales, d'une taille paire, puisque RoPE tourne les valeurs par paires.
+
+<AtelierParametres client:load verrou="atelier" acquis="atelier" />
+
+</Verrou>
+
+Le nombre de têtes ne change rien au total : il coupe le même vecteur en plus ou moins de tranches, avec les mêmes matrices. La largeur, elle, pèse partout : dans la table du plongement, et au carré dans chaque bloc.
+
+<Fragment slot="note">
+
+Tout ce qui est jaune se manipule. Les nombres se font glisser à la souris ou au doigt ; au clavier, atteins-les avec Tab, puis utilise les flèches. Les noms des tailles, dans le tableau, se cliquent.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={9} titre="Égal à forge">
+
+Chaque pièce de ce chapitre est refaite dans le projet, en fonctions pures : aucun `nn.Module`, aucune attention toute faite, la softmax écrite à la main. Reste à vérifier qu'elles calculent comme forge. Le test compare chaque pièce au module correspondant de forge, sur un même lot de jetons, avec les mêmes poids :
+
+<CodeExplique fichier="projets/1.4-transformer/tests/test_pieces.py" region="test-egalite">
+  <li data-lignes="1">`parametrize` fait de ce test un test par pièce : RMSNorm, RoPE, l'attention, SwiGLU, un bloc, le modèle entier.</li>
+  <li data-lignes="2-3">`ecarts` construit un petit modèle de forge, en float64, sur le processeur, refait chaque pièce avec `pieces.py`, et rend le plus grand écart de chacune. Il doit rester sous 10⁻¹².</li>
+</CodeExplique>
+
+La commande `comparer` du projet affiche ces écarts, pièce par pièce :
+
+<SortieCommande
+  fichier={MESURES_PARTIE_1.sortieComparaison}
+  commande={TRANSFORMER_COMPARER}
+  legende="La comparaison de chaque pièce à forge, sur le processeur"
+  absent="À mesurer : la comparaison des pièces à forge."
+/>
+
+Pour tenir sous 10⁻¹², il a fallu refaire forge jusque dans ses détails les moins visibles : forge calcule RMSNorm et RoPE en float32, même dans un modèle en float64, et le projet refait ces deux passages aux mêmes endroits. Sans eux, l'écart dépasserait 10⁻⁹ : un test du projet le vérifie.
+
+</Etape>
+
+<Etape numero={10} titre="Chez un grand labo">
+
+Ton IA est un petit transformer. Les grands labos en construisent de bien plus grands.
+
+<EncadreLabo sources={LABO.sources}>
+
+Llama 3 405B, de Meta, empile {LABO.couches} blocs, contre {TON_IA.couches} pour ton IA. Ses vecteurs ont {LABO.dim} nombres, contre {TON_IA.dim}, et chacun de ses blocs a {LABO.tetes} têtes de {LABO.dimTete} nombres, contre {TON_IA.tetes} de {TON_IA.dimTete}. Mais ses {LABO.tetes} têtes ne calculent que {LABO.tetesKv} jeux de clés et de valeurs, chacun partagé par {LABO.parGroupe} têtes ; dans ton IA, chaque tête a les siens.
+
+Il s'est entraîné sur des passages de {LABO.contexte} jetons, {LABO.fois} fois les {TON_IA.contexte} de ton IA, et choisit parmi {LABO.vocabulaire} jetons, contre {TON_IA.vocabulaire}. En tout, {LABO.parametres} de paramètres, environ {LABO.rapport} fois ceux de ton IA.
+
+</EncadreLabo>
+
+</Etape>
+
+<Etape numero={11} titre="Le projet">
+
+<RecupererProjet
+  projet="1.4-transformer"
+  intro="Le projet du chapitre est dans le dépôt du site : chaque pièce du transformer refaite en fonctions pures, comparée à forge, et le comptage des paramètres."
+  suite="Puis, dans le dossier du projet, compte les paramètres de ton IA, famille par famille :"
+/>
+
+<BlocCommande commandes={[TRANSFORMER_COMPTER]} ou="un terminal, dans le dossier du projet" />
+
+Ce sont les nombres de l'atelier à l'arrivée, ceux de la taille « très grand ». Le projet utilise PyTorch, comme ceux des chapitres 0.3 à 0.5 : `--extra cpu` prend sa version pour le processeur, qui suffit ici. Pour lancer les tests :
+
+<BlocCommande commandes={[TRANSFORMER_TESTS]} ou="un terminal, dans le dossier du projet" />
+
+Le projet complet, avec un notebook qui refait les pièces une à une, est sur GitHub :
+
+<LiensProjet projet="1.4-transformer" />
+
+### À suivre
+
+Ton IA a sa forme : {TON_IA.total} paramètres tirés au hasard, qui ne savent encore rien. Il reste à les régler, en lui faisant lire ses textes : c'est le chapitre 1.5, {SUITE.lien ? <a href={SUITE.lien}>{SUITE.titre}</a> : SUITE.titre}.
+
+</Etape>

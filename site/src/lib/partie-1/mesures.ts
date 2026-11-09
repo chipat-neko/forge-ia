@@ -17,6 +17,8 @@ export const MESURES_PARTIE_1 = Object.freeze({
   sortieApercu: 'projets/1.2-donnees/sorties/apercu.txt',
   /** 1.2 : les volumes du corpus principal de ton IA, lus dans `.complet` et `index.json`. */
   corpusPrincipal: 'projets/1.2-donnees/mesures/corpus-principal.json',
+  /** 1.4 : ce que la commande `comparer` affiche, chaque pièce face à forge (la première ligne est « # relevé le AAAA-MM-JJ »). */
+  sortieComparaison: 'projets/1.4-transformer/sorties/comparaison.txt',
 } as const);
 
 export type NomMesuresPartie1 = keyof typeof MESURES_PARTIE_1;

@@ -24,7 +24,7 @@ import {
   CLONER_DEPOT,
   METTRE_A_JOUR_DEPOT,
 } from '../../lib/partie-0/commandes';
-import { ALLER_AU_PROJET_1_1, ALLER_AU_PROJET_1_2 } from '../../lib/partie-1/commandes';
+import { ALLER_AU_PROJET_1_1, ALLER_AU_PROJET_1_2, ALLER_AU_PROJET_1_4 } from '../../lib/partie-1/commandes';
 import { typographier } from '../../lib/typo';
 
 interface Props {
@@ -43,6 +43,7 @@ const ALLER: Record<string, string> = {
   '0.5-reseau': ALLER_AU_PROJET_0_5,
   '1.1-modele-de-langage': ALLER_AU_PROJET_1_1,
   '1.2-donnees': ALLER_AU_PROJET_1_2,
+  '1.4-transformer': ALLER_AU_PROJET_1_4,
 };
 const aller = ALLER[projet];
 if (aller === undefined) {
