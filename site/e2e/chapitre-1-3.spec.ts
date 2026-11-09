@@ -89,7 +89,9 @@ test('chapitre 1.3 complet', async ({ page }, info) => {
   await page.locator('[data-pari="rare"] [data-juste]').click();
   await page.locator('[data-pari="zip"] [data-juste]').click();
   await expect(page.locator('#recap')).toContainText('5 sur 5');
-  await expect(page.locator('footer')).toContainText('à venir'); // 1.2 et 1.4 pas encore écrits
+  // Depuis la parution de 1.4, les deux voisins de 1.3 sont parus : le pied mène à l'un et à l'autre.
+  await expect(page.locator('footer a[href$="/partie-1/1-2/"]')).toBeVisible();
+  await expect(page.locator('footer a[href$="/partie-1/1-4/"]')).toBeVisible();
   await verifierAxe(page);
   await verifierSansDebordement(page);
 });

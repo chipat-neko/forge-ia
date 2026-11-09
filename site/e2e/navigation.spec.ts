@@ -19,7 +19,12 @@ test('accueil : 34 chapitres, 1.3 disponible', async ({ page }) => {
   const total = PARCOURS.reduce((n, p) => n + p.chapitres.length, 0);
   await expect(page.locator('.parcours-tete p').first()).toContainText(`Quatre parties, ${total} chapitres.`);
   await expect(page.locator('[data-chapitre-carte="1.3"]')).toHaveAttribute('data-etat', 'disponible');
-  await expect(page.locator('[data-chapitre-carte="1.4"]')).toHaveAttribute('data-etat', 'a-venir');
+  // Le premier chapitre de la Partie 1 sans fichier parmi les chapitres parus est « à venir »
+  // (un brouillon n'est pas paru). Calculé, pour tenir à chaque parution. Playwright tourne dans site/.
+  const premierAVenir = PARCOURS.find((p) => p.numero === 1)!.chapitres.find(
+    (c) => !existsSync(`src/content/chapitres/${c.numero.replace('.', '-')}.mdx`),
+  )!;
+  await expect(page.locator(`[data-chapitre-carte="${premierAVenir.numero}"]`)).toHaveAttribute('data-etat', 'a-venir');
   await verifierAxe(page);
   await verifierSansDebordement(page);
   await page.locator('[data-chapitre-carte="1.3"] a').click();
@@ -186,7 +191,9 @@ test('recherche : « jeux » et « mots » trouvent « jeu » et « mot », comm
 test('recherche : la requête de l’adresse est cherchée d’emblée', async ({ page }) => {
   await page.goto('/forge-ia/recherche/?q=jetons');
   await expect(page.getByRole('searchbox')).toHaveValue('jetons');
-  await expect(page.locator('[data-resultat]').first()).toContainText('tokenizer');
+  // Depuis la parution de 1.4, plusieurs chapitres parlent surtout de jetons : l'ordre des
+  // résultats n'est plus celui d'un seul chapitre. 1.3 (le tokenizer) doit en être.
+  await expect(page.locator('[data-resultat]', { hasText: 'tokenizer' }).first()).toBeVisible();
   await expect(page.locator('[data-resultat] a[href*="#etape-"]').first()).toBeVisible();
 });
 
