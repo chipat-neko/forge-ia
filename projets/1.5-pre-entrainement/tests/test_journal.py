@@ -181,3 +181,41 @@ def test_regions_de_journal():
     fermees = [m.group(1) for ligne in lignes if (m := re.match(r"\s*# fin: (\S+)", ligne))]
     assert ouvertes == ["sessions", "courbe"]
     assert fermees == ouvertes
+
+
+# --- Un plantage, puis une reprise qui refait des pas ----------------------------------------------
+# `journal-factice-plantage.jsonl` : début, pas 1 à 7, sauvegarde au pas 5, plantage (aucune ligne de
+# fin), reprise depuis la sauvegarde du pas 5, pas 6 à 10 (6 et 7 sont refaits), fin.
+PLANTAGE = DOSSIER / "journal-factice-plantage.jsonl"
+
+
+def test_sessions_apres_un_plantage():
+    assert sessions(lire(PLANTAGE)) == [
+        {"depart": "debut", "premier_pas": 1, "dernier_pas": 7, "secondes": 3.5, "fin": "coupée"},
+        # Elle part du temps de calcul du pas 5 (2,5 s), pas de celui du pas 7 : 5,1 - 2,5.
+        {"depart": "reprise", "premier_pas": 6, "dernier_pas": 10, "secondes": 2.6, "fin": "fin"},
+    ]
+    assert all(s["secondes"] >= 0 for s in sessions(lire(PLANTAGE)))
+
+
+def test_resume_apres_un_plantage():
+    r = resume(lire(PLANTAGE), CONFIG_FACTICE)
+    assert r["pas_faits"] == 10  # les pas distincts : 6 et 7 ne comptent qu'une fois
+    assert r["jetons_vus"] == 10 * 1024 and r["pauses"] == 0
+    # Le temps réellement passé, pas refaits compris : 3,5 + 2,6.
+    assert r["secondes_de_calcul"] == 6.1
+    assert r["perte_dernier_pas"] == 8.6 and r["validation_finale"] == 9.1
+
+
+def test_courbe_apres_un_plantage_garde_la_derniere_occurrence_de_chaque_pas():
+    c = courbe(lire(PLANTAGE))
+    assert c["pertes"] == [[p, v] for p, v in zip(range(1, 11), [10.4, 10.3, 10.1, 9.8, 9.5, 9.3 + 0.01, 9.0 + 0.01, 8.8, 8.7, 8.6])]
+    assert c["validations"] == [[5, 10.0], [10, 9.1]]
+    # Des paquets de 5 : le pas p est bien à l'indice p - 1.
+    assert courbe(lire(PLANTAGE), points=2)["pertes"][1] == [8, pytest.approx((9.31 + 9.01 + 8.8 + 8.7 + 8.6) / 5)]
+
+
+def test_validation_refaite_garde_la_derniere():
+    lignes = lignes_de_pas(2) + [{"pas": 2, "perte": 5.0, "perte_val": 4.0}]
+    lignes[2]["perte_val"] = 9.0
+    assert courbe(lignes)["validations"] == [[2, 4.0]]

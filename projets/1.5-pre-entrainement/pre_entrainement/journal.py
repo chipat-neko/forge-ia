@@ -48,15 +48,25 @@ def sessions(lignes: list[dict]) -> list[dict]:
     si elle s'est arrêtée avant son premier pas), ses secondes de calcul, et sa fin : `pause`,
     `fin`, `perte_non_finie` (la perte est devenue infinie : forge n'a rien sauvegardé), ou
     `coupée` quand le journal n'a pas de ligne de fin (un plantage, une coupure de courant).
+
+    Une session de reprise part de l'état de sa ligne `reprise`, pas de la fin de la session
+    d'avant : si celle-ci a été coupée, forge repart de la dernière sauvegarde, et refait les pas
+    d'après. Les secondes d'une session sont donc le dernier cumul `secondes` de la session moins
+    le cumul au pas de sa reprise (jamais négatives). Leur somme est le temps réellement passé
+    à calculer, pas refaits compris.
     """
     resultat: list[dict] = []
     courante = None
-    cumul_au_depart = 0.0  # le temps de calcul cumulé quand la session commence
-    cumul = 0.0  # le temps de calcul cumulé au dernier pas lu
+    cumul_au_depart = 0.0  # le temps de calcul cumulé de l'état d'où la session part
+    cumul_par_pas: dict[int, float] = {}  # le cumul lu à chaque pas (le dernier lu, si un pas est refait)
     for ligne in lignes:
         evenement = ligne.get("evenement")
         if evenement in DEBUTS_DE_SESSION:
-            cumul_au_depart = cumul
+            # Une reprise repart de la dernière sauvegarde : du pas de sa ligne `reprise` et du temps
+            # de calcul qu'il avait alors. Les pas d'après (ceux d'une session coupée) sont refaits.
+            pas_de_depart = ligne["pas"] if evenement == "reprise" and isinstance(ligne.get("pas"), int) else 0
+            avant = [c for p, c in cumul_par_pas.items() if p <= pas_de_depart]
+            cumul_au_depart = cumul_par_pas.get(pas_de_depart, max(avant) if avant else 0.0) if evenement == "reprise" else 0.0
             courante = {"depart": evenement, "premier_pas": None, "dernier_pas": None, "secondes": 0.0, "fin": "coupée"}
             resultat.append(courante)
         elif courante is None:
@@ -69,8 +79,8 @@ def sessions(lignes: list[dict]) -> list[dict]:
                 courante["premier_pas"] = ligne["pas"]
             courante["dernier_pas"] = ligne["pas"]
             if _est_un_nombre(ligne.get("secondes")):
-                cumul = ligne["secondes"]
-                courante["secondes"] = round(cumul - cumul_au_depart, 3)
+                cumul_par_pas[ligne["pas"]] = ligne["secondes"]
+                courante["secondes"] = max(0.0, round(ligne["secondes"] - cumul_au_depart, 3))
     return resultat
 # fin: sessions
 
@@ -88,8 +98,12 @@ def courbe(lignes: list[dict], points: int = 600, pas_total: int | None = None) 
     pas du journal.
 
     `validations` : `[pas, perte]` pour chaque perte de validation. `hasard` : ln 32 768.
+
+    Un pas refait après un plantage apparaît deux fois dans le journal : on garde sa dernière
+    occurrence (les pas sont rangés dans l'ordre, la perte du pas p à l'indice p − 1).
     """
-    pertes = [float(ligne["perte"]) for ligne in lignes if _est_un_pas(ligne)]
+    par_pas = {ligne["pas"]: float(ligne["perte"]) for ligne in lignes if _est_un_pas(ligne)}  # un pas refait : sa dernière perte
+    pertes = [par_pas[pas] for pas in sorted(par_pas)]
     taille = max(1, math.ceil((len(pertes) if pas_total is None else pas_total) / points))
     paquets = []
     for debut in range(0, len(pertes), taille):
@@ -101,11 +115,12 @@ def courbe(lignes: list[dict], points: int = 600, pas_total: int | None = None) 
                 nombre += 1
         milieu = (debut + 1 + fin) / 2
         paquets.append([int(milieu) if milieu == int(milieu) else milieu, somme / nombre if nombre else None])
-    validations = [
-        [ligne["pas"], ligne["perte_val"]]
+    val_par_pas = {
+        ligne["pas"]: ligne["perte_val"]
         for ligne in lignes
         if isinstance(ligne.get("pas"), int) and "evenement" not in ligne and _est_un_nombre(ligne.get("perte_val"))
-    ]
+    }
+    validations = [[pas, val_par_pas[pas]] for pas in sorted(val_par_pas)]
     return {"taille_paquet": taille, "pertes": paquets, "validations": validations, "hasard": HASARD}
 # fin: courbe
 
@@ -114,8 +129,9 @@ def resume(lignes: list[dict], config: ConfigEntrainement) -> dict:
     """L'entraînement en quelques nombres.
 
     - `parametres`, `pas_total` : ceux de la configuration ;
-    - `pas_faits`, `jetons_vus` : au dernier pas du journal ;
-    - `secondes_de_calcul` : la somme des sessions ; `debit_moyen` : les jetons vus par seconde de calcul ;
+    - `pas_faits` : le nombre de pas distincts du journal ; `jetons_vus` : ceux de son dernier pas ;
+    - `secondes_de_calcul` : la somme des sessions, c'est-à-dire le temps réellement passé à calculer, pas refaits
+      après un plantage compris ; `debit_moyen` : les jetons vus par seconde de calcul ;
     - `pauses` : les sessions finies par une pause ;
     - `perte_finale` : la moyenne des `PERTES_RECENTES` derniers pas (comme `docs/mesures/ton-ia-mini.md`) ;
     - `validation_finale` : la dernière perte de validation ;
@@ -124,7 +140,8 @@ def resume(lignes: list[dict], config: ConfigEntrainement) -> dict:
 
     Un journal sans pas donne `None` pour tout ce qui se lit dans un pas.
     """
-    pas = [ligne for ligne in lignes if _est_un_pas(ligne)]
+    brut = {ligne["pas"]: ligne for ligne in lignes if _est_un_pas(ligne)}  # un pas refait : sa dernière ligne
+    pas = [brut[numero] for numero in sorted(brut)]
     parties = sessions(lignes)
     total = 0.0
     for session in parties:
@@ -139,7 +156,7 @@ def resume(lignes: list[dict], config: ConfigEntrainement) -> dict:
     return {
         "parametres": nombre_parametres(config.modele),
         "pas_total": config.pas_total,
-        "pas_faits": pas[-1]["pas"] if pas else 0,
+        "pas_faits": len(pas),
         "jetons_vus": jetons,
         "secondes_de_calcul": secondes,
         "pauses": sum(1 for session in parties if session["fin"] == "pause"),

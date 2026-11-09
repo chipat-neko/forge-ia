@@ -142,6 +142,9 @@ export function verifierEntrainement(valeur: unknown, fichier: string): Entraine
   const sessions = valeur.sessions;
   if (!Array.isArray(sessions) || sessions.length === 0) throw faute('sessions est vide');
   let derniere = 0;
+  // La session d'avant : sa fin, et son dernier pas. Une reprise après un plantage repart de la dernière
+  // sauvegarde, donc d'un pas qui peut être avant la fin de la session coupée (ses pas d'après sont refaits).
+  let precedente: { fin: string; dernier: number } | null = null;
   let secondes = 0;
   let pauses = 0;
   sessions.forEach((s: unknown, i: number) => {
@@ -164,10 +167,14 @@ export function verifierEntrainement(valeur: unknown, fichier: string): Entraine
       const premier = s.premier_pas as number;
       const dernier = s.dernier_pas as number;
       if (premier > dernier) throw faute(`la session ${i + 1} finit avant de commencer`);
-      if (premier <= derniere) {
+      const refait = precedente !== null && precedente.fin === 'coupée' && premier <= precedente.dernier;
+      if (premier <= derniere && !refait) {
         throw faute(`la session ${i + 1} commence au pas ${premier}, avant la fin de la précédente (pas ${derniere})`);
       }
-      derniere = dernier;
+      derniere = Math.max(derniere, dernier);
+      precedente = { fin: s.fin as string, dernier };
+    } else {
+      precedente = { fin: s.fin as string, dernier: precedente?.dernier ?? 0 };
     }
     secondes += s.secondes;
     if (s.fin === 'pause') pauses += 1;

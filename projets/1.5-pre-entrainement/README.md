@@ -74,16 +74,22 @@ fichier avec `forge.suivi.lire_journal` :
 | Région | Fonction | Ce qu'elle rend |
 | --- | --- | --- |
 | `sessions` | `sessions(lignes)` | une session par `debut` ou `reprise` : son départ, son premier et son dernier pas, ses secondes de calcul, et sa fin (`pause`, `fin`, `perte_non_finie`, ou `coupée` quand le journal n'a pas de ligne de fin) |
-| `courbe` | `courbe(lignes, points)` | `pertes` en `[pas, moyenne]` par paquets de pas, `validations` en `[pas, perte]`, et `hasard` = ln 32 768 |
+| `courbe` | `courbe(lignes, points, pas_total)` | `pertes` en `[pas, moyenne]` par paquets de pas, `validations` en `[pas, perte]`, et `hasard` = ln 32 768 |
 | (hors région) | `resume(lignes, config)` | `parametres`, `pas_total`, `pas_faits`, `jetons_vus`, `secondes_de_calcul`, `pauses`, `debit_moyen`, `perte_finale`, `validation_finale`, `perte_premier_pas`, `perte_dernier_pas` |
 
-- Le temps d'une session est la différence entre les `secondes` cumulées de son dernier pas et du
-  dernier pas de la session d'avant. À la sauvegarde près (qui se fait après le dernier pas de la
-  session), elles s'additionnent donc en `secondes_de_calcul`, le temps de la boucle.
+- Le temps d'une session est la différence entre les `secondes` cumulées de son dernier pas et celles de
+  l'état d'où elle part : 0 pour `debut`, et pour une `reprise` le cumul du pas de sa ligne `reprise`.
+  Il ne compte pas la sauvegarde qui suit le dernier pas de la session, et n'est jamais négatif.
+- **Après un plantage**, forge reprend à la dernière sauvegarde : les pas d'après (ceux de la session
+  `coupée`) sont refaits. `resume.secondes_de_calcul` reste la somme des sessions, c'est-à-dire le temps
+  réellement passé à calculer, pas refaits compris ; `pas_faits` compte les pas distincts ; `courbe` garde la
+  dernière occurrence de chaque pas (et de chaque validation), pour que la perte du pas p reste à l'indice p - 1.
+  (forge coupe d'ordinaire lui-même le journal à la reprise ; le projet lit aussi un journal qui ne l'a pas été.)
+  `tests/journal-factice-plantage.jsonl` en est un exemple.
 - `courbe` découpe comme le site (`site/src/lib/courbe.ts`, `taillePaquet` et `moyennesParPaquets`) :
   `ceil(pas_total / 600)` pas par paquet, chaque point au milieu de son paquet, le dernier paquet
-  éventuellement incomplet. La taille est celle du nombre total de pas de la configuration, pour que le
-  lissage ne change pas pendant l'entraînement. Les sommes sont des boucles, pas `sum()` : le
+  éventuellement incomplet. `pas_total`, le troisième paramètre (la ligne de commande donne celui de la configuration), fixe la taille ; sans lui, c'est le nombre de pas du journal. Avec le total de la
+  configuration, le lissage ne change pas pendant l'entraînement. Les sommes sont des boucles, pas `sum()` : le
   TypeScript additionne dans le même ordre.
 - `perte_finale` est la moyenne des 20 derniers pas, comme le tableau de `docs/mesures/ton-ia-mini.md`.
   Le journal n'ayant pas de dates, `resume` donne les pertes du premier et du dernier pas plutôt que
@@ -116,7 +122,7 @@ que Ctrl+C écrit en plus.
   `projets/0.5-reseau/premier_reseau/__main__.py` (le message quand PyTorch voit la carte sans
   pouvoir calculer dessus).
 
-Des tests le vérifient quand le dépôt entier est là. Une correction se fait dans 0.3 ou 0.5, puis se
+Des tests le vérifient quand l'original est là (ils sont sautés sinon). Une correction se fait dans 0.3 ou 0.5, puis se
 recopie ici.
 
 ## Tester

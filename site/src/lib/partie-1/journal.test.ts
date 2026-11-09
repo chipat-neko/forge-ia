@@ -67,6 +67,35 @@ describe('verifierEntrainement', () => {
     expect(() => verifierEntrainement(r, 'essai.json')).not.toThrow();
   });
 
+  it('accepte une reprise après un plantage, qui refait des pas (la dernière sauvegarde est avant la fin de la session coupée)', () => {
+    const r = releve();
+    r.sessions = [
+      { depart: 'debut', premier_pas: 1, dernier_pas: 7, secondes: 3.5, fin: 'coupée' },
+      { depart: 'reprise', premier_pas: 6, dernier_pas: 10, secondes: 2.6, fin: 'fin' },
+    ];
+    r.resume.pauses = 0;
+    r.resume.secondes_de_calcul = 6.1;
+    expect(() => verifierEntrainement(r, 'essai.json')).not.toThrow();
+  });
+
+  it('refuse une reprise qui commence avant la fin de la session d’avant quand celle-ci n’est pas coupée, ou après sa fin', () => {
+    const apresFin = releve();
+    apresFin.sessions[0].fin = 'fin';
+    apresFin.resume.pauses = 0;
+    expect(() => verifierEntrainement(apresFin, 'essai.json')).not.toThrow(); // 6 > 5 : rien de refait
+    apresFin.sessions[1].premier_pas = 5;
+    expect(() => verifierEntrainement(apresFin, 'essai.json')).toThrow(/commence au pas 5, avant la fin de la précédente/);
+    // Coupée au pas 7, mais reprise au pas 8 : elle repart plus loin que sa fin, rien n'est refait, c'est valable.
+    const plusLoin = releve();
+    plusLoin.sessions = [
+      { depart: 'debut', premier_pas: 1, dernier_pas: 7, secondes: 3.5, fin: 'coupée' },
+      { depart: 'reprise', premier_pas: 8, dernier_pas: 10, secondes: 1.6, fin: 'fin' },
+    ];
+    plusLoin.resume.pauses = 0;
+    plusLoin.resume.secondes_de_calcul = 5.1;
+    expect(() => verifierEntrainement(plusLoin, 'essai.json')).not.toThrow();
+  });
+
   it('refuse ce qui n’est pas un objet', () => {
     expect(() => verifierEntrainement([], 'projets/essai.json')).toThrow(/projets\/essai\.json.*ce n’est pas un objet JSON/s);
   });

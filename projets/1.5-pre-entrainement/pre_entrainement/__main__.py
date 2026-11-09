@@ -14,6 +14,7 @@ sont les mêmes. Sans carte graphique, `--appareil cuda` dit quoi faire, sans tr
 import argparse
 import datetime
 import json
+import math
 import os
 import sys
 import tempfile
@@ -111,6 +112,21 @@ def lignes_de_courbe(nom: str, r: dict, parties: list[dict]) -> list[str]:
     return lignes
 
 
+def defaut_du_resume(r: dict) -> str | None:
+    """Ce qui empêche d'écrire le relevé d'un journal (le JSON n'admet ni NaN ni infini), ou None."""
+    if r["pas_faits"] == 0:
+        return "il n’a aucun pas. Vérifie le chemin de --journal, ou relance l’entraînement qui l’écrit."
+    for cle, endroit in (("perte_premier_pas", "au premier pas"), ("perte_dernier_pas", "au dernier pas"), ("perte_finale", "parmi les 20 derniers pas"), ("validation_finale", "à la dernière validation")):
+        if r[cle] is not None and not math.isfinite(r[cle]):
+            return (
+                f"la perte n’est pas un nombre fini {endroit}. L’entraînement a divergé : relève un journal "
+                "d’avant la divergence, ou relance l’entraînement avec un taux_max plus petit."
+            )
+    if not isinstance(r["jetons_vus"], int) or r["jetons_vus"] <= 0:
+        return "le dernier pas n’a pas de `jetons_vus`. Ce n’est pas le journal d’un `forge entrainer` : vérifie --journal."
+    return None
+
+
 def commande_courbe(options: argparse.Namespace) -> int:
     journal = Path(options.journal)
     if not journal.exists():
@@ -124,6 +140,10 @@ def commande_courbe(options: argparse.Namespace) -> int:
     lignes = lire(journal)
     nom = Path(config.sortie).name
     r = resume(lignes, config)
+    probleme = defaut_du_resume(r)
+    if probleme:
+        print(f"Le journal {journal} ne se relève pas{FINE}: {probleme}", file=sys.stderr)
+        return 2
     parties = sessions(lignes)
     print("\n".join(lignes_de_courbe(nom, r, parties)))
     if options.json:

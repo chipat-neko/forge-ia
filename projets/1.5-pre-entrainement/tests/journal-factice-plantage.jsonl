@@ -1,0 +1,17 @@
+{"evenement": "debut", "pas": 0, "message": "Début de l'entraînement : 10 pas."}
+{"pas": 1, "jetons_vus": 1024, "perte": 10.4, "taux": 0.001, "jetons_par_seconde": 2048.0, "secondes": 0.5}
+{"pas": 2, "jetons_vus": 2048, "perte": 10.3, "taux": 0.001, "jetons_par_seconde": 2048.0, "secondes": 1.0}
+{"pas": 3, "jetons_vus": 3072, "perte": 10.1, "taux": 0.001, "jetons_par_seconde": 2048.0, "secondes": 1.5}
+{"pas": 4, "jetons_vus": 4096, "perte": 9.8, "taux": 0.001, "jetons_par_seconde": 2048.0, "secondes": 2.0}
+{"pas": 5, "jetons_vus": 5120, "perte": 9.5, "taux": 0.001, "jetons_par_seconde": 2048.0, "secondes": 2.5, "perte_val": 10.0}
+{"evenement": "sauvegarde", "pas": 5, "fichier": "etape-0000005.pt"}
+{"pas": 6, "jetons_vus": 6144, "perte": 9.3, "taux": 0.001, "jetons_par_seconde": 2048.0, "secondes": 3.0}
+{"pas": 7, "jetons_vus": 7168, "perte": 9.0, "taux": 0.001, "jetons_par_seconde": 2048.0, "secondes": 3.5}
+{"evenement": "reprise", "pas": 5, "message": "Reprise au pas 5 sur 10."}
+{"pas": 6, "jetons_vus": 6144, "perte": 9.31, "taux": 0.001, "jetons_par_seconde": 2048.0, "secondes": 3.1}
+{"pas": 7, "jetons_vus": 7168, "perte": 9.01, "taux": 0.001, "jetons_par_seconde": 2048.0, "secondes": 3.6}
+{"pas": 8, "jetons_vus": 8192, "perte": 8.8, "taux": 0.001, "jetons_par_seconde": 2048.0, "secondes": 4.1}
+{"pas": 9, "jetons_vus": 9216, "perte": 8.7, "taux": 0.001, "jetons_par_seconde": 2048.0, "secondes": 4.6}
+{"pas": 10, "jetons_vus": 10240, "perte": 8.6, "taux": 0.001, "jetons_par_seconde": 2048.0, "secondes": 5.1, "perte_val": 9.1}
+{"evenement": "sauvegarde", "pas": 10, "fichier": "etape-0000010.pt"}
+{"evenement": "fin", "pas": 10}

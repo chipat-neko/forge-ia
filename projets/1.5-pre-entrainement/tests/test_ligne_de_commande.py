@@ -224,9 +224,8 @@ def fonction_du_fichier(chemin: pathlib.Path, nom: str) -> str:
 
 def test_carte_inutilisable_est_la_copie_de_0_5():
     original = RACINE / "projets" / "0.5-reseau" / "premier_reseau" / "__main__.py"
-    if not (RACINE / "projets" / "forge").exists():
+    if not original.exists():
         pytest.skip("Projet téléchargé seul : projets/0.5-reseau n'est pas là pour comparer la copie.")
-    assert original.exists(), f"{original} est introuvable : corrige son chemin dans ce test."
     copie = fonction_du_fichier(PROJET / "pre_entrainement" / "__main__.py", "carte_inutilisable")
     assert copie == fonction_du_fichier(original, "carte_inutilisable"), (
         "carte_inutilisable n'est plus la copie exacte de celle de projets/0.5-reseau. Une correction "
@@ -236,9 +235,8 @@ def test_carte_inutilisable_est_la_copie_de_0_5():
 
 def test_appareil_est_la_copie_de_0_3():
     original = RACINE / "projets" / "0.3-poste" / "poste" / "appareil.py"
-    if not (RACINE / "projets" / "forge").exists():
+    if not original.exists():
         pytest.skip("Projet téléchargé seul : projets/0.3-poste n'est pas là pour comparer la copie.")
-    assert original.exists(), f"{original} est introuvable : corrige son chemin dans ce test."
     assert (PROJET / "pre_entrainement" / "appareil.py").read_bytes() == original.read_bytes()
 
 
@@ -246,3 +244,34 @@ def test_carte_inutilisable_dit_quoi_faire():
     message = carte_inutilisable(RuntimeError("CUDA error: boom.\nautre ligne"))
     assert "CUDA error: boom." in message and "autre ligne" not in message
     assert re.search(r"FORGE_APPAREIL=cpu", message)
+
+
+# --- Les journaux qu'on ne peut pas relever -------------------------------------------------------
+
+
+def ecrire_journal(chemin, lignes):
+    chemin.write_text("".join(json.dumps(ligne) + "\n" for ligne in lignes), encoding="utf-8")
+
+
+def pas_de_journal(numero, **champs):
+    return {"pas": numero, "jetons_vus": 1024 * numero, "perte": 5.0, "taux": 0.001, "secondes": float(numero), **champs}
+
+
+@pytest.mark.parametrize(
+    "lignes, attendu",
+    [
+        ([{"evenement": "debut", "pas": 0}], "il n’a aucun pas"),
+        ([{"evenement": "debut", "pas": 0}, pas_de_journal(1, perte=float("nan")), pas_de_journal(2)], "au premier pas"),
+        ([{"evenement": "debut", "pas": 0}, pas_de_journal(1), pas_de_journal(2, perte=float("inf"))], "au dernier pas"),
+        ([{"evenement": "debut", "pas": 0}, pas_de_journal(1), {"pas": 2, "perte": 5.0, "secondes": 2.0}], "n’a pas de `jetons_vus`"),
+        ([{"evenement": "debut", "pas": 0}, pas_de_journal(1), pas_de_journal(2, perte_val=float("nan"))], "à la dernière validation"),
+    ],
+)
+def test_journal_impossible_a_relever(config, tmp_path, capsys, lignes, attendu):
+    journal = tmp_path / "journal.jsonl"
+    ecrire_journal(journal, lignes)
+    sortie = tmp_path / "relevé.json"
+    assert main(["courbe", "--journal", str(journal), "--config", str(config), "--json", str(sortie)]) == 2
+    lu = capsys.readouterr()
+    assert attendu in lu.err and "ne se relève pas" in lu.err
+    assert "Traceback" not in lu.err and lu.out == "" and not sortie.exists()
