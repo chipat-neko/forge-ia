@@ -17,6 +17,7 @@ import { PART_VALIDATION } from './donnees';
 import {
   BLANCS_PYTHON,
   empreinte,
+  estUnControleRetire,
   estValidation,
   garderPythonPermissif,
   LONGUEUR_MINIMALE,
@@ -212,9 +213,9 @@ export const CONTROLE_RETIRE = '·';
 /** Un morceau du texte nettoyé, tel que l'atelier le montre : du texte gardé, ou des retraits. */
 export type Morceau = { texte: string; retire: false } | { texte: string; retire: true; nombre: number };
 
-// Les caractères que le nettoyage retire : ceux de nettoyeur.ts (contrôles, \r seul, moitiés
-// de paire). Lus point de code par point de code, une paire complète (un emoji) n'en est pas.
-const CONTROLE = /^[\u{0}-\u{8}\u{b}-\u{1f}\u{7f}-\u{9f}\u{d800}-\u{dfff}]$/u;
+// Les caractères que le nettoyage retire sont ceux de nettoyeur.ts (estUnControleRetire :
+// contrôles, \r seul, moitiés de paire). Lus point de code par point de code, une paire
+// complète (un emoji) n'en est pas.
 const BLANCS: ReadonlySet<number> = new Set(BLANCS_PYTHON);
 
 type Element = { garde: string } | { signe: string };
@@ -254,7 +255,7 @@ export function morceauxDuNettoyage(brut: string): Morceau[] {
   const points = Array.from(brut);
   for (let i = 0; i < points.length; i++) {
     const c = points[i];
-    if (c === '\r' || CONTROLE.test(c)) {
+    if (c === '\r' || estUnControleRetire(c)) {
       if (garde !== '') elements.push({ garde });
       garde = '';
       elements.push({ signe: c === '\r' ? RETOUR_CHARIOT : CONTROLE_RETIRE });
@@ -350,9 +351,19 @@ export function verdictDuTexte(etat: EtatNettoyage): string {
   return `Écarté${FINE}: trop court, il manque ${caracteres(LONGUEUR_MINIMALE - etat.longueur)}.`;
 }
 
-/** Où ira le texte : à l'entraînement ou à la validation, d'après son empreinte (estValidation). */
-export function coteDuTexte(etat: EtatNettoyage, empreinteDuTexte: string): string {
+/** Ce que dit l'atelier quand le navigateur ne sait pas calculer l'empreinte (pas de crypto.subtle). */
+export const EMPREINTE_IMPOSSIBLE = 'impossible à calculer dans ce navigateur';
+export const COTE_SANS_EMPREINTE = 'Sans son empreinte, l’atelier ne peut pas dire de quel côté ira ce texte.';
+export const DOUBLON_SANS_EMPREINTE = 'Sans empreinte, l’atelier ne peut pas comparer les deux textes.';
+export const DEFI_SANS_EMPREINTE = `Pas encore${FINE}: sans empreinte, l’atelier ne peut pas le vérifier.`;
+
+/**
+ * Où ira le texte : à l'entraînement ou à la validation, d'après son empreinte (estValidation).
+ * Sans empreinte (null : le navigateur n'a pas pu la calculer), un texte gardé n'a pas de côté connu.
+ */
+export function coteDuTexte(etat: EtatNettoyage, empreinteDuTexte: string | null): string {
   if (!etat.garde) return 'Écarté, ce texte ne servira ni à l’entraînement, ni à la validation.';
+  if (empreinteDuTexte === null) return COTE_SANS_EMPREINTE;
   return estValidation(empreinteDuTexte) ? 'Ce texte servira à la validation.' : 'Ce texte servira à l’entraînement.';
 }
 
@@ -384,5 +395,56 @@ export function etatDuDefi(
   return {
     reussi: true,
     texte: `Défi réussi${FINE}: deux textes différents, une seule empreinte. Une fois nettoyés, ils sont identiques.`,
+  };
+}
+
+/**
+ * Une empreinte calculée par l'atelier, avec le texte pour lequel elle l'a été (`pour`). Si le
+ * navigateur n'a pas pu la calculer, `empreinte` vaut null et `erreur` est vrai.
+ */
+export interface EmpreinteCalculee {
+  pour: string;
+  empreinte: string | null;
+  erreur: boolean;
+}
+
+/** Les trois messages de l'atelier qui dépendent des empreintes. */
+export interface MessagesDeLAtelier {
+  cote: string;
+  doublon: string;
+  defi: { reussi: boolean; texte: string };
+}
+
+/**
+ * Les messages de l'atelier qui dépendent des empreintes : le côté du premier texte, le doublon
+ * et le défi. Ils ne se calculent qu'avec des empreintes à jour, celles des textes à l'écran :
+ * tant qu'un calcul est en route (une empreinte manque, ou elle a été calculée pour un autre
+ * texte), la fonction rend null, et l'atelier garde ses messages d'avant. Sans cela, une
+ * empreinte périmée mêlée au texte nouveau pourrait afficher, et annoncer, un faux « Défi réussi ».
+ *
+ * `brut` est le premier texte tel que le nettoyage le reçoit (fins de ligne comprises),
+ * `premier` tel qu'il est à l'écran, `autre` le second champ.
+ */
+export function messagesDeLAtelier(
+  etat: EtatNettoyage,
+  brut: string,
+  premier: string,
+  autre: string,
+  a: EmpreinteCalculee | null,
+  b: EmpreinteCalculee | null,
+): MessagesDeLAtelier | null {
+  if (a === null || a.pour !== brut) return null;
+  if (autre !== '' && (b === null || b.pour !== autre)) return null;
+  const cote = coteDuTexte(etat, a.empreinte);
+  if (autre === '') {
+    return { cote, doublon: messageDoublon(etat, '', null, null), defi: etatDuDefi(premier, '', null, null) };
+  }
+  if (a.erreur || b!.erreur) {
+    return { cote, doublon: DOUBLON_SANS_EMPREINTE, defi: { reussi: false, texte: DEFI_SANS_EMPREINTE } };
+  }
+  return {
+    cote,
+    doublon: messageDoublon(etat, autre, a.empreinte, b!.empreinte),
+    defi: etatDuDefi(premier, autre, a.empreinte, b!.empreinte),
   };
 }

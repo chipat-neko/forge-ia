@@ -9,6 +9,7 @@
 // Le lien vers l'annuaire des données vient de ANNEXES (parcours.ts), lu à la
 // construction : il ne paraît que quand l'annexe a son adresse (`href`), et
 // jamais vers une page absente.
+import { formaterDate } from '../../../lib/calculateur/formats';
 import { nombre } from '../../../lib/nombres';
 import { ANNEXES } from '../../../lib/parcours';
 import { NOMS_DES_SOURCES } from '../../../lib/partie-1/donnees';
@@ -39,11 +40,16 @@ const lignes = NOMS_DES_SOURCES.map((source) => {
 });
 const [web, wiki, code] = lignes;
 const unites = typographier(
-  `Hugging Face écrit ces tailles en GB, des milliards d’octets : ${web.gb}, ${wiki.gb} et ${code.gb}. ` +
-    'Le site écrit les siennes en Gio, des paquets de 2³⁰ octets, comme ses annexes : un Gio vaut un peu plus ' +
-    'qu’un GB.',
+  `En octets décimaux, l’unité de Hugging Face (un GB vaut un milliard d’octets), cela fait ${web.gb}, ` +
+    `${wiki.gb} et ${code.gb}. Le site écrit ses tailles en Gio, des paquets de 2³⁰ octets, comme ses annexes : ` +
+    'un Gio vaut un peu plus qu’un GB.',
 );
-const releve = typographier('Relevé le 9 novembre 2026, à l’API de Hugging Face : ');
+// La date du relevé : celle des réponses de l'API, toutes lues le même jour.
+const dates = new Set(lignes.flatMap((l) => [TAILLES_DES_SOURCES[l.source].api.verifieLe, l.fiche.api.verifieLe]));
+if (dates.size !== 1) {
+  throw new Error('TableauSources : les réponses de l’API n’ont plus toutes la même date de relevé (sources-1-2.ts) : la phrase des sources est à revoir.');
+}
+const releve = typographier(`Relevé le ${formaterDate([...dates][0])}, à l’API de Hugging Face : `);
 ---
 
 <figure class="tableau-sources" data-test="sources">
@@ -64,10 +70,8 @@ const releve = typographier('Relevé le 9 novembre 2026, à l’API de Hugging F
             <th scope="row">
               <span class="nom">{typographier(l.fiche.nom)}</span>
               {/* Le dépôt se coupe après « / », jamais au milieu d'un nom. */}
-              <code>
-                {l.proprietaire}/<wbr />
-                {l.jeu}
-              </code>
+              {/* Sur une seule ligne : aucun blanc entre le propriétaire, la barre et le nom. */}
+              <code>{l.proprietaire}/<wbr /><span class="insecable">{l.jeu}</span></code>
               <span class="petit">{l.partie}</span>
             </th>
             <td class="nombre">
@@ -177,6 +181,11 @@ const releve = typographier('Relevé le 9 novembre 2026, à l’API de Hugging F
     font-size: 13px;
     font-variant-ligatures: none;
     overflow-wrap: break-word;
+  }
+
+  /* Un nom de jeu ne se coupe jamais à son trait d'union. */
+  .insecable {
+    white-space: nowrap;
   }
 
   .petit {

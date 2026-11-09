@@ -2,7 +2,7 @@
 // nettoyage (nettoyeur.ts), appliqué aux exemples du projet 1.2 et à son aperçu, lus sur le
 // disque. Les attendus du Python (FICHIERS_PARTIE_1.nettoyeur) servent de témoin.
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PART_VALIDATION } from './donnees';
 import { FICHIERS_PARTIE_1 } from './fichiers';
@@ -26,6 +26,10 @@ import {
   choixValidation,
   coteDuTexte,
   CONTROLE_RETIRE,
+  COTE_SANS_EMPREINTE,
+  DEFI_SANS_EMPREINTE,
+  DOUBLON_SANS_EMPREINTE,
+  EMPREINTE_IMPOSSIBLE,
   etatDuDefi,
   etatDuNettoyage,
   faitsDuPariCourt,
@@ -33,6 +37,7 @@ import {
   faitsDuPariValidation,
   lireJsonl,
   messageDoublon,
+  messagesDeLAtelier,
   morceauxDuNettoyage,
   phraseLongueur,
   RETOUR_CHARIOT,
@@ -301,5 +306,71 @@ describe('l’atelier : les retraits rendus visibles', () => {
     }
     durees.sort((a, b) => a - b);
     expect(durees[2], durees.map((d) => d.toFixed(1)).join(', ')).toBeLessThan(200);
+  });
+});
+
+describe('le frontmatter du chapitre 1.2', () => {
+  it('l’acquis « court » dit le seuil de nettoyeur.ts', () => {
+    // Le chapitre est un brouillon, puis paraît dans content/ : on le lit là où il est.
+    const chemin = ['src/brouillons/chapitres/1-2.mdx', 'src/content/chapitres/1-2.mdx'].find((c) => existsSync(c));
+    expect(chemin, 'le chapitre 1.2 est introuvable').toBeDefined();
+    const mdx = readFileSync(chemin!, 'utf8');
+    const court = /- cle: court\n\s+texte: "([^"]*)"/.exec(mdx)?.[1];
+    expect(court).toBe(`Sous ${LONGUEUR_MINIMALE} caractères, un texte est écarté, même sans faute.`);
+  });
+});
+
+describe('l’atelier : des messages seulement avec des empreintes à jour', () => {
+  const calculee = async (pour: string) => ({ pour, empreinte: await empreinte(pour), erreur: false });
+
+  it('une empreinte calculée pour un autre texte : aucun message (l’atelier garde ceux d’avant)', async () => {
+    const texte = texteDe(1);
+    const brut = versWindows(texte);
+    const a = await calculee(brut);
+    const b = await calculee(texte);
+    // Le cas de la relecture : le même texte dans les deux champs, puis une lettre tapée dans le second.
+    const avant = messagesDeLAtelier(etatDuNettoyage(brut), brut, texte, texte, a, b)!;
+    expect(avant.defi).toEqual({ reussi: false, texte: `Pas encore${FINE}: les deux textes sont les mêmes.` });
+    expect(messagesDeLAtelier(etatDuNettoyage(brut), brut, texte, `${texte}x`, a, b)).toBeNull();
+    // Une lettre dans le premier : son empreinte est celle de l'ancien texte.
+    const nouveau = versWindows(`${texte}y`);
+    expect(messagesDeLAtelier(etatDuNettoyage(nouveau), nouveau, `${texte}y`, texte, a, b)).toBeNull();
+    // Pas encore d'empreinte du tout.
+    expect(messagesDeLAtelier(etatDuNettoyage(brut), brut, texte, texte, null, b)).toBeNull();
+    expect(messagesDeLAtelier(etatDuNettoyage(brut), brut, texte, texte, a, null)).toBeNull();
+  });
+
+  it('à jour : les messages du côté, du doublon et du défi', async () => {
+    const texte = texteDe(1);
+    const brut = versWindows(texte);
+    const a = await calculee(brut);
+    const etat = etatDuNettoyage(brut);
+    expect(messagesDeLAtelier(etat, brut, texte, '', a, null)).toEqual({
+      cote: coteDuTexte(etat, a.empreinte),
+      doublon: 'Écris un autre texte pour comparer les empreintes.',
+      defi: { reussi: false, texte: `Pas encore${FINE}: écris un autre texte.` },
+    });
+    const autre = `${texte}   `;
+    const b = await calculee(autre);
+    expect(messagesDeLAtelier(etat, brut, texte, autre, a, b)).toEqual({
+      cote: coteDuTexte(etat, a.empreinte),
+      doublon: `Même empreinte${FINE}: c’est un doublon.`,
+      defi: etatDuDefi(texte, autre, a.empreinte, b.empreinte),
+    });
+    expect(etatDuDefi(texte, autre, a.empreinte, b.empreinte).reussi).toBe(true);
+  });
+
+  it('sans crypto.subtle : l’atelier dit qu’il ne peut ni situer ni comparer', () => {
+    const texte = texteDe(1);
+    const etat = etatDuNettoyage(texte);
+    const a = { pour: texte, empreinte: null, erreur: true };
+    expect(coteDuTexte(etat, null)).toBe(COTE_SANS_EMPREINTE);
+    expect(coteDuTexte(etatDuNettoyage('abc'), null)).toBe('Écarté, ce texte ne servira ni à l’entraînement, ni à la validation.');
+    expect(messagesDeLAtelier(etat, texte, texte, 'autre', a, { pour: 'autre', empreinte: null, erreur: true })).toEqual({
+      cote: COTE_SANS_EMPREINTE,
+      doublon: DOUBLON_SANS_EMPREINTE,
+      defi: { reussi: false, texte: DEFI_SANS_EMPREINTE },
+    });
+    expect(EMPREINTE_IMPOSSIBLE).toBe('impossible à calculer dans ce navigateur');
   });
 });

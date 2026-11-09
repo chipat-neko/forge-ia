@@ -135,7 +135,11 @@ export const WIKIPEDIA_EN_4_0 = Object.freeze({
 
 /**
  * La carte de github-code, dont github-code-clean est tiré : chaque fichier porte la licence
- * du dépôt GitHub d'où il vient (section « Licenses »), parmi 15, dans 30 langages.
+ * du dépôt GitHub d'où il vient (section « Licenses » : « annotated with the license of the
+ * associated repository »), parmi 15, dans 30 langages. La carte de github-code-clean, elle,
+ * ne dit que sa licence, apache-2.0 (métadonnée `license`), et qu'il est une version nettoyée
+ * de github-code. Qu'Apache-2.0 couvre la compilation et que chaque fichier garde la sienne est
+ * notre lecture de ces deux cartes : le chapitre la dit comme telle.
  */
 export const LICENCES_DE_GITHUB_CODE = Object.freeze({
   licences: 15,
@@ -190,7 +194,9 @@ export const FICHES_DES_SOURCES = Object.freeze({
     dossier: 'data',
     configuration: null,
     licences: Object.freeze([LICENCES.apache]),
-    precision: 'pour la compilation ; chaque fichier garde la sienne',
+    // La carte de github-code-clean ne dit que « apache-2.0 » ; celle de github-code, dont il est
+    // tiré, note pour chaque fichier la licence de son dépôt. Le tableau dit les deux, sans conclure.
+    precision: 'chaque fichier : la licence de son dépôt',
     libre: true,
     api: source('API de Hugging Face, codeparrot/github-code-clean', 'https://huggingface.co/api/datasets/codeparrot/github-code-clean'),
   }),
@@ -206,6 +212,9 @@ export const FINEWEB_2 = Object.freeze({
   francais: Object.freeze({ mots: 220662584640, documents: 360058973 }),
   total: Object.freeze({ mots: 3339271691958, documents: 5018505566 }),
   copiesDuWeb: 96,
+  /** Les copies du web de Common Crawl vont « from the summer of 2013 to April 2024 ». */
+  copiesDepuis: 'l’été 2013',
+  copiesJusqua: 'avril 2024',
   source: source('Hugging Face, carte de HuggingFaceFW/fineweb-2', 'https://huggingface.co/datasets/HuggingFaceFW/fineweb-2'),
 });
 

@@ -40,7 +40,14 @@ import { LANCER_TESTS } from '../../lib/partie-0/commandes';
 import { DONNEES_APERCU, DONNEES_TRIER } from '../../lib/partie-1/commandes';
 import { LICENCES_PERMISSIVES, MELANGE, PART_VALIDATION } from '../../lib/partie-1/donnees';
 import { MESURES_PARTIE_1 } from '../../lib/partie-1/mesures';
-import { empreinte, garderPythonPermissif, LONGUEUR_MINIMALE, longueurPointsDeCode, trier } from '../../lib/partie-1/nettoyeur';
+import {
+  CHIFFRES_DE_LA_CLE,
+  empreinte,
+  garderPythonPermissif,
+  LONGUEUR_MINIMALE,
+  longueurPointsDeCode,
+  trier,
+} from '../../lib/partie-1/nettoyeur';
 import {
   choixCourt,
   choixDoublon,
@@ -55,12 +62,14 @@ import {
 import { APERCU, CORPUS_PRINCIPAL, EXEMPLES_CODE, EXEMPLES_WEB } from '../../lib/partie-1/projet-1-2';
 import {
   enGio,
+  FICHES_DES_SOURCES,
   FINEWEB_2,
   LICENCES,
   LICENCES_DE_GITHUB_CODE,
   LLAMA_3,
   REGLEMENT_IA,
   SOURCES_1_2,
+  TAILLES_DES_SOURCES,
   WIKIPEDIA_EN_4_0,
 } from '../../lib/partie-1/sources-1-2';
 import { typographier } from '../../lib/typo';
@@ -92,6 +101,8 @@ export const EXEMPLES = (() => {
     TRI.web[0].raison === 'trop court' && TRI.web[1].raison === 'gardé' && TRI.web[2].raison === 'doublon' && TRI.web[3].raison === 'doublon',
     'les quatre premiers exemples du web ne sont plus « trop court », « gardé », « doublon », « doublon »',
   );
+  // « Le quatrième, copie exacte du deuxième » (étape 6).
+  exiger(EXEMPLES_WEB[3].text === EXEMPLES_WEB[1].text, 'le quatrième exemple du web n’est plus une copie exacte du deuxième');
   // Étape 3 : les trois fichiers de code, gardé, écarté pour sa licence, écarté pour son langage.
   exiger(
     TRI.code.map((v) => v.raison).join(',') === 'gardé,licence,langage',
@@ -118,6 +129,34 @@ export const COURT = (() => {
 })();
 
 export const LICENCES_GARDEES = [...LICENCES_PERMISSIVES];
+
+export const SEPT = (() => {
+  // Le nombre de licences gardées, écrit en lettres dans le texte (étape 3).
+  exiger(LICENCES_GARDEES.length === 7, `forge garde ${LICENCES_GARDEES.length} licences : « sept » (étape 3) est à revoir`);
+  return 'sept';
+})();
+
+export const CLE = (() => {
+  // Les chiffres de l'empreinte que retient le tri (étape 6) : 4 bits par chiffre hexadécimal.
+  exiger(CHIFFRES_DE_LA_CLE * 4 === 64, 'la clé des doublons ne fait plus 64 bits : l’étape 6 est à revoir');
+  return { chiffres: nombre(CHIFFRES_DE_LA_CLE), bits: nombre(CHIFFRES_DE_LA_CLE * 4) };
+})();
+
+export const DATES = (() => {
+  // La copie de Wikipédia (d'après le nom de sa configuration, 20231101.fr) et les dates de lecture des sources.
+  const m = /^(\d{4})(\d{2})(\d{2})\./.exec(FICHES_DES_SOURCES.wikipedia_fr.configuration ?? '');
+  exiger(m !== null, 'la configuration de Wikipédia n’a plus la forme AAAAMMJJ.fr');
+  const unique = (sources, quoi) => {
+    const dates = new Set(sources.map((x) => x.verifieLe));
+    exiger(dates.size === 1, `${quoi} n’ont plus été lues le même jour : la phrase qui donne leur date est à revoir`);
+    return formaterDate([...dates][0]);
+  };
+  return {
+    copieWikipedia: formaterDate(`${m[1]}-${m[2]}-${m[3]}`),
+    cartes: unique([FINEWEB_2.source, LICENCES_DE_GITHUB_CODE.source, TAILLES_DES_SOURCES.code_python.page], 'les cartes des jeux'),
+    licences: unique(Object.values(LICENCES).map((l) => l.source), 'les licences'),
+  };
+})();
 
 export const CHOIX = await (async () => {
   // Les choix des paris dont les empreintes passent par crypto.subtle (asynchrone), calculés ici :
@@ -162,6 +201,7 @@ export const VALIDATION = await (async () => {
     uneSur: nombre(f.uneSur),
     part: pourcent(PART_VALIDATION, 1),
     longueur: nombre(longueurPointsDeCode(f.texte)),
+    texte: f.texte,
   };
 })();
 
@@ -174,6 +214,11 @@ export const PART = (() => {
   exiger(
     code.raisons.langage > code.raisons.licence && code.raisons.licence > code.raisons['trop court'],
     'les raisons d’écart du code ne sont plus dans l’ordre langage, licence, trop court',
+  );
+  // « Parmi les autres, … langage, … licence et … trop courts » : ce sont bien tous les écartés.
+  exiger(
+    code.raisons.doublon === 0 && code.raisons.langage + code.raisons.licence + code.raisons['trop court'] === code.lus - code.gardes,
+    'les écarts du code ne sont plus seulement langage, licence et trop court : l’étape 8 est à revoir',
   );
   const fois = code.lus / web.lus;
   exiger(fois > 10, 'le code lu n’est plus dix fois plus nombreux que le web lu');
@@ -236,6 +281,8 @@ export const LABO = (() => {
     fwDocuments: formaterQuantite(FINEWEB_2.francais.documents),
     fwTotal: formaterQuantite(FINEWEB_2.total.mots),
     copies: nombre(FINEWEB_2.copiesDuWeb),
+    copiesDepuis: FINEWEB_2.copiesDepuis,
+    copiesJusqua: FINEWEB_2.copiesJusqua,
     article: REGLEMENT_IA.article,
     depuis: formaterDate(REGLEMENT_IA.appliqueDepuis),
     anterieurs: formaterDate(REGLEMENT_IA.modelesAnterieurs),
@@ -255,6 +302,8 @@ export const SOURCES = {
   billet: WIKIPEDIA_EN_4_0.source.url,
   billetLe: formaterDate(WIKIPEDIA_EN_4_0.annonceLe),
   githubCode: LICENCES_DE_GITHUB_CODE.source.url,
+  githubCodeClean: TAILLES_DES_SOURCES.code_python.page.url,
+  partValidation: String(PART_VALIDATION),
   licencesGithub: nombre(LICENCES_DE_GITHUB_CODE.licences),
   langagesGithub: nombre(LICENCES_DE_GITHUB_CODE.langages),
   fineweb: FINEWEB_2.source.url,
@@ -290,11 +339,11 @@ Personne n'écrit des milliards de pages pour entraîner une IA. Les textes exis
 
 <TableauSources />
 
-FineWeb-2 vient de {LABO.copies} copies d'une partie du web, faites par Common Crawl de l'été 2013 à avril 2024. Ses auteurs, chez Hugging Face, ont repéré la langue de chaque page, retiré les doublons langue par langue, puis écarté les pages de mauvaise qualité avec des règles adaptées à chaque langue. Le jeu de Wikipédia est une copie de l'encyclopédie du 1er novembre 2023. Et github-code-clean rassemble des fichiers publiés sur GitHub, en {SOURCES.langagesGithub} langages de programmation, dont Python.
+FineWeb-2 vient de {LABO.copies} copies d'une partie du web, faites par Common Crawl de {LABO.copiesDepuis} à {LABO.copiesJusqua}. Ses auteurs, chez Hugging Face, ont repéré la langue de chaque page, retiré les doublons langue par langue, puis écarté les pages de mauvaise qualité avec des règles adaptées à chaque langue. Le jeu de Wikipédia est une copie de l'encyclopédie du {DATES.copieWikipedia}. Et github-code-clean rassemble des fichiers publiés sur GitHub, en {SOURCES.langagesGithub} langages de programmation, dont Python.
 
 <Fragment slot="note">
 
-D'après la <a href={SOURCES.fineweb}>carte de FineWeb-2</a> et celle de <a href={SOURCES.githubCode}>github-code</a>, dont github-code-clean est tiré, lues le 9 novembre 2026.
+D'après la <a href={SOURCES.fineweb}>carte de FineWeb-2</a> et celle de <a href={SOURCES.githubCode}>github-code</a>, dont github-code-clean est tiré, lues le {DATES.cartes}.
 
 </Fragment>
 
@@ -304,17 +353,17 @@ D'après la <a href={SOURCES.fineweb}>carte de FineWeb-2</a> et celle de <a href
 
 Un texte publié n'est pas un texte libre de droits. Chaque jeu de données dit, dans sa licence, ce qu'on a le droit d'en faire. Ce chapitre ne donne pas d'avis juridique : il dit ce qu'écrit chaque licence, avec son lien, et ce que forge en fait.
 
-FineWeb-2 est publié sous <a href={SOURCES.odcBy}>ODC-By 1.0</a>, une licence de bases de données. Elle permet de se servir de la base, y compris pour un usage commercial, et demande de la citer quand on la diffuse publiquement. Elle le dit elle-même, à sa section 2.4 : elle couvre la base, pas chaque page qu'elle contient, qui peut garder ses propres droits. La carte du jeu ajoute que les <a href={SOURCES.commonCrawl}>conditions d'utilisation de Common Crawl</a> s'appliquent aussi.
+FineWeb-2 est publié sous <a href={SOURCES.odcBy}>ODC-By 1.0</a>, une licence de bases de données. Elle permet de se servir de la base, y compris pour un usage commercial. Elle demande de la citer quand on la diffuse publiquement (section 4.2), et quand on montre en public une œuvre produite à partir d'elle (section 4.3). Elle le dit elle-même, à sa section 2.4 : elle couvre la base, pas chaque page qu'elle contient, qui peut garder ses propres droits. La carte du jeu ajoute que les <a href={SOURCES.commonCrawl}>conditions d'utilisation de Common Crawl</a> s'appliquent aussi.
 
-Le jeu de Wikipédia annonce deux licences, <a href={SOURCES.ccBySa3}>CC BY-SA 3.0</a> et <a href={SOURCES.gfdl}>GFDL</a>. CC BY-SA demande de citer les auteurs (BY) et de partager ce qu'on en tire sous la même licence (SA). Le {SOURCES.billetLe}, Creative Commons <a href={SOURCES.billet}>annonçait</a> que les nouvelles modifications de Wikipédia passaient sous <a href={SOURCES.ccBySa4}>CC BY-SA 4.0</a>, et que les anciennes restaient en 3.0. La copie du 1er novembre 2023 mêle donc sans doute les deux versions : c'est notre lecture de ces deux sources, le jeu ne le dit pas.
+Le jeu de Wikipédia annonce deux licences, <a href={SOURCES.ccBySa3}>CC BY-SA 3.0</a> et <a href={SOURCES.gfdl}>GFDL</a>. CC BY-SA demande de citer les auteurs (BY) et, si l'on partage ce qu'on en tire, de le faire sous la même licence (SA). Le {SOURCES.billetLe}, Creative Commons <a href={SOURCES.billet}>annonçait</a> que les nouvelles modifications de Wikipédia passaient sous <a href={SOURCES.ccBySa4}>CC BY-SA 4.0</a>, et que les anciennes restaient en 3.0. La copie du {DATES.copieWikipedia} mêle donc sans doute les deux versions : c'est notre lecture de ces deux sources, le jeu ne le dit pas.
 
-github-code-clean est publié sous <a href={SOURCES.apache}>Apache-2.0</a>, mais seulement en tant que compilation. Chaque fichier garde la licence du dépôt GitHub d'où il vient, notée dans la colonne `license` ; la carte de github-code en compte {SOURCES.licencesGithub}. Certaines, comme la <a href={SOURCES.gpl3}>GPL-3.0</a>, demandent que tout ce qu'on en tire et qu'on transmet reste sous la même licence (section 5 c). D'autres, dites permissives, comme <a href={SOURCES.mit}>MIT</a>, demandent surtout de garder la mention de l'auteur et de la licence dans toute copie. Forge ne garde que les fichiers Python sous l'une de ces sept licences : {LICENCES_GARDEES.map((l, i) => <>{i > 0 && (i === LICENCES_GARDEES.length - 1 ? ' et ' : ', ')}<code>{l}</code></>)}.
+La <a href={SOURCES.githubCodeClean}>carte de github-code-clean</a> annonce une seule licence, <a href={SOURCES.apache}>Apache-2.0</a>, et le présente comme une version nettoyée de github-code. La <a href={SOURCES.githubCode}>carte de github-code</a> note, pour chaque fichier, la licence du dépôt GitHub d'où il vient, dans la colonne `license` ; elle en compte {SOURCES.licencesGithub}. Nous en lisons qu'Apache-2.0 couvre le jeu tel qu'il est assemblé, et que chaque fichier garde la licence de son dépôt : c'est notre lecture de ces deux cartes, aucune ne le dit en ces termes. Parmi ces licences, certaines, comme la <a href={SOURCES.gpl3}>GPL-3.0</a>, demandent que tout ce qu'on en tire et qu'on transmet reste sous la même licence (section 5 c). D'autres, dites permissives, comme <a href={SOURCES.mit}>MIT</a>, demandent surtout de garder la mention de l'auteur et de la licence dans toute copie. Forge ne garde que les fichiers Python sous l'une de ces {SEPT} licences : {LICENCES_GARDEES.map((l, i) => <>{i > 0 && (i === LICENCES_GARDEES.length - 1 ? ' et ' : ', ')}<code>{l}</code></>)}.
 
 <CodeExplique fichier="projets/forge/forge/donnees/sources.py" symbole="_garder_python_permissif">
   <li data-lignes="1">La fonction reçoit une ligne du jeu, un dictionnaire : le code, son langage, sa licence…</li>
   <li data-lignes="2">`get` lit la colonne `license`, ou rend `None` si elle manque.</li>
   <li data-lignes="4">Le fichier doit être du Python.</li>
-  <li data-lignes="5-6">Et sa licence, du texte, mise en minuscules, doit être dans `LICENCES_PERMISSIVES`, les sept de la liste. Tout le reste est écarté.</li>
+  <li data-lignes="5-6">Et sa licence, du texte, mise en minuscules, doit être dans `LICENCES_PERMISSIVES`, les {SEPT} de la liste. Tout le reste est écarté.</li>
 </CodeExplique>
 
 C'est un choix de forge, prudent, et pas une règle de droit.
@@ -327,13 +376,13 @@ C'est un choix de forge, prudent, et pas une règle de droit.
   acquis="licences"
 >
 
-Non : `gpl-3.0` n'est pas dans la liste des sept, et le filtre écarte tout fichier dont la licence n'y est pas. Citer son auteur n'y change rien : le filtre ne lit que la licence. Les trois fichiers des exemples du projet le montrent : le premier, du Python sous MIT, est gardé ; le deuxième, sous {EXEMPLES.gpl}, est écarté pour sa licence ; le troisième, sous MIT mais en {EXEMPLES.langage}, pour son langage.
+Non : `gpl-3.0` n'est pas dans la liste des {SEPT}, et le filtre écarte tout fichier dont la licence n'y est pas. Citer son auteur n'y change rien : le filtre ne lit que la licence. Les trois fichiers des exemples du projet le montrent : le premier, du Python sous MIT, est gardé ; le deuxième, sous {EXEMPLES.gpl}, est écarté pour sa licence ; le troisième, sous MIT mais en {EXEMPLES.langage}, pour son langage.
 
 </Pari>
 
 <Fragment slot="note">
 
-Les licences sont liées à leur texte, relu le 9 novembre 2026. Les sept noms sont ceux de la colonne `license` du jeu, en minuscules.
+Les licences sont liées à leur texte, relu le {DATES.licences}. Les {SEPT} noms sont ceux de la colonne `license` du jeu, en minuscules.
 
 </Fragment>
 
@@ -382,11 +431,9 @@ Non : {COURT.longueur} caractères, il en manque {COURT.manque}. Le texte est pr
 
 Écris ou colle un texte. Dessous, le texte nettoyé : chaque caractère retiré y est marqué, ␍ pour un retour chariot, · pour un autre caractère invisible, un contrôle ou un blanc en fin de texte. Puis sa longueur, le verdict, et son empreinte, dont parle l'étape 6.
 
-<AtelierNettoyeur client:load texteInitial={INITIAL} empreinteInitiale={EMPREINTE_INITIALE} verrou="atelier" acquis="atelier">
+Le texte du départ est le deuxième exemple du projet, écrit sous Windows : chaque fin de ligne y perd son ␍. Un champ de saisie ne garde jamais de retour chariot, le navigateur les retire : ce sont les deux bascules sous le champ, « Linux ou macOS » et « Windows », qui choisissent les fins de ligne, comme dans un fichier enregistré sur l'un ou sur l'autre. Ajoute une espace à la fin, ou colle un texte copié d'un vieux logiciel, et regarde ce qui part.
 
-Le texte du départ est le deuxième exemple du projet, écrit sous Windows : chaque fin de ligne y perd son ␍. Un champ de saisie ne garde jamais de retour chariot, le navigateur les retire : ce sont les fins de ligne choisies plus haut qui les remettent, comme dans un fichier enregistré sous Windows. Ajoute une espace à la fin, ou colle un texte copié d'un vieux logiciel, et regarde ce qui part.
-
-</AtelierNettoyeur>
+<AtelierNettoyeur client:load texteInitial={INITIAL} empreinteInitiale={EMPREINTE_INITIALE} verrou="atelier" acquis="atelier" />
 
 </Verrou>
 
@@ -409,11 +456,11 @@ Pour reconnaître un texte déjà vu sans garder tous les textes en mémoire, fo
   <li data-lignes="2">`encode("utf-8")` en fait des octets, `hashlib.sha1` en calcule l'empreinte, et `hexdigest` l'écrit en chiffres hexadécimaux. `usedforsecurity=False` dit à Python que l'empreinte ne protège rien : elle sert seulement à reconnaître des copies.</li>
 </CodeExplique>
 
-Le projet retient les 16 premiers chiffres de chaque empreinte vue, comme le téléchargement de forge :
+Le projet retient les {CLE.chiffres} premiers chiffres de chaque empreinte vue, comme le téléchargement de forge :
 
 <CodeExplique fichier="projets/1.2-donnees/donnees_pas_a_pas/trier.py" region="doublons">
   <li data-lignes="1">La fonction reçoit l'ensemble des empreintes déjà vues, et celle du texte.</li>
-  <li data-lignes="3">Les 16 premiers chiffres, soit 64 bits : en pratique, deux textes différents d'un même corpus n'ont jamais les mêmes.</li>
+  <li data-lignes="3">Les {CLE.chiffres} premiers chiffres, `CHIFFRES_DE_LA_CLE`, soit {CLE.bits} bits : en pratique, deux textes différents d'un même corpus n'ont jamais les mêmes.</li>
   <li data-lignes="4-5">Déjà vue : c'est un doublon.</li>
   <li data-lignes="6-7">Sinon, on la retient, et le texte est gardé.</li>
 </CodeExplique>
@@ -439,7 +486,7 @@ Une empreinte ne reconnaît que les copies exactes, une fois nettoyées : une vi
 Au {LIENS.l11 ? <a href={LIENS.l11}>chapitre 1.1</a> : 'chapitre 1.1'}, le modèle était jugé sur un texte qu'il n'avait jamais lu. Ton IA aussi : forge met de côté {VALIDATION.part} des documents, un sur {VALIDATION.uneSur}, pour la validation. Pour savoir lesquels, il ne tire pas au sort : il regarde leur empreinte.
 
 <CodeExplique fichier="projets/forge/forge/donnees/melange.py" symbole="est_validation">
-  <li data-lignes="1">La fonction reçoit l'empreinte d'un texte, et la part à mettre de côté : `0.005`, soit {VALIDATION.part}.</li>
+  <li data-lignes="1">La fonction reçoit l'empreinte d'un texte, et la part à mettre de côté : <code>{SOURCES.partValidation}</code>, soit {VALIDATION.part}.</li>
   <li data-lignes="2">`empreinte[:8]` prend les 8 premiers chiffres, et `int(…, 16)` les lit comme un nombre hexadécimal, entre 0 et 2³² − 1, un peu plus de 4 milliards. Le texte va dans la validation si ce nombre est sous {VALIDATION.part} de 2³². Les empreintes se répartissent comme au hasard : environ un texte sur {VALIDATION.uneSur} tombe sous ce seuil.</li>
 </CodeExplique>
 
@@ -448,7 +495,7 @@ Le choix ne dépend que du texte. On peut relancer le téléchargement, changer 
 <Pari
   id="validation"
   question={`Ajoute aux exemples du projet le carnet de l’essai numéro ${VALIDATION.essai} : le tri le met de côté pour la validation. Tu relances le tri sur les mêmes documents, dans l’ordre inverse. Où va ce carnet ?`}
-  precision={`Un carnet est un texte de ${VALIDATION.longueur} caractères, qui ne change d’un essai à l’autre que par son numéro.`}
+  precision={`Le carnet, ${VALIDATION.longueur} caractères, ne change d’un essai à l’autre que par son numéro : « ${VALIDATION.texte} »`}
   choix={CHOIX.validation}
   acquis="validation"
 >
@@ -468,7 +515,7 @@ Le projet a lu les trois sources pour de vrai, en flux, jusqu'à garder {PART.mi
 <Pari
   id="part"
   question="Sur les documents du web français lus par l'aperçu, quelle part le tri a-t-il gardée ?"
-  precision={`Il a lu ${PART.webLus} documents de FineWeb-2, en flux, jusqu’à en garder ${PART.mio} Mio de texte.`}
+  precision={`Il a lu ${PART.webLus} documents de FineWeb\u20112, en flux, jusqu’à en garder ${PART.mio} Mio de texte.`}
   choix={choixPartGardee(APERCU)}
   acquis="melange"
 >

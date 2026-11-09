@@ -45,7 +45,18 @@ const BLANCS: ReadonlySet<number> = new Set(BLANCS_PYTHON);
 // Les caractères de contrôle retirés : tout sauf \n (0x0A) et \t (0x09), donc aussi \r seul, les
 // contrôles C0, 0x7F et les contrôles C1. S'y ajoutent les moitiés de paires de substitution.
 // L'indicateur « u » : une paire complète est un seul point de code, hors de la classe.
-const CONTROLES = /[\u{0}-\u{8}\u{b}-\u{1f}\u{7f}-\u{9f}\u{d800}-\u{dfff}]/gu;
+const CLASSE_DES_CONTROLES = '[\\u{0}-\\u{8}\\u{b}-\\u{1f}\\u{7f}-\\u{9f}\\u{d800}-\\u{dfff}]';
+const CONTROLES = new RegExp(CLASSE_DES_CONTROLES, 'gu');
+const UN_CONTROLE = new RegExp(`^${CLASSE_DES_CONTROLES}$`, 'u');
+
+/**
+ * Dit si un caractère (un point de code, tel que le donne Array.from) est de ceux que le
+ * nettoyage retire : un contrôle, \r seul compris, ou une moitié de paire. L'atelier du
+ * chapitre 1.2 s'en sert pour montrer chaque retrait à sa place.
+ */
+export function estUnControleRetire(caractere: string): boolean {
+  return UN_CONTROLE.test(caractere);
+}
 
 /** Le nombre de points de code d'un texte, comme len() en Python (une moitié de paire compte pour un). */
 export function longueurPointsDeCode(texte: string): number {
@@ -142,8 +153,11 @@ export interface Verdict {
   validation: boolean | null;
 }
 
-// Le téléchargement de forge retient les 64 premiers bits de l'empreinte pour reconnaître un doublon.
-const CHIFFRES_DE_LA_CLE = 16;
+/**
+ * Le téléchargement de forge retient les 64 premiers bits de l'empreinte (16 chiffres
+ * hexadécimaux) pour reconnaître un doublon : CHIFFRES_DE_LA_CLE de trier.py.
+ */
+export const CHIFFRES_DE_LA_CLE = 16;
 
 /** Un autre langage que Python : « langage » ; sinon, c'est la licence. */
 export function raisonDuRefus(ligne: Ligne): Raison {

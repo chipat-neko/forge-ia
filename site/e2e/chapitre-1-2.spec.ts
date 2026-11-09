@@ -18,8 +18,12 @@ import {
   choixLicence,
   choixPartGardee,
   choixValidation,
+  COTE_SANS_EMPREINTE,
   coteDuTexte,
   CONTROLE_RETIRE,
+  DEFI_SANS_EMPREINTE,
+  DOUBLON_SANS_EMPREINTE,
+  EMPREINTE_IMPOSSIBLE,
   etatDuNettoyage,
   lireJsonl,
   messageDoublon,
@@ -100,6 +104,43 @@ async function nettoyeAffiche(page: Page): Promise<{ gardes: string; retraits: s
     }
     return { gardes, retraits };
   });
+}
+
+/**
+ * L'empreinte passe par crypto.subtle : avant le chargement de la page, on enveloppe digest pour
+ * pouvoir la retenir (retenir), puis la relâcher (lacher), et voir ce que l'atelier montre en attendant.
+ */
+async function installerRetenue(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __retenir: boolean; __enAttente: (() => void)[] };
+    w.__retenir = false;
+    w.__enAttente = [];
+    const digest = SubtleCrypto.prototype.digest;
+    SubtleCrypto.prototype.digest = function (this: SubtleCrypto, ...args: Parameters<SubtleCrypto['digest']>) {
+      const resultat = digest.apply(this, args);
+      if (!w.__retenir) return resultat;
+      return new Promise<ArrayBuffer>((ok, ko) => w.__enAttente.push(() => void resultat.then(ok, ko)));
+    } as SubtleCrypto['digest'];
+  });
+}
+
+async function retenir(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    (window as unknown as { __retenir: boolean }).__retenir = true;
+  });
+}
+
+async function lacher(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const w = window as unknown as { __retenir: boolean; __enAttente: (() => void)[] };
+    w.__retenir = false;
+    for (const lacherUn of w.__enAttente.splice(0)) lacherUn();
+  });
+}
+
+/** Attend que la page ait dessiné deux images : ce qu'un lecteur verrait. */
+async function deuxImages(page: Page): Promise<void> {
+  await page.evaluate(() => new Promise((fin) => requestAnimationFrame(() => requestAnimationFrame(() => fin(null)))));
 }
 
 /** Vérifie tout ce que l'atelier dit du premier texte, face au jumeau (le brut tient compte des fins de ligne). */
@@ -283,49 +324,88 @@ test('atelier : le doublon et le défi', async ({ page }) => {
   await verifierAxe(page);
 });
 
-test('atelier : 100 000 caractères en moins de 200 ms, et le verdict avant l’empreinte', async ({ page }) => {
-  // L'empreinte passe par crypto.subtle : on peut la retenir, pour voir ce que l'atelier montre en attendant.
+test('atelier : pendant un calcul d’empreinte, ni faux « Défi réussi », ni doublon faux', async ({ page }) => {
+  await installerRetenue(page);
+  await ouvrirAtelier(page);
+  const champ = page.locator('[data-test="nt-texte"]');
+  const autre = page.locator('[data-test="nt-autre"]');
+  const defi = page.locator('[data-defi]');
+  const annonceDefi = defi.locator('[role="status"]');
+  const lesMemes = `Pas encore${FINE}: les deux textes sont les mêmes.`;
+  const doublon = `Même empreinte${FINE}: c’est un doublon.`;
+
+  // Le même texte dans les deux champs : doublon, et pas de défi (ils sont pareils à l'écran).
+  await autre.fill(INITIAL);
+  await expect.poll(() => texteExact(page, '[data-test="nt-defi"]')).toBe(lesMemes);
+  await expect.poll(() => texteExact(page, '[data-test="nt-doublon"]')).toBe(doublon);
+
+  // Une lettre de plus dans le second champ, empreinte retenue : les messages d'avant restent, rien ne s'annonce.
+  await retenir(page);
+  await autre.fill(`${INITIAL}x`);
+  await deuxImages(page);
+  await expect(defi).not.toHaveClass(/\breussi\b/);
+  expect(await texteExact(page, '[data-test="nt-defi"]')).toBe(lesMemes);
+  expect(await texteExact(page, '[data-test="nt-doublon"]')).toBe(doublon);
+  expect(await annonceDefi.textContent()).toBe('');
+  await lacher(page);
+  await expect.poll(() => texteExact(page, '[data-test="nt-defi"]')).toBe(`Pas encore${FINE}: les empreintes diffèrent.`);
+  await expect.poll(() => texteExact(page, '[data-test="nt-doublon"]')).toBe(`Empreinte différente${FINE}: ce n’est pas un doublon.`);
+
+  // De nouveau le même texte, puis une lettre dans le premier champ : même chose.
+  await autre.fill(INITIAL);
+  await expect.poll(() => texteExact(page, '[data-test="nt-defi"]')).toBe(lesMemes);
+  await retenir(page);
+  await champ.fill(`${INITIAL}y`);
+  await deuxImages(page);
+  await expect(defi).not.toHaveClass(/\breussi\b/);
+  expect(await texteExact(page, '[data-test="nt-defi"]')).toBe(lesMemes);
+  expect(await annonceDefi.textContent()).toBe('');
+  await lacher(page);
+  await expect.poll(() => texteExact(page, '[data-test="nt-defi"]')).toBe(`Pas encore${FINE}: les empreintes diffèrent.`);
+  await expect(defi).not.toHaveClass(/\breussi\b/);
+});
+
+test('atelier : sans crypto.subtle, l’atelier dit qu’il ne peut pas calculer l’empreinte', async ({ page }) => {
+  // Une page ouverte en http:// sur le réseau local n'a pas crypto.subtle.
   await page.addInitScript(() => {
-    const w = window as unknown as { __retenir: boolean; __enAttente: (() => void)[] };
-    w.__retenir = false;
-    w.__enAttente = [];
-    const digest = SubtleCrypto.prototype.digest;
-    SubtleCrypto.prototype.digest = function (this: SubtleCrypto, ...args: Parameters<SubtleCrypto['digest']>) {
-      const resultat = digest.apply(this, args);
-      if (!w.__retenir) return resultat;
-      return new Promise<ArrayBuffer>((ok, ko) => w.__enAttente.push(() => void resultat.then(ok, ko)));
-    } as SubtleCrypto['digest'];
+    Object.defineProperty(window.crypto, 'subtle', { value: undefined, configurable: true });
   });
+  await ouvrirAtelier(page);
+  // Le texte de départ garde l'empreinte calculée à la construction.
+  await expect(page.locator('[data-test="nt-empreinte"]')).toHaveText((await empreinte(versWindows(INITIAL))).slice(0, 8));
+  // Un autre texte : plus d'empreinte affichée, et l'atelier le dit.
+  await page.locator('[data-test="nt-texte"]').fill(texteDe(13));
+  await expect(page.locator('[data-test="nt-empreinte"]')).toHaveCount(0);
+  await expect.poll(() => texteExact(page, '[data-test="nt-empreinte-impossible"]')).toBe(EMPREINTE_IMPOSSIBLE);
+  await expect.poll(() => texteExact(page, '[data-test="nt-cote"]')).toBe(COTE_SANS_EMPREINTE);
+  await page.locator('[data-test="nt-autre"]').fill(texteDe(13));
+  await expect.poll(() => texteExact(page, '[data-test="nt-doublon"]')).toBe(DOUBLON_SANS_EMPREINTE);
+  await expect.poll(() => texteExact(page, '[data-test="nt-defi"]')).toBe(DEFI_SANS_EMPREINTE);
+  await expect(page.locator('[data-defi]')).not.toHaveClass(/\breussi\b/);
+  // Le verdict, lui, ne dépend pas de l'empreinte.
+  expect(await texteExact(page, '[data-test="nt-verdict"]')).toBe(verdictDuTexte(etatDuNettoyage(versWindows(texteDe(13)))));
+});
+
+test('atelier : 100 000 caractères en moins de 200 ms, et le verdict avant l’empreinte', async ({ page }) => {
+  await installerRetenue(page);
   await ouvrirAtelier(page);
   const avant = await texteExact(page, '[data-test="nt-empreinte"]');
 
   // Empreinte retenue : le verdict change tout de suite, l'empreinte attend, sans disparaître.
-  await page.evaluate(() => {
-    (window as unknown as { __retenir: boolean }).__retenir = true;
-  });
+  await retenir(page);
   await page.locator('[data-test="nt-texte"]').fill(texteDe(9));
   await expect.poll(() => texteExact(page, '[data-test="nt-verdict"]')).toBe(`Écarté${FINE}: trop court, il manque 1 caractère.`);
   await expect.poll(() => texteExact(page, '[data-test="nt-annonce"]')).toBe(`Écarté${FINE}: trop court, il manque 1 caractère.`);
   await expect(page.locator('[data-test="nt-empreinte"]')).toHaveAttribute('data-en-cours', 'oui');
   expect(await texteExact(page, '[data-test="nt-empreinte"]')).toBe(avant);
-  await page.evaluate(() => {
-    const w = window as unknown as { __retenir: boolean; __enAttente: (() => void)[] };
-    w.__retenir = false;
-    for (const lacher of w.__enAttente.splice(0)) lacher();
-  });
+  await lacher(page);
   await verifierTexte(page, versWindows(texteDe(9)));
 
   // Un aller-retour pendant que l'empreinte attend : celle du texte intermédiaire ne s'affiche jamais.
-  await page.evaluate(() => {
-    (window as unknown as { __retenir: boolean }).__retenir = true;
-  });
+  await retenir(page);
   await page.locator('[data-test="nt-texte"]').fill(texteDe(8));
   await page.locator('[data-test="nt-texte"]').fill(texteDe(9));
-  await page.evaluate(() => {
-    const w = window as unknown as { __retenir: boolean; __enAttente: (() => void)[] };
-    w.__retenir = false;
-    for (const lacher of w.__enAttente.splice(0)) lacher();
-  });
+  await lacher(page);
   await page.waitForTimeout(100);
   await verifierTexte(page, versWindows(texteDe(9)));
 
@@ -340,8 +420,9 @@ test('atelier : 100 000 caractères en moins de 200 ms, et le verdict avant l’
         const debut = performance.now();
         champ.value = texte;
         champ.dispatchEvent(new Event('input', { bubbles: true }));
-        // Svelte met la page à jour avant la prochaine image.
-        await new Promise((fin) => requestAnimationFrame(() => fin(null)));
+        // Svelte met la page à jour avant la prochaine image ; la seconde image est celle que le
+        // lecteur voit, une fois le style, la mise en page et le dessin du texte nettoyé faits.
+        await new Promise((fin) => requestAnimationFrame(() => requestAnimationFrame(() => fin(null))));
         return performance.now() - debut;
       }, `${long.slice(0, 100_000 - 1)}${'abcde'[essai]}`),
     );

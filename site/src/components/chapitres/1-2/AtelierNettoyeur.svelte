@@ -22,8 +22,13 @@
   // L'empreinte (SHA-1, par crypto.subtle) est asynchrone : la longueur et le
   // verdict s'affichent tout de suite, et l'empreinte affichée reste celle du
   // texte précédent (marquée data-en-cours) jusqu'à l'arrivée de la nouvelle.
-  // Rien ne disparaît, rien ne clignote. Les zones role="status" n'annoncent que
-  // les changements de verdict : gardé ou écarté, doublon ou non, défi réussi.
+  // Le côté, le doublon et le défi, eux, ne se calculent qu'avec des empreintes à
+  // jour, celles des textes à l'écran (messagesDeLAtelier) : pendant un calcul, ils
+  // gardent leur message d'avant. Rien ne disparaît, rien ne clignote, et les zones
+  // role="status" n'annoncent que les changements de verdict : gardé ou écarté,
+  // doublon ou non, défi réussi. Sans crypto.subtle (une page ouverte en http://
+  // sur le réseau local), l'atelier dit qu'il ne peut pas calculer l'empreinte, et
+  // n'affiche plus celle d'un autre texte.
   //
   // À placer dans le MDX avec client:load, en général dans un <Verrou> :
   //   <AtelierNettoyeur client:load texteInitial={…} empreinteInitiale={…} verrou="atelier" acquis="atelier" />
@@ -39,11 +44,14 @@
   import { empreinte } from '../../../lib/partie-1/nettoyeur';
   import {
     CONTROLE_RETIRE,
-    coteDuTexte,
+    EMPREINTE_IMPOSSIBLE,
     etatDuDefi,
     etatDuNettoyage,
     messageDoublon,
+    messagesDeLAtelier,
     phraseLongueur,
+    type EmpreinteCalculee,
+    type MessagesDeLAtelier,
     RETOUR_CHARIOT,
     verdictDuTexte,
     versWindows,
@@ -86,52 +94,91 @@
   const autresRetraits = $derived(etat.morceaux.reduce((n, m) => (m.retire && m.texte[0] === CONTROLE_RETIRE ? n + m.nombre : n), 0));
 
   // ---------- Les empreintes, asynchrones ----------
-  // Chaque calcul porte un numéro : seul le dernier lancé s'affiche, même si un
-  // précédent arrive après lui.
-  let empreinteA = $state<string | null>(untrack(() => empreinteInitiale ?? null));
-  let calculeePourA = untrack(() => (empreinteInitiale === undefined ? null : versWindows(texteInitial)));
+  // Chaque empreinte garde le texte pour lequel elle a été calculée (`pour`). Chaque
+  // calcul porte un numéro : seul le dernier lancé compte, même si un précédent
+  // arrive après lui. Un échec (pas de crypto.subtle) donne une empreinte nulle,
+  // marquée `erreur`.
+  let a = $state<EmpreinteCalculee | null>(
+    untrack(() =>
+      empreinteInitiale === undefined
+        ? null
+        : { pour: versWindows(texteInitial), empreinte: empreinteInitiale, erreur: false },
+    ),
+  );
   let enCoursA = $state(false);
   let numeroA = 0;
   $effect(() => {
-    const b = brut;
+    const t = brut;
     const n = ++numeroA;
-    // Retour au texte dont l'empreinte est affichée : rien à calculer, et un calcul
-    // encore en route (celui d'un texte intermédiaire) ne doit plus s'afficher.
-    if (b === calculeePourA) {
+    // Retour au texte dont l'empreinte est connue : rien à calculer, et un calcul
+    // encore en route (celui d'un texte intermédiaire) ne compte plus.
+    if (t === untrack(() => a?.pour)) {
       enCoursA = false;
       return;
     }
     enCoursA = true;
-    void empreinte(b).then((e) => {
-      if (n !== numeroA) return;
-      empreinteA = e;
-      calculeePourA = b;
-      enCoursA = false;
-    });
+    empreinte(t).then(
+      (e) => {
+        if (n !== numeroA) return;
+        a = { pour: t, empreinte: e, erreur: false };
+        enCoursA = false;
+      },
+      () => {
+        if (n !== numeroA) return;
+        a = { pour: t, empreinte: null, erreur: true };
+        enCoursA = false;
+      },
+    );
   });
 
-  let empreinteB = $state<string | null>(null);
+  let b = $state<EmpreinteCalculee | null>(null);
   let enCoursB = $state(false);
   let numeroB = 0;
   $effect(() => {
-    const b = autre;
+    const t = autre;
     const n = ++numeroB;
-    if (b === '') {
-      empreinteB = null;
+    if (t === '' || t === untrack(() => b?.pour)) {
       enCoursB = false;
       return;
     }
     enCoursB = true;
-    void empreinte(b).then((e) => {
-      if (n !== numeroB) return;
-      empreinteB = e;
-      enCoursB = false;
-    });
+    empreinte(t).then(
+      (e) => {
+        if (n !== numeroB) return;
+        b = { pour: t, empreinte: e, erreur: false };
+        enCoursB = false;
+      },
+      () => {
+        if (n !== numeroB) return;
+        b = { pour: t, empreinte: null, erreur: true };
+        enCoursB = false;
+      },
+    );
   });
 
-  const cote = $derived(empreinteA === null ? '' : coteDuTexte(etat, empreinteA));
-  const doublon = $derived(messageDoublon(etat, autre, empreinteA, empreinteB));
-  const defi = $derived(etatDuDefi(texte, autre, empreinteA, empreinteB));
+  // L'empreinte montrée sous chaque champ : la dernière calculée, même pendant un
+  // calcul (data-en-cours), sauf après un échec.
+  const empreinteA = $derived(a === null || a.erreur ? null : a.empreinte);
+  const empreinteB = $derived(b === null || b.erreur || autre === '' ? null : b.empreinte);
+
+  // Le côté, le doublon et le défi : seulement avec des empreintes à jour ; sinon,
+  // ceux d'avant. Au départ (et sans JavaScript), ceux du texte de départ.
+  const SANS_EMPREINTE: MessagesDeLAtelier = {
+    cote: '',
+    doublon: messageDoublon(etatDuNettoyage(''), '', null, null),
+    defi: etatDuDefi('', '', null, null),
+  };
+  let derniers: MessagesDeLAtelier = untrack(
+    () => messagesDeLAtelier(etat, brut, texte, autre, a, b) ?? SANS_EMPREINTE,
+  );
+  const messages = $derived.by(() => {
+    const m = messagesDeLAtelier(etat, brut, texte, autre, a, b);
+    if (m !== null) derniers = m;
+    return derniers;
+  });
+  const cote = $derived(messages.cote);
+  const doublon = $derived(messages.doublon);
+  const defi = $derived(messages.defi);
 
   // ---------- Les annonces : seulement quand un verdict change ----------
   let annonce = $state('');
@@ -143,13 +190,14 @@
     annonce = untrack(() => verdict);
   });
 
+  // Le message du doublon change seulement quand ses empreintes sont à jour.
   let annonceDoublon = $state('');
-  let memeAvant: boolean | null = null;
+  let doublonAvant = untrack(() => doublon);
   $effect(() => {
-    const meme = autre !== '' && empreinteA !== null && empreinteB !== null ? empreinteA === empreinteB : null;
-    if (meme === memeAvant) return;
-    memeAvant = meme;
-    annonceDoublon = meme === null ? '' : untrack(() => doublon);
+    const d = doublon;
+    if (d === doublonAvant) return;
+    doublonAvant = d;
+    annonceDoublon = autre === '' ? '' : d;
   });
 
   let annonceDefi = $state('');
@@ -237,9 +285,13 @@
     <p data-test="nt-longueur">{phraseLongueur(etat.longueur)}.</p>
     <p class="jugement"><strong data-test="nt-verdict">{verdict}</strong></p>
     <p>
-      Son empreinte{FINE}: <code data-test="nt-empreinte" data-en-cours={enCoursA ? 'oui' : undefined}
-        >{empreinteA === null ? '' : empreinteA.slice(0, 8)}</code
-      >, les 8 premiers de ses 40 chiffres.
+      {#if a !== null && a.erreur && !enCoursA}
+        Son empreinte{FINE}: <span data-test="nt-empreinte-impossible">{EMPREINTE_IMPOSSIBLE}</span>.
+      {:else}
+        Son empreinte{FINE}: <code data-test="nt-empreinte" data-en-cours={enCoursA ? 'oui' : undefined}
+          >{empreinteA === null ? '' : empreinteA.slice(0, 8)}</code
+        >, les 8 premiers de ses 40 chiffres.
+      {/if}
     </p>
     <p data-test="nt-cote">{cote}</p>
   </div>
@@ -260,7 +312,9 @@
     ></textarea>
   </div>
   <p class="comparaison">
-    {#if autre !== ''}
+    {#if autre !== '' && b !== null && b.erreur && !enCoursB}
+      Son empreinte{FINE}: <span data-test="nt-autre-empreinte-impossible">{EMPREINTE_IMPOSSIBLE}</span>.
+    {:else if autre !== ''}
       Son empreinte{FINE}: <code data-test="nt-autre-empreinte" data-en-cours={enCoursB ? 'oui' : undefined}
         >{empreinteB === null ? '' : empreinteB.slice(0, 8)}</code
       >.

@@ -11,11 +11,13 @@ import { describe, expect, it } from 'vitest';
 import { FICHIERS_PARTIE_1 } from './fichiers';
 import {
   BLANCS_PYTHON,
+  CHIFFRES_DE_LA_CLE,
   coderTexte,
   compterRaisons,
   decoderTexte,
   empreinte,
   empreinteDuTexteNettoye,
+  estUnControleRetire,
   estValidation,
   garderPythonPermissif,
   LONGUEUR_MINIMALE,
@@ -228,5 +230,21 @@ describe('parité', () => {
     const calcul = CALCULS_PARTIE_1.nettoyeur();
     expect(calcul).toBeInstanceOf(Promise);
     expect(await calcul).toStrictEqual(attendus);
+  });
+});
+
+describe('ce que l’atelier du chapitre 1.2 lit du nettoyeur', () => {
+  it('estUnControleRetire dit vrai exactement pour les caractères que normaliser retire', () => {
+    // Tout le premier plan d'Unicode, plus des points de code hors de lui (emoji, U+10FFFF).
+    const points = [...Array.from({ length: 0x10000 }, (_, i) => i), 0x1f600, 0x1f44d, 0x10ffff];
+    for (const point of points) {
+      const c = String.fromCodePoint(point);
+      expect(estUnControleRetire(c), point.toString(16)).toBe(normaliser(`a${c}b`) === 'ab');
+    }
+  });
+
+  it('CHIFFRES_DE_LA_CLE est celui de trier.py', () => {
+    const trier = readFileSync('../projets/1.2-donnees/donnees_pas_a_pas/trier.py', 'utf8');
+    expect(Number(/^CHIFFRES_DE_LA_CLE = (\d+)$/m.exec(trier)?.[1])).toBe(CHIFFRES_DE_LA_CLE);
   });
 });

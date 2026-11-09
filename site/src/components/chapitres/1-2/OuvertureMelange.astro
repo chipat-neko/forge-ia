@@ -1,29 +1,36 @@
 ---
-// L'ouverture du chapitre 1.2 : ce que lit ton IA, en une bande. Les trois
-// sources se partagent sa largeur selon leur part du mélange de forge
-// (MELANGE, donnees.ts, vérifié contre melange.py), puis la légende les
-// nomme, part en tête. Tout est rendu à la construction : la page arrive
-// prête, sans script.
+// L'ouverture du chapitre 1.2 : ce que lit ton IA, en une seule bande. Les
+// trois sources se partagent sa largeur selon leur part du mélange de forge
+// (MELANGE, donnees.ts, vérifié contre melange.py). Sous la bande, chaque
+// source est nommée, avec sa part, à la taille du texte, au bout d'un trait
+// qui descend de son morceau de bande, en escalier : un renvoi par ligne,
+// à gauche du trait pour les morceaux de la moitié droite, à droite sinon.
+// Tout est rendu à la construction : la page arrive prête, sans script.
 //
-// La bande est cachée aux lecteurs d'écran : la liste qui suit dit la même
-// chose, en mots.
+// La bande et les traits sont cachés aux lecteurs d'écran : la liste des
+// renvois dit les mêmes parts, en mots.
 import { pourcent } from '../../../lib/nombres';
 import { MELANGE, NOMS_DES_SOURCES } from '../../../lib/partie-1/donnees';
 import { typographier } from '../../../lib/typo';
 
-/** Ce que chaque source apporte à ton IA, en quelques mots, dans l'ordre du mélange. */
-const SOURCES = {
-  web_fr: { nom: 'de pages web en français', apport: 'la langue de tous les jours' },
-  wikipedia_fr: { nom: 'de Wikipédia en français', apport: 'des faits, rédigés avec soin' },
-  code_python: { nom: 'de code Python', apport: 'de quoi apprendre à coder' },
+/** Le nom de chaque source, tel que le renvoi le dit. */
+const NOMS = {
+  web_fr: 'pages web en français',
+  wikipedia_fr: 'Wikipédia en français',
+  code_python: 'code Python',
 } as const;
 
-const parts = NOMS_DES_SOURCES.map((source) => ({
-  source,
-  part: MELANGE[source],
-  pourcent: pourcent(MELANGE[source]),
-  ...SOURCES[source],
-}));
+// Le trait d'un morceau de la moitié gauche part près de son début (au plus
+// 15 % de la bande plus loin) ; celui d'un morceau de la moitié droite, de
+// son milieu. Les renvois ne se croisent pas : chacun a sa ligne.
+let debut = 0;
+const renvois = NOMS_DES_SOURCES.map((source, rang) => {
+  const part = MELANGE[source];
+  const aDroite = debut > 0.5;
+  const ancre = aDroite ? debut + part / 2 : debut + Math.min(part / 2, 0.15);
+  debut += part;
+  return { source, part, rang, aDroite, ancre: `${(ancre * 100).toFixed(2)}%`, texte: typographier(`${NOMS[source]}, ${pourcent(part)}`) };
+});
 const legende = typographier(
   'La part de chaque source dans les textes de ton IA, comptée en octets. Ce mélange est écrit dans forge, ' +
     'son moteur ; ce chapitre dit où l’on trouve ces textes, ce qu’on a le droit d’en faire, et comment ' +
@@ -33,18 +40,14 @@ const legende = typographier(
 
 <figure class="ouverture-melange" data-test="ouverture">
   <div class="bande" aria-hidden="true">
-    {parts.map((p) => <span class:list={['part', p.source]} style={`flex-grow: ${p.part}`} />)}
+    {renvois.map((r) => <span class:list={['part', r.source]} style={`flex-grow: ${r.part}`} />)}
   </div>
-  <ol class="parts">
+  <ol class="renvois">
     {
-      parts.map((p) => (
-        <li data-source={p.source}>
-          <span class:list={['pastille', p.source]} aria-hidden="true" />
-          <span class="pourcent">{p.pourcent}</span>
-          <span class="nom">
-            {typographier(p.nom)}
-            <span class="apport">{typographier(p.apport)}</span>
-          </span>
+      renvois.map((r) => (
+        <li data-source={r.source} class:list={{ 'a-droite': r.aDroite }} style={`--ancre: ${r.ancre}; --rang: ${r.rang}`}>
+          <span class="trait" aria-hidden="true" />
+          {r.texte}
         </li>
       ))
     }
@@ -55,6 +58,8 @@ const legende = typographier(
 <style>
   .ouverture-melange {
     margin: 0 0 2.2em;
+    --ligne: 1.7em;
+    --ecart: 12px;
   }
 
   /* Une seule bande, partagée à plat : pas de dégradé, pas d'ombre. */
@@ -62,7 +67,6 @@ const legende = typographier(
     display: flex;
     gap: 3px;
     height: 34px;
-    margin-bottom: 14px;
   }
 
   .part {
@@ -82,49 +86,35 @@ const legende = typographier(
     background: var(--teinte-b-trait);
   }
 
-  .parts {
+  /* Les renvois : un par ligne, en escalier, chacun au bout de son trait. */
+  .renvois {
     list-style: none;
     padding: 0;
-    margin: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px 32px;
+    margin: var(--ecart) 0 0;
   }
 
-  .parts li {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
+  .renvois li {
+    position: relative;
+    height: var(--ligne);
+    line-height: var(--ligne);
+    white-space: nowrap;
+    padding-left: calc(var(--ancre) + 10px);
   }
 
-  .pastille {
-    flex: none;
-    width: 12px;
-    height: 12px;
-    border-radius: 2px;
-    /* À mi-hauteur du grand nombre (30 px, 26 sur un téléphone). */
-    align-self: flex-start;
-    margin-top: 9px;
+  .renvois li.a-droite {
+    padding-left: 0;
+    padding-right: calc(100% - var(--ancre) + 10px);
+    text-align: right;
   }
 
-  .pourcent {
-    font-family: var(--titres);
-    font-weight: 700;
-    font-size: 30px;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .nom {
-    font-family: var(--titres);
-    font-size: 16px;
-    line-height: 1.25;
-  }
-
-  .apport {
-    display: block;
-    color: var(--indigo-doux);
-    font-size: 14px;
+  /* Le trait descend du bas de la bande jusqu'au milieu de la ligne de son renvoi. */
+  .trait {
+    position: absolute;
+    left: var(--ancre);
+    top: calc(-1 * (var(--rang) * var(--ligne) + var(--ecart)));
+    height: calc(var(--rang) * var(--ligne) + var(--ecart) + var(--ligne) / 2);
+    width: 1px;
+    background: var(--indigo-doux);
   }
 
   figcaption {
@@ -135,19 +125,6 @@ const legende = typographier(
   @media (max-width: 720px) {
     .bande {
       height: 26px;
-    }
-
-    .parts {
-      flex-direction: column;
-    }
-
-    .pourcent {
-      font-size: 26px;
-      min-width: 2.3em;
-    }
-
-    .pastille {
-      margin-top: 7px;
     }
   }
 </style>
