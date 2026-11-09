@@ -75,11 +75,13 @@ par `git show`.
 ## Ce que montre le chapitre
 
 Le chapitre 1.1 montre le code du projet, tiré des régions balisées par
-`# region: <nom>` et `# fin: <nom>`.
+`# region: <nom>` et `# fin: <nom>` : `compter`, `distribution`, `poids`,
+`generer`, `perplexite` et `test-uniforme`. Les autres régions sont prêtes pour
+les chapitres et le notebook.
 
 | Fichier | Région |
 | --- | --- |
-| `modele_de_langage/ngrammes.py` | `compter`, `distribution`, `poids`, `tirer`, `generer`, `perplexite` |
+| `modele_de_langage/ngrammes.py` | `compter`, `distribution`, `poids`, `tirer`, `generer`, `tirage`, `perplexite` |
 | `tests/test_ngrammes.py` | `test-uniforme` |
 
 ## Ce que contient le paquet
@@ -89,8 +91,10 @@ Le chapitre 1.1 montre le code du projet, tiré des régions balisées par
   ordres de 0 à n), la `distribution` des probabilités avec le lissage de
   Laplace (pour mesurer, jamais pour tirer), les `poids` de chaque température
   (des comptes bruts : un caractère jamais vu a un poids nul), `tirer` au sort,
-  `generer` du texte (il recule d'un ordre quand le contexte est inconnu), la
-  part de contextes jamais vus, et la `perplexite`.
+  `generer` du texte (il recule d'un ordre quand le contexte est inconnu), le
+  `tirage` (ce que `generer` tirerait après un contexte : l'ordre utilisé et la
+  chance de chaque caractère, les barres de l'atelier du chapitre), la part de
+  contextes jamais vus, et la `perplexite`.
 - `extraire.py` : la prose d'un chapitre MDX, et la lecture des chapitres du dépôt.
 - `hasard.py` : un hasard reproductible (SplitMix32).
 - `attendus.py` : les valeurs de référence pour le site.
@@ -108,8 +112,10 @@ identique à l'original.
 Le fichier `tests/attendus.json` contient les résultats du Python : l'alphabet
 du texte, pour chaque n de 0 à 6 les perplexités, la part de contextes jamais
 vus et les dix caractères les plus probables après des contextes de référence,
-des suites écrites à chaque température et avec deux graines, et des cas
-limites (texte vide, un seul caractère, un emoji, un contexte jamais vu).
+des suites écrites à chaque température et avec deux graines, les tirages
+(l'ordre utilisé et les dix caractères les plus probables, pour chaque n,
+chaque température et chaque contexte de référence), et des cas limites (texte
+vide, un seul caractère, un emoji, un contexte jamais vu).
 Le jumeau TypeScript doit retrouver à l'identique tout ce qui n'est pas une
 perplexité. Pour le régénérer :
 

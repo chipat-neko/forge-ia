@@ -1,0 +1,147 @@
+---
+// Le tableau des perplexités du chapitre 1.1 : pour chaque nombre de
+// caractères de contexte (n = 0 à 6), la part des contextes du texte de
+// validation que le modèle n'a jamais vus, puis sa perplexité sur le texte
+// appris et sur le texte jamais lu.
+//
+// Les perplexités sont celles du Python (PERPLEXITES, lues dans les attendus :
+// elles passent par exp et log, que le site ne refait pas). La part des
+// contextes jamais vus est recalculée ici par le jumeau (partJamaisVue), que
+// les attendus du projet vérifient. La ligne du minimum de la validation est
+// marquée (data-minimum), en gras, et la légende dit pourquoi.
+//
+// Un tableau typographié, comme ceux du chapitre 0.2 : des filets, rien d'autre.
+import { nombre, pourcent } from '../../../lib/nombres';
+import { compter, couper, partJamaisVue } from '../../../lib/partie-1/ngrammes';
+import { minimumDesPerplexites } from '../../../lib/partie-1/paris-1-1';
+import type { PerplexiteDOrdre } from '../../../lib/partie-1/texte-1-1';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  /** Le texte du site (TEXTE_DU_SITE). */
+  texte: string;
+  /** Les perplexités du Python (PERPLEXITES). */
+  perplexites: readonly PerplexiteDOrdre[];
+}
+
+const { texte, perplexites } = Astro.props;
+const [entrainement, validation] = couper(texte);
+const minimum = minimumDesPerplexites(perplexites);
+
+/** Une part en pour cent : une décimale sous 10 %, aucune au-delà, et « 0 % » pour rien du tout. */
+function part(f: number): string {
+  if (f === 0) return pourcent(0);
+  return pourcent(f, f < 0.1 ? 1 : 0);
+}
+
+const lignes = perplexites.map((p) => {
+  const [absents, total] = partJamaisVue(compter(entrainement, p.n), validation, p.n);
+  return {
+    n: p.n,
+    minimum: p.n === minimum.n,
+    jamaisVus: part(absents / total),
+    entrainement: nombre(p.entrainement, 1),
+    validation: nombre(p.validation, 1),
+  };
+});
+const legende = typographier(
+  'La perplexité du modèle selon son nombre de caractères de contexte, calculée par le projet (Python). ' +
+    'En gras, la plus basse sur le texte jamais lu.',
+);
+---
+
+<figure class="tableau-perplexites">
+  <figcaption id="legende-perplexites">{legende}</figcaption>
+  <table data-test="perplexites" aria-labelledby="legende-perplexites">
+    <thead>
+      <tr>
+        <th scope="col" class="nombre">{typographier('Contexte')}</th>
+        <th scope="col" class="nombre">{typographier('Contextes jamais vus')}</th>
+        <th scope="col" class="nombre">{typographier('Sur le texte appris')}</th>
+        <th scope="col" class="nombre">{typographier('Sur le texte jamais lu')}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        lignes.map((l) => (
+          <tr data-n={l.n} data-minimum={l.minimum ? '' : undefined}>
+            <th scope="row" class="nombre">{l.n > 1 ? `${l.n} caractères` : `${l.n} caractère`}</th>
+            <td class="nombre">{l.jamaisVus}</td>
+            <td class="nombre">{l.entrainement}</td>
+            <td class="nombre">{l.validation}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</figure>
+
+<style>
+  .tableau-perplexites {
+    margin: 1.1em 0 1.2em;
+  }
+
+  figcaption {
+    margin-bottom: 8px;
+  }
+
+  table {
+    border-collapse: collapse;
+    max-width: 100%;
+  }
+
+  thead th {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1.3;
+    color: var(--indigo-doux);
+    vertical-align: bottom;
+    padding: 0 22px 6px 0;
+    border-bottom: 2px solid var(--indigo);
+  }
+
+  tbody th,
+  td {
+    padding: 5px 22px 5px 0;
+    border-bottom: 1px solid var(--brume);
+  }
+
+  tbody th {
+    font-weight: 400;
+  }
+
+  th:last-child,
+  td:last-child {
+    padding-right: 0;
+  }
+
+  .nombre {
+    text-align: right;
+    font-family: var(--titres);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  thead .nombre {
+    white-space: normal;
+  }
+
+  /* Le minimum de la validation : sa ligne en gras. */
+  [data-minimum] th,
+  [data-minimum] td {
+    font-weight: 700;
+  }
+
+  @media (max-width: 720px) {
+    thead th {
+      font-size: 14px;
+      padding-right: 12px;
+    }
+
+    tbody th,
+    td {
+      padding-right: 12px;
+    }
+  }
+</style>

@@ -185,6 +185,43 @@ def generer(
 # fin: generer
 
 
+# region: tirage
+def tirage(
+    comptes_par_ordre: list[dict[str, Counter[str]]],
+    alphabet: list[str],
+    contexte: str,
+    n: int,
+    temperature: float,
+) -> tuple[int, list[tuple[str, float]]]:
+    """Ce que `generer` tirerait après ce contexte : l'ordre utilisé, puis la chance de chaque caractère.
+
+    Comme `generer`, on recule tant que les k derniers caractères n'ont jamais été vus
+    (k = n, puis n − 1, … jusqu'à 0). La chance d'un caractère est son poids, à cette
+    température, divisé par le total des poids. Seuls les caractères de poids non nul
+    sont rendus, du plus probable au moins probable (à égalité, le plus petit point de
+    code d'abord).
+    """
+    if not alphabet:
+        raise ValueError(MESSAGE_TEXTE_VIDE)
+    fin_du_contexte(contexte, n)  # lève l'erreur si le contexte est trop court
+    suivants = None
+    ordre = n
+    for k in range(n, -1, -1):
+        suivants = comptes_par_ordre[k].get(contexte[len(contexte) - k :])
+        if suivants is not None:
+            ordre = k
+            break
+    if suivants is None:
+        raise ValueError(MESSAGE_TEXTE_VIDE)
+    les_poids = poids(suivants, alphabet, temperature)
+    total = 0.0
+    for p in les_poids:
+        total += p
+    chances = [(c, p / total) for c, p in zip(alphabet, les_poids) if p > 0]
+    return ordre, sorted(chances, key=lambda cp: (-cp[1], cp[0]))
+# fin: tirage
+
+
 def part_jamais_vue(comptes: dict[str, Counter[str]], validation: str, n: int) -> tuple[int, int]:
     """Combien de contextes du texte de validation le modèle n'a jamais vus, et combien il y en a."""
     absents = total = 0

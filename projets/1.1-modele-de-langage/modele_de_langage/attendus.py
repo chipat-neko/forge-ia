@@ -13,9 +13,12 @@ Le fichier contient, dans l'ordre :
   et sur celui de validation, la part de contextes jamais vus, et les dix
   caractères les plus probables après chaque contexte de référence ;
 - `suites` : le texte écrit, pour chaque n, chaque température et deux graines ;
+- `tirages` : pour chaque n, chaque température et chaque contexte de référence,
+  ce que `tirage` rend (l'ordre utilisé après le recul, le nombre de caractères
+  qui ont une chance, et les dix plus probables) : les barres de l'atelier ;
 - `cas_limites` : le texte vide, un seul caractère, un caractère répété, un emoji
   (hors du premier plan d'Unicode), « İ » (dont la minuscule a deux caractères)
-  et des contextes que le texte ne contient pas.
+  et des contextes que le texte ne contient pas, avec leur tirage.
 
 Pour régénérer le fichier (dans projets/1.1-modele-de-langage) :
 
@@ -37,11 +40,12 @@ from modele_de_langage.ngrammes import (
     generer,
     part_jamais_vue,
     perplexite,
+    tirage,
 )
 
 # Les sections qui n'utilisent que des comptes, + − × ÷ et la racine carrée : le même
 # résultat au bit près sur toutes les machines, et dans le navigateur.
-SECTIONS_EXACTES = ("alphabet", "suites", "cas_limites")
+SECTIONS_EXACTES = ("alphabet", "suites", "tirages", "cas_limites")
 # La section `ordres` mêle des valeurs exactes et des perplexités, qui passent par
 # math.exp et math.log : leur dernier chiffre peut changer d'un système à l'autre
 # (voir tests/test_attendus.py). Ces deux clés se comparent à 10^-9 près.
@@ -145,6 +149,30 @@ def calculer_suites() -> list[dict]:
     return suites
 
 
+def calculer_tirages() -> list[dict]:
+    texte = charger_texte()
+    entrainement, validation = couper(texte)
+    lettres = alphabet(texte)
+    contextes = contextes_de_reference(entrainement, validation)
+    comptes = compter_par_ordre(entrainement, ORDRE_MAX)
+    tirages = []
+    for n in range(ORDRE_MAX + 1):
+        for temperature in TEMPERATURES:
+            for contexte in contextes:
+                ordre, chances = tirage(comptes, lettres, contexte, n, temperature)
+                tirages.append(
+                    {
+                        "n": n,
+                        "temperature": temperature,
+                        "contexte": contexte,
+                        "ordre": ordre,
+                        "nombre": len(chances),
+                        "rangs": [[c, p] for c, p in chances[:NB_RANGS]],
+                    }
+                )
+    return tirages
+
+
 def calculer_cas_limites() -> list[dict]:
     cas = []
     for nom, texte, n, contexte in CAS_LIMITES:
@@ -161,6 +189,11 @@ def calculer_cas_limites() -> list[dict]:
             erreur_suite = None
         except ValueError as e:
             suite, erreur_suite = None, str(e)
+        try:
+            ordre, chances = tirage(compter_par_ordre(texte, n), lettres, contexte, n, 1)
+            le_tirage, erreur_tirage = [ordre, [[c, p] for c, p in chances]], None
+        except ValueError as e:
+            le_tirage, erreur_tirage = None, str(e)
         cas.append(
             {
                 "nom": nom,
@@ -174,6 +207,8 @@ def calculer_cas_limites() -> list[dict]:
                 "erreur": erreur,
                 "suite": suite,
                 "erreur_suite": erreur_suite,
+                "tirage": le_tirage,
+                "erreur_tirage": erreur_tirage,
             }
         )
     return cas
@@ -185,6 +220,7 @@ def calculer_attendus() -> dict:
         "alphabet": calculer_alphabet(),
         "ordres": calculer_ordres(),
         "suites": calculer_suites(),
+        "tirages": calculer_tirages(),
         "cas_limites": calculer_cas_limites(),
     }
 

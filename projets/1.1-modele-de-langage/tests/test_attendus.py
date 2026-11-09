@@ -86,7 +86,7 @@ def test_attendus_a_jour():
 
 
 def test_sections_exactes_et_libm():
-    assert SECTIONS_EXACTES == ("alphabet", "suites", "cas_limites")
+    assert SECTIONS_EXACTES == ("alphabet", "suites", "tirages", "cas_limites")
     assert SECTIONS_LIBM == ("ordres",)
     # Chaque section du fichier est dans l'une des deux listes, et une seule.
     assert sorted(lire()) == sorted(SECTIONS_EXACTES + SECTIONS_LIBM)
@@ -139,6 +139,15 @@ def test_contenu_du_fichier():
     assert all(s["suite"].startswith(s["depart"]) and len(s["suite"]) == s["n"] + 120 for s in lu["suites"])
     assert all(s["depart"] == validation[: s["n"]] for s in lu["suites"])
     assert [c["nom"] for c in lu["cas_limites"]] == [nom for nom, *_ in CAS_LIMITES]
+    # Les tirages : chaque ordre, chaque température, chaque contexte de référence.
+    assert len(lu["tirages"]) == (ORDRE_MAX + 1) * len(TEMPERATURES) * 6
+    for t in lu["tirages"]:
+        assert 0 <= t["ordre"] <= t["n"] and 1 <= len(t["rangs"]) <= 10 and len(t["rangs"]) <= t["nombre"]
+    # Le contexte absent recule toujours à l'ordre 0 ; à température 0, un seul caractère a une chance.
+    assert all(t["ordre"] == 0 for t in lu["tirages"] if set(t["contexte"]) == {"¤"})
+    assert all(t["nombre"] == 1 and t["rangs"][0][1] == 1.0 for t in lu["tirages"] if t["temperature"] == 0)
+    # Les cas limites ont aussi leur tirage, ou l'erreur qu'il lève.
+    assert all((c["tirage"] is None) != (c["erreur_tirage"] is None) for c in lu["cas_limites"])
     # Chaque contexte de référence a ses dix premiers rangs.
     assert all(len(d["rangs"]) == 10 for o in lu["ordres"] for d in o["distributions"])
     assert len(entrainement) + len(validation) == len(texte)

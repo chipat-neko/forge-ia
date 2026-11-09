@@ -1,9 +1,10 @@
 ---
-// Récupérer le projet d'un chapitre de la Partie 0 : le passage commun aux
-// chapitres 0.3, 0.4 et 0.5 (revue finale, m10). Le lecteur met à jour le dépôt
-// téléchargé au chapitre 0.1, ou le télécharge, puis entre dans le projet ; un
-// zip, lui, ne se met pas à jour. Les commandes viennent de commandes.ts (M4),
-// et l'entrée dans le projet suit la prop `projet`.
+// Récupérer le projet d'un chapitre : le passage commun aux chapitres 0.3, 0.4
+// et 0.5 (revue finale, m10), puis à ceux de la Partie 1. Le lecteur met à jour
+// le dépôt téléchargé au chapitre 0.1, ou le télécharge, puis entre dans le
+// projet ; un zip, lui, ne se met pas à jour. Les commandes viennent de commandes.ts (M4) :
+// celui de la Partie 0, et celui de la Partie 1 pour l'entrée dans ses projets.
+// L'entrée dans le projet suit la prop `projet`.
 //
 // « Ouvre un nouveau terminal » (revue finale, m11) : au chapitre 0.1, le
 // lecteur ouvre un terminal et y télécharge le dépôt sans changer de dossier.
@@ -23,10 +24,11 @@ import {
   CLONER_DEPOT,
   METTRE_A_JOUR_DEPOT,
 } from '../../lib/partie-0/commandes';
+import { ALLER_AU_PROJET_1_1 } from '../../lib/partie-1/commandes';
 import { typographier } from '../../lib/typo';
 
 interface Props {
-  /** Le dossier du projet, par exemple « 0.4-tenseurs ». */
+  /** Le dossier du projet, par exemple « 0.4-tenseurs » ou « 1.1-modele-de-langage ». */
   projet: string;
   /** La phrase d'avant, propre au chapitre : où est le projet, ce qu'il contient. */
   intro: string;
@@ -39,12 +41,13 @@ const ALLER: Record<string, string> = {
   '0.3-poste': ALLER_AU_PROJET_0_3,
   '0.4-tenseurs': ALLER_AU_PROJET_0_4,
   '0.5-reseau': ALLER_AU_PROJET_0_5,
+  '1.1-modele-de-langage': ALLER_AU_PROJET_1_1,
 };
 const aller = ALLER[projet];
 if (aller === undefined) {
   throw new Error(
     `RecupererProjet : projet « ${projet} » inconnu. Ajoute sa commande d'entrée (ALLER_AU_PROJET_…, dans ` +
-      'src/lib/partie-0/commandes.ts) à la table ALLER de ce composant.',
+      'src/lib/partie-0/commandes.ts ou src/lib/partie-1/commandes.ts) à la table ALLER de ce composant.',
   );
 }
 const miseAJour = typographier(

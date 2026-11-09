@@ -35,7 +35,9 @@ import {
   couper,
   distribution,
   generer,
+  ORDRE_MAX,
   partJamaisVue,
+  tirage,
   type Comptes,
 } from './ngrammes';
 import { TEXTE_DU_SITE } from './texte-1-1';
@@ -54,6 +56,7 @@ interface EntreesCasLimite {
 export interface EntreesNgrammes {
   ordres: { n: number; distributions: { contexte: string }[] }[];
   suites: { n: number; temperature: number; graine: number; depart: string; longueur: number }[];
+  tirages: { n: number; temperature: number; contexte: string }[];
   cas_limites: EntreesCasLimite[];
 }
 
@@ -73,9 +76,9 @@ function comptesEnPaires(comptes: Comptes): [string, [string, number][]][] {
 }
 
 /**
- * Les sections alphabet, ordres (sans les perplexités), suites et cas_limites
- * du fichier des n-grammes, refaites à partir de ses seules entrées et du texte
- * du site.
+ * Les sections alphabet, ordres (sans les perplexités), suites, tirages et
+ * cas_limites du fichier des n-grammes, refaites à partir de ses seules
+ * entrées et du texte du site.
  */
 export function refaireNgrammes(texte: string, entrees: EntreesNgrammes): Attendus {
   const [entrainement, validation] = couper(texte);
@@ -89,6 +92,8 @@ export function refaireNgrammes(texte: string, entrees: EntreesNgrammes): Attend
     }
     return comptes;
   };
+  // Les comptes de tous les ordres, pour les tirages : calculés une fois, au premier tirage.
+  let tousLesOrdres: Comptes[] | null = null;
   return {
     alphabet: lettres,
     ordres: entrees.ordres.map(({ n, distributions }) => {
@@ -110,6 +115,11 @@ export function refaireNgrammes(texte: string, entrees: EntreesNgrammes): Attend
       longueur,
       suite: generer(compterParOrdre(entrainement, n), lettres, n, depart, longueur, temperature, graine),
     })),
+    tirages: entrees.tirages.map(({ n, temperature, contexte }) => {
+      tousLesOrdres ??= compterParOrdre(entrainement, ORDRE_MAX);
+      const [ordre, chances] = tirage(tousLesOrdres, lettres, contexte, n, temperature);
+      return { n, temperature, contexte, ordre, nombre: chances.length, rangs: chances.slice(0, 10) };
+    }),
     cas_limites: entrees.cas_limites.map(({ nom, texte: texteDuCas, n, contexte }) => {
       const [apprendre, verifier] = couper(texteDuCas);
       const lettresDuCas = alphabet(texteDuCas);
@@ -121,6 +131,10 @@ export function refaireNgrammes(texte: string, entrees: EntreesNgrammes): Attend
       });
       const erreurSuite = messageDe(() => {
         suite = generer(compterParOrdre(texteDuCas, n), lettresDuCas, n, contexte, 8, 1, 0);
+      });
+      let leTirage: [number, [string, number][]] | null = null;
+      const erreurTirage = messageDe(() => {
+        leTirage = tirage(compterParOrdre(texteDuCas, n), lettresDuCas, contexte, n, 1);
       });
       return {
         nom,
@@ -134,6 +148,8 @@ export function refaireNgrammes(texte: string, entrees: EntreesNgrammes): Attend
         erreur,
         suite,
         erreur_suite: erreurSuite,
+        tirage: leTirage,
+        erreur_tirage: erreurTirage,
       };
     }),
   };

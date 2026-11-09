@@ -24,6 +24,7 @@ import {
   partJamaisVue,
   poids,
   TEMPERATURES,
+  tirage,
   tirer,
   tourneEnRond,
 } from './ngrammes';
@@ -40,6 +41,7 @@ interface AttendusNgrammes extends EntreesNgrammes {
     distributions: { contexte: string; rangs: [string, number][] }[];
   }[];
   suites: { n: number; temperature: number; graine: number; depart: string; longueur: number; suite: string }[];
+  tirages: { n: number; temperature: number; contexte: string; ordre: number; nombre: number; rangs: [string, number][] }[];
   cas_limites: {
     nom: string;
     texte: string;
@@ -52,6 +54,8 @@ interface AttendusNgrammes extends EntreesNgrammes {
     erreur: string | null;
     suite: string | null;
     erreur_suite: string | null;
+    tirage: [number, [string, number][]] | null;
+    erreur_tirage: string | null;
   }[];
 }
 
@@ -110,6 +114,18 @@ describe('jumeau du Python : les attendus partagés de 1.1', () => {
     }
   });
 
+  it('tirages : l’ordre utilisé et les chances de chaque caractère, pour chaque ordre, température et contexte', () => {
+    const comptes = compterParOrdre(entrainement, ORDRE_MAX);
+    expect(ATTENDUS.tirages).toHaveLength((ORDRE_MAX + 1) * TEMPERATURES.length * 6);
+    for (const t of ATTENDUS.tirages) {
+      const [ordre, chances] = tirage(comptes, lettres, t.contexte, t.n, t.temperature);
+      const nom = `n = ${t.n}, T = ${t.temperature}, contexte ${JSON.stringify(t.contexte)}`;
+      expect(ordre, nom).toBe(t.ordre);
+      expect(chances, nom).toHaveLength(t.nombre);
+      expect(chances.slice(0, 10), nom).toStrictEqual(t.rangs);
+    }
+  });
+
   it('cas limites : texte vide, un caractère, un emoji, « İ », contextes jamais vus ou trop courts', () => {
     expect(ATTENDUS.cas_limites.map((c) => c.nom)).toHaveLength(8);
     for (const c of ATTENDUS.cas_limites) {
@@ -130,6 +146,12 @@ describe('jumeau du Python : les attendus partagés de 1.1', () => {
       });
       expect(suite, c.nom).toBe(c.suite);
       expect(erreurSuite, c.nom).toBe(c.erreur_suite);
+      let leTirage: [number, [string, number][]] | null = null;
+      const erreurTirage = messageDErreur(() => {
+        leTirage = tirage(compterParOrdre(c.texte, c.n), lettresDuCas, c.contexte, c.n, 1);
+      });
+      expect(leTirage, c.nom).toStrictEqual(c.tirage);
+      expect(erreurTirage, c.nom).toBe(c.erreur_tirage);
     }
   });
 
@@ -225,6 +247,41 @@ describe('les mêmes exemples que les tests du Python', () => {
     // « zz » est inconnu aux ordres 2 et 1 : le modèle recule à l'ordre 0.
     expect(new Set(Array.from(generer(c, ['a', 'b', 'z'], 2, 'zz', 20, 1, 0)))).toStrictEqual(new Set(['z', 'a', 'b']));
     expect(generer(c, ['a', 'b', 'z'], 2, 'ab', 20, 1, 0)).not.toContain('z');
+  });
+
+  it('tirage recule comme generer', () => {
+    const c = compterParOrdre('abab', 2);
+    // « ab » est connu à l'ordre 2 : seul « a » l'a suivi.
+    expect(tirage(c, ['a', 'b', 'z'], 'ab', 2, 1)).toStrictEqual([2, [['a', 1]]]);
+    // « zb » est inconnu à l'ordre 2, mais « b » est connu à l'ordre 1.
+    expect(tirage(c, ['a', 'b', 'z'], 'zb', 2, 1)).toStrictEqual([1, [['a', 1]]]);
+    // « zz » est inconnu aux ordres 2 et 1 : l'ordre 0, toujours connu ; « z » n'y a aucun poids.
+    expect(tirage(c, ['a', 'b', 'z'], 'zz', 2, 1)).toStrictEqual([
+      0,
+      [
+        ['a', 0.5],
+        ['b', 0.5],
+      ],
+    ]);
+  });
+
+  it('tirage aux quatre températures', () => {
+    const c = compterParOrdre('aab', 0);
+    const lettres = ['a', 'b', 'c'];
+    expect(tirage(c, lettres, '', 0, 1)).toStrictEqual([0, [['a', 2 / 3], ['b', 1 / 3]]]);
+    expect(tirage(c, lettres, '', 0, 0.5)).toStrictEqual([0, [['a', 4 / 5], ['b', 1 / 5]]]);
+    const racine = Math.sqrt(2);
+    expect(tirage(c, lettres, '', 0, 2)).toStrictEqual([0, [['a', racine / (0.0 + racine + 1)], ['b', 1 / (0.0 + racine + 1)]]]);
+    expect(tirage(c, lettres, '', 0, 0)).toStrictEqual([0, [['a', 1]]]);
+  });
+
+  it('tirage : contexte trop court, texte vide, température inconnue', () => {
+    const c = compterParOrdre('abab', 2);
+    expect(() => tirage(c, ['a', 'b'], 'a', 2, 1)).toThrow(MESSAGE_CONTEXTE_COURT);
+    expect(() => tirage([new Map()], [], '', 0, 1)).toThrow(MESSAGE_TEXTE_VIDE);
+    expect(() => tirage(c, ['a', 'b'], 'ab', 2, 3)).toThrow(MESSAGE_TEMPERATURE);
+    // Un emoji compte pour un caractère de contexte.
+    expect(tirage(compterParOrdre('😀a😀b', 1), ['a', 'b', '😀'], 'x😀', 1, 1)).toStrictEqual([1, [['a', 0.5], ['b', 0.5]]]);
   });
 
   it('les points de code, pas les unités UTF-16', () => {

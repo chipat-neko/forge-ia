@@ -1,0 +1,171 @@
+---
+// L'ouverture du chapitre 1.1 : « Le forgeron frappe », puis, en éventail
+// après sa dernière lettre, les cinq caractères que le modèle du chapitre juge
+// les plus probables, avec leur probabilité. Tout est calculé à la
+// construction par le jumeau du Python (ouvertureDuChapitre, dans
+// paris-1-1.ts) : la page arrive prête, sans script.
+//
+// L'éventail est caché aux lecteurs d'écran (des lettres isolées et des
+// pourcentages s'écoutent mal) : la légende dit la même chose en une phrase.
+import { pourcent } from '../../../lib/nombres';
+import { nomDuBlanc, ouvertureDuChapitre, unBlanc, visible } from '../../../lib/partie-1/paris-1-1';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  /** Le texte du site (TEXTE_DU_SITE). */
+  texte: string;
+}
+
+const { texte } = Astro.props;
+const { contexte, regarde, suites, reste, autres } = ouvertureDuChapitre(texte);
+const points = Array.from(contexte);
+const avant = points.slice(0, points.length - Array.from(regarde).length).join('');
+
+/** « une espace (41 %) », ou « « s » (15 %) » : un caractère et sa chance, dits en mots. */
+function enMots([c, p]: [string, number]): string {
+  const nom = nomDuBlanc(c);
+  const qui = nom === null ? `« ${c} »` : unBlanc(nom);
+  return `${qui} (${pourcent(p)})`;
+}
+
+const liste = suites.map(enMots);
+const dernier = liste.pop();
+const legende = typographier(
+  `Après « ${contexte} », les ${suites.length} caractères les plus probables selon le modèle de ce chapitre, ` +
+    `qui ne regarde ici que la dernière lettre, « ${regarde} » : ${liste.join(', ')} et ${dernier}.`,
+);
+const constat = typographier(
+  `Les ${autres} autres caractères se partagent les ${pourcent(reste)} qui restent. Ces nombres, le modèle les a ` +
+    `trouvés en comptant ce qui suit chaque « ${regarde} » dans le texte de ce site. Il ne sait rien faire d’autre, ` +
+    'et c’est déjà un modèle de langage : à la fin de ce chapitre, tu sauras ce que lui apporte un plus long regard ' +
+    'en arrière, et où il bute.',
+);
+---
+
+<figure class="ouverture-suite" data-test="ouverture">
+  <div class="eventail" aria-hidden="true">
+    <p class="debut">{avant}<span class="regarde">{regarde}</span></p>
+    <ol class="suites">
+      {
+        suites.map(([c, p]) => (
+          <li data-caractere={c}>
+            <span class:list={['car', { blanc: nomDuBlanc(c) !== null }]}>{visible(c)}</span>
+            <span class="piste">
+              <span class="barre" style={`width: ${(p * 100).toFixed(2)}%`} />
+            </span>
+            <span class="chance">{pourcent(p)}</span>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+  <figcaption>{legende}</figcaption>
+  <p class="constat">{constat}</p>
+</figure>
+
+<style>
+  .ouverture-suite {
+    margin: 40px 0 0;
+  }
+
+  /* La phrase, puis l'éventail de ses suites possibles, collé à sa dernière lettre. */
+  .eventail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0 6px;
+    font-size: 34px;
+    line-height: 1.2;
+    font-variation-settings: 'opsz' 48;
+  }
+
+  .debut {
+    margin: 0;
+    padding-top: 4px;
+  }
+
+  /* La lettre que le modèle regarde : soulignée, comme les morceaux découpés de 1.3. */
+  .regarde {
+    border-bottom: 3px solid var(--teinte-a-trait);
+  }
+
+  .suites {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: auto 6em auto;
+    align-items: baseline;
+    column-gap: 12px;
+  }
+
+  .suites li {
+    display: contents;
+  }
+
+  .car {
+    padding: 0 6px;
+    background: var(--teinte-a);
+    border-radius: 4px;
+    text-align: center;
+  }
+
+  .suites li:nth-child(even) .car {
+    background: var(--teinte-b);
+  }
+
+  /* Les blancs se voient (« ␣ »), plus discrètement que les lettres. */
+  .car.blanc {
+    color: var(--indigo-doux);
+  }
+
+  /* Les suites moins probables s'effacent un peu : la première est celle qu'on lit. */
+  .suites li:not(:first-child) .car {
+    font-size: 0.72em;
+  }
+
+  .piste {
+    align-self: center;
+    height: 10px;
+    background: var(--brume-claire);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .barre {
+    display: block;
+    height: 100%;
+    background: var(--indigo-doux);
+  }
+
+  .chance {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 17px;
+    font-variant-numeric: tabular-nums;
+    color: var(--indigo-doux);
+    text-align: right;
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 15px;
+    color: var(--indigo-doux);
+    margin-top: 10px;
+  }
+
+  .constat {
+    margin: 18px 0 0;
+  }
+
+  @media (max-width: 720px) {
+    .eventail {
+      font-size: 26px;
+    }
+
+    .suites {
+      grid-template-columns: auto 4em auto;
+      column-gap: 8px;
+    }
+  }
+</style>

@@ -192,6 +192,44 @@ export function generer(
   return texte.join('');
 }
 
+/**
+ * Ce que generer tirerait après ce contexte : l'ordre utilisé, puis la chance
+ * de chaque caractère. Comme generer, on recule tant que les k derniers
+ * caractères n'ont jamais été vus (k = n, puis n − 1, … jusqu'à 0). La chance
+ * d'un caractère est son poids, à cette température, divisé par le total des
+ * poids. Seuls les caractères de poids non nul sont rendus, du plus probable au
+ * moins probable (à égalité, le plus petit point de code d'abord).
+ */
+export function tirage(
+  comptesParOrdre: readonly ReadonlyMap<string, ReadonlyMap<string, number>>[],
+  lettres: readonly string[],
+  contexte: string,
+  n: number,
+  temperature: number,
+): [number, [string, number][]] {
+  if (lettres.length === 0) throw new RangeError(MESSAGE_TEXTE_VIDE);
+  finDuContexte(contexte, n); // lève l'erreur si le contexte est trop court
+  const points = Array.from(contexte);
+  let suivants: ReadonlyMap<string, number> | undefined;
+  let ordre = n;
+  for (let k = n; k >= 0; k--) {
+    suivants = comptesParOrdre[k].get(points.slice(points.length - k).join(''));
+    if (suivants !== undefined) {
+      ordre = k;
+      break;
+    }
+  }
+  if (suivants === undefined) throw new RangeError(MESSAGE_TEXTE_VIDE);
+  const lesPoids = poids(suivants, lettres, temperature);
+  let total = 0.0;
+  for (const p of lesPoids) total += p;
+  const chances: [string, number][] = [];
+  lettres.forEach((c, i) => {
+    if (lesPoids[i] > 0) chances.push([c, lesPoids[i] / total]);
+  });
+  return [ordre, chances.sort((a, b) => (a[1] > b[1] ? -1 : a[1] < b[1] ? 1 : comparerPointsDeCode(a[0], b[0])))];
+}
+
 /** Combien de contextes du texte de validation le modèle n'a jamais vus, et combien il y en a. */
 export function partJamaisVue(
   comptes: ReadonlyMap<string, ReadonlyMap<string, number>>,

@@ -1,0 +1,507 @@
+---
+partie: 1
+numero: "1.1"
+titre: "Ce qu'est vraiment un modèle de langage"
+chapeau: "Un modèle de langage devine la suite d'un texte, un morceau à la fois. Tu en construis un ici, le plus simple qui soit : il compte les caractères du texte de ce site, puis il écrit en tirant au sort. Tu verras ce qu'il réussit, et où il bute."
+programme: "9 étapes, 4 paris, environ 30 minutes."
+acquis:
+  - cle: distribution
+    texte: "Un modèle de langage donne une probabilité à chaque suite possible."
+    ou: "à l'étape 2"
+  - cle: temperature
+    texte: "La température règle l'audace du tirage."
+    ou: "à l'étape 3"
+  - cle: atelier
+    texte: "Le contexte choisit la distribution."
+    ou: "à l'étape 4, en changeant le nombre jaune"
+  - cle: contexte
+    texte: "Plus de contexte, plus de cas jamais vus."
+    ou: "à l'étape 5"
+  - cle: perplexite
+    texte: "La perplexité mesure la surprise sur un texte jamais lu."
+    ou: "à l'étape 7"
+---
+
+import AtelierModeleDeLangage from '../../components/chapitres/1-1/AtelierModeleDeLangage.svelte';
+import OuvertureSuite from '../../components/chapitres/1-1/OuvertureSuite.astro';
+import TableauPerplexites from '../../components/chapitres/1-1/TableauPerplexites.astro';
+import BlocCommande from '../../components/gabarit/BlocCommande.astro';
+import RecupererProjet from '../../components/gabarit/RecupererProjet.astro';
+import { modelePublic } from '../../lib/calculateur/donnees';
+import { formaterQuantite } from '../../lib/calculateur/formats';
+import { PRESETS_FORGE } from '../../lib/calculateur/ton-ia';
+import { chapitresParus } from '../../lib/chapitres-parus';
+import { exigeur } from '../../lib/exiger';
+import { nombre, pourcent } from '../../lib/nombres';
+import { hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
+import { LANCER_TESTS } from '../../lib/partie-0/commandes';
+import { MODELE_SUITE } from '../../lib/partie-1/commandes';
+import { compter, compterParOrdre, couper, generer, partJamaisVue, tourneEnRond } from '../../lib/partie-1/ngrammes';
+import {
+  blancsDuPariSuivant,
+  choixContexte,
+  choixPerplexite,
+  choixSuivant,
+  choixTemperature,
+  CONTEXTE_INITIAL,
+  faitsDuPariContexte,
+  faitsDuPariSuivant,
+  GRAINE_INITIALE,
+  LONGUEUR_SUITE,
+  minimumDesPerplexites,
+  N_DU_PARI,
+  N_INITIAL,
+  N_MAX,
+  N_OUVERTURE,
+  NS_DU_PARI_PERPLEXITE,
+  suiteDuPariTemperature,
+  TEMPERATURE_INITIALE,
+} from '../../lib/partie-1/paris-1-1';
+import { ALPHABET, PERPLEXITES, TEXTE_DU_SITE } from '../../lib/partie-1/texte-1-1';
+import { typographier } from '../../lib/typo';
+
+export const exiger = exigeur('le texte du chapitre 1.1 (1-1.mdx)');
+
+export const DECOUPE = couper(TEXTE_DU_SITE);
+
+export const TEXTE = {
+  // Les longueurs du texte du site et de ses deux parts, en caractères (points de code, comme Python).
+  caracteres: nombre(Array.from(TEXTE_DU_SITE).length),
+  entrainement: nombre(Array.from(DECOUPE[0]).length),
+  validation: nombre(Array.from(DECOUPE[1]).length),
+  v: nombre(ALPHABET.length),
+  lien01: hrefChapitre('0.1'),
+  lien02: hrefChapitre('0.2'),
+  lien13: hrefChapitre('1.3'),
+};
+
+export const APRES_E = (() => {
+  // L'étape 2 explique l'ouverture : ce qui suit « e » dans le texte d'apprentissage, compté, puis lissé.
+  const regarde = Array.from(CONTEXTE_INITIAL).slice(-N_OUVERTURE).join('');
+  const suivants = compter(DECOUPE[0], N_OUVERTURE).get(regarde);
+  exiger(suivants !== undefined, `« ${regarde} » n’apparaît plus dans le texte d’apprentissage : l’étape 2 en compte les suivants`);
+  let total = 0;
+  for (const k of suivants.values()) total += k;
+  const espace = suivants.get(' ') ?? 0;
+  const tries = [...suivants].sort((a, b) => b[1] - a[1]);
+  exiger(tries[0][0] === ' ' && tries[1][0] === 's', `après « ${regarde} », l’espace puis « s » ne sont plus en tête : l’étape 2 est à revoir`);
+  return {
+    regarde,
+    total: nombre(total),
+    espace: nombre(espace),
+    s: nombre(suivants.get('s')),
+    differents: nombre(suivants.size),
+    pEspace: pourcent((espace + 1) / (total + ALPHABET.length)),
+  };
+})();
+
+export const SUIVANT = (() => {
+  // Le pari « suivant » : ce qui suit « ton I », compté puis lissé.
+  const f = faitsDuPariSuivant(TEXTE_DU_SITE);
+  exiger(
+    f.suivants.length === 1,
+    `« ${f.contexte} » est suivi de ${f.suivants.length} caractères différents : « et de rien d’autre » (pari « suivant ») est à revoir`,
+  );
+  exiger(`${f.contexte}${f.premier[0]}` === 'ton IA', 'le pari « suivant » ne porte plus sur « ton IA » : sa question et son explication sont à revoir');
+  const fois = f.suivants[0][1];
+  return {
+    contexte: f.contexte,
+    premier: f.premier[0],
+    fois: nombre(fois),
+    plusUn: nombre(fois + 1),
+    denominateur: nombre(f.total + f.v),
+    v: nombre(f.v),
+    autres: nombre(f.v - 1),
+    p: pourcent(f.premier[1], 1),
+    pAutre: pourcent(f.deuxieme[1], 1),
+    precision: [`Le modèle regarde les ${N_DU_PARI} derniers caractères.`, blancsDuPariSuivant(TEXTE_DU_SITE)].filter(Boolean).join(' '),
+  };
+})();
+
+export const BOUCLE = (() => {
+  // Le pari « temperature » : la suite écrite à température 0, qui tourne en rond.
+  const suite = suiteDuPariTemperature(TEXTE_DU_SITE);
+  exiger(tourneEnRond(suite), 'à température 0, la suite du pari « temperature » ne tourne plus en rond : son explication est à revoir');
+  // Un extrait d'une centaine de caractères, coupé à une espace.
+  const debut = Array.from(suite).slice(0, 110).join('');
+  return { extrait: `${debut.slice(0, debut.lastIndexOf(' '))}…`, n: N_INITIAL, longueur: nombre(LONGUEUR_SUITE) };
+})();
+
+export const MOTS = (() => {
+  // Ce que montre l'atelier à l'arrivée (mêmes réglages : contexte, température 1, graine 0) : la part des
+  // mots de la suite, de deux lettres ou plus, qui existent dans le texte d'apprentissage. Avec 4 caractères
+  // de contexte, avec 1, et avec le n du minimum de la perplexité (étape 7).
+  const comptes = compterParOrdre(DECOUPE[0], N_INITIAL);
+  const connus = new Set(DECOUPE[0].toLowerCase().match(/\p{L}{2,}/gu));
+  const part = (n) => {
+    const suite = generer(comptes, ALPHABET, n, CONTEXTE_INITIAL, LONGUEUR_SUITE, TEMPERATURE_INITIALE, GRAINE_INITIALE);
+    const mots = suite.slice(CONTEXTE_INITIAL.length).toLowerCase().match(/\p{L}{2,}/gu) ?? [];
+    return mots.filter((m) => connus.has(m)).length / mots.length;
+  };
+  const nMin = minimumDesPerplexites(PERPLEXITES).n;
+  const avecN = part(N_INITIAL);
+  const avecUn = part(1);
+  const avecMin = part(nMin);
+  exiger(
+    avecN >= 0.75 && avecUn <= 0.5 && nMin < N_INITIAL && avecMin < avecN,
+    `${pourcent(avecN)} des mots de la suite à n = ${N_INITIAL} existent, ${pourcent(avecUn)} à n = 1 et ${pourcent(avecMin)} ` +
+      `à n = ${nMin} : les étapes 4 et 7 sont à revoir`,
+  );
+  return { n: N_INITIAL, avecN: pourcent(avecN), avecUn: pourcent(avecUn), nMin, avecMin: pourcent(avecMin) };
+})();
+
+export const APPE = (() => {
+  // La note de l'étape 4 : d'où viennent les 4 dernières lettres de « Le forgeron frappe » dans le texte d'apprentissage.
+  const fin = Array.from(CONTEXTE_INITIAL).slice(-N_INITIAL).join('');
+  const mots = new Map();
+  for (const [m] of DECOUPE[0].toLowerCase().matchAll(/\p{L}+/gu)) if (m.includes(fin)) mots.set(m, (mots.get(m) ?? 0) + 1);
+  const tries = [...mots].sort((a, b) => b[1] - a[1]);
+  let total = 0;
+  for (const [, k] of tries) total += k;
+  exiger(
+    tries.length > 0 && tries[0][0] === 'appelle' && 2 * tries[0][1] > total,
+    `« ${fin} » ne vient plus surtout d’« appelle » dans le texte d’apprentissage : la note de l’étape 4 est à revoir`,
+  );
+  return { fin, fois: nombre(tries[0][1]), total: nombre(total) };
+})();
+
+export const RARETE = (() => {
+  // Le pari « contexte » et l'étape 5 : la part des contextes jamais vus, selon n.
+  const f = faitsDuPariContexte(TEXTE_DU_SITE);
+  const [entrainement, validation] = DECOUPE;
+  const partDe = (n) => {
+    const [absents, total] = partJamaisVue(compter(entrainement, n), validation, n);
+    return absents / total;
+  };
+  const p2 = partDe(2);
+  const p4 = partDe(4);
+  const p6 = f.absents / f.total;
+  exiger(p2 < p4 && p4 < p6, 'la part des contextes jamais vus ne croît plus avec n : l’étape 5 est à revoir');
+  exiger(Math.round(1 / p6) === 3, `à n = ${f.n}, ${pourcent(p6)} des contextes sont jamais vus : « près d’un sur trois » est à revoir`);
+  const possibles = f.v ** f.n;
+  exiger(possibles > 1000 * f.differents, 'les contextes possibles ne sont plus mille fois plus nombreux que ceux du texte : l’étape 5 est à revoir');
+  return {
+    n: f.n,
+    absents: nombre(f.absents),
+    total: nombre(f.total),
+    part: pourcent(p6),
+    p2: pourcent(p2),
+    p4: pourcent(p4),
+    differents: nombre(f.differents),
+    possibles: formaterQuantite(possibles),
+    v: nombre(f.v),
+  };
+})();
+
+export const PERPLEXITE = (() => {
+  // L'étape 7 : le minimum de la perplexité de validation, et ce que font les deux courbes autour de lui.
+  const { n, valeur } = minimumDesPerplexites(PERPLEXITES);
+  const descendPuisMonte = (cle) =>
+    PERPLEXITES.every((p, i) => i === 0 || (p.n <= n ? p[cle] < PERPLEXITES[i - 1][cle] : p[cle] > PERPLEXITES[i - 1][cle]));
+  exiger(descendPuisMonte('validation'), `la perplexité de validation ne descend plus jusqu’à n = ${n} puis ne remonte plus à chaque caractère de plus`);
+  exiger(descendPuisMonte('entrainement'), `la perplexité sur le texte appris n’a plus son minimum à n = ${n} : « remonte aussi » (étape 7) est à revoir`);
+  const derniere = PERPLEXITES.at(-1);
+  const de = (k) => nombre(PERPLEXITES.find((p) => p.n === k).validation, 1);
+  // La rareté des longs contextes, qui fait remonter la perplexité même sur le texte appris.
+  const longs = compter(DECOUPE[0], derniere.n);
+  let rares = 0;
+  for (const suivants of longs.values()) {
+    let total = 0;
+    for (const k of suivants.values()) total += k;
+    if (total <= 2) rares += 1;
+  }
+  exiger(rares / longs.size > 0.5, 'les contextes de 6 caractères vus une ou deux fois ne sont plus la majorité : l’étape 7 est à revoir');
+  return {
+    n,
+    valeur: nombre(valeur, 1),
+    nFin: derniere.n,
+    fin: nombre(derniere.validation, 1),
+    pari: NS_DU_PARI_PERPLEXITE.map((k) => ({ n: k, valeur: de(k) })),
+    rares: pourcent(rares / longs.size),
+    v: nombre(ALPHABET.length),
+  };
+})();
+
+export const LABO = (() => {
+  // GPT-3 et Llama 3 405B (modèles publics du calculateur, sourcés), face au modèle du chapitre.
+  const gpt3 = modelePublic('gpt-3-175b');
+  const llama = modelePublic('llama-3-405b');
+  const vers = (s) => ({ titre: s.titre, url: s.url, verifieLe: s.releveLe });
+  const forme = (m) => ({ contexte: nombre(m.contexte), vocabulaire: nombre(m.vocabulaire), jetons: formaterQuantite(m.jetonsOrigine) });
+  return {
+    gpt3: forme(gpt3),
+    llama: forme(llama),
+    tonIA: nombre(PRESETS_FORGE.tres_grand.contexte),
+    // GPT-2 en dernier : le vocabulaire de GPT-3 vient de son article (note du calculateur).
+    sources: [vers(gpt3.source), vers(llama.source), ...(gpt3.autresSources ?? []).map(vers)],
+  };
+})();
+
+export const PARUS = await chapitresParus();
+
+export const SUITE = (() => {
+  // L'« À suivre » : le chapitre 1.2. Tant qu'il n'a pas paru, la phrase le dit, et renvoie au premier
+  // chapitre paru de la Partie 1 après lui, par un lien : un lien ne vise qu'un chapitre paru.
+  const paru = (numero) => PARUS.has(numero);
+  const { partie, chapitre } = trouverChapitre('1.2');
+  const ouvert = paru(chapitre.numero) ? null : partie.chapitres.find((c) => c.numero !== '1.1' && paru(c.numero));
+  return {
+    titre: typographier(`« ${titreCourt(chapitre.titre)} »`),
+    lienSuite: paru(chapitre.numero) ? hrefChapitre(chapitre.numero) : null,
+    avant: paru(chapitre.numero) ? '' : typographier(ouvert ? ' Ce chapitre n\'a pas encore paru ; tu peux déjà lire ' : ' Ce chapitre n\'a pas encore paru.'),
+    lien: ouvert ? { href: hrefChapitre(ouvert.numero), texte: typographier(`le chapitre ${ouvert.numero}, « ${titreCourt(ouvert.titre)} »`) } : null,
+  };
+})();
+
+<OuvertureSuite texte={TEXTE_DU_SITE} />
+
+<Etape numero={1} titre="Prédire la suite">
+
+Au <a href={TEXTE.lien01}>chapitre 0.1</a>, ton programme devinait le mot suivant : il comptait, dans un texte, quel mot suit chaque mot, puis prenait toujours le plus fréquent, sans hasard. Il finissait par tourner en rond.
+
+Un modèle de langage fait le même travail, autrement : au lieu d'un seul gagnant, il donne une probabilité à chaque suite possible. Pour écrire, il tire la suite au sort selon ces probabilités, l'ajoute au texte, et recommence. Les grands modèles qui répondent dans une conversation ne font rien d'autre, un morceau après l'autre.
+
+Ce chapitre en construit un, le plus simple qui soit. Il travaille caractère par caractère, et ne regarde que les quelques caractères qui précèdent : leur groupe s'appelle le contexte. Pour apprendre, il lui faut un livre. Le sien, c'est ce site : la prose des chapitres 0.1 à 0.5 et 1.3, soit {TEXTE.caracteres} caractères.
+
+<Fragment slot="note">
+
+Des chapitres, il ne reste que les phrases : les blocs de code, les calculs de la page et les balises des composants sont retirés. Le texte est figé, pris tel qu'il était à un moment donné : il ne change pas quand les chapitres changent.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={2} titre="Des probabilités, jamais zéro">
+
+Le modèle commence par compter. Pour chaque contexte de n caractères du texte, il note quels caractères le suivent, et combien de fois :
+
+<CodeExplique fichier="projets/1.1-modele-de-langage/modele_de_langage/ngrammes.py" region="compter">
+  <li data-lignes="1">`compter` reçoit le texte et n, la longueur du contexte. Elle rend un dictionnaire : à chaque contexte, un `Counter` de ses suivants, comme au chapitre 0.1.</li>
+  <li data-lignes="7-8">`i` parcourt le texte, et `texte[i - n : i]`, une tranche, prend les n caractères qui précèdent le caractère `i`.</li>
+  <li data-lignes="9-10">Un contexte encore jamais vu reçoit un `Counter` vide.</li>
+  <li data-lignes="11">On ajoute 1 au compte du caractère qui suit ce contexte.</li>
+</CodeExplique>
+
+Avec n = {N_OUVERTURE}, le contexte est un seul caractère. Dans le texte d'apprentissage, « {APRES_E.regarde} » est suivi {APRES_E.total} fois d'un caractère : {APRES_E.espace} fois d'une espace, {APRES_E.s} fois d'un « s », et ainsi de suite, {APRES_E.differents} caractères différents en tout.
+
+Pour passer des comptes aux probabilités, il suffit de diviser par le total. Mais un caractère jamais vu après ce contexte aurait alors une probabilité de zéro : le modèle le jugerait impossible. À l'étape 7, on mesurera sa surprise par −ln de la chance qu'il donnait au bon caractère, comme l'erreur du <a href={TEXTE.lien02}>chapitre 0.2</a>. Et −ln 0 est infini : un seul zéro casserait la mesure. On ajoute donc 1 au compte de chacun des {TEXTE.v} caractères de l'alphabet du texte. C'est le lissage de Laplace :
+
+<CodeExplique fichier="projets/1.1-modele-de-langage/modele_de_langage/ngrammes.py" region="distribution">
+  <li data-lignes="1-3">`distribution` reçoit les comptes, l'alphabet, un contexte et n. Elle rend chaque caractère avec sa probabilité.</li>
+  <li data-lignes="12">Les suivants des n derniers caractères du contexte. Un contexte jamais vu n'a aucun suivant : un `Counter` vide.</li>
+  <li data-lignes="13-15">Le compte de chaque caractère, plus 1, divisé par le total des comptes plus la taille de l'alphabet. Les probabilités font bien 1 en tout.</li>
+  <li data-lignes="17">Du plus probable au moins probable, comme `predire` au chapitre 0.1.</li>
+</CodeExplique>
+
+La chance de l'espace, dans l'ouverture, vient de là : <span class="formule-en-texte">({APRES_E.espace} + 1) ÷ ({APRES_E.total} + {TEXTE.v})</span>, soit {APRES_E.pEspace}.
+
+<Pari
+  id="suivant"
+  question={`Dans le texte d'apprentissage, quel caractère suit le plus souvent « ${SUIVANT.contexte} » ?`}
+  precision={SUIVANT.precision}
+  choix={choixSuivant(TEXTE_DU_SITE)}
+  acquis="distribution"
+>
+
+Après « {SUIVANT.contexte} », le texte met « {SUIVANT.premier} » {SUIVANT.fois} fois, et rien d'autre : c'est le début de « ton IA », le nom de l'IA que tu fabriques. Avec le lissage, « {SUIVANT.premier} » reçoit <span class="formule-en-texte">{SUIVANT.plusUn} ÷ {SUIVANT.denominateur}</span>, soit {SUIVANT.p}. Chacun des {SUIVANT.autres} autres caractères reçoit 1 chance sur {SUIVANT.denominateur}, soit {SUIVANT.pAutre} : aucun n'est impossible.
+
+Quand un contexte est rare, le lissage pèse lourd : ici, {SUIVANT.fois} observations contre {SUIVANT.v} fois « +1 ». Pour mesurer, ce n'est pas un problème. Pour écrire, si : un tirage dans cette distribution choisirait souvent un caractère jamais vu à cet endroit. L'étape 3 tire donc autrement.
+
+</Pari>
+
+</Etape>
+
+<Etape numero={3} titre="Tirer au sort">
+
+Pour écrire, le modèle ne tire que parmi les caractères déjà vus après le contexte, chacun selon son compte : un caractère vu 30 fois sort 30 fois plus souvent qu'un caractère vu une fois. La fonction `poids` donne ces comptes, retouchés par la température du <a href={TEXTE.lien02}>chapitre 0.2</a> :
+
+<CodeExplique fichier="projets/1.1-modele-de-langage/modele_de_langage/ngrammes.py" region="poids">
+  <li data-lignes="1">`poids` reçoit les suivants d'un contexte, l'alphabet et la température. Elle rend un poids par caractère de l'alphabet.</li>
+  <li data-lignes="9-10">À la température 1, le poids est le compte : les chances suivent ce que le modèle a lu. Un caractère jamais vu a un compte nul, donc un poids nul : il ne sort jamais.</li>
+  <li data-lignes="11-12">À 0,5, le compte est élevé au carré : un caractère vu 3 fois pèse 9, un caractère vu une fois pèse toujours 1. Le plus fréquent sort encore plus souvent.</li>
+  <li data-lignes="13-14">À 2, sa racine carrée : 3 devient environ 1,7. Les écarts se resserrent, et les caractères rares sortent plus souvent.</li>
+  <li data-lignes="15-21">À 0, plus de hasard : seul le plus compté a un poids, de 1. À égalité, le premier dans l'ordre des numéros des caractères.</li>
+</CodeExplique>
+
+Reste un cas : un contexte que le modèle n'a jamais vu. Il n'a alors aucun compte. Il raccourcit son contexte : il regarde un caractère de moins, puis un autre, jusqu'à un groupe qu'il connaît. Au pire, il ne regarde plus rien, et tire selon la fréquence de chaque caractère dans tout le texte. Le tirage d'une suite rassemble tout cela :
+
+<CodeExplique fichier="projets/1.1-modele-de-langage/modele_de_langage/ngrammes.py" region="generer">
+  <li data-lignes="1-9">`generer` reçoit les comptes de chaque longueur de contexte, de 0 à n, l'alphabet, n, le texte de départ, la longueur à écrire, la température et une graine pour le hasard.</li>
+  <li data-lignes="21">Le hasard reproductible du <a href={TEXTE.lien02}>chapitre 0.2</a> : la même graine donne le même texte, ici comme dans la page.</li>
+  <li data-lignes="23">Un tour de boucle par caractère à écrire.</li>
+  <li data-lignes="25-28">Le recul : `k` part de n et descend jusqu'à 0. `texte[len(texte) - k :]` prend les k derniers caractères, et la boucle s'arrête au premier groupe que le modèle connaît. À k = 0, le groupe est vide, toujours connu.</li>
+  <li data-lignes="31">Les poids de ce contexte, un nombre tiré au hasard entre 0 et 1, et `tirer` choisit le caractère, qui s'ajoute au texte.</li>
+</CodeExplique>
+
+<Pari
+  id="temperature"
+  question={`À la température 0, le modèle prend toujours le caractère le plus compté. Avec ${BOUCLE.n} caractères de contexte, à quoi ressemblent les ${BOUCLE.longueur} caractères qu'il écrit après « Le forgeron frappe » ?`}
+  choix={choixTemperature(TEXTE_DU_SITE)}
+  acquis="temperature"
+  ouvre="atelier"
+>
+
+Il tourne en rond :
+
+<p><code>{BOUCLE.extrait}</code></p>
+
+Sans hasard, le caractère suivant ne dépend que des {BOUCLE.n} derniers. Dès que {BOUCLE.n} caractères reviennent, tout ce qui suit recommence à l'identique : c'est la boucle du chapitre 0.1, caractère par caractère. Le modèle, lui, ne s'arrête jamais : il écrit toujours ses {BOUCLE.longueur} caractères. À toi de jouer : l'atelier de l'étape 4 est ouvert.
+
+</Pari>
+
+<Fragment slot="note">
+
+Diviser le logarithme des comptes par la température, puis prendre l'exponentielle, comme softmax au chapitre 0.2, revient à élever chaque compte à la puissance 1 ÷ T : le carré pour 0,5, la racine carrée pour 2.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={4} titre="L'atelier">
+
+<Verrou nom="atelier" message="Fais ton pari à l'étape 3 : le texte, le nombre jaune et les températures se débloquent juste après.">
+
+Écris un début de texte, choisis combien de caractères le modèle regarde, et à quelle température il tire. Les barres montrent ses chances pour le caractère suivant ; la suite, ce qu'il écrit, un caractère après l'autre.
+
+<AtelierModeleDeLangage client:load texteInitial={CONTEXTE_INITIAL} verrou="atelier" acquis="atelier">
+
+Avec {MOTS.n} caractères de contexte, {MOTS.avecN} des mots de la suite existent dans le texte du site. Ils s'enchaînent mal : le modèle ne voit jamais plus de {MOTS.n} caractères en arrière. Mets le nombre jaune à 1 : il n'en reste que {MOTS.avecUn}. À 0, le modèle tire chaque caractère selon sa fréquence dans tout le texte, et n'écrit que du bruit.
+
+</AtelierModeleDeLangage>
+
+</Verrou>
+
+<Fragment slot="note">
+
+Tout ce qui est jaune se manipule. Le nombre se fait glisser à la souris ou au doigt ; au clavier, atteins-le avec Tab, puis utilise les flèches.
+
+« Le forgeron frappe » continue souvent en « frappelle » : avec {N_INITIAL} caractères, le modèle ne voit que « {APPE.fin} ». Dans le texte d'entraînement, ces lettres viennent {APPE.fois} fois sur {APPE.total} du mot « appelle ».
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={5} titre="Plus de contexte ?">
+
+Plus le modèle regarde loin, plus ses suites ressemblent au texte du site. Pourquoi ne pas lui donner 10, 20 ou 100 caractères de contexte ? Pour le savoir, il faut un texte qu'il n'a jamais lu : le dernier dixième du texte du site a été mis de côté, l'étape 6 dira comment.
+
+<Pari
+  id="contexte"
+  question={`Dans le texte jamais lu, prends chaque groupe de ${RARETE.n} caractères. Quelle part de ces groupes le modèle n'a-t-il jamais vue dans le texte d'apprentissage ?`}
+  choix={choixContexte(TEXTE_DU_SITE)}
+  acquis="contexte"
+>
+
+{RARETE.absents} groupes sur {RARETE.total}, soit {RARETE.part} : près d'un sur trois. Avec 2 caractères, la part n'est que de {RARETE.p2} ; avec 4, de {RARETE.p4}.
+
+Chaque caractère de plus multiplie par {RARETE.v} le nombre de contextes possibles. Avec {RARETE.n} caractères, il y en a {RARETE.possibles}, et le texte d'apprentissage n'en contient que {RARETE.differents} différents. Devant un contexte qu'il n'a jamais vu, le modèle ne sait rien, même si ce contexte ressemble beaucoup à un contexte connu : il ne peut que raccourcir son regard.
+
+</Pari>
+
+En 2003, Yoshua Bengio et trois collègues ont donné un nom à ce mur : la malédiction de la dimension. Plus le contexte est long, plus le texte à prédire contient des suites jamais vues pendant l'apprentissage. Leur réponse : un réseau de neurones qui représente chaque mot par une liste de nombres, pour que des contextes qui se ressemblent partagent ce que le modèle en sait. Ton IA prendra ce chemin.
+
+<Fragment slot="note">
+
+Yoshua Bengio, Réjean Ducharme, Pascal Vincent et Christian Jauvin, [« A Neural Probabilistic Language Model »](https://www.jmlr.org/papers/v3/bengio03a.html), Journal of Machine Learning Research, 2003 (vérifié le 9 novembre 2026).
+
+Ton IA, dans sa plus grande taille, regarde jusqu'à {LABO.tonIA} jetons en arrière, pas {RARETE.n} caractères. Son réseau ne compte pas les contextes : il apprend à rapprocher ceux qui se ressemblent.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={6} titre="Le test du texte jamais lu">
+
+Pour juger un modèle, on ne l'interroge pas sur ce qu'il a lu : il pourrait l'avoir retenu par cœur. La fonction `couper` du projet sépare donc le texte du site en deux. Les 90 premiers pour cent, {TEXTE.entrainement} caractères, servent à compter : c'est le texte d'entraînement. Les {TEXTE.validation} derniers, jamais comptés, servent à vérifier : c'est le texte de validation.
+
+Tout ce chapitre suit cette règle : l'ouverture, les paris et l'atelier ne se servent que des comptes du texte d'entraînement. Le pari de l'étape 5 et la mesure de l'étape 7, eux, portent sur le texte de validation.
+
+<Fragment slot="note">
+
+La coupe se fait à <code class="insecable">len(texte) * 9 // 10</code> : `//` est la division entière de Python, qui tombe toujours sur un nombre entier de caractères.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={7} titre="La perplexité">
+
+Reste à mesurer. Pour chaque caractère du texte de validation, on regarde la chance que le modèle lui donnait, avec le lissage de l'étape 2, et on en prend −ln : 0 si le modèle était sûr, un grand nombre s'il était surpris. On fait la moyenne, puis on en prend l'exponentielle. C'est la perplexité.
+
+Elle se lit comme un nombre de choix : une perplexité de 12, c'est un modèle qui hésite autant que s'il choisissait au hasard entre 12 caractères. Un modèle qui ne saurait rien hésiterait entre les {PERPLEXITE.v}.
+
+<CodeExplique fichier="projets/1.1-modele-de-langage/modele_de_langage/ngrammes.py" region="perplexite">
+  <li data-lignes="1-3">`perplexite` reçoit les comptes, l'alphabet, n et le texte à mesurer.</li>
+  <li data-lignes="15-18">Pour chaque caractère du texte, sauf les n premiers, sa probabilité lissée après les n caractères qui le précèdent : le calcul de `distribution`, pour un seul caractère.</li>
+  <li data-lignes="19-20">On ajoute sa surprise, −ln p, et on compte les caractères.</li>
+  <li data-lignes="23">L'exponentielle de la surprise moyenne. `math.exp` et `math.log` sont l'exponentielle et le logarithme naturel du chapitre 0.2.</li>
+</CodeExplique>
+
+<Pari
+  id="perplexite"
+  question="Avec combien de caractères de contexte le modèle est-il le moins surpris par le texte jamais lu ?"
+  choix={choixPerplexite(PERPLEXITES)}
+  acquis="perplexite"
+>
+
+Perplexité sur le texte jamais lu : {PERPLEXITE.pari[0].valeur} avec {PERPLEXITE.pari[0].n} caractère, {PERPLEXITE.pari[1].valeur} avec {PERPLEXITE.pari[1].n}, {PERPLEXITE.pari[2].valeur} avec {PERPLEXITE.pari[2].n}. Plus de contexte rend le modèle plus surpris, pas moins, passé un certain point.
+
+</Pari>
+
+<TableauPerplexites texte={TEXTE_DU_SITE} perplexites={PERPLEXITES} />
+
+<p data-test="minimum">Sur le texte jamais lu, la perplexité est la plus basse avec {PERPLEXITE.n} caractères de contexte : {PERPLEXITE.valeur}. Au-delà, elle remonte, jusqu'à {PERPLEXITE.fin} avec {PERPLEXITE.nFin} caractères : chaque caractère de plus rend les contextes plus rares, et le modèle en rencontre de plus en plus qu'il n'a jamais vus.</p>
+
+Même sur le texte qu'il a lu, la perplexité remonte après {PERPLEXITE.n} caractères. C'est le lissage : {PERPLEXITE.rares} des contextes de {PERPLEXITE.nFin} caractères du texte d'entraînement n'y apparaissent qu'une ou deux fois, et les {PERPLEXITE.v} fois « +1 » noient ces quelques comptes. Le meilleur pour la perplexité n'est donc pas celui qui écrit le mieux : dans la suite de l'atelier à l'arrivée, {MOTS.avecN} des mots existent avec {MOTS.n} caractères de contexte, et {MOTS.avecMin} seulement avec {MOTS.nMin}. Compter ne suffit pas.
+
+</Etape>
+
+<Etape numero={8} titre="Ce que fera ton IA de plus">
+
+Ton IA fera le même travail que ce modèle : donner une probabilité à chaque suite possible, tirer au sort, recommencer. Trois choses changent.
+
+Elle lira des jetons, les morceaux du <a href={TEXTE.lien13}>chapitre 1.3</a>, plutôt que des caractères : un mot fréquent tient en un seul jeton, et le même contexte voit plus loin. Un réseau de neurones, le transformer du chapitre 1.4, remplacera les comptes : il rapproche les contextes qui se ressemblent, et peut donc deviner après un contexte jamais vu. Et elle apprendra au chapitre 1.5, sur bien plus de texte que ce site.
+
+Sa mesure, elle, ne changera pas : la perte qu'on suit pendant son entraînement est la moyenne des −ln de l'étape 7, le logarithme de la perplexité.
+
+<EncadreLabo sources={LABO.sources}>
+
+Le modèle de ce chapitre regarde au plus {N_MAX} caractères en arrière, choisit parmi {TEXTE.v} caractères, et a appris sur {TEXTE.entrainement} caractères.
+
+GPT-3, d'OpenAI, s'est entraîné sur des passages de {LABO.gpt3.contexte} jetons, choisit parmi {LABO.gpt3.vocabulaire} jetons, et a appris sur {LABO.gpt3.jetons} de jetons. Llama 3 405B, de Meta, s'est entraîné sur des passages de {LABO.llama.contexte} jetons, choisit parmi {LABO.llama.vocabulaire}, et a appris sur {LABO.llama.jetons} de jetons. Les deux font pourtant ce que fait le tien : prédire le morceau suivant.
+
+</EncadreLabo>
+
+</Etape>
+
+<Etape numero={9} titre="Le code et le projet">
+
+Les tests du projet vérifient chaque fonction. Celui-ci vérifie le lissage, sur un tout petit texte : devant un contexte jamais vu, chaque caractère doit avoir la même chance.
+
+<CodeExplique fichier="projets/1.1-modele-de-langage/tests/test_ngrammes.py" region="test-uniforme">
+  <li data-lignes="1">Le nom commence par `test_` : pytest le trouve tout seul, comme au chapitre 0.1.</li>
+  <li data-lignes="2">Les comptes de « abab », avec 2 caractères de contexte : « ab » et « ba » sont connus.</li>
+  <li data-lignes="3">« bb » n'apparaît jamais. Les deux caractères de l'alphabet, « a » et « b », ont alors chacun la probabilité 0,5 : l'ensemble des probabilités ne contient que 0,5.</li>
+</CodeExplique>
+
+<RecupererProjet
+  projet="1.1-modele-de-langage"
+  intro="Le projet du chapitre est dans le dépôt du site : le modèle, ses tests, et le texte du site sur lequel il apprend."
+  suite="Puis, dans le dossier du projet, demande-lui une suite :"
+/>
+
+<BlocCommande commandes={[MODELE_SUITE]} ou="un terminal, dans le dossier du projet" />
+
+Il écrit {nombre(LONGUEUR_SUITE)} caractères après « Le forgeron ». Le même texte s'obtient dans l'atelier : règle-le sur {N_INITIAL} caractères et la température {TEMPERATURE_INITIALE}, et écris « Le forgeron » suivi d'une espace, sans tirer encore. La graine {GRAINE_INITIALE} donne la même suite, caractère pour caractère. Pour lancer les tests :
+
+<BlocCommande commandes={[LANCER_TESTS]} ou="un terminal, dans le dossier du projet" />
+
+Le projet complet (le modèle, ses tests et le texte du site) est sur GitHub, avec un notebook à ouvrir dans Colab :
+
+<LiensProjet projet="1.1-modele-de-langage" />
+
+### À suivre
+
+Ce modèle a appris sur le texte de ce site. Ton IA apprendra sur des textes venus d'ailleurs : il faudra les trouver, les nettoyer, et vérifier qu'on a le droit de s'en servir. C'est le chapitre 1.2, {SUITE.lienSuite ? <a href={SUITE.lienSuite}>{SUITE.titre}</a> : SUITE.titre}.{SUITE.avant}{SUITE.lien && <><a href={SUITE.lien.href}>{SUITE.lien.texte}</a>.</>}
+
+</Etape>

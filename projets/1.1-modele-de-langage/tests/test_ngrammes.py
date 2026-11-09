@@ -16,6 +16,7 @@ from modele_de_langage.ngrammes import (
     part_jamais_vue,
     perplexite,
     poids,
+    tirage,
     tirer,
     tourne_en_rond,
 )
@@ -65,6 +66,54 @@ def test_generer_ne_tire_que_parmi_les_caracteres_deja_vus_et_recule():
     c = compter_par_ordre("abab", 2)
     assert set(generer(c, ["a", "b", "z"], 2, "zz", 20, 1, 0)) <= {"a", "b", "z"}
     assert "z" not in generer(c, ["a", "b", "z"], 2, "ab", 20, 1, 0)
+
+
+def test_tirage_recule_comme_generer():
+    c = compter_par_ordre("abab", 2)
+    # « ab » est connu à l'ordre 2 : seul « a » l'a suivi.
+    assert tirage(c, ["a", "b", "z"], "ab", 2, 1) == (2, [("a", 1.0)])
+    # « zb » est inconnu à l'ordre 2, mais « b » est connu à l'ordre 1.
+    assert tirage(c, ["a", "b", "z"], "zb", 2, 1) == (1, [("a", 1.0)])
+    # « zz » est inconnu aux ordres 2 et 1 : l'ordre 0, toujours connu ; « z » n'y a aucun poids.
+    assert tirage(c, ["a", "b", "z"], "zz", 2, 1) == (0, [("a", 0.5), ("b", 0.5)])
+
+
+def test_tirage_aux_quatre_temperatures():
+    c = compter_par_ordre("aab", 0)
+    lettres = ["a", "b", "c"]
+    assert tirage(c, lettres, "", 0, 1) == (0, [("a", 2 / 3), ("b", 1 / 3)])
+    assert tirage(c, lettres, "", 0, 0.5) == (0, [("a", 4 / 5), ("b", 1 / 5)])
+    racine = math.sqrt(2)
+    assert tirage(c, lettres, "", 0, 2) == (0, [("a", racine / (0.0 + racine + 1)), ("b", 1 / (0.0 + racine + 1))])
+    assert tirage(c, lettres, "", 0, 0) == (0, [("a", 1.0)])
+
+
+def test_tirage_trie_et_raconte_le_meme_tirage_que_generer():
+    t = charger_texte()
+    entr, _ = couper(t)
+    a = alphabet(t)
+    c = compter_par_ordre(entr, 4)
+    for contexte in ("Le forgeron ", "ton I", "zzzz"):
+        for temperature in (0, 0.5, 1, 2):
+            ordre, chances = tirage(c, a, contexte, 4, temperature)
+            assert 0 <= ordre <= 4
+            assert all(p > 0 for _, p in chances)
+            assert abs(sum(p for _, p in chances) - 1) < 1e-12
+            assert chances == sorted(chances, key=lambda cp: (-cp[1], cp[0]))
+            # Le premier caractère écrit par generer est l'un de ceux du tirage, pour chaque graine.
+            for graine in range(20):
+                suite = generer(c, a, 4, contexte, 1, temperature, graine)
+                assert suite[-1] in {ch for ch, _ in chances}
+
+
+def test_tirage_erreurs():
+    c = compter_par_ordre("abab", 2)
+    with pytest.raises(ValueError, match="Il faut au moins n caractères de contexte."):
+        tirage(c, ["a", "b"], "a", 2, 1)
+    with pytest.raises(ValueError, match="Le texte est vide"):
+        tirage([{}], [], "", 0, 1)
+    with pytest.raises(ValueError, match="température"):
+        tirage(c, ["a", "b"], "ab", 2, 3)
 
 
 def test_texte_du_site_suffit():

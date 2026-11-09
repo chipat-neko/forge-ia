@@ -1,0 +1,88 @@
+// Les commandes affichées par les chapitres de la Partie 1 (commandes.ts) sont
+// vérifiées contre le dépôt, comme celles de la Partie 0 : chaque dossier visé
+// par un cd existe, chaque module lancé par python -m a son __main__.py dans un
+// projet de la Partie 1 (ou dans forge), et la mise à jour du dépôt mène au
+// projet. Chaque chapitre vérifie ensuite ses propres commandes contre son
+// projet (le README, le __main__.py).
+
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { CLONER_DEPOT, METTRE_A_JOUR_DEPOT } from '../partie-0/commandes';
+import * as commandes from './commandes';
+import { GRAINE_INITIALE, LONGUEUR_SUITE, N_INITIAL, TEMPERATURE_INITIALE } from './paris-1-1';
+
+// Vitest est lancé depuis site/ : le dépôt est un dossier plus haut.
+const RACINE = '..';
+const TOUTES = Object.entries(commandes) as [string, string][];
+/** Le dossier que crée le clonage, et que vise la mise à jour : le dernier morceau de l'adresse. */
+const DOSSIER = CLONER_DEPOT.split('/').at(-1)!;
+
+describe('commandes de la Partie 1', () => {
+  it('chaque commande tient sur une ligne, sans espace en trop', () => {
+    expect(TOUTES.length).toBeGreaterThan(0);
+    for (const [nom, commande] of TOUTES) {
+      expect(commande, nom).not.toMatch(/\n/);
+      expect(commande, nom).toBe(commande.trim());
+    }
+  });
+
+  it('chaque cd vise un dossier du dépôt cloné qui existe, et la mise à jour y mène', () => {
+    expect(METTRE_A_JOUR_DEPOT).toBe(`git -C ${DOSSIER} pull`);
+    const cd = TOUTES.filter(([, c]) => c.startsWith('cd '));
+    expect(cd.length).toBeGreaterThan(0);
+    for (const [nom, commande] of cd) {
+      const chemin = commande.slice(3);
+      expect(chemin.startsWith(`${DOSSIER}/projets/1.`) || chemin === `${DOSSIER}/projets/forge`, nom).toBe(true);
+      expect(existsSync(`${RACINE}/${chemin.slice(DOSSIER.length + 1)}`), `${nom} : ${chemin}`).toBe(true);
+    }
+  });
+
+  it('chaque python -m vise un module qui a son __main__.py dans un projet de la Partie 1, ou dans forge', () => {
+    const projets = readdirSync(`${RACINE}/projets`).filter((d) => /^1\./.test(d) || d === 'forge');
+    for (const [nom, commande] of TOUTES) {
+      for (const [, module] of commande.matchAll(/python -m (\S+)/g)) {
+        const trouves = projets.filter((p) => existsSync(`${RACINE}/projets/${p}/${module.replace(/\./g, '/')}/__main__.py`));
+        expect(trouves, `${nom} : ${module}`).toHaveLength(1);
+      }
+    }
+  });
+});
+
+// Le chapitre 1.1 : le script `python -m modele_de_langage suite`, vérifié
+// contre le __main__.py et le README du projet, lus en texte.
+describe('commandes du chapitre 1.1', () => {
+  const PROJET = `${RACINE}/projets/1.1-modele-de-langage`;
+  const MAIN = readFileSync(`${PROJET}/modele_de_langage/__main__.py`, 'utf8').replace(/\r\n?/g, '\n');
+  const README = readFileSync(`${PROJET}/README.md`, 'utf8').replace(/\r\n?/g, '\n');
+
+  it('les commandes, à l’identique', () => {
+    expect(commandes.ALLER_AU_PROJET_1_1).toBe('cd forge-ia/projets/1.1-modele-de-langage');
+    expect(commandes.MODELE_SUITE).toBe('uv run python -m modele_de_langage suite --n 4 --temperature 1 --graine 0 "Le forgeron "');
+  });
+
+  it('suite est une commande du script, avec ses trois options', () => {
+    expect(MAIN).toContain('add_parser("suite"');
+    expect(/python -m modele_de_langage (\S+)/.exec(commandes.MODELE_SUITE)![1]).toBe('suite');
+    for (const option of ['--n', '--temperature', '--graine']) {
+      expect(commandes.MODELE_SUITE).toContain(`${option} `);
+      expect(MAIN, option).toContain(`suite.add_argument("${option}"`);
+    }
+    // Aucun --extra : le projet n'utilise que la bibliothèque standard.
+    expect(commandes.MODELE_SUITE).not.toContain('--extra');
+  });
+
+  it('ses réglages sont ceux de l’atelier à l’arrivée : le chapitre dit que l’atelier écrit le même texte', () => {
+    const option = (nom: string) => Number(new RegExp(`--${nom} (\\S+)`).exec(commandes.MODELE_SUITE)![1]);
+    expect(option('n')).toBe(N_INITIAL);
+    expect(option('temperature')).toBe(TEMPERATURE_INITIALE);
+    expect(option('graine')).toBe(GRAINE_INITIALE);
+    // Sans --longueur, le script écrit 200 caractères, comme l'atelier.
+    expect(commandes.MODELE_SUITE).not.toContain('--longueur');
+    expect(MAIN).toContain(`suite.add_argument("--longueur", type=int, default=${LONGUEUR_SUITE},`);
+  });
+
+  it('ce sont les commandes du README du projet', () => {
+    expect(README).toContain(`${commandes.ALLER_AU_PROJET_1_1}\n`);
+    expect(README).toContain(`${commandes.MODELE_SUITE}\n`);
+  });
+});
