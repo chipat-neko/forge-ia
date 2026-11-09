@@ -1,0 +1,153 @@
+---
+// L'ouverture du chapitre 1.2 : ce que lit ton IA, en une bande. Les trois
+// sources se partagent sa largeur selon leur part du mélange de forge
+// (MELANGE, donnees.ts, vérifié contre melange.py), puis la légende les
+// nomme, part en tête. Tout est rendu à la construction : la page arrive
+// prête, sans script.
+//
+// La bande est cachée aux lecteurs d'écran : la liste qui suit dit la même
+// chose, en mots.
+import { pourcent } from '../../../lib/nombres';
+import { MELANGE, NOMS_DES_SOURCES } from '../../../lib/partie-1/donnees';
+import { typographier } from '../../../lib/typo';
+
+/** Ce que chaque source apporte à ton IA, en quelques mots, dans l'ordre du mélange. */
+const SOURCES = {
+  web_fr: { nom: 'de pages web en français', apport: 'la langue de tous les jours' },
+  wikipedia_fr: { nom: 'de Wikipédia en français', apport: 'des faits, rédigés avec soin' },
+  code_python: { nom: 'de code Python', apport: 'de quoi apprendre à coder' },
+} as const;
+
+const parts = NOMS_DES_SOURCES.map((source) => ({
+  source,
+  part: MELANGE[source],
+  pourcent: pourcent(MELANGE[source]),
+  ...SOURCES[source],
+}));
+const legende = typographier(
+  'La part de chaque source dans les textes de ton IA, comptée en octets. Ce mélange est écrit dans forge, ' +
+    'son moteur ; ce chapitre dit où l’on trouve ces textes, ce qu’on a le droit d’en faire, et comment ' +
+    'on les prépare.',
+);
+---
+
+<figure class="ouverture-melange" data-test="ouverture">
+  <div class="bande" aria-hidden="true">
+    {parts.map((p) => <span class:list={['part', p.source]} style={`flex-grow: ${p.part}`} />)}
+  </div>
+  <ol class="parts">
+    {
+      parts.map((p) => (
+        <li data-source={p.source}>
+          <span class:list={['pastille', p.source]} aria-hidden="true" />
+          <span class="pourcent">{p.pourcent}</span>
+          <span class="nom">
+            {typographier(p.nom)}
+            <span class="apport">{typographier(p.apport)}</span>
+          </span>
+        </li>
+      ))
+    }
+  </ol>
+  <figcaption>{legende}</figcaption>
+</figure>
+
+<style>
+  .ouverture-melange {
+    margin: 0 0 2.2em;
+  }
+
+  /* Une seule bande, partagée à plat : pas de dégradé, pas d'ombre. */
+  .bande {
+    display: flex;
+    gap: 3px;
+    height: 34px;
+    margin-bottom: 14px;
+  }
+
+  .part {
+    flex-basis: 0;
+    border-radius: 3px;
+  }
+
+  .web_fr {
+    background: var(--indigo);
+  }
+
+  .wikipedia_fr {
+    background: var(--lavande);
+  }
+
+  .code_python {
+    background: var(--teinte-b-trait);
+  }
+
+  .parts {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 32px;
+  }
+
+  .parts li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .pastille {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    /* À mi-hauteur du grand nombre (30 px, 26 sur un téléphone). */
+    align-self: flex-start;
+    margin-top: 9px;
+  }
+
+  .pourcent {
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 30px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .nom {
+    font-family: var(--titres);
+    font-size: 16px;
+    line-height: 1.25;
+  }
+
+  .apport {
+    display: block;
+    color: var(--indigo-doux);
+    font-size: 14px;
+  }
+
+  figcaption {
+    margin-top: 14px;
+    color: var(--indigo-doux);
+  }
+
+  @media (max-width: 720px) {
+    .bande {
+      height: 26px;
+    }
+
+    .parts {
+      flex-direction: column;
+    }
+
+    .pourcent {
+      font-size: 26px;
+      min-width: 2.3em;
+    }
+
+    .pastille {
+      margin-top: 7px;
+    }
+  }
+</style>

@@ -59,6 +59,12 @@ export interface Partie {
 export interface Annexe {
   titre: string;
   resume: string;
+  /**
+   * L'adresse de sa page, une fois qu'elle existe ; sans valeur avant. Les pages qui
+   * renvoient à une annexe (le tableau des sources de 1.2 pour l'annuaire) lisent ce
+   * champ à la construction : le lien paraît de lui-même, et jamais vers une page absente.
+   */
+  href?: string;
 }
 
 type Brouillon = Omit<Chapitre, 'numero' | 'groupe'>;

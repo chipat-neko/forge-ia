@@ -9,6 +9,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CLONER_DEPOT, METTRE_A_JOUR_DEPOT } from '../partie-0/commandes';
 import * as commandes from './commandes';
+import { MESURES_PARTIE_1 } from './mesures';
 import { GRAINE_INITIALE, LONGUEUR_SUITE, N_INITIAL, TEMPERATURE_INITIALE } from './paris-1-1';
 
 // Vitest est lancé depuis site/ : le dépôt est un dossier plus haut.
@@ -84,5 +85,46 @@ describe('commandes du chapitre 1.1', () => {
   it('ce sont les commandes du README du projet', () => {
     expect(README).toContain(`${commandes.ALLER_AU_PROJET_1_1}\n`);
     expect(README).toContain(`${commandes.MODELE_SUITE}\n`);
+  });
+});
+
+// Le chapitre 1.2 : le tri des exemples et l'aperçu des sources, vérifiés contre le
+// __main__.py et le README du projet, et contre les fichiers que lit le chapitre.
+describe('commandes du chapitre 1.2', () => {
+  const PROJET = `${RACINE}/projets/1.2-donnees`;
+  const MAIN = readFileSync(`${PROJET}/donnees_pas_a_pas/__main__.py`, 'utf8').replace(/\r\n?/g, '\n');
+  const README = readFileSync(`${PROJET}/README.md`, 'utf8').replace(/\r\n?/g, '\n');
+
+  it('les commandes, à l’identique', () => {
+    expect(commandes.ALLER_AU_PROJET_1_2).toBe('cd forge-ia/projets/1.2-donnees');
+    expect(commandes.DONNEES_TRIER).toBe('uv run python -m donnees_pas_a_pas trier exemples/web.jsonl');
+    expect(commandes.DONNEES_APERCU).toBe(
+      'uv run python -m donnees_pas_a_pas apercu --octets 5M --enregistrer sorties/apercu.txt --json mesures/apercu.json',
+    );
+  });
+
+  it('trier et apercu sont des commandes du script, avec leurs options', () => {
+    expect(MAIN).toContain('add_parser("trier"');
+    expect(MAIN).toContain('add_parser("apercu"');
+    for (const option of ['--octets', '--enregistrer', '--json']) {
+      expect(commandes.DONNEES_APERCU).toContain(`${option} `);
+      expect(MAIN, option).toContain(`ape.add_argument("${option}"`);
+    }
+    expect(existsSync(`${PROJET}/${/trier (\S+)$/.exec(commandes.DONNEES_TRIER)![1]}`)).toBe(true);
+    // Aucun --extra : le projet n'installe pas PyTorch.
+    expect(commandes.DONNEES_TRIER).not.toContain('--extra');
+    expect(commandes.DONNEES_APERCU).not.toContain('--extra');
+  });
+
+  it('l’aperçu écrit les fichiers que lit le chapitre (MESURES_PARTIE_1)', () => {
+    const projet = 'projets/1.2-donnees/';
+    expect(`${projet}${/--enregistrer (\S+)/.exec(commandes.DONNEES_APERCU)![1]}`).toBe(MESURES_PARTIE_1.sortieApercu);
+    expect(`${projet}${/--json (\S+)/.exec(commandes.DONNEES_APERCU)![1]}`).toBe(MESURES_PARTIE_1.apercu);
+  });
+
+  it('ce sont les commandes du README du projet', () => {
+    expect(README).toContain(`${commandes.ALLER_AU_PROJET_1_2}\n`);
+    expect(README).toContain(`${commandes.DONNEES_TRIER}\n`);
+    expect(README).toContain(`${commandes.DONNEES_APERCU}\n`);
   });
 });

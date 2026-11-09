@@ -1,0 +1,533 @@
+---
+partie: 1
+numero: "1.2"
+titre: "Les données"
+chapeau: "Ton IA ne saura que ce qu'elle aura lu. Dans ce chapitre, tu choisis ses textes : où les trouver, ce qu'on a le droit d'en faire, puis comment les nettoyer, écarter les copies et en garder quelques-uns de côté pour la juger."
+programme: "10 étapes, 5 paris, environ 30 minutes."
+acquis:
+  - cle: licences
+    texte: "Chaque source a sa licence, et chaque fichier de code la sienne."
+    ou: "à l'étape 3"
+  - cle: court
+    texte: "Sous 200 caractères, un texte est écarté, même sans faute."
+    ou: "à l'étape 4"
+  - cle: atelier
+    texte: "Le nettoyage ne touche qu'à ce qui ne se voit pas."
+    ou: "à l'étape 5, en modifiant le texte"
+  - cle: doublons
+    texte: "Deux textes qui se nettoient pareil ont la même empreinte : le second est un doublon."
+    ou: "à l'étape 6"
+  - cle: validation
+    texte: "Le même texte va toujours du même côté, entraînement ou validation."
+    ou: "à l'étape 7"
+  - cle: melange
+    texte: "Les parts du mélange se comptent après le tri : le code en perd bien plus que le web."
+    ou: "à l'étape 8"
+---
+
+import AtelierNettoyeur from '../../components/chapitres/1-2/AtelierNettoyeur.svelte';
+import OuvertureMelange from '../../components/chapitres/1-2/OuvertureMelange.astro';
+import TableauSources from '../../components/chapitres/1-2/TableauSources.astro';
+import BlocCommande from '../../components/gabarit/BlocCommande.astro';
+import RecupererProjet from '../../components/gabarit/RecupererProjet.astro';
+import SortieCommande from '../../components/gabarit/SortieCommande.astro';
+import { formaterDate, formaterQuantite } from '../../lib/calculateur/formats';
+import { chapitresParus } from '../../lib/chapitres-parus';
+import { exigeur } from '../../lib/exiger';
+import { nombre, pourcent } from '../../lib/nombres';
+import { hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
+import { LANCER_TESTS } from '../../lib/partie-0/commandes';
+import { DONNEES_APERCU, DONNEES_TRIER } from '../../lib/partie-1/commandes';
+import { LICENCES_PERMISSIVES, MELANGE, PART_VALIDATION } from '../../lib/partie-1/donnees';
+import { MESURES_PARTIE_1 } from '../../lib/partie-1/mesures';
+import { empreinte, garderPythonPermissif, LONGUEUR_MINIMALE, longueurPointsDeCode, trier } from '../../lib/partie-1/nettoyeur';
+import {
+  choixCourt,
+  choixDoublon,
+  choixLicence,
+  choixPartGardee,
+  choixValidation,
+  faitsDuPariCourt,
+  faitsDuPariDoublon,
+  faitsDuPariValidation,
+  versWindows,
+} from '../../lib/partie-1/paris-1-2';
+import { APERCU, CORPUS_PRINCIPAL, EXEMPLES_CODE, EXEMPLES_WEB } from '../../lib/partie-1/projet-1-2';
+import {
+  enGio,
+  FINEWEB_2,
+  LICENCES,
+  LICENCES_DE_GITHUB_CODE,
+  LLAMA_3,
+  REGLEMENT_IA,
+  SOURCES_1_2,
+  WIKIPEDIA_EN_4_0,
+} from '../../lib/partie-1/sources-1-2';
+import { typographier } from '../../lib/typo';
+
+export const exiger = exigeur('le texte du chapitre 1.2 (1-2.mdx)');
+
+export const PARUS = await chapitresParus();
+
+export const LIENS = {
+  // Le chapitre 1.1 a paru : un lien ne vise qu'un chapitre paru.
+  l11: PARUS.has('1.1') ? hrefChapitre('1.1') : null,
+  l13: PARUS.has('1.3') ? hrefChapitre('1.3') : null,
+};
+
+export const MEL = {
+  web: pourcent(MELANGE.web_fr),
+  wiki: pourcent(MELANGE.wikipedia_fr),
+  code: pourcent(MELANGE.code_python),
+};
+
+export const TRI = await (async () => {
+  // Le tri des exemples du projet, par le jumeau : ce que la commande trier du projet affiche.
+  return { web: await trier(EXEMPLES_WEB, 'web_fr'), code: await trier(EXEMPLES_CODE, 'code_python') };
+})();
+
+export const EXEMPLES = (() => {
+  // Étapes 4, 6 et 10 : le premier exemple du web est trop court, les deux suivants du deuxième sont des doublons.
+  exiger(
+    TRI.web[0].raison === 'trop court' && TRI.web[1].raison === 'gardé' && TRI.web[2].raison === 'doublon' && TRI.web[3].raison === 'doublon',
+    'les quatre premiers exemples du web ne sont plus « trop court », « gardé », « doublon », « doublon »',
+  );
+  // Étape 3 : les trois fichiers de code, gardé, écarté pour sa licence, écarté pour son langage.
+  exiger(
+    TRI.code.map((v) => v.raison).join(',') === 'gardé,licence,langage',
+    'les trois fichiers de code ne sont plus « gardé », « licence », « langage »',
+  );
+  const gpl = EXEMPLES_CODE[1];
+  exiger(
+    gpl.language === 'Python' && String(gpl.license).toUpperCase() === LICENCES.gpl3.nom && !garderPythonPermissif(gpl),
+    'le deuxième fichier de code n’est plus du Python sous GPL-3.0, écarté',
+  );
+  exiger(
+    EXEMPLES_CODE[0].license === 'mit' && EXEMPLES_CODE[2].license === 'mit' && EXEMPLES_CODE[2].language === 'JavaScript',
+    'le premier et le troisième fichier de code ne sont plus sous MIT, le troisième en JavaScript',
+  );
+  return { gpl: LICENCES.gpl3.nom, langage: String(EXEMPLES_CODE[2].language) };
+})();
+
+export const COURT = (() => {
+  // Le pari « court » : le premier exemple du web, propre, mais trop court.
+  const texte = String(EXEMPLES_WEB[0].text);
+  const f = faitsDuPariCourt(texte);
+  exiger(!f.garde, 'le texte du pari « court » est gardé : son explication est à revoir');
+  return { texte, longueur: nombre(f.longueur), manque: nombre(LONGUEUR_MINIMALE - f.longueur), seuil: nombre(LONGUEUR_MINIMALE) };
+})();
+
+export const LICENCES_GARDEES = [...LICENCES_PERMISSIVES];
+
+export const CHOIX = await (async () => {
+  // Les choix des paris dont les empreintes passent par crypto.subtle (asynchrone), calculés ici :
+  // une expression du texte du chapitre ne peut pas attendre.
+  return {
+    doublon: await choixDoublon(String(EXEMPLES_WEB[1].text), String(EXEMPLES_WEB[2].text)),
+    validation: await choixValidation(EXEMPLES_WEB),
+  };
+})();
+
+export const INITIAL = String(EXEMPLES_WEB[1].text);
+export const EMPREINTE_INITIALE = await empreinte(versWindows(INITIAL));
+
+export const DOUBLON = await (async () => {
+  // Le pari « doublon » : le deuxième exemple du web, et le même écrit sous Windows (le troisième).
+  const unix = String(EXEMPLES_WEB[1].text);
+  const windows = String(EXEMPLES_WEB[2].text);
+  const f = await faitsDuPariDoublon(unix, windows);
+  exiger(f.meme, 'le texte écrit sous Windows n’a plus la même empreinte : le pari « doublon » est à revoir');
+  const octets = (s) => new TextEncoder().encode(s).length;
+  // « Un de plus par fin de ligne » : le \r de chaque \r\n.
+  exiger(
+    octets(windows) - octets(unix) === unix.split('\n').length - 1,
+    'le texte écrit sous Windows n’a plus un octet de plus par fin de ligne',
+  );
+  return {
+    longueur: nombre(longueurPointsDeCode(unix)),
+    octetsUnix: nombre(octets(unix)),
+    octetsWindows: nombre(octets(windows)),
+    debut: f.empreinte.slice(0, 8),
+  };
+})();
+
+export const VALIDATION = await (async () => {
+  // Le pari « validation » : le premier carnet que est_validation met de côté, trié dans un sens puis dans l'autre.
+  const f = await faitsDuPariValidation(EXEMPLES_WEB);
+  exiger(f.retour, 'le carnet mis de côté ne va plus dans la validation au second tri');
+  exiger(f.essai + 1 > f.uneSur, 'le premier carnet de validation arrive avant le 200e : « il a fallu … carnets » est à revoir');
+  return {
+    essai: nombre(f.essai),
+    essais: nombre(f.essai + 1),
+    uneSur: nombre(f.uneSur),
+    part: pourcent(PART_VALIDATION, 1),
+    longueur: nombre(longueurPointsDeCode(f.texte)),
+  };
+})();
+
+export const PART = (() => {
+  // Le pari « part » et l'étape 8 : ce que l'aperçu a gardé de chaque source.
+  const { web_fr: web, wikipedia_fr: wiki, code_python: code } = APERCU.sources;
+  exiger(web.gardes === web.lus && wiki.gardes === wiki.lus, 'l’aperçu n’a plus gardé tout le web et tout Wikipédia : l’étape 8 est à revoir');
+  exiger(web.raisons.doublon === 0 && web.raisons['trop court'] === 0, 'l’aperçu a trouvé des doublons ou des textes trop courts dans le web');
+  exiger(code.gardes / code.lus < 0.1, 'le code gardé dépasse un fichier lu sur dix : « ne passe presque pas » est à revoir');
+  exiger(
+    code.raisons.langage > code.raisons.licence && code.raisons.licence > code.raisons['trop court'],
+    'les raisons d’écart du code ne sont plus dans l’ordre langage, licence, trop court',
+  );
+  const fois = code.lus / web.lus;
+  exiger(fois > 10, 'le code lu n’est plus dix fois plus nombreux que le web lu');
+  return {
+    mio: nombre(APERCU.octets_par_source / 1048576),
+    webLus: nombre(web.lus),
+    wikiLus: nombre(wiki.lus),
+    codeLus: nombre(code.lus),
+    codeGardes: nombre(code.gardes),
+    codePart: pourcent(code.gardes / code.lus, 1),
+    langage: nombre(code.raisons.langage),
+    licence: nombre(code.raisons.licence),
+    court: nombre(code.raisons['trop court']),
+    fois: nombre(fois, 1),
+    webValidation: nombre(web.en_validation),
+  };
+})();
+
+export const CORPUS = (() => {
+  // Les volumes du corpus principal de ton IA (mesures/corpus-principal.json).
+  const c = CORPUS_PRINCIPAL;
+  const documents = c.documents_train + c.documents_val;
+  const partVal = c.documents_val / documents;
+  exiger(Math.abs(partVal - PART_VALIDATION) < 0.0005, 'la part des documents de validation du corpus ne fait plus 0,5 %');
+  const fragments = c.fragments_par_source;
+  for (const [nom, part] of Object.entries(MELANGE)) {
+    exiger(Math.abs(fragments[nom] / c.fragments - part) < 0.01, `les fragments de ${nom} ne suivent plus la part du mélange`);
+  }
+  return {
+    gio: nombre(enGio(c.octets), 1),
+    documents: formaterQuantite(documents),
+    fragments: nombre(c.fragments),
+    web: nombre(fragments.web_fr),
+    wiki: nombre(fragments.wikipedia_fr),
+    code: nombre(fragments.code_python),
+    train: formaterQuantite(c.jetons_train),
+    val: formaterQuantite(c.jetons_val),
+    docsVal: nombre(c.documents_val),
+    partVal: pourcent(partVal, 2),
+    octetsParJeton: nombre(c.octets_par_jeton, 2),
+  };
+})();
+
+export const LABO = (() => {
+  // Llama 3, FineWeb-2 et le règlement européen (sources-1-2.ts), face au corpus de ton IA.
+  const rapport = LLAMA_3.jetons / CORPUS_PRINCIPAL.jetons_train;
+  exiger(rapport > 1000, 'Llama 3 n’a plus lu mille fois plus de jetons que ton IA');
+  const m = LLAMA_3.melange;
+  return {
+    jetons: formaterQuantite(LLAMA_3.jetons),
+    annee: LLAMA_3.connaissancesJusqua,
+    connaissances: pourcent(m.connaissances),
+    maths: pourcent(m.mathsEtRaisonnement),
+    code: pourcent(m.code),
+    multilingue: pourcent(m.multilingue),
+    fois: nombre(LLAMA_3.ligneRepetee.fois),
+    paquet: nombre(LLAMA_3.ligneRepetee.documents / 1e6),
+    rapport: nombre(Math.round(rapport / 100) * 100),
+    fwMots: formaterQuantite(FINEWEB_2.francais.mots),
+    fwDocuments: formaterQuantite(FINEWEB_2.francais.documents),
+    fwTotal: formaterQuantite(FINEWEB_2.total.mots),
+    copies: nombre(FINEWEB_2.copiesDuWeb),
+    article: REGLEMENT_IA.article,
+    depuis: formaterDate(REGLEMENT_IA.appliqueDepuis),
+    anterieurs: formaterDate(REGLEMENT_IA.modelesAnterieurs),
+    sources: [...SOURCES_1_2.labo],
+  };
+})();
+
+export const SOURCES = {
+  odcBy: LICENCES.odcBy.source.url,
+  commonCrawl: LICENCES.commonCrawl.source.url,
+  ccBySa3: LICENCES.ccBySa3.source.url,
+  ccBySa4: LICENCES.ccBySa4.source.url,
+  gfdl: LICENCES.gfdl.source.url,
+  apache: LICENCES.apache.source.url,
+  gpl3: LICENCES.gpl3.source.url,
+  mit: LICENCES.mit.source.url,
+  billet: WIKIPEDIA_EN_4_0.source.url,
+  billetLe: formaterDate(WIKIPEDIA_EN_4_0.annonceLe),
+  githubCode: LICENCES_DE_GITHUB_CODE.source.url,
+  licencesGithub: nombre(LICENCES_DE_GITHUB_CODE.licences),
+  langagesGithub: nombre(LICENCES_DE_GITHUB_CODE.langages),
+  fineweb: FINEWEB_2.source.url,
+};
+
+export const SUITE = (() => {
+  // L'« À suivre » : le chapitre 1.3, un lien s'il a paru.
+  const { chapitre } = trouverChapitre('1.3');
+  return { titre: typographier(`« ${titreCourt(chapitre.titre)} »`), lien: PARUS.has(chapitre.numero) ? hrefChapitre(chapitre.numero) : null };
+})();
+
+<OuvertureMelange />
+
+<Etape numero={1} titre="Ton IA est ce qu'elle lit">
+
+Un modèle de langage ne sait que ce qu'il a lu. Celui du {LIENS.l11 ? <a href={LIENS.l11}>chapitre 1.1</a> : 'chapitre 1.1'} avait appris sur le texte de ce site : il écrivait comme lui, avec ses mots. S'il n'avait lu que de l'anglais, il n'écrirait pas un mot de français ; s'il n'avait jamais vu de code, il ne saurait pas en écrire. Avant d'apprendre quoi que ce soit, ton IA a donc besoin d'une bibliothèque, et c'est à toi de la choisir.
+
+Celle de ton IA mélange trois sources : {MEL.web} de pages web en français, pour la langue de tous les jours ; {MEL.wiki} de Wikipédia en français, pour des faits rédigés avec soin ; {MEL.code} de code Python, pour apprendre à en écrire. Ces parts se comptent en octets de texte : sur 100 octets que lit ton IA, {Math.round(MELANGE.web_fr * 100)} viennent du web.
+
+Ce chapitre suit le chemin d'un texte : où on le trouve, ce qu'on a le droit d'en faire, comment on le nettoie, comment on écarte ses copies, et comment on en garde quelques-uns de côté pour juger ton IA. Puis il compte ce qui reste vraiment.
+
+<Fragment slot="note">
+
+Le mélange est écrit une seule fois, dans forge, le moteur de ton IA : `MELANGE_PAR_DEFAUT`, dans `forge/donnees/melange.py`. Le téléchargement des textes le lit là.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={2} titre="Où trouver des textes">
+
+Personne n'écrit des milliards de pages pour entraîner une IA. Les textes existent déjà, publiés par d'autres, et des équipes les ont rassemblés en jeux de données. Ceux de ton IA sont publiés sur Hugging Face, un site qui héberge des jeux de données et des modèles. Ton IA y lit ses trois sources, en flux, sans jamais les télécharger en entier :
+
+<TableauSources />
+
+FineWeb-2 vient de {LABO.copies} copies d'une partie du web, faites par Common Crawl de l'été 2013 à avril 2024. Ses auteurs, chez Hugging Face, ont repéré la langue de chaque page, retiré les doublons langue par langue, puis écarté les pages de mauvaise qualité avec des règles adaptées à chaque langue. Le jeu de Wikipédia est une copie de l'encyclopédie du 1er novembre 2023. Et github-code-clean rassemble des fichiers publiés sur GitHub, en {SOURCES.langagesGithub} langages de programmation, dont Python.
+
+<Fragment slot="note">
+
+D'après la <a href={SOURCES.fineweb}>carte de FineWeb-2</a> et celle de <a href={SOURCES.githubCode}>github-code</a>, dont github-code-clean est tiré, lues le 9 novembre 2026.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={3} titre="Les licences">
+
+Un texte publié n'est pas un texte libre de droits. Chaque jeu de données dit, dans sa licence, ce qu'on a le droit d'en faire. Ce chapitre ne donne pas d'avis juridique : il dit ce qu'écrit chaque licence, avec son lien, et ce que forge en fait.
+
+FineWeb-2 est publié sous <a href={SOURCES.odcBy}>ODC-By 1.0</a>, une licence de bases de données. Elle permet de se servir de la base, y compris pour un usage commercial, et demande de la citer quand on la diffuse publiquement. Elle le dit elle-même, à sa section 2.4 : elle couvre la base, pas chaque page qu'elle contient, qui peut garder ses propres droits. La carte du jeu ajoute que les <a href={SOURCES.commonCrawl}>conditions d'utilisation de Common Crawl</a> s'appliquent aussi.
+
+Le jeu de Wikipédia annonce deux licences, <a href={SOURCES.ccBySa3}>CC BY-SA 3.0</a> et <a href={SOURCES.gfdl}>GFDL</a>. CC BY-SA demande de citer les auteurs (BY) et de partager ce qu'on en tire sous la même licence (SA). Le {SOURCES.billetLe}, Creative Commons <a href={SOURCES.billet}>annonçait</a> que les nouvelles modifications de Wikipédia passaient sous <a href={SOURCES.ccBySa4}>CC BY-SA 4.0</a>, et que les anciennes restaient en 3.0. La copie du 1er novembre 2023 mêle donc sans doute les deux versions : c'est notre lecture de ces deux sources, le jeu ne le dit pas.
+
+github-code-clean est publié sous <a href={SOURCES.apache}>Apache-2.0</a>, mais seulement en tant que compilation. Chaque fichier garde la licence du dépôt GitHub d'où il vient, notée dans la colonne `license` ; la carte de github-code en compte {SOURCES.licencesGithub}. Certaines, comme la <a href={SOURCES.gpl3}>GPL-3.0</a>, demandent que tout ce qu'on en tire et qu'on transmet reste sous la même licence (section 5 c). D'autres, dites permissives, comme <a href={SOURCES.mit}>MIT</a>, demandent surtout de garder la mention de l'auteur et de la licence dans toute copie. Forge ne garde que les fichiers Python sous l'une de ces sept licences : {LICENCES_GARDEES.map((l, i) => <>{i > 0 && (i === LICENCES_GARDEES.length - 1 ? ' et ' : ', ')}<code>{l}</code></>)}.
+
+<CodeExplique fichier="projets/forge/forge/donnees/sources.py" symbole="_garder_python_permissif">
+  <li data-lignes="1">La fonction reçoit une ligne du jeu, un dictionnaire : le code, son langage, sa licence…</li>
+  <li data-lignes="2">`get` lit la colonne `license`, ou rend `None` si elle manque.</li>
+  <li data-lignes="4">Le fichier doit être du Python.</li>
+  <li data-lignes="5-6">Et sa licence, du texte, mise en minuscules, doit être dans `LICENCES_PERMISSIVES`, les sept de la liste. Tout le reste est écarté.</li>
+</CodeExplique>
+
+C'est un choix de forge, prudent, et pas une règle de droit.
+
+<Pari
+  id="licence"
+  question={`Un fichier Python sous ${EXEMPLES.gpl} entre-t-il dans les données de ton IA ?`}
+  precision={`C'est le deuxième fichier des exemples du projet : du Python, publié sous ${EXEMPLES.gpl}.`}
+  choix={choixLicence(EXEMPLES_CODE[1])}
+  acquis="licences"
+>
+
+Non : `gpl-3.0` n'est pas dans la liste des sept, et le filtre écarte tout fichier dont la licence n'y est pas. Citer son auteur n'y change rien : le filtre ne lit que la licence. Les trois fichiers des exemples du projet le montrent : le premier, du Python sous MIT, est gardé ; le deuxième, sous {EXEMPLES.gpl}, est écarté pour sa licence ; le troisième, sous MIT mais en {EXEMPLES.langage}, pour son langage.
+
+</Pari>
+
+<Fragment slot="note">
+
+Les licences sont liées à leur texte, relu le 9 novembre 2026. Les sept noms sont ceux de la colonne `license` du jeu, en minuscules.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={4} titre="Nettoyer">
+
+Un texte du web arrive rarement propre. Il a été écrit sous Windows, sous Linux ou sur un téléphone, copié d'un vieux logiciel, et il traîne des caractères qu'on ne voit pas. Avant de le garder, forge le normalise :
+
+<CodeExplique fichier="projets/forge/forge/donnees/nettoyage.py" symbole="_normaliser">
+  <li data-lignes="1">`_normaliser` reçoit le texte brut et rend le texte normalisé. Le `_` du début dit qu'elle sert à l'intérieur du module.</li>
+  <li data-lignes="2">Windows finit chaque ligne par deux caractères, `\r\n` : le retour chariot, puis le retour à la ligne. Linux et macOS, par un seul, `\n`. On garde `\n`.</li>
+  <li data-lignes="3">On retire les caractères de contrôle : des codes invisibles hérités des terminaux et des imprimantes, comme le bip ou le caractère nul. Seuls le retour à la ligne et la tabulation restent. Un `\r` resté seul part aussi.</li>
+  <li data-lignes="4">La forme NFC : un « é » peut s'écrire d'un seul caractère, ou d'un « e » suivi d'un accent. NFC choisit la forme en un seul quand elle existe, pour que deux écritures du même mot soient le même texte.</li>
+  <li data-lignes="5">`rstrip` retire les blancs de la fin : espaces, tabulations, retours à la ligne.</li>
+</CodeExplique>
+
+Puis `nettoyer` applique un seuil :
+
+<CodeExplique fichier="projets/forge/forge/donnees/nettoyage.py" symbole="nettoyer">
+  <li data-lignes="2">D'abord la normalisation.</li>
+  <li data-lignes="3-4">Sous `LONGUEUR_MINIMALE`, {COURT.seuil} caractères, le texte est écarté : la fonction rend `None`. `len` compte en caractères, pas en octets : un « é » compte pour un, même s'il occupe deux octets.</li>
+  <li data-lignes="5">Sinon, elle rend le texte nettoyé.</li>
+</CodeExplique>
+
+Le nettoyage ne corrige rien : ni l'orthographe, ni la typographie. Il ne touche qu'à ce qui ne se voit pas, puis il mesure.
+
+<Pari
+  id="court"
+  question={`Ce texte de ${COURT.longueur} caractères, sans faute, est-il gardé ?`}
+  precision={`« ${COURT.texte} »`}
+  choix={choixCourt(COURT.texte)}
+  acquis="court"
+  ouvre="atelier"
+>
+
+Non : {COURT.longueur} caractères, il en manque {COURT.manque}. Le texte est propre et bien écrit, et il est quand même écarté : le seuil ne juge que la longueur. Une ligne de menu, une légende de photo ou un bout de phrase apprennent peu à un modèle ; forge a choisi de les laisser de côté, quitte à perdre de temps en temps un texte court mais bon. C'est le premier exemple du projet, et son script le dit « trop court ». À toi de jouer : l'atelier de l'étape 5 est ouvert.
+
+</Pari>
+
+</Etape>
+
+<Etape numero={5} titre="L'atelier">
+
+<Verrou nom="atelier" message="Fais ton pari à l'étape 4 : le texte et ses réglages se débloquent juste après.">
+
+Écris ou colle un texte. Dessous, le texte nettoyé : chaque caractère retiré y est marqué, ␍ pour un retour chariot, · pour un autre caractère invisible, un contrôle ou un blanc en fin de texte. Puis sa longueur, le verdict, et son empreinte, dont parle l'étape 6.
+
+<AtelierNettoyeur client:load texteInitial={INITIAL} empreinteInitiale={EMPREINTE_INITIALE} verrou="atelier" acquis="atelier">
+
+Le texte du départ est le deuxième exemple du projet, écrit sous Windows : chaque fin de ligne y perd son ␍. Un champ de saisie ne garde jamais de retour chariot, le navigateur les retire : ce sont les fins de ligne choisies plus haut qui les remettent, comme dans un fichier enregistré sous Windows. Ajoute une espace à la fin, ou colle un texte copié d'un vieux logiciel, et regarde ce qui part.
+
+</AtelierNettoyeur>
+
+</Verrou>
+
+<Fragment slot="note">
+
+Tout ce qui est jaune se manipule. ␍ est le dessin du retour chariot, `\r` en Python. Le second champ garde ses fins de ligne `\n`.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={6} titre="Les doublons">
+
+Le web se répète : une même dépêche reprise par dix sites, une page copiée, un texte enregistré deux fois. Un texte lu dix fois pèse dix fois plus dans ce que le modèle apprend. Forge ne garde donc chaque texte qu'une fois.
+
+Pour reconnaître un texte déjà vu sans garder tous les textes en mémoire, forge calcule son empreinte, avec SHA-1 : un calcul qui transforme n'importe quel texte en 40 chiffres hexadécimaux, de 0 à 9 et de a à f. Le même texte donne toujours la même empreinte ; deux textes différents, en pratique jamais.
+
+<CodeExplique fichier="projets/forge/forge/donnees/nettoyage.py" symbole="empreinte_du_texte_nettoye">
+  <li data-lignes="1">La fonction reçoit un texte déjà nettoyé : c'est lui qu'on reconnaît, pas le texte brut.</li>
+  <li data-lignes="2">`encode("utf-8")` en fait des octets, `hashlib.sha1` en calcule l'empreinte, et `hexdigest` l'écrit en chiffres hexadécimaux. `usedforsecurity=False` dit à Python que l'empreinte ne protège rien : elle sert seulement à reconnaître des copies.</li>
+</CodeExplique>
+
+Le projet retient les 16 premiers chiffres de chaque empreinte vue, comme le téléchargement de forge :
+
+<CodeExplique fichier="projets/1.2-donnees/donnees_pas_a_pas/trier.py" region="doublons">
+  <li data-lignes="1">La fonction reçoit l'ensemble des empreintes déjà vues, et celle du texte.</li>
+  <li data-lignes="3">Les 16 premiers chiffres, soit 64 bits : en pratique, deux textes différents d'un même corpus n'ont jamais les mêmes.</li>
+  <li data-lignes="4-5">Déjà vue : c'est un doublon.</li>
+  <li data-lignes="6-7">Sinon, on la retient, et le texte est gardé.</li>
+</CodeExplique>
+
+<Pari
+  id="doublon"
+  question={"Le même texte, écrit sous Windows (fins de ligne `\\r\\n`), compte-t-il comme un doublon ?"}
+  precision={`Les exemples 2 et 3 du projet : le même texte de ${DOUBLON.longueur} caractères, l'un fini par \`\\n\` à chaque ligne, l'autre par \`\\r\\n\`. Le premier est déjà gardé.`}
+  choix={CHOIX.doublon}
+  acquis="doublons"
+>
+
+Oui. L'empreinte se calcule sur le texte nettoyé, et le nettoyage a déjà changé chaque `\r\n` en `\n` : les deux textes deviennent le même, et leurs empreintes aussi, qui commencent toutes deux par <code>{DOUBLON.debut}</code>. Leurs octets bruts, eux, diffèrent : {DOUBLON.octetsUnix} contre {DOUBLON.octetsWindows}, un de plus par fin de ligne. Le script du projet range le troisième exemple parmi les doublons, comme le quatrième, copie exacte du deuxième.
+
+Une empreinte ne reconnaît que les copies exactes, une fois nettoyées : une virgule de plus suffit à la changer. Les grands labos chassent aussi les textes presque identiques ; l'étape 9 dit comment.
+
+</Pari>
+
+</Etape>
+
+<Etape numero={7} titre="Mettre de côté la validation">
+
+Au {LIENS.l11 ? <a href={LIENS.l11}>chapitre 1.1</a> : 'chapitre 1.1'}, le modèle était jugé sur un texte qu'il n'avait jamais lu. Ton IA aussi : forge met de côté {VALIDATION.part} des documents, un sur {VALIDATION.uneSur}, pour la validation. Pour savoir lesquels, il ne tire pas au sort : il regarde leur empreinte.
+
+<CodeExplique fichier="projets/forge/forge/donnees/melange.py" symbole="est_validation">
+  <li data-lignes="1">La fonction reçoit l'empreinte d'un texte, et la part à mettre de côté : `0.005`, soit {VALIDATION.part}.</li>
+  <li data-lignes="2">`empreinte[:8]` prend les 8 premiers chiffres, et `int(…, 16)` les lit comme un nombre hexadécimal, entre 0 et 2³² − 1, un peu plus de 4 milliards. Le texte va dans la validation si ce nombre est sous {VALIDATION.part} de 2³². Les empreintes se répartissent comme au hasard : environ un texte sur {VALIDATION.uneSur} tombe sous ce seuil.</li>
+</CodeExplique>
+
+Le choix ne dépend que du texte. On peut relancer le téléchargement, changer l'ordre des sources, reprendre après une coupure : le même texte tombe toujours du même côté. Un texte de validation ne glisse donc jamais dans l'entraînement au second essai.
+
+<Pari
+  id="validation"
+  question={`Ajoute aux exemples du projet le carnet de l’essai numéro ${VALIDATION.essai} : le tri le met de côté pour la validation. Tu relances le tri sur les mêmes documents, dans l’ordre inverse. Où va ce carnet ?`}
+  precision={`Un carnet est un texte de ${VALIDATION.longueur} caractères, qui ne change d’un essai à l’autre que par son numéro.`}
+  choix={CHOIX.validation}
+  acquis="validation"
+>
+
+Encore dans la validation : son empreinte ne change pas, donc son côté non plus. Un vrai tirage au sort donnerait un autre résultat à chaque fois ; l'empreinte, elle, donne le même « tirage » pour le même texte.
+
+Pour trouver ce carnet, il a fallu en essayer {VALIDATION.essais}, du numéro 0 au numéro {VALIDATION.essai} : tous les autres vont à l'entraînement. Un sur {VALIDATION.uneSur} est une moyenne, et sur quelques centaines de textes, le hasard des empreintes s'en écarte facilement.
+
+</Pari>
+
+</Etape>
+
+<Etape numero={8} titre="Ce qu'on garde vraiment">
+
+Le projet a lu les trois sources pour de vrai, en flux, jusqu'à garder {PART.mio} Mio de texte de chacune. Pour le web, le tri n'écarte que les textes trop courts et les doublons : aucune licence ni aucun langage n'y sont filtrés.
+
+<Pari
+  id="part"
+  question="Sur les documents du web français lus par l'aperçu, quelle part le tri a-t-il gardée ?"
+  precision={`Il a lu ${PART.webLus} documents de FineWeb-2, en flux, jusqu’à en garder ${PART.mio} Mio de texte.`}
+  choix={choixPartGardee(APERCU)}
+  acquis="melange"
+>
+
+Tous : {PART.webLus} sur {PART.webLus}. FineWeb-2 arrive déjà filtré et dédoublonné : ses auteurs ont gardé un seul document par groupe de copies, langue par langue, puis écarté les pages de mauvaise qualité, comme le dit sa <a href={SOURCES.fineweb}>carte</a>. Notre tri n'y a trouvé ni doublon, ni texte de moins de {COURT.seuil} caractères. Wikipédia non plus : {PART.wikiLus} articles sur {PART.wikiLus}.
+
+Le code, lui, ne passe presque pas : sur {PART.codeLus} fichiers lus, {PART.codeGardes} sont gardés, soit {PART.codePart}. Parmi les autres, {PART.langage} sont écartés pour leur langage, {PART.licence} pour leur licence et {PART.court} parce qu'ils sont trop courts. Pour garder autant de texte, le projet a donc lu {PART.fois} fois plus de fichiers de code que de documents du web. Les parts du mélange se comptent après le tri : pour tenir ses {MEL.code} de code, ton IA doit en lire beaucoup plus.
+
+</Pari>
+
+<SortieCommande
+  fichier={MESURES_PARTIE_1.sortieApercu}
+  commande={DONNEES_APERCU}
+  legende="La sortie de l'aperçu des trois sources, lues en flux sur Hugging Face"
+  absent="À mesurer : l'aperçu des trois sources."
+/>
+
+Dans ce petit aperçu, {PART.webValidation} documents du web sont mis de côté pour la validation : un échantillon trop petit pour en tirer une part.
+
+Ces quelques Mio ne sont qu'un aperçu. Le corpus principal de ton IA, prêt pour son entraînement, compte {CORPUS.gio} Gio de texte et {CORPUS.documents} de documents, rangés en {CORPUS.fragments} fragments : {CORPUS.web} du web, {CORPUS.wiki} de Wikipédia et {CORPUS.code} de code, à peu près les parts du mélange. Découpé en jetons, les morceaux du {LIENS.l13 ? <a href={LIENS.l13}>chapitre 1.3</a> : 'chapitre 1.3'}, il fait {CORPUS.train} de jetons d'entraînement et {CORPUS.val} de validation, un jeton valant en moyenne {CORPUS.octetsParJeton} octets de texte. Sur ce grand nombre, les {CORPUS.docsVal} documents de validation font {CORPUS.partVal} des documents : la part choisie par `est_validation`.
+
+</Etape>
+
+<Etape numero={9} titre="Chez un grand labo">
+
+Ton IA lit trois sources, nettoyées et dédoublonnées par un script de quelques pages. Un grand labo fait le même travail, à une autre échelle.
+
+<EncadreLabo sources={LABO.sources}>
+
+Meta a décrit les données de Llama 3 : environ {LABO.jetons} de jetons, des connaissances qui s'arrêtent à la fin de {LABO.annee}, et un mélange final d'environ {LABO.connaissances} de connaissances générales, {LABO.maths} de maths et de raisonnement, {LABO.code} de code et {LABO.multilingue} de textes multilingues. Les copies y sont chassées trois fois : par adresse de page, par document, même presque identique, et par ligne, en retirant les lignes qui reviennent plus de {LABO.fois} fois dans un paquet de {LABO.paquet} millions de documents. Ton IA lit environ {LABO.rapport} fois moins de jetons.
+
+FineWeb-2, à lui seul, compte en français {LABO.fwMots} de mots dans {LABO.fwDocuments} de documents, et {LABO.fwTotal} de mots dans toutes ses langues.
+
+En Europe, le règlement sur l'IA, à son article {LABO.article}, demande au fournisseur d'un modèle d'IA à usage général deux choses sur ses données : une politique pour respecter le droit d'auteur, y compris les réserves de droits exprimées par leurs titulaires, et un résumé « suffisamment détaillé » du contenu utilisé pour l'entraîner, publié selon un modèle du Bureau de l'IA. D'après son article 113, ces obligations s'appliquent depuis le {LABO.depuis} ; un modèle mis sur le marché avant cette date a jusqu'au {LABO.anterieurs}, d'après son article 111. Savoir si un modèle comme ton IA est concerné est une question juridique, que ce site ne tranche pas.
+
+</EncadreLabo>
+
+</Etape>
+
+<Etape numero={10} titre="Le projet">
+
+<RecupererProjet
+  projet="1.2-donnees"
+  intro="Le projet du chapitre est dans le dépôt du site : le tri pas à pas, sur le vrai code de forge, avec ses exemples et son aperçu des sources."
+  suite="Puis, dans le dossier du projet, trie les exemples du web :"
+/>
+
+<BlocCommande commandes={[DONNEES_TRIER]} ou="un terminal, dans le dossier du projet" />
+
+Chaque document reçoit son verdict, le même que dans ce chapitre : le premier est trop court, le deuxième gardé, le troisième et le quatrième sont des doublons. Pour lancer les tests :
+
+<BlocCommande commandes={[LANCER_TESTS]} ou="un terminal, dans le dossier du projet" />
+
+Le projet complet, avec un notebook qui refait le tri pas à pas, est sur GitHub :
+
+<LiensProjet projet="1.2-donnees" />
+
+### À suivre
+
+Ton IA a ses textes. Il reste à les découper en morceaux qu'elle sait lire : c'est le chapitre 1.3, {SUITE.lien ? <a href={SUITE.lien}>{SUITE.titre}</a> : SUITE.titre}.
+
+</Etape>

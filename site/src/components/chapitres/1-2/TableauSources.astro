@@ -1,0 +1,220 @@
+---
+// Le tableau des trois sources de ton IA : leur nom et leur dépôt sur Hugging
+// Face, leur taille, leur licence et leur accès, d'après les relevés de
+// sources-1-2.ts (tailles par l'API de Hugging Face, licences et accès par la
+// fiche de chaque jeu, le 9 novembre 2026). Les tailles sont écrites en Gio,
+// comme dans tout le site ; la phrase sous le tableau dit une fois l'unité de
+// Hugging Face, des GB de 10⁹ octets.
+//
+// Le lien vers l'annuaire des données vient de ANNEXES (parcours.ts), lu à la
+// construction : il ne paraît que quand l'annexe a son adresse (`href`), et
+// jamais vers une page absente.
+import { nombre } from '../../../lib/nombres';
+import { ANNEXES } from '../../../lib/parcours';
+import { NOMS_DES_SOURCES } from '../../../lib/partie-1/donnees';
+import { enGio, FICHES_DES_SOURCES, TAILLES_DES_SOURCES } from '../../../lib/partie-1/sources-1-2';
+import { typographier } from '../../../lib/typo';
+
+const annuaire = ANNEXES.find((a) => a.titre.startsWith('Annuaire des données'));
+if (annuaire === undefined) {
+  throw new Error('TableauSources : l’annexe « Annuaire des données, modèles et outils » manque dans ANNEXES (src/lib/parcours.ts).');
+}
+
+// Une décimale, deux sous 10 Gio : « 502,8 Gio », « 4,30 Gio », comme docs/donnees.md.
+const decimales = (gio: number) => (gio < 10 ? 2 : 1);
+const lignes = NOMS_DES_SOURCES.map((source) => {
+  const fiche = FICHES_DES_SOURCES[source];
+  const taille = TAILLES_DES_SOURCES[source];
+  const gio = enGio(taille.octets);
+  return {
+    source,
+    fiche,
+    proprietaire: fiche.depot.split('/')[0],
+    jeu: fiche.depot.split('/')[1],
+    partie: fiche.dossier !== null ? `dossier ${fiche.dossier}` : `configuration ${fiche.configuration}`,
+    gio: `${nombre(gio, decimales(gio))}\u202FGio`,
+    fichiers: `${nombre(taille.fichiers)} fichiers`,
+    gb: `${nombre(taille.octets / 1e9, decimales(taille.octets / 1e9))}\u202FGB`,
+  };
+});
+const [web, wiki, code] = lignes;
+const unites = typographier(
+  `Hugging Face écrit ces tailles en GB, des milliards d’octets : ${web.gb}, ${wiki.gb} et ${code.gb}. ` +
+    'Le site écrit les siennes en Gio, des paquets de 2³⁰ octets, comme ses annexes : un Gio vaut un peu plus ' +
+    'qu’un GB.',
+);
+const releve = typographier('Relevé le 9 novembre 2026, à l’API de Hugging Face : ');
+---
+
+<figure class="tableau-sources" data-test="sources">
+  <table>
+    <caption>{typographier('Les trois sources de ton IA, sur Hugging Face')}</caption>
+    <thead>
+      <tr>
+        <th scope="col">Source</th>
+        <th scope="col" class="nombre">Taille</th>
+        <th scope="col">Licence</th>
+        <th scope="col">Accès</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        lignes.map((l) => (
+          <tr data-source={l.source}>
+            <th scope="row">
+              <span class="nom">{typographier(l.fiche.nom)}</span>
+              {/* Le dépôt se coupe après « / », jamais au milieu d'un nom. */}
+              <code>
+                {l.proprietaire}/<wbr />
+                {l.jeu}
+              </code>
+              <span class="petit">{l.partie}</span>
+            </th>
+            <td class="nombre">
+              {l.gio}
+              <span class="petit">{l.fichiers}</span>
+            </td>
+            <td>
+              {l.fiche.licences.map((licence, i) => (
+                <>
+                  {i > 0 && (i === l.fiche.licences.length - 1 ? ' et ' : ', ')}
+                  <a href={licence.source.url}>{licence.nom}</a>
+                </>
+              ))}
+              {l.fiche.precision && <span class="petit">{typographier(l.fiche.precision)}</span>}
+            </td>
+            <td>
+              {l.fiche.libre ? 'libre' : 'sur demande'}
+              <span class="petit">{l.fiche.libre ? 'sans formulaire' : 'formulaire ou accord'}</span>
+            </td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+  <p class="unites">{unites}</p>
+  <p class="unites">
+    {releve}
+    {
+      lignes.map((l, i) => (
+        <>
+          {i > 0 && (i === lignes.length - 1 ? ' et ' : ', ')}
+          {l.fiche.nom.split(',')[0]} (<a href={TAILLES_DES_SOURCES[l.source].api.url}>tailles</a>,{' '}
+          <a href={l.fiche.api.url}>fiche</a>)
+        </>
+      ))
+    }.
+  </p>
+  {
+    annuaire.href !== undefined && (
+      <p class="unites">
+        {typographier('Ces sources, et d’autres, sont dans ')}
+        <a href={annuaire.href} data-annuaire>
+          {typographier('l’annuaire des données')}
+        </a>
+        .
+      </p>
+    )
+  }
+</figure>
+
+<style>
+  .tableau-sources {
+    margin: 1.1em 0 1.2em;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  caption {
+    text-align: left;
+    caption-side: top;
+    padding-bottom: 8px;
+  }
+
+  thead th {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1.3;
+    color: var(--indigo-doux);
+    text-align: left;
+    vertical-align: bottom;
+    padding: 0 16px 6px 0;
+    border-bottom: 2px solid var(--indigo);
+  }
+
+  tbody th,
+  td {
+    text-align: left;
+    vertical-align: top;
+    padding: 8px 16px 8px 0;
+    border-bottom: 1px solid var(--brume);
+    font-size: 17px;
+    line-height: 1.35;
+  }
+
+  th:last-child,
+  td:last-child {
+    padding-right: 0;
+  }
+
+  tbody th {
+    font-weight: 400;
+  }
+
+  .nom {
+    display: block;
+    font-family: var(--titres);
+    font-weight: 600;
+  }
+
+  code {
+    display: block;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-variant-ligatures: none;
+    overflow-wrap: break-word;
+  }
+
+  .petit {
+    display: block;
+    font-size: 14px;
+    color: var(--indigo-doux);
+  }
+
+  .nombre {
+    font-family: var(--titres);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* Les phrases sous le tableau : à la taille du texte, en encre douce. */
+  .unites {
+    margin: 10px 0 0;
+    color: var(--indigo-doux);
+  }
+
+  @media (max-width: 720px) {
+    thead th {
+      font-size: 14px;
+      padding-right: 8px;
+    }
+
+    tbody th,
+    td {
+      font-size: 15px;
+      padding-right: 8px;
+    }
+
+    code {
+      font-size: 12px;
+    }
+
+    .petit {
+      font-size: 13px;
+    }
+  }
+</style>
