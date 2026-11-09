@@ -1,0 +1,615 @@
+---
+partie: 1
+numero: "1.5"
+titre: "Le pré-entraînement sur ton GPU"
+chapeau: "Ton IA naît ici : elle lit ses textes, pas après pas, et apprend à prédire le jeton suivant. Un petit modèle apprend la même recette sous tes yeux, tu mets un entraînement en pause puis le reprends au même nombre près, et tu suis la version d'une heure de ton IA jusqu'à son dernier pas."
+programme: "10 étapes, 4 paris, environ 35 minutes."
+acquis:
+  - cle: depart
+    texte: "Au premier pas, ton IA donne à peu près la même chance à chaque jeton : sa perte est celle du hasard, ln V."
+    ou: "à l'étape 2"
+  - cle: taux
+    texte: "Un taux d'apprentissage trop grand fait apprendre moins bien, ou plus du tout."
+    ou: "à l'étape 4, au pari sur le taux"
+  - cle: atelier
+    texte: "Un petit modèle apprend sous tes yeux, avec la même recette que ton IA."
+    ou: "à l'étape 4, au bout d'un entraînement de l'atelier"
+  - cle: reprise
+    texte: "Une sauvegarde complète permet de reprendre un entraînement au même nombre près."
+    ou: "à l'étape 6"
+  - cle: courte
+    texte: "Sur une carte graphique, la version d'une heure de ton IA lit des centaines de milliers de jetons chaque seconde."
+    ou: "à l'étape 7"
+---
+
+import { root } from 'astro:config/server';
+import CourbeEntrainement from '../../components/chapitres/1-5/CourbeEntrainement.astro';
+import OuvertureNaissance from '../../components/chapitres/1-5/OuvertureNaissance.astro';
+import TableauSessions from '../../components/chapitres/1-5/TableauSessions.astro';
+import DemoMiniModele from '../../components/demos/DemoMiniModele.astro';
+import BlocCommande from '../../components/gabarit/BlocCommande.astro';
+import RecupererProjet from '../../components/gabarit/RecupererProjet.astro';
+import SortieCommande from '../../components/gabarit/SortieCommande.astro';
+import { materiel } from '../../lib/calculateur/donnees';
+import { dixPuissance, formaterPuissanceDeDix, formaterQuantite } from '../../lib/calculateur/formats';
+import { OPERATIONS_PAR_PARAMETRE_ET_JETON, operationsEntrainement } from '../../lib/calculateur/formules';
+import { CLES_FORGE, dureeHeures, JETONS_PAR_PARAMETRE, MATERIEL_DES_MESURES, MESURES_TON_IA, NOMS_TAILLES, PRESETS_FORGE } from '../../lib/calculateur/ton-ia';
+import { chapitresParus } from '../../lib/chapitres-parus';
+import { exigeur } from '../../lib/exiger';
+import { etatInitial } from '../../lib/mini-modele/apercu';
+import { choixTauxTropGrand, explicationTauxTropGrand, questionTauxTropGrand, TAUX_GRAND } from '../../lib/mini-modele/paris';
+import { PRESETS_MINI } from '../../lib/mini-modele/reglages';
+import { decimalesUtiles, formaterPerte, nombre, pourcent } from '../../lib/nombres';
+import { ANNEXES, hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
+import {
+  ENTRAINER_COURT,
+  PAUSE,
+  PRE_ENTRAINEMENT_COURBE,
+  PRE_ENTRAINEMENT_ESSAI,
+  PRE_ENTRAINEMENT_TESTS,
+  REPRENDRE,
+} from '../../lib/partie-1/commandes';
+import { resultatDuDefi } from '../../lib/partie-1/defi-1-5';
+import { lireEntrainement } from '../../lib/partie-1/journal';
+import { MESURES_PARTIE_1 } from '../../lib/partie-1/mesures';
+import {
+  choixDebitCourte,
+  choixPerteDepartTonIA,
+  choixReprise,
+  dureeDeCalcul,
+  ECART_DU_DEFI,
+  faitsDuPariDebit,
+  faitsDuPariDepart,
+  lireEssaiDeReprise,
+  lireReglages,
+  pasTotalDesReglages,
+  TEXTES_REPRISE,
+  TRANCHES_DEPART,
+} from '../../lib/partie-1/paris-1-5';
+import { LLAMA_31_405B, SOURCES_LABO_1_5 } from '../../lib/partie-1/sources-1-5';
+import { typographier } from '../../lib/typo';
+
+export const exiger = exigeur('le texte du chapitre 1.5 (1-5.mdx)');
+
+export const PARUS = await chapitresParus();
+
+export const LIENS = (() => {
+  // L'annexe du calculateur a sa page (ANNEXES) : l'encadré de l'étape 9 y mène.
+  const calculateur = ANNEXES.find((a) => a.titre === 'Calculateur de coût')?.href ?? null;
+  exiger(calculateur !== null, 'l’annexe du calculateur n’a plus de page : l’encadré de l’étape 9 y mène');
+  return {
+    // Les chapitres 0.2, 0.5, 1.3 et 1.4 ont paru : un lien ne vise qu'un chapitre paru.
+    l02: PARUS.has('0.2') ? hrefChapitre('0.2') : null,
+    l05: PARUS.has('0.5') ? hrefChapitre('0.5') : null,
+    l13: PARUS.has('1.3') ? hrefChapitre('1.3') : null,
+    l14: PARUS.has('1.4') ? hrefChapitre('1.4') : null,
+    calculateur,
+  };
+})();
+
+export const reglage = (x) => {
+  // Un réglage écrit tel qu'il est réglé : « 0,001 », « 0,95 », « 1 ».
+  return nombre(x, decimalesUtiles(Number(x.toPrecision(12))));
+};
+
+export const RACINE = new URL('../', root); // Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+
+export const MINI = (() => {
+  // La version d'une heure de ton IA (« mini ») : le relevé de son journal, versionné par le projet 1.5.
+  const m = lireEntrainement('ton-ia-mini', RACINE);
+  exiger(m !== null, 'le relevé de la version d’une heure (mesures/ton-ia-mini.json) manque');
+  return m;
+})();
+
+export const TON_IA_15 = lireEntrainement('ton-ia-1.5', RACINE); // null jusqu'à son relevé (tâche 16) : « à mesurer ».
+
+export const DEPART = (() => {
+  // Le pari « depart » : la perte du premier pas de mini, face au hasard ln V.
+  const f = faitsDuPariDepart(MINI);
+  // L'explication commence par la bonne tranche, « Plus de 5 », et dit que la perte est un peu au-dessus du hasard.
+  exiger(choixPerteDepartTonIA(MINI).find((c) => c.juste)?.texte === TRANCHES_DEPART[2].texte, 'la perte du premier pas n’est plus « Plus de 5 »');
+  exiger(f.ecart > 0, 'la perte du premier pas n’est plus au-dessus de celle du hasard');
+  return {
+    vocabulaire: nombre(f.vocabulaire),
+    hasard: formaterPerte(f.hasard),
+    premier: formaterPerte(f.premier),
+    ecart: nombre(f.ecart, 2),
+  };
+})();
+
+export const REGLAGES = (() => {
+  // Les réglages de la version d'une heure (configs/mini.toml) et le ratio_min de planning.py.
+  const r = lireReglages('mini', RACINE);
+  const forme = PRESETS_FORGE[r.preset];
+  exiger(forme !== undefined, `la taille « ${r.preset} » de configs/mini.toml n’est pas une taille de forge`);
+  exiger(r.preset === 'mini', 'configs/mini.toml n’entraîne plus la taille mini');
+  // « Dans sa plus petite taille » (étape 1).
+  exiger(CLES_FORGE[0] === 'mini', 'mini n’est plus la plus petite taille de forge');
+  exiger(forme.parametres === MINI.resume.parametres, 'le relevé de mini n’a plus le nombre de paramètres de la taille mini');
+  exiger(pasTotalDesReglages(r) === MINI.resume.pas_total, 'configs/mini.toml ne fait plus le nombre de pas du relevé');
+  const lignes = r.taille_lot_jetons / forme.contexte;
+  exiger(Number.isInteger(lignes) && lignes % r.micro_lot === 0, 'le lot de mini n’est plus fait de micro-lots entiers');
+  // « Le micro-lot le plus rapide mesuré » : celui du repère du calculateur, lu dans configs/mini.toml.
+  exiger(MESURES_TON_IA.mini.carte.microLot === r.micro_lot, 'le micro-lot de mini n’est plus celui de la mesure');
+  exiger(r.echauffement % 2 === 0, 'l’échauffement de mini n’a plus de milieu entier');
+  return {
+    brut: r,
+    lot: nombre(r.taille_lot_jetons),
+    lignes: nombre(lignes),
+    contexte: nombre(forme.contexte),
+    microLot: nombre(r.micro_lot),
+    accumulation: nombre(lignes / r.micro_lot),
+    tauxMax: reglage(r.taux_max),
+    demiEchauffement: nombre(r.echauffement / 2),
+    demiTaux: reglage(r.taux_max / 2),
+    echauffement: nombre(r.echauffement),
+    ratio: reglage(r.ratio_min),
+    tauxMin: reglage(r.ratio_min * r.taux_max),
+    pasTotal: nombre(pasTotalDesReglages(r)),
+    decroissance: reglage(r.poids_decroissance),
+    beta1: reglage(r.betas[0]),
+    beta2: reglage(r.betas[1]),
+    ecretage: reglage(r.ecretage),
+    parametres: nombre(forme.parametres),
+    taille: NOMS_TAILLES.mini,
+  };
+})();
+
+export const ATELIER = (() => {
+  // Le mini-modèle de l'atelier : « la même recette que ton IA, en N paramètres » (N lu dans son moteur).
+  const depart = etatInitial('complet');
+  const c = PRESETS_MINI.complet;
+  const r = REGLAGES.brut;
+  exiger(
+    c.beta1 === r.betas[0] && c.beta2 === r.betas[1] && c.poidsDecroissance === r.poids_decroissance && c.ecretage === r.ecretage && c.ratioMin === r.ratio_min,
+    'le mini-modèle n’a plus la recette de ton IA (betas, décroissance des poids, écrêtage, fin du taux)',
+  );
+  exiger(c.echauffement < c.pasTotal, 'le mini-modèle n’a plus d’échauffement suivi d’une descente');
+  return {
+    parametres: nombre(depart.nbParametres),
+    pas: nombre(c.pasTotal),
+    lot: nombre(c.lot),
+    taux: reglage(c.tauxMax),
+    tauxGrand: reglage(TAUX_GRAND),
+    question: questionTauxTropGrand(),
+    choix: choixTauxTropGrand(),
+    explication: explicationTauxTropGrand(),
+  };
+})();
+
+export const DEFI = (() => {
+  // Le défi de l'atelier : ses pertes viennent du moteur du mini-modèle (defi-1-5.ts).
+  const d = resultatDuDefi();
+  const ecart = (x) => nombre(x - d.defaut.fin, 3);
+  exiger(Number.isFinite(d.suivant.fin), 'le taux qui suit la réponse du défi explose : son explication est à revoir');
+  exiger(d.suivant.fin > d.defaut.fin, 'le taux qui suit la réponse du défi finit plus bas que le défaut');
+  return {
+    ecartMax: nombre(ECART_DU_DEFI, 2),
+    defaut: reglage(d.defaut.taux),
+    finDefaut: formaterPerte(d.defaut.fin),
+    reponse: reglage(d.reponse.taux),
+    finReponse: formaterPerte(d.reponse.fin),
+    ecartReponse: ecart(d.reponse.fin),
+    plusBas: d.reponse.fin < d.defaut.fin,
+    suivant: reglage(d.suivant.taux),
+    finSuivant: formaterPerte(d.suivant.fin),
+    ecartSuivant: ecart(d.suivant.fin),
+  };
+})();
+
+export const ESSAI = (() => {
+  // Le pari « reprise » et l'essai de pause et de reprise du projet, sur le processeur.
+  const e = lireEssaiDeReprise(RACINE);
+  exiger(e.appareil === 'cpu', 'l’essai montré n’est plus celui du processeur');
+  // L'explication commence par la bonne réponse : « Elle continue la courbe, au même nombre près. »
+  exiger(choixReprise(e).find((c) => c.juste)?.texte === TEXTES_REPRISE[0], 'la bonne réponse du pari « reprise » a changé');
+  // « Arrêté au pas 30 » : à mi-chemin, comme le dit la question.
+  exiger(2 * e.pas_de_la_pause === e.pas_total, 'l’essai ne s’arrête plus à mi-chemin');
+  return {
+    choix: choixReprise(e),
+    pas: nombre(e.pas_total),
+    pause: nombre(e.pas_de_la_pause),
+    perte: nombre(e.perte_un_trait, 6),
+  };
+})();
+
+export const COURTE = (() => {
+  // Le pari « courte » et le résumé de la version d'une heure (son journal, relevé par le projet).
+  const r = MINI.resume;
+  const f = faitsDuPariDebit(MINI);
+  const mesure = MESURES_TON_IA.mini.carte.jetonsParSeconde;
+  const ecartMesure = Math.abs(f.debit / mesure - 1);
+  exiger(ecartMesure < 0.01, 'le débit de l’heure entière s’écarte de 1 % ou plus de celui mesuré avant');
+  // L'acquis : « des centaines de milliers de jetons chaque seconde ».
+  exiger(f.debit >= 1e5 && f.debit < 1e6, 'le débit de la version d’une heure n’est plus de quelques centaines de milliers de jetons par seconde');
+  exiger(r.pauses === 0 && MINI.sessions.length === 1, 'la version d’une heure a maintenant des pauses : son texte est à revoir');
+  // La première validation, au pas evaluation_tous_pas : déjà plus de la moitié du chemin.
+  const [pasVal1, val1] = MINI.courbe.validations[0];
+  exiger(pasVal1 === REGLAGES.brut.evaluation_tous_pas, 'la première validation n’est plus au premier palier de validation');
+  const chemin = (r.perte_premier_pas - val1) / (r.perte_premier_pas - r.validation_finale);
+  exiger(chemin > 0.5, 'à la première validation, la perte n’a plus fait la moitié du chemin');
+  exiger(r.validation_finale > r.perte_finale, 'à la fin, la perte de validation n’est plus au-dessus de celle d’entraînement');
+  // « Un peu plus haut » : à moins d'un demi-point.
+  exiger(r.validation_finale - r.perte_finale < 0.5, 'à la fin, la perte de validation n’est plus « un peu » au-dessus de celle d’entraînement');
+  return {
+    choix: choixDebitCourte(MINI),
+    carte: materiel(MATERIEL_DES_MESURES).nom,
+    debit: nombre(f.debit),
+    duree: dureeDeCalcul(r.secondes_de_calcul),
+    jetons: nombre(r.jetons_vus),
+    pas: nombre(r.pas_faits),
+    lot: nombre(f.lot),
+    parJeton: nombre(f.jetonsParParametre),
+    parametres: nombre(r.parametres),
+    mesure: nombre(mesure),
+    ecartMesure: pourcent(ecartMesure, 1),
+    premier: formaterPerte(r.perte_premier_pas),
+    finale: formaterPerte(r.perte_finale),
+    validation: formaterPerte(r.validation_finale),
+    pasVal1: nombre(pasVal1),
+    val1: formaterPerte(val1),
+    partDesPas: pourcent(pasVal1 / r.pas_total, 1),
+  };
+})();
+
+export const PRINCIPAL = (() => {
+  // Ton IA, la vraie : ses réglages (configs/principal.toml), connus avant la fin de l'entraînement.
+  const r = lireReglages('principal', RACINE);
+  const forme = PRESETS_FORGE[r.preset];
+  exiger(forme !== undefined && r.preset === 'tres_grand', 'l’entraînement principal n’est plus la taille très grand');
+  const mini = REGLAGES.brut;
+  exiger(
+    r.betas[0] === mini.betas[0] && r.betas[1] === mini.betas[1] && r.poids_decroissance === mini.poids_decroissance && r.ecretage === mini.ecretage,
+    'l’entraînement principal n’a plus la recette de la version d’une heure',
+  );
+  const parJeton = r.jetons_total / forme.parametres;
+  exiger(Math.abs(parJeton - JETONS_PAR_PARAMETRE) < 0.01, 'l’entraînement principal ne lit plus 20 jetons par paramètre');
+  // « Ton IA, la vraie, demande des jours de calcul » (étape 6) : au débit mesuré de sa taille, plus de deux jours.
+  exiger(dureeHeures(r.jetons_total, MESURES_TON_IA[r.preset].carte.jetonsParSeconde) > 48, 'l’entraînement principal ne demande plus des jours de calcul');
+  return {
+    taille: NOMS_TAILLES.tres_grand,
+    parametres: nombre(forme.parametres),
+    fois: nombre(Math.round(forme.parametres / MINI.resume.parametres)),
+    jetons: nombre(r.jetons_total),
+    parJeton: nombre(JETONS_PAR_PARAMETRE),
+    pas: nombre(pasTotalDesReglages(r)),
+    lot: nombre(r.taille_lot_jetons),
+    taux: reglage(r.taux_max),
+  };
+})();
+
+export const RESUME_15 = (() => {
+  // Le résumé de l'entraînement principal : null jusqu'à son relevé (tâche 16).
+  if (TON_IA_15 === null) return null;
+  const r = TON_IA_15.resume;
+  return {
+    pas: nombre(r.pas_faits),
+    jetons: nombre(r.jetons_vus),
+    duree: dureeDeCalcul(r.secondes_de_calcul),
+    sessions: nombre(TON_IA_15.sessions.length),
+    premier: formaterPerte(r.perte_premier_pas),
+    finale: formaterPerte(r.perte_finale),
+    validation: formaterPerte(r.validation_finale),
+  };
+})();
+
+export const LABO = (() => {
+  // Llama 3.1 405B (sources-1-5.ts), face à la version d'une heure de ton IA.
+  const l = LLAMA_31_405B;
+  const heuresMini = MINI.resume.secondes_de_calcul / 3600;
+  const opsMini = operationsEntrainement(MINI.resume.parametres, MINI.resume.jetons_vus);
+  const foisOps = l.operations.valeur / opsMini;
+  exiger(foisOps > 1e8 && foisOps < 1e9, 'Llama 3.1 405B n’a plus fait des centaines de millions de fois les opérations de mini');
+  // « Des cartes bien plus puissantes que celle de l'auteur » : plus de cinq fois sa crête (données du calculateur).
+  exiger(materiel('h100-sxm').creteTflops > 5 * materiel(MATERIEL_DES_MESURES).creteTflops, 'une H100 n’est plus bien plus puissante que la carte de l’auteur');
+  // « Des centaines de fois » : les interruptions de la période observée.
+  exiger(l.interruptions.valeur >= 200, 'Llama 3.1 405B n’a plus eu des centaines d’interruptions');
+  const [mantisse, exposant] = l.operations.valeur.toExponential().split('e').map(Number);
+  return {
+    heures: `${nombre(l.heuresH100.valeur / 1e6, 2)} millions`,
+    heuresMini: `${nombre(heuresMini, 1)} ${Number(heuresMini.toFixed(1)) < 2 ? 'heure' : 'heures'}`,
+    foisHeures: formaterQuantite(l.heuresH100.valeur / heuresMini),
+    cartes: nombre(l.cartesMax.valeur),
+    jours: nombre(l.joursObserves.valeur),
+    interruptions: nombre(l.interruptions.valeur),
+    prevues: nombre(l.interruptionsPrevues.valeur),
+    imprevues: nombre(l.interruptionsImprevues.valeur),
+    operations: `${nombre(mantisse, decimalesUtiles(mantisse))}\u202F×\u202F${dixPuissance(exposant)}`,
+    opsMini: formaterPuissanceDeDix(opsMini),
+    foisOps: `${nombre(Math.round(foisOps / 1e7) * 10)} millions`,
+    parJeton: nombre(OPERATIONS_PAR_PARAMETRE_ET_JETON),
+  };
+})();
+
+export const SUITE = (() => {
+  // L'« À suivre » : le chapitre 1.6, un lien s'il a paru.
+  const { chapitre } = trouverChapitre('1.6');
+  return { titre: typographier(`« ${titreCourt(chapitre.titre)} »`), lien: PARUS.has(chapitre.numero) ? hrefChapitre(chapitre.numero) : null };
+})();
+
+<Etape numero={1} titre="Ton IA naît">
+
+<OuvertureNaissance />
+
+Voici ton IA dans sa version d'une heure, la taille « {REGLAGES.taille} » : {REGLAGES.parametres} paramètres, le transformer du {LIENS.l14 ? <a href={LIENS.l14}>chapitre 1.4</a> : 'chapitre 1.4'} dans sa plus petite taille. Au premier pas, ils ne savent rien ; au dernier, le {REGLAGES.pasTotal}ᵉ, ils ont été corrigés à chaque pas, d'après tout ce qu'elle a lu.
+
+Entre les deux, le pré-entraînement : elle lit des textes, morceau par morceau, et apprend à prédire le jeton qui vient ensuite. C'est son premier entraînement, et le plus long. Ce chapitre l'ouvre pièce par pièce : la perte, le lot, le taux, l'optimiseur, puis la pause et la reprise. Un petit modèle refait la même recette dans ta page, et la version d'une heure se refait sur ta carte graphique. Ton IA, la vraie, suit le même chemin, en bien plus long.
+
+</Etape>
+
+<Etape numero={2} titre="La perte au départ">
+
+À chaque position d'un texte, ton IA donne une probabilité à chacun des {DEPART.vocabulaire} jetons de son vocabulaire, celui du {LIENS.l13 ? <a href={LIENS.l13}>chapitre 1.3</a> : 'chapitre 1.3'}. Sa perte, c'est l'entropie croisée du {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : 'chapitre 0.2'} : <span class="formule-en-texte">−ln p</span>, où p est la probabilité qu'elle donnait au bon jeton, en moyenne sur tous les jetons d'un lot. Elle vaut 0 si ton IA était sûre du bon jeton, et grandit à mesure qu'elle lui en donnait moins.
+
+<Pari
+  id="depart"
+  question="Avant d'avoir rien appris, quelle perte a ton IA au premier pas ?"
+  precision={`Ses poids sont tirés au hasard. Elle choisit parmi ${DEPART.vocabulaire} jetons.`}
+  choix={choixPerteDepartTonIA(MINI)}
+  acquis="depart"
+  ouvre="depart"
+>
+
+Plus de 5 : au premier pas de la version d'une heure, elle valait {DEPART.premier}. Avec des poids tirés au hasard, ton IA donne à peu près la même chance à chacun des {DEPART.vocabulaire} jetons : p vaut à peu près 1 sur {DEPART.vocabulaire}, et la perte, <span class="formule-en-texte">ln {DEPART.vocabulaire}</span>, soit {DEPART.hasard}. C'est la perte du hasard : ln V, pour un vocabulaire de V jetons. Celle du premier pas n'en est éloignée que de {DEPART.ecart} : au départ, ton IA ne sait vraiment rien. Cette perte est maintenant dévoilée dans l'ouverture, au pas 1.
+
+Tout l'entraînement consiste à faire descendre ce nombre. Il ne descendra jamais à 0 : même un texte bien connu laisse plusieurs suites possibles.
+
+</Pari>
+
+</Etape>
+
+<Etape numero={3} titre="Le lot, le taux, le planning">
+
+Un pas d'entraînement, c'est la boucle du {LIENS.l05 ? <a href={LIENS.l05}>chapitre 0.5</a> : 'chapitre 0.5'} : lire un lot, mesurer la perte, calculer le gradient, corriger les poids. À chaque pas, la version d'une heure lit un lot de {REGLAGES.lot} jetons : {REGLAGES.lignes} lignes de {REGLAGES.contexte} jetons, la longueur de son contexte. Pour chaque ligne, elle doit deviner, à chaque position, le jeton qui suit.
+
+La carte graphique ne traite pas ces {REGLAGES.lignes} lignes d'un coup. Elle les prend par micro-lots de {REGLAGES.microLot} lignes, le réglage le plus rapide mesuré sur la carte de l'auteur, et additionne leurs gradients avant de toucher aux poids : {REGLAGES.accumulation} micro-lots par pas. C'est l'accumulation de gradient. Le pas est le même que si la carte avait tout lu d'un coup.
+
+Reste à savoir de combien corriger les poids : c'est le taux d'apprentissage. Ton IA ne le garde pas fixe. Elle suit un planning, celui de forge :
+
+<CodeExplique fichier="projets/forge/forge/entrainement/planning.py" symbole="taux">
+  <li data-lignes="1">`taux` reçoit le numéro du pas, le nombre de pas, le taux maximal et la durée de l'échauffement. `ratio_min` dit où finit la descente : à {REGLAGES.ratio} fois le taux maximal.</li>
+  <li data-lignes="3-4">L'échauffement : le taux monte en ligne droite, de 0 au taux maximal. Au début, les poids sont tirés au hasard et les gradients partent dans tous les sens : de grands pas déstabiliseraient le modèle. Pour la version d'une heure, au pas {REGLAGES.demiEchauffement}, à mi-échauffement, il vaut {REGLAGES.demiTaux}.</li>
+  <li data-lignes="5-6">Après le dernier pas, le taux ne bouge plus.</li>
+  <li data-lignes="7">`avancement` va de 0, à la fin de l'échauffement, à 1, au dernier pas.</li>
+  <li data-lignes="8">La descente suit une demi-vague de cosinus : cos 0 vaut 1, et le taux est au maximum ; cos π vaut −1, et il est au minimum. Elle est douce au début et à la fin, plus rapide au milieu.</li>
+</CodeExplique>
+
+Pour la version d'une heure : le taux monte de 0 à {REGLAGES.tauxMax} pendant {REGLAGES.echauffement} pas, puis redescend jusqu'à {REGLAGES.tauxMin} au pas {REGLAGES.pasTotal}. En fin d'entraînement, de petits pas affinent ce qui est appris sans le défaire.
+
+Le taux ne dépend que du numéro du pas. Après une pause, il repart donc au bon endroit sans rien garder d'autre que ce numéro : l'étape 6 s'en servira.
+
+</Etape>
+
+<Etape numero={4} titre="L'atelier : un petit modèle apprend">
+
+Ton IA met une heure à apprendre dans sa plus petite taille. Ce petit modèle-là apprend dans ta page, en quelques secondes : un transformer minuscule, qui invente des prénoms, caractère par caractère. C'est la même recette que ton IA, en {ATELIER.parametres} paramètres : le même optimiseur, le même écrêtage, le même planning du taux. À chaque pas, il lit {ATELIER.lot} prénoms.
+
+Son taux maximal est réglable. D'habitude, il vaut {ATELIER.taux}.
+
+<Pari
+  id="taux"
+  question={ATELIER.question}
+  choix={ATELIER.choix}
+  acquis="taux"
+  ouvre="atelier"
+>
+
+<p>{ATELIER.explication}</p>
+
+Essaie-le : lance un entraînement au taux habituel, puis règle le taux sur {ATELIER.tauxGrand}, relance, et compare avec la courbe d'avant, en pointillé.
+
+</Pari>
+
+<Verrou nom="atelier" message="Fais le pari juste au-dessus : l'atelier s'ouvre juste après.">
+  <DemoMiniModele verrou="atelier" acquis="atelier" />
+</Verrou>
+
+**Ton défi.** À la fin de chaque entraînement, la liste sous la courbe donne son erreur de validation au pas {ATELIER.pas}, le dernier. Trouve le plus grand taux dont cette erreur ne dépasse pas de plus de {DEFI.ecartMax} celle du taux habituel, {DEFI.defaut}.
+
+<details class="reponse-defi">
+<summary><span class="bascule-soleil">La réponse du défi</span></summary>
+
+{DEFI.reponse} : au pas {ATELIER.pas}, son erreur de validation vaut {DEFI.finReponse}, contre {DEFI.finDefaut} au taux habituel, {DEFI.plusBas ? 'plus bas encore' : `${DEFI.ecartReponse} de plus`}. À {DEFI.suivant}, elle finit à {DEFI.finSuivant}, {DEFI.ecartSuivant} de plus : c'est trop. Un taux un peu plus grand apprend presque aussi bien ; un taux bien plus grand, non. Ces erreurs sont celles que la démo affiche : la page les a calculées avec le même moteur, les mêmes prénoms et la même graine.
+
+</details>
+
+<Fragment slot="note">
+
+Tout ce qui est jaune se manipule. Le taux se fait glisser à la souris ou au doigt ; au clavier, atteins-le avec Tab, puis utilise les flèches.
+
+Le petit modèle calcule dans ton navigateur, sur le processeur : rien ne passe par la carte graphique. Son erreur, c'est la même perte que celle de ton IA, sur des caractères au lieu de jetons.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={5} titre="AdamW et l'écrêtage">
+
+La descente de gradient du {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : 'chapitre 0.2'} recule chaque poids du taux fois sa pente. Ton IA, elle, utilise AdamW : pour chaque poids, il garde deux moyennes, celle de ses pentes récentes et celle de leurs carrés. Il avance d'après la première, divisée par la racine de la seconde. Un poids dont la pente garde le même signe avance d'à peu près le taux à chaque pas ; un poids dont la pente change sans cesse de signe avance moins. Voici comment forge le crée :
+
+<CodeExplique fichier="projets/forge/forge/entrainement/boucle.py" symbole="_creer_optimiseur">
+  <li data-lignes="1">`_creer_optimiseur` reçoit le modèle, la configuration de l'entraînement et l'appareil.</li>
+  <li data-lignes="2-3">Les poids sont rangés en deux familles : les matrices, qui ont au moins deux dimensions (la table du plongement, les projections de l'attention et du MLP), et les vecteurs, les poids des RMSNorm.</li>
+  <li data-lignes="4-7">La décroissance des poids, {REGLAGES.decroissance} pour la version d'une heure, ne s'applique qu'aux matrices : à chaque pas, elle tire doucement chacun de leurs poids vers 0.</li>
+  <li data-lignes="8-9">AdamW, avec le taux maximal et `betas`, {REGLAGES.beta1} et {REGLAGES.beta2} : la mémoire des deux moyennes. Plus un beta est proche de 1, plus sa moyenne se souvient loin. `fused` : sur la carte, une seule opération met à jour tous les poids.</li>
+</CodeExplique>
+
+Un lot bizarre peut donner un gradient énorme, et un saut qui défait des heures d'apprentissage. Avant chaque pas d'AdamW, forge l'écrête : si la norme du gradient, la longueur de toutes ses pentes mises bout à bout, dépasse {REGLAGES.ecretage}, toutes les pentes sont réduites dans la même proportion. Voici un pas entier :
+
+<CodeExplique fichier="projets/forge/forge/entrainement/boucle.py" symbole="_pas_d_optimisation">
+  <li data-lignes="1-9">Un pas reçoit le modèle, l'optimiseur, le chargeur des jetons, le nombre de micro-lots par pas, le taux de ce pas (celui du planning), le seuil de l'écrêtage et l'appareil.</li>
+  <li data-lignes="10-11">Le taux du planning est donné à l'optimiseur.</li>
+  <li data-lignes="12-13">Les gradients du pas d'avant sont effacés, et la somme des pertes part de 0.</li>
+  <li data-lignes="14-16">Un micro-lot après l'autre : `x`, des lignes de jetons, et `y`, les mêmes décalées d'un jeton, les jetons à deviner.</li>
+  <li data-lignes="17-18">Le modèle calcule sa perte. Sur la carte, `_autocast` fait les calculs en bfloat16, des nombres sur 16 bits, plus rapides.</li>
+  <li data-lignes="19-20">Chaque perte est divisée par le nombre de micro-lots avant `backward` : les gradients s'additionnent, et leur somme est celle de la perte moyenne du lot entier. `somme` garde les pertes, pour le journal.</li>
+  <li data-lignes="21">L'écrêtage : `clip_grad_norm_` réduit les gradients si leur norme dépasse le seuil, et rend la norme d'avant.</li>
+  <li data-lignes="22-24">La perte moyenne du pas. Si elle, ou la norme, n'est plus un nombre fini, tout s'arrête avant de toucher aux poids : l'entraînement a divergé.</li>
+  <li data-lignes="25-26">AdamW corrige les poids, et le pas rend sa perte, celle que note le journal.</li>
+</CodeExplique>
+
+</Etape>
+
+<Etape numero={6} titre="Pause et reprise">
+
+La version d'une heure tient en une heure. Ton IA, la vraie, demande des jours de calcul, sur un PC qui sert aussi à autre chose. Il faut pouvoir l'arrêter, puis la reprendre plus tard.
+
+<Pari
+  id="reprise"
+  question="Après une pause, la perte du pas repris…"
+  precision="Un entraînement est arrêté à mi-chemin, sauvegardé, puis repris le lendemain."
+  choix={ESSAI.choix}
+  acquis="reprise"
+>
+
+Elle continue la courbe, au même nombre près. Le projet du chapitre le vérifie : un petit modèle s'entraîne {ESSAI.pas} pas d'un trait, puis de nouveau, arrêté au pas {ESSAI.pause} et repris. Les deux finissent sur la même perte, {ESSAI.perte}, au bit près, et chaque pas repris a exactement la perte qu'il avait d'un trait.
+
+Pour cela, la sauvegarde garde tout ce dont le pas suivant dépend :
+
+- les poids du modèle ;
+- l'état d'AdamW : les deux moyennes de chaque poids ;
+- le numéro du pas, qui suffit au planning du taux ;
+- la position dans les données : le prochain morceau de texte à lire ;
+- l'état du hasard, pour qu'il tire les mêmes nombres qu'avant ;
+- et la configuration, pour refuser une reprise qui changerait le calcul.
+
+Sans les moyennes d'AdamW, les pas suivants ne seraient plus les mêmes ; sans la position dans les données, ton IA relirait des textes déjà lus.
+
+</Pari>
+
+Voici le test du projet qui le vérifie, sur le processeur :
+
+<CodeExplique fichier="projets/1.5-pre-entrainement/tests/test_essai.py" region="test-reprise">
+  <li data-lignes="2">`essai_pause_reprise` entraîne le petit modèle trois fois : d'un trait, puis arrêté à mi-chemin, puis repris jusqu'au bout.</li>
+  <li data-lignes="3">L'écart des deux pertes finales doit être exactement 0, pas seulement petit.</li>
+  <li data-lignes="4-5">Et la seconde moitié, refaite pas à pas, a les mêmes pertes que d'un trait.</li>
+</CodeExplique>
+
+Et la commande de l'essai, avec ce qu'elle a affiché :
+
+<SortieCommande
+  fichier={MESURES_PARTIE_1.sortieEssaiProcesseur}
+  commande={PRE_ENTRAINEMENT_ESSAI}
+  legende="L'essai de pause et de reprise, sur le processeur"
+  absent="À mesurer : l'essai de pause et de reprise sur le processeur."
+/>
+
+Avec forge, c'est la même chose, en grand. Pendant l'entraînement de la version d'une heure, que l'étape suivante te fait lancer, {PAUSE} : le pas en cours se termine, tout est sauvegardé, puis forge affiche la commande de reprise et s'arrête. Pour reprendre exactement là :
+
+<BlocCommande commandes={[REPRENDRE]} ou="un terminal, dans le dossier projets/forge du dépôt" />
+
+<Fragment slot="note">
+
+Sur la carte graphique, deux entraînements identiques peuvent différer un peu : certains calculs y additionnent dans un ordre qui varie. La reprise, elle, repart exactement du point sauvegardé. Le projet ne demande l'écart nul que sur le processeur.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={7} titre="La version d'une heure">
+
+La version d'une heure de ton IA a tourné sur la carte de l'auteur, une {COURTE.carte}, d'une traite, sans pause.
+
+<Pari
+  id="courte"
+  question="En moyenne, combien de jetons a-t-elle lus par seconde ?"
+  precision={`Sur la ${COURTE.carte} de l'auteur, pendant toute son heure d'entraînement.`}
+  choix={COURTE.choix}
+  acquis="courte"
+>
+
+{COURTE.debit} jetons par seconde. En {COURTE.duree} de calcul, cela fait {COURTE.jetons} jetons : {COURTE.pas} pas de {COURTE.lot} jetons, soit environ {COURTE.parJeton} jetons lus pour chacun de ses {COURTE.parametres} paramètres. Tu pouvais le calculer à l'étape 3 : le nombre de pas, fois le lot, divisé par les secondes d'une heure.
+
+Avant de la lancer, une mesure de quelques pas en avait prédit {COURTE.mesure} par seconde : l'heure entière a tenu ce rythme, à {COURTE.ecartMesure} près.
+
+</Pari>
+
+Voici sa courbe, relevée dans son journal :
+
+<CourbeEntrainement nom="ton-ia-mini" titre="La courbe de la version d'une heure" />
+
+La perte part du hasard et chute très vite : à la première validation, au pas {COURTE.pasVal1}, la perte de validation est déjà à {COURTE.val1}. Plus de la moitié de la descente est faite, en {COURTE.partDesPas} des pas. Ensuite, elle baisse de plus en plus lentement. La perte d'entraînement finit à {COURTE.finale}, en moyenne sur ses 20 derniers pas. La perte de validation, mesurée sur des textes que ton IA ne lit jamais pendant l'entraînement, finit un peu plus haut, à {COURTE.validation} : ce qu'elle a appris vaut aussi, presque autant, pour des textes nouveaux.
+
+<TableauSessions nom="ton-ia-mini" titre="Les sessions de la version d'une heure" />
+
+Pour la refaire chez toi, sur une carte graphique NVIDIA : télécharger des textes, les encoder avec le tokenizer de ton IA, entraîner la taille « {REGLAGES.taille} », puis l'évaluer. Ce sont ces quatre commandes, dans l'ordre :
+
+<BlocCommande commandes={ENTRAINER_COURT} ou="un terminal, dans le dossier projets/forge du dépôt" />
+
+La dernière commande vise la sauvegarde du dernier pas, avec le chemin du PC de l'auteur, sous `D:\forge-ia-donnees` : remplace-le par le tien. Chez toi, forge range ses données dans le dossier `forge-ia-donnees` de ton dossier personnel, ou dans celui que donne la variable `FORGE_DONNEES`.
+
+<Fragment slot="note">
+
+Le journal ne donne pas de dates : la courbe et le tableau sont relevés dans `mesures/ton-ia-mini.json`, du projet du chapitre, par sa commande `courbe` (étape 10).
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={8} titre="Ton IA, la vraie">
+
+La version d'une heure n'était qu'une répétition. Ton IA, la vraie, a la taille « {PRINCIPAL.taille} » : {PRINCIPAL.parametres} paramètres, environ {PRINCIPAL.fois} fois plus. Son entraînement lit {PRINCIPAL.jetons} jetons, {PRINCIPAL.parJeton} par paramètre, en {PRINCIPAL.pas} pas de {PRINCIPAL.lot} jetons. Il tourne sur la même carte, avec la même recette : AdamW, la même décroissance des poids, le même écrêtage, et un planning du taux qui monte jusqu'à {PRINCIPAL.taux}.
+
+Il ne s'est pas fait d'un trait. Quand le PC servait à autre chose, l'entraînement s'est mis en pause, puis il a repris, exactement comme à l'étape 6. Sa courbe et ses sessions le montreront, avec ses arrêts.
+
+<CourbeEntrainement nom="ton-ia-1.5" titre="La courbe de ton IA" />
+
+<TableauSessions nom="ton-ia-1.5" titre="Les sessions de ton IA" />
+
+{RESUME_15 === null ? (
+  <p data-a-mesurer>{typographier('Son résumé en nombres, ses pas, ses jetons, sa durée de calcul et ses pertes : à mesurer, quand son entraînement sera fini.')}</p>
+) : (
+  <p>{typographier(`En tout, ${RESUME_15.pas} pas et ${RESUME_15.jetons} jetons, en ${RESUME_15.duree} de calcul, sur ${RESUME_15.sessions} sessions. Sa perte part de ${RESUME_15.premier} au premier pas, et finit à ${RESUME_15.finale}, en moyenne sur ses 20 derniers pas ; sa perte de validation, à ${RESUME_15.validation}.`)}</p>
+)}
+
+</Etape>
+
+<Etape numero={9} titre="Chez un grand labo">
+
+Ton IA s'entraîne sur une seule carte. Les grands labos en font travailler des milliers ensemble.
+
+<EncadreLabo sources={SOURCES_LABO_1_5}>
+
+Llama 3.1 405B, de Meta, a demandé {LABO.heures} d'heures de calcul de cartes H100, des cartes de centre de données bien plus puissantes que celle de l'auteur. La version d'une heure de ton IA a pris {LABO.heuresMini} de calcul, sur une seule carte : environ {LABO.foisHeures} de fois moins. Meta l'a entraîné avec jusqu'à {LABO.cartes} cartes à la fois. Son pré-entraînement a compté {LABO.operations} opérations, environ {LABO.foisOps} de fois les {LABO.opsMini} de la version d'une heure, comptées comme le calculateur : {LABO.parJeton} par paramètre et par jeton lu.
+
+Avec autant de cartes, les pannes sont ordinaires. Sur une période de {LABO.jours} jours de son pré-entraînement, Meta a compté {LABO.interruptions} interruptions : {LABO.prevues} prévues, pour de la maintenance, et {LABO.imprevues} imprévues. Comme toutes les cartes calculent ensemble, une seule en panne peut obliger à relancer tout le calcul, depuis une sauvegarde : la pause et la reprise de l'étape 6, des centaines de fois.
+
+Pour estimer la mémoire, la durée et le prix d'un entraînement, à la taille et sur la carte de ton choix, ouvre le <a href={LIENS.calculateur}>calculateur de coût</a>, en annexe.
+
+</EncadreLabo>
+
+<Fragment slot="note">
+
+L'article de Meta appelle ce modèle Llama 3 405B ; ses heures de calcul sont dans la carte de modèle de Llama 3.1. Les 54 jours sont une période observée par Meta, pas toute la durée du pré-entraînement.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={10} titre="Le projet">
+
+<RecupererProjet
+  projet="1.5-pre-entrainement"
+  intro="Le projet du chapitre est dans le dépôt du site : l'essai de pause et de reprise, et la lecture du journal d'un entraînement de forge."
+  suite="Puis, dans le dossier du projet, refais l'essai sur ton processeur :"
+/>
+
+<BlocCommande commandes={[PRE_ENTRAINEMENT_ESSAI]} ou="un terminal, dans le dossier du projet" />
+
+Il doit finir sur « la reprise est exacte : oui ». Si tu as entraîné la version d'une heure, relève sa courbe et ses sessions comme le projet l'a fait :
+
+<BlocCommande commandes={[PRE_ENTRAINEMENT_COURBE]} ou="un terminal, dans le dossier du projet" />
+
+Les chemins en `D:\` sont ceux du PC de l'auteur : remplace-les par les tiens, le `journal.jsonl` de ton entraînement. Le projet utilise PyTorch, comme ceux des chapitres 0.3 à 0.5 et 1.4 : `--extra cpu` prend sa version pour le processeur, qui suffit ici. Pour lancer les tests :
+
+<BlocCommande commandes={[PRE_ENTRAINEMENT_TESTS]} ou="un terminal, dans le dossier du projet" />
+
+Le projet complet, avec un notebook qui refait l'essai pas à pas, est sur GitHub :
+
+<LiensProjet projet="1.5-pre-entrainement" />
+
+### À suivre
+
+Ton IA est née : elle prédit le jeton suivant, et peut donc écrire. Que vaut ce qu'elle écrit ? Le chapitre 1.6, {SUITE.lien ? <a href={SUITE.lien}>{SUITE.titre}</a> : SUITE.titre}, la met à l'épreuve.
+
+</Etape>

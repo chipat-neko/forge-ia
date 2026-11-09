@@ -1,0 +1,372 @@
+---
+// La courbe d'un entraînement de ton IA, lue à la construction dans son relevé
+// (projets/1.5-pre-entrainement/mesures/<nom>.json, par lireEntrainement) : la perte
+// d'entraînement en indigo, déjà moyennée par paquets de pas par le projet, la perte de
+// validation en points, le hasard (ln 32 768) en tirets, et les arrêts entre deux sessions (une
+// pause, une coupure) en traits fins verticaux. Rien n'est recalculé : la page dessine le relevé.
+//
+// Un SVG dessiné à la main (aucune bibliothèque), en viewBox 640 × 280, avec l'échelle de la
+// courbe du mini-modèle (echelleCourbe : de 0 à 1,25 fois le hasard). Les textes (graduations,
+// « hasard », légende) sont du HTML posé autour : ils gardent leur taille. Le SVG est caché aux
+// lecteurs d'écran : un tableau, caché à l'écran, dit la même chose, point de validation par point.
+//
+// Tant que le relevé manque (ton-ia-1.5 jusqu'à la tâche 16), le composant affiche « à mesurer »,
+// marqué data-a-mesurer.
+//
+//   <CourbeEntrainement nom="ton-ia-mini" titre="La courbe de la version d'une heure" />
+import { root } from 'astro:config/server';
+import { cheminCourbe, echelleCourbe, graduations, type Point } from '../../../lib/courbe';
+import { formaterPerte, nombre } from '../../../lib/nombres';
+import { lireEntrainement, type NomEntrainement } from '../../../lib/partie-1/journal';
+import { arretsDeLaCourbe, lignesDeLaCourbe } from '../../../lib/partie-1/paris-1-5';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  nom: NomEntrainement;
+  /** Le titre de la figure, sans point final : « La courbe de la version d'une heure ». */
+  titre: string;
+}
+
+const { nom, titre } = Astro.props;
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const entrainement = lireEntrainement(nom, new URL('../', root));
+
+const LARGEUR = 640;
+const HAUTEUR = 280;
+
+const dessin = (() => {
+  if (entrainement === null) return null;
+  const { courbe, resume, sessions } = entrainement;
+  const e = echelleCourbe(resume.pas_total, courbe.hasard, LARGEUR, HAUTEUR);
+  // Un paquet sans perte finie coupe le tracé (cheminCourbe recommence au point suivant).
+  const enPoints = (points: [number, number | null][]): Point[] => points.map(([pas, perte]) => ({ pas, perte: perte ?? Number.NaN }));
+  const trace = cheminCourbe(enPoints(courbe.pertes), e);
+  // Chaque point de validation est un trait de longueur nulle à bouts ronds : un rond à toute largeur.
+  const points = enPoints(courbe.validations)
+    .map((p) => cheminCourbe([p], e).d)
+    .filter((d) => d !== '')
+    .map((d) => `${d}h0`)
+    .join('');
+  const horsEchelle = trace.horsEchelle || cheminCourbe(enPoints(courbe.validations), e).horsEchelle;
+  if (trace.d === '' || /NaN|Infinity/.test(trace.d + points)) {
+    throw new Error(`CourbeEntrainement : la courbe de ${nom} est vide ou contient une valeur non finie. Vérifie son relevé.`);
+  }
+  const enX = (pas: number) => (pas / e.xMax) * 100;
+  const enY = (v: number) => 100 - ((v - e.yMin) / (e.yMax - e.yMin)) * 100;
+  return {
+    e,
+    trace: trace.d,
+    points,
+    horsEchelle,
+    yHasard: (e.hauteur * enY(courbe.hasard)) / 100,
+    hautHasard: enY(courbe.hasard),
+    arrets: arretsDeLaCourbe(sessions).map((a) => ({ ...a, x: (enX(a.pas) * e.largeur) / 100 })),
+    gradX: graduations(e.xMax, 3).map((v) => ({ v, gauche: enX(v) })),
+    gradY: graduations(e.yMax, 4)
+      .filter((v) => v < e.yMax)
+      .map((v) => ({ v, haut: enY(v), y: (e.hauteur * enY(v)) / 100 })),
+    lignes: lignesDeLaCourbe(courbe),
+    paquet: courbe.taille_paquet,
+    hasard: courbe.hasard,
+  };
+})();
+
+const ecrire = (x: number | null) => (x === null ? 'aucune' : formaterPerte(x));
+const absent = typographier(`${titre} : à mesurer, quand cet entraînement sera fini.`);
+---
+
+{
+  dessin === null ? (
+    <p class="a-mesurer" data-a-mesurer data-courbe-absente={nom}>
+      {absent}
+    </p>
+  ) : (
+    <figure class="courbe-entrainement" data-courbe={nom}>
+      <div class="cadre">
+        <span class="titre-axe titre-y" aria-hidden="true">
+          perte
+        </span>
+        <div class="graduations-y" aria-hidden="true">
+          {dessin.gradY.map((g) => (
+            <span style={`top: ${g.haut}%`}>{nombre(g.v)}</span>
+          ))}
+        </div>
+        <div class="trace">
+          <svg viewBox={`0 0 ${LARGEUR} ${HAUTEUR}`} preserveAspectRatio="none" aria-hidden="true" data-test="courbe-svg">
+            {dessin.gradY
+              .filter((g) => g.v > 0)
+              .map((g) => (
+                <line class="grille" x1="0" x2={LARGEUR} y1={g.y} y2={g.y} />
+              ))}
+            <line class="hasard" x1="0" x2={LARGEUR} y1={dessin.yHasard} y2={dessin.yHasard} />
+            {dessin.arrets.map((a) => (
+              <line class="arret" x1={a.x} x2={a.x} y1="0" y2={HAUTEUR} data-arret={a.pas} data-fin={a.fin} />
+            ))}
+            {/* Les points de validation d'abord : la ligne d'entraînement passe par-dessus, et reste visible. */}
+            <path class="validation" d={dessin.points} data-test="courbe-validation" />
+            <path class="entrainement" d={dessin.trace} data-test="courbe-entrainement" />
+          </svg>
+          <span class="repere-hasard" style={`top: ${dessin.hautHasard}%`} aria-hidden="true">
+            hasard
+          </span>
+        </div>
+      </div>
+      <div class="graduations-x" aria-hidden="true">
+        {dessin.gradX.map((g) => (
+          <span style={`left: ${g.gauche}%`}>{nombre(g.v)}</span>
+        ))}
+      </div>
+      <span class="titre-axe titre-x" aria-hidden="true">
+        pas
+      </span>
+      <figcaption>
+        <span class="titre-figure">{typographier(titre)}</span>
+        <span class="cles" aria-hidden="true">
+          <span>
+            <svg class="cle" viewBox="0 0 24 8">
+              <line class="entrainement" x1="1" x2="23" y1="4" y2="4" />
+            </svg>
+            {typographier(`la perte d’entraînement, en moyenne par paquets de ${nombre(dessin.paquet)} pas`)}
+          </span>
+          <span>
+            <svg class="cle" viewBox="0 0 24 8">
+              <path class="validation" d="M12,4h0" />
+            </svg>
+            la perte de validation, sur des textes jamais lus
+          </span>
+          <span>
+            <svg class="cle" viewBox="0 0 24 8">
+              <line class="hasard" x1="1" x2="23" y1="4" y2="4" />
+            </svg>
+            {typographier(`le hasard, ${formaterPerte(dessin.hasard)}`)}
+          </span>
+          {dessin.arrets.length > 0 && (
+            <span>
+              <svg class="cle" viewBox="0 0 24 8">
+                <line class="arret" x1="12" x2="12" y1="0" y2="8" />
+              </svg>
+              un arrêt, puis une reprise
+            </span>
+          )}
+        </span>
+        {dessin.horsEchelle && <span class="hors-echelle">{typographier('Par endroits, la perte sort du cadre par le haut.')}</span>}
+      </figcaption>
+      {/* Le même contenu pour les lecteurs d'écran, point de validation par point. Des nombres bruts : hors de la recherche.
+          Le tableau est dans une boîte cachée, et non caché lui-même : une table ne se réduit pas à un pixel, et
+          élargirait la page sur un téléphone. */}
+      <div class="vh" data-test="courbe-tableau" data-pagefind-ignore>
+        <table>
+          <caption>
+            {typographier(
+              `${titre}, en nombres. La perte du hasard vaut ${formaterPerte(dessin.hasard)}.` +
+                (dessin.arrets.length > 0
+                  ? ` L’entraînement s’est arrêté, puis a repris, après les pas ${dessin.arrets.map((a) => nombre(a.pas)).join(', ')}.`
+                  : ''),
+            )}
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Pas</th>
+              <th scope="col">{typographier(`Perte d’entraînement (paquet de ${nombre(dessin.paquet)} pas)`)}</th>
+              <th scope="col">Perte de validation</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dessin.lignes.map((l) => (
+              <tr>
+                <th scope="row">{nombre(l.pas)}</th>
+                <td>{ecrire(l.entrainement)}</td>
+                <td>{ecrire(l.validation)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </figure>
+  )
+}
+
+<style>
+  .courbe-entrainement {
+    margin: 0.8em 0 1.4em;
+    font-family: var(--titres);
+    font-size: 13px;
+    line-height: 1.2;
+    color: var(--indigo-doux);
+    /* La place des graduations de la perte, à gauche de la courbe. */
+    --gauche: 2.2em;
+  }
+
+  .cadre {
+    position: relative;
+    padding: 1.6em 0 0 var(--gauche);
+  }
+
+  .titre-axe {
+    font-weight: 600;
+  }
+
+  .titre-y {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .titre-x {
+    display: block;
+    text-align: right;
+    margin-top: 2px;
+  }
+
+  .graduations-y {
+    position: absolute;
+    top: 1.6em;
+    bottom: 0;
+    left: 0;
+    width: var(--gauche);
+  }
+
+  .graduations-y span,
+  .graduations-x span {
+    position: absolute;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .graduations-y span {
+    right: 0.7em;
+    transform: translateY(-50%);
+  }
+
+  .graduations-x {
+    position: relative;
+    height: 1.4em;
+    margin: 4px 0 0 var(--gauche);
+  }
+
+  .graduations-x span {
+    top: 0;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+
+  /* Les graduations des bords restent dans le cadre. */
+  .graduations-x span:first-child {
+    transform: none;
+  }
+
+  .graduations-x span:last-child:not(:first-child) {
+    transform: translateX(-100%);
+  }
+
+  .trace {
+    position: relative;
+  }
+
+  .trace svg {
+    display: block;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    aspect-ratio: 640 / 280;
+    overflow: visible;
+    border-bottom: 1px solid var(--indigo-doux);
+  }
+
+  line,
+  path {
+    vector-effect: non-scaling-stroke;
+    fill: none;
+  }
+
+  .grille {
+    stroke: var(--brume);
+    stroke-width: 1;
+  }
+
+  .hasard {
+    stroke: var(--lavande);
+    stroke-width: 2;
+    stroke-dasharray: 6 5;
+  }
+
+  .arret {
+    stroke: var(--indigo-doux);
+    stroke-width: 1;
+  }
+
+  .entrainement {
+    stroke: var(--indigo);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  .validation {
+    stroke: var(--indigo);
+    stroke-width: 6;
+    stroke-linecap: round;
+  }
+
+  .repere-hasard {
+    position: absolute;
+    right: 0;
+    transform: translateY(-120%);
+    padding: 0 2px;
+    background: var(--papier);
+  }
+
+  figcaption {
+    margin-top: 8px;
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  .titre-figure {
+    display: block;
+    color: var(--indigo);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .cles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    font-size: 13px;
+  }
+
+  .cles > span {
+    white-space: nowrap;
+  }
+
+  .cle {
+    display: inline-block;
+    width: 24px;
+    height: 8px;
+    max-width: none;
+    margin-right: 4px;
+    vertical-align: middle;
+    overflow: visible;
+  }
+
+  .hors-echelle {
+    display: block;
+    margin-top: 4px;
+  }
+
+  .a-mesurer {
+    font-style: italic;
+    color: var(--indigo-doux);
+  }
+
+  @media (max-width: 720px) {
+    /* Sur un téléphone, la courbe gagne en hauteur ce qu'elle perd en largeur. */
+    .trace svg {
+      aspect-ratio: 640 / 400;
+    }
+
+    .cles > span {
+      white-space: normal;
+    }
+  }
+</style>

@@ -1,0 +1,164 @@
+---
+// L'ouverture du chapitre 1.5 : ton IA au premier pas et au dernier, dans sa version d'une heure
+// (la taille « mini »). La perte de ces deux pas vient du relevé de son journal
+// (mesures/ton-ia-mini.json, par lireEntrainement).
+//
+// La perte du premier pas est la réponse du pari de l'étape 2 : elle reste sous un verrou, que ce
+// pari ouvre (le pari vient avant le résultat qu'il demande de deviner). Sans JavaScript, tout se
+// lit.
+//
+// Le texte que mini écrit au dernier pas viendra de son rapport d'évaluation
+// (projets/1.6-evaluation/mesures/evaluation-mini.json, tâche 12) : son journal n'a pas
+// d'échantillon, et son rapport n'en a qu'au dernier pas. D'ici là, il est « à mesurer »
+// (data-a-mesurer).
+import { root } from 'astro:config/server';
+import Verrou from '../../gabarit/Verrou.astro';
+import { formaterPerte, nombre } from '../../../lib/nombres';
+import { lireEntrainement } from '../../../lib/partie-1/journal';
+import { typographier } from '../../../lib/typo';
+
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const mini = lireEntrainement('ton-ia-mini', new URL('../', root));
+if (mini === null) {
+  throw new Error(
+    'OuvertureNaissance : le relevé de la version d’une heure (projets/1.5-pre-entrainement/mesures/ton-ia-mini.json) manque. ' +
+      'Il est versionné : récupère-le, ou relance « python -m pre_entrainement courbe » (README du projet 1.5).',
+  );
+}
+const r = mini.resume;
+// « Une heure de calcul plus tard » : à 5 % près.
+if (Math.abs(r.secondes_de_calcul / 3600 - 1) > 0.05) {
+  throw new Error('Exemple devenu faux : la version d’une heure n’a plus duré une heure de calcul. Revoir OuvertureNaissance.astro.');
+}
+const premier = typographier(`Ses ${nombre(r.parametres)} paramètres sont tirés au hasard : elle ne sait encore rien.`);
+const dernier = typographier('Une heure de calcul plus tard, sur une carte graphique.');
+const echantillon = typographier('Ce qu’elle écrit à ce pas : à mesurer, avec le rapport de son évaluation.');
+const legende = typographier(
+  'La version d’une heure de ton IA, au premier pas et au dernier. Chaque perte est celle d’un seul pas, lue dans le journal de son entraînement.',
+);
+---
+
+<figure class="ouverture-naissance" data-test="ouverture">
+  <div class="moments">
+    <div class="moment" data-moment="premier">
+      <p class="quand">Au pas 1</p>
+      <Verrou nom="depart" message="Ton pari de l'étape 2 dévoile cette perte.">
+        <p class="perte">
+          <span class="nom">perte</span>
+          <span class="valeur" data-test="perte-premier-pas">{formaterPerte(r.perte_premier_pas)}</span>
+        </p>
+      </Verrou>
+      <p class="etat">{premier}</p>
+    </div>
+    <div class="moment" data-moment="dernier">
+      <p class="quand">{`Au pas ${nombre(r.pas_faits)}`}</p>
+      <p class="perte">
+        <span class="nom">perte</span>
+        <span class="valeur" data-test="perte-dernier-pas">{formaterPerte(r.perte_dernier_pas)}</span>
+      </p>
+      <p class="etat">{dernier}</p>
+      <p class="a-mesurer" data-a-mesurer data-echantillon="dernier">{echantillon}</p>
+    </div>
+  </div>
+  <figcaption>{legende}</figcaption>
+</figure>
+
+<style>
+  .ouverture-naissance {
+    margin: 40px 0 1.2em;
+  }
+
+  /* Deux moments côte à côte, sous un trait d'encre ; l'un sous l'autre sur un téléphone. */
+  .moments {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 40px;
+    border-top: 2px solid var(--indigo);
+    padding-top: 14px;
+  }
+
+  .moment {
+    min-width: 0;
+  }
+
+  .moment p {
+    margin: 0;
+  }
+
+  .quand {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--indigo-doux);
+  }
+
+  .perte {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-family: var(--titres);
+    margin: 4px 0 6px;
+  }
+
+  .perte .nom {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--indigo-doux);
+  }
+
+  .perte .valeur {
+    font-size: 56px;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: var(--indigo);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .etat {
+    font-size: 19px;
+    line-height: 1.45;
+  }
+
+  .a-mesurer {
+    margin-top: 8px !important;
+    font-size: 19px;
+    line-height: 1.45;
+    font-style: italic;
+    color: var(--indigo-doux);
+  }
+
+  /* Le message du verrou passe sur un seul nombre : il ne descend pas aussi bas que sur une grande zone. */
+  .moment :global(.verrou-msg) {
+    padding: 0;
+    align-self: center;
+  }
+
+  .moment :global(.verrou-msg p) {
+    font-size: 16px;
+    padding: 8px 12px;
+  }
+
+  figcaption {
+    margin-top: 14px;
+    font-family: var(--titres);
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--indigo-doux);
+  }
+
+  @media (max-width: 720px) {
+    .moments {
+      grid-template-columns: 1fr;
+      gap: 22px;
+    }
+
+    .perte .valeur {
+      font-size: 46px;
+    }
+
+    .etat {
+      font-size: 18px;
+    }
+  }
+</style>

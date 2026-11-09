@@ -1,0 +1,187 @@
+---
+// Les sessions d'un entraînement de ton IA, lues à la construction dans son relevé
+// (projets/1.5-pre-entrainement/mesures/<nom>.json, par lireEntrainement) : une ligne par
+// session, de son début (le départ, ou une reprise) à sa fin (une pause, la fin, une perte non
+// finie, ou une coupure), avec ses pas et sa durée de calcul ; puis le total. Une session plantée
+// avant son premier pas n'a aucun pas (premier et dernier pas à null).
+//
+// Un tableau typographié, sans cadre, comme ceux des autres chapitres (TableauChronos).
+//
+// Tant que le relevé manque (ton-ia-1.5 jusqu'à la tâche 16), le composant affiche « à mesurer »,
+// marqué data-a-mesurer.
+//
+//   <TableauSessions nom="ton-ia-mini" titre="Les sessions de la version d'une heure" />
+import { root } from 'astro:config/server';
+import { nombre } from '../../../lib/nombres';
+import { lireEntrainement, type NomEntrainement } from '../../../lib/partie-1/journal';
+import { dureeDeCalcul, lignesDesSessions } from '../../../lib/partie-1/paris-1-5';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  nom: NomEntrainement;
+  /** Le titre du tableau, sans point final : « Les sessions de la version d'une heure ». */
+  titre: string;
+}
+
+const { nom, titre } = Astro.props;
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const entrainement = lireEntrainement(nom, new URL('../', root));
+const lignes = entrainement === null ? [] : lignesDesSessions(entrainement.sessions);
+const idLegende = `sessions-${nom}`;
+const absent = typographier(`${titre} : à mesurer, quand cet entraînement sera fini.`);
+---
+
+{
+  entrainement === null ? (
+    <p class="a-mesurer" data-a-mesurer data-sessions-absentes={nom}>
+      {absent}
+    </p>
+  ) : (
+    <figure class="tableau-sessions" data-sessions={nom}>
+      <figcaption id={idLegende}>
+        <span class="objet">{typographier(titre)}</span>
+        {typographier(
+          'Une session va du départ, ou d’une reprise, jusqu’à une pause (Ctrl+C), la fin, une perte non finie ou une coupure. ' +
+            'Sa durée est du temps de calcul, sans les pauses.',
+        )}
+      </figcaption>
+      <table aria-labelledby={idLegende} data-test="sessions">
+        <thead>
+          <tr>
+            <th scope="col">Session</th>
+            <th scope="col">Début</th>
+            <th scope="col">Fin</th>
+            <th scope="col" class="nombre">
+              Pas
+            </th>
+            <th scope="col" class="nombre">
+              Durée de calcul
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {lignes.map((l) => (
+            <tr data-session={l.numero}>
+              <th scope="row">{nombre(l.numero)}</th>
+              <td>{l.debut}</td>
+              <td>{l.fin}</td>
+              <td class="nombre">{l.pas}</td>
+              <td class="nombre">{l.duree}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <th scope="row" colspan="3">
+              En tout
+            </th>
+            <td class="nombre">{`${nombre(entrainement.resume.pas_faits)} pas`}</td>
+            <td class="nombre">{dureeDeCalcul(entrainement.resume.secondes_de_calcul)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </figure>
+  )
+}
+
+<style>
+  .tableau-sessions {
+    margin: 1.4em 0 1.2em;
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--indigo-doux);
+    margin-bottom: 10px;
+  }
+
+  /* Pas de classe « titre » : la règle globale .titre du gabarit s'y appliquerait. */
+  figcaption .objet {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--indigo);
+    margin-bottom: 4px;
+  }
+
+  /* Un tableau typographié, sans cadre : un trait d'encre en haut, des filets brume entre les lignes. */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 17px;
+    line-height: 1.35;
+    border-top: 2px solid var(--indigo);
+  }
+
+  thead th {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--indigo-doux);
+    text-align: left;
+    vertical-align: bottom;
+    padding: 6px 0 4px 16px;
+    border-bottom: 2px solid var(--indigo);
+  }
+
+  thead th:first-child {
+    padding-left: 0;
+  }
+
+  tbody th,
+  tfoot th {
+    font-family: var(--titres);
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--brume);
+  }
+
+  td {
+    padding: 7px 0 7px 16px;
+    border-bottom: 1px solid var(--brume);
+  }
+
+  tfoot th,
+  tfoot td {
+    border-bottom: none;
+    border-top: 2px solid var(--indigo);
+  }
+
+  thead th.nombre {
+    text-align: right;
+  }
+
+  tbody th,
+  tbody td,
+  tfoot th,
+  tfoot td {
+    vertical-align: baseline;
+  }
+
+  td.nombre {
+    text-align: right;
+    white-space: nowrap;
+    font-family: var(--titres);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .a-mesurer {
+    font-style: italic;
+    color: var(--indigo-doux);
+  }
+
+  @media (max-width: 720px) {
+    table {
+      font-size: 16px;
+    }
+
+    thead th,
+    td {
+      padding-left: 10px;
+    }
+  }
+</style>
