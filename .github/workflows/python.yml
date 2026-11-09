@@ -10,12 +10,16 @@ on:
       - 'projets/**'
       - 'notebooks/**'
       - 'outils/**'
+      # Les tests de forge relisent la documentation des sources.
+      - 'docs/donnees.md'
       - '.github/workflows/python.yml'
   pull_request:
     paths:
       - 'projets/**'
       - 'notebooks/**'
       - 'outils/**'
+      # Les tests de forge relisent la documentation des sources.
+      - 'docs/donnees.md'
       - '.github/workflows/python.yml'
 
 permissions:
