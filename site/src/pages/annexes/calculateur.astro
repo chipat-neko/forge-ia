@@ -49,6 +49,8 @@ if (href === undefined) throw new Error('calculateur.astro : l’annexe « Calcu
 
   <div class="bloc corps-calculateur">
     <div class="texte">
+      {/* Le composant met ses parties en h3 : un h2 caché les range sous le titre de la page. */}
+      <h2 class="vh">Régler l’entraînement</h2>
       <Calculateur client:load />
     </div>
   </div>

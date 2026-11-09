@@ -65,7 +65,10 @@ test('page de partie', async ({ page }) => {
 test('recherche', async ({ page }) => {
   await page.goto('/forge-ia/recherche/');
   await page.getByRole('searchbox').fill('fusions');
-  await expect(page.locator('[data-resultat]').first()).toContainText('tokenizer');
+  // Depuis l'index du glossaire, plusieurs pages parlent de fusions : l'ordre des résultats peut
+  // changer. 1.3 (le tokenizer) doit en être, et parler de son tokenizer.
+  const chapitre13 = page.locator('[data-resultat]').filter({ has: page.locator('h2 a[href$="/partie-1/1-3/"]') });
+  await expect(chapitre13.first()).toContainText('tokenizer');
   await verifierAxe(page);
   await verifierSansDebordement(page);
 });

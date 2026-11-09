@@ -49,7 +49,7 @@ const dates = [...new Set(ANNUAIRE.map((f) => f.releveLe))].sort();
 const quand = dates.length === 1 ? `le ${formaterDate(dates[0])}` : `du ${formaterDate(dates[0])} au ${formaterDate(dates.at(-1)!)}`;
 const programme = typographier(`${ANNUAIRE.length} jeux en ${GROUPES.length} groupes, relevés ${quand} sur Hugging Face.`);
 
-const COLONNES = ['Nom', 'Ce que c’est', 'Taille annoncée', 'Licence', 'Accès', 'Ton IA', 'Relevé le'];
+const COLONNES = ['Nom', 'Ce que c’est', 'Taille', 'Licence', 'Accès', 'Ton IA', 'Relevé le'];
 ---
 
 <LayoutAnnexe
@@ -80,7 +80,7 @@ const COLONNES = ['Nom', 'Ce que c’est', 'Taille annoncée', 'Licence', 'Accè
     <p>
       {
         typographier(
-          "Chaque taille est celle qu'annonce Hugging Face, dans son unité. Une taille en octets a dessous sa valeur en Gio, de 2³⁰ octets : c'est le Go de la mémoire, dans ce site.",
+          "Chaque taille est celle qu'annonce Hugging Face, dans son unité, ou la somme des fichiers de données du jeu, calculée d'après son API. Sous une taille en octets, sa valeur en Gio, de 2³⁰ octets : c'est le Go de la mémoire, dans ce site.",
         )
       }
     </p>
@@ -164,6 +164,15 @@ const COLONNES = ['Nom', 'Ce que c’est', 'Taille annoncée', 'Licence', 'Accè
                       <td class="releve-le" data-col="Relevé le" data-pagefind-ignore data-test="releve-le">
                         <span class="v">
                           <time datetime={f.releveLe}>{dateCourte(f.releveLe)}</time>
+                          {/* D'où viennent la taille et la fiche, comme les « (tailles, fiche) » de 1.2. */}
+                          <small class="sources" data-test="sources-fiche">
+                            {f.sourceTaille !== undefined && (
+                              <>
+                                <a href={f.sourceTaille}>taille</a>,{' '}
+                              </>
+                            )}
+                            <a href={f.source}>fiche</a>
+                          </small>
                         </span>
                       </td>
                     </tr>
@@ -350,6 +359,10 @@ const COLONNES = ['Nom', 'Ce que c’est', 'Taille annoncée', 'Licence', 'Accè
     font-variant-numeric: tabular-nums;
     color: var(--indigo-doux);
     white-space: nowrap;
+  }
+
+  .annuaire .releve-le a {
+    color: var(--indigo);
   }
 
   .annuaire .non {

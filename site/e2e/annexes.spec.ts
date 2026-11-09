@@ -101,6 +101,10 @@ test('glossaire : chaque terme a son ancre, et l’adresse #<id> mène à son te
   await ouvrir(page, `${GLOSSAIRE_HREF}#perplexite`);
   await expect(page.locator('#perplexite')).toBeInViewport();
   await expect(page.locator('#perplexite')).toHaveText('perplexité');
+  // Les renvois sont de la navigation : hors de l'index de la recherche.
+  for (const renvois of await page.locator('.renvois').all()) {
+    expect(await renvois.evaluate((e) => e.closest('[data-pagefind-ignore]') !== null)).toBe(true);
+  }
 });
 
 test('glossaire : le filtre réduit la liste, garde les termes d’un chapitre, et dit quand rien ne reste', async ({ page }) => {
@@ -120,7 +124,7 @@ test('glossaire : le filtre réduit la liste, garde les termes d’un chapitre, 
   await expect(page.locator('[data-terme] mark').first()).toHaveText(/gradient/i);
   await expect(compte).toHaveText(`${attendus.length} termes sur ${GLOSSAIRE.length} pour «${FINE}gradient${FINE}».`);
 
-  // Un numéro de chapitre garde les termes que ce chapitre explique.
+  // Un numéro de chapitre garde les termes dont ce chapitre parle (expliqués, cités ou appliqués).
   await champ.fill('1.3');
   const du13 = GLOSSAIRE.filter((t) => t.renvois.some((r) => r.chapitre === '1.3'));
   await expect(visibles).toHaveCount(du13.length);
@@ -191,6 +195,11 @@ test('annuaire : une ligne par fiche, les jeux de ton IA marqués, les dates hor
     await expect(ligne.getByRole('link', { name: f.nom, exact: true })).toHaveAttribute('href', f.url);
     if (f.licence === null) await expect(ligne.locator('.licence')).toContainText('non indiquée');
     await expect(ligne.locator('[data-test="releve-le"] time')).toHaveAttribute('datetime', f.releveLe);
+    // On remonte au relevé : la fiche (réponse de l'API), et la source de la taille quand il y en a une.
+    const sources = ligne.locator('[data-test="sources-fiche"]');
+    await expect(sources.getByRole('link', { name: 'fiche' })).toHaveAttribute('href', f.source);
+    if (f.sourceTaille !== undefined) await expect(sources.getByRole('link', { name: 'taille' })).toHaveAttribute('href', f.sourceTaille);
+    else await expect(sources.getByRole('link', { name: 'taille' })).toHaveCount(0);
   }
   // Les colonnes de dates restent hors de l'index de la recherche ; le reste du tableau y entre.
   const dates = page.locator('[data-test="releve-le"], thead th:last-child');

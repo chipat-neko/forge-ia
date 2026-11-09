@@ -7,7 +7,7 @@
 //
 // Le champ du haut filtre la liste dans la page : un mot (cherché dans le terme, ses
 // autres noms et sa définition, sans accents ni capitales), ou un numéro de chapitre,
-// qui garde les termes de ce chapitre. Sans JavaScript, le champ reste caché, et toute
+// qui garde les termes dont ce chapitre parle (expliqués, cités ou appliqués). Sans JavaScript, le champ reste caché, et toute
 // la liste se lit.
 //
 // La page est dans l'index de la recherche : chaque terme a son titre et son ancre
@@ -44,6 +44,8 @@ const programme = typographier(
   `${GLOSSAIRE.length} termes, de « ${premier} » à « ${dernier} », de la Partie 0 au chapitre ${plusLoin}.`,
 );
 const VOIR_AUSSI = typographier('voir aussi : ');
+// Entre « en » et le titre du chapitre, qui ne se coupe pas : jamais de « en » seul en fin de ligne.
+const INSECABLE = '\u00A0';
 ---
 
 <LayoutAnnexe
@@ -126,12 +128,14 @@ const VOIR_AUSSI = typographier('voir aussi : ');
                   )}
                 </div>
                 <p class="def">{typographier(t.definition)}</p>
-                <p class="renvois">
+                {/* Les renvois sont de la navigation : hors de l'index de la recherche, où leurs « voir aussi »
+                    répéteraient les mêmes mots à chaque terme. */}
+                <p class="renvois" data-pagefind-ignore>
                   <span>
                     {t.renvois.map((r, i) => (
                       <>
                         {i > 0 && ', '}
-                        {`${r.verbe} en `}
+                        {`${r.verbe} en${INSECABLE}`}
                         {parus.has(r.chapitre) ? (
                           <a href={hrefChapitre(r.chapitre)}>{titreDuChapitre(r.chapitre)}</a>
                         ) : (
@@ -292,7 +296,7 @@ const VOIR_AUSSI = typographier('voir aussi : ');
       const fort = (texte: string) => Object.assign(document.createElement('strong'), { textContent: texte });
       if (!q) return [fort(String(total)), ' termes.'];
       if (n === 0) return [`Aucun terme sur ${total} pour ${guillemets}.`];
-      const fin = chapitre ? `, ceux qu’explique ${brut}.` : '.';
+      const fin = chapitre ? `, ceux dont parle ${brut}.` : '.';
       return [fort(String(n)), ` ${pluriel(n)} sur ${total} pour ${guillemets}${fin}`];
     };
     window.clearTimeout(minuterie);
@@ -440,6 +444,11 @@ const VOIR_AUSSI = typographier('voir aussi : ');
 
   .effacer[hidden] {
     display: none;
+  }
+
+  /* Tant que « effacer » est caché, le texte indicatif prend toute la largeur du champ. */
+  .filtre-ligne:has(.effacer[hidden]) input {
+    padding-right: 16px;
   }
 
   .compte {

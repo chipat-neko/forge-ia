@@ -20,6 +20,8 @@ describe('ANNUAIRE', () => {
       expect(new Date(`${f.releveLe}T00:00:00Z`).toISOString().slice(0, 10), f.id).toBe(f.releveLe);
       expect(f.source, f.id).toMatch(/^https:\/\//);
       if (f.licence) expect(f.licence.url, f.id).toMatch(/^https:\/\//);
+      // Une taille donnée a toujours sa source, que la page met en lien.
+      if (f.taille !== null) expect(f.sourceTaille, f.id).toMatch(/^https:\/\//);
       for (const l of f.autresLicences ?? []) expect(l.url, f.id).toMatch(/^https:\/\//);
     }
   });

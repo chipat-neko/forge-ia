@@ -7,13 +7,20 @@
 // Relevé du 9 novembre 2026. Pour chaque jeu, `source` est la réponse de l'API de Hugging
 // Face (`/api/datasets/<dépôt>`) qui donne son accès (`gated` : false, « auto » pour des
 // conditions à accepter, « manual » pour un accord) et sa licence (`cardData.license`).
-// Les tailles viennent de `sourceTaille` quand elle est donnée, sinon de la même réponse :
-// - FineWeb-2, Wikipédia et github-code-clean : les relevés de sources-1-2.ts (chapitre
-//   1.2), relus le même jour ; la taille de la carte de FineWeb-2, « 502.82GB », est la
-//   colonne « Disk size » de sa ligne fra_Latn ;
+// Les tailles viennent de `sourceTaille`, que la page donne en lien (« taille ») à côté de la
+// date, comme `source` (« fiche »). Une taille est annoncée (par une carte, une page ou
+// l'API `size` de datasets-server), ou calculée : la somme, à l'API `tree`, des seuls
+// fichiers de données d'un dossier (parquet ou zst), sans ses autres fichiers (sommes de
+// contrôle, README). Ainsi :
+// - FineWeb-2 : « 502.82GB », colonne « Disk size » de sa ligne fra_Latn sur la carte ; sa
+//   valeur en Gio vient de la somme de ses fichiers parquet (sources-1-2.ts, chapitre 1.2) ;
+// - Wikipédia et github-code-clean : les sommes de leurs fichiers parquet (sources-1-2.ts),
+//   relues le même jour ;
 // - Common Corpus : sa carte (2 267 302 720 836 jetons, dont 283 227 402 898 de code) ;
 // - Lucie : le tableau de sa carte (2 314,862 milliards de jetons, dont 928,618 en français) ;
-// - CulturaX et OSCAR : la somme des fichiers du dossier du français, à l'API (`tree`) ;
+// - CulturaX : la somme de ses 512 fichiers parquet du dossier fr (sans fr/checksum.sha256) ;
+// - OSCAR : la somme de ses 294 fichiers .jsonl.zst du dossier fr_meta (sans
+//   fr_meta/checksum.sha256), une taille compressée ;
 // - The Stack v2 : sa page (« The total uncompressed size of all files is 67.53TB ») ;
 // - HellaSwag, ARC-Challenge et MMMLU : l'API `size` de datasets-server, partie par partie.
 // La taille de Croissant n'a pas été relevée : ses fichiers sont trop nombreux pour une
@@ -84,7 +91,7 @@ export interface Fiche {
   releveLe: string;
   /** La réponse de l'API de Hugging Face qui donne la licence et l'accès. */
   source: string;
-  /** D'où vient la taille, quand ce n'est pas `source`. */
+  /** D'où vient la taille (carte, page ou réponse de l'API), quand elle est donnée. */
   sourceTaille?: string;
   /** Les notes qu'appellent ses cellules, par identifiant de note. */
   appels?: Partial<Record<Cellule, string>>;
@@ -127,7 +134,7 @@ const CROISSANT = 'https://arxiv.org/abs/2402.00786';
 const COMMON_CORPUS = { jetons: 2267302720836, code: 283227402898 };
 const LUCIE = { milliardsDeJetons: 2314.862, francais: 928.618 };
 const CULTURAX_FR = 794485956703;
-const OSCAR_FR = 183213517636;
+const OSCAR_FR = 183213490696;
 const WIKIPEDIA_FR_ARTICLES = 2564646;
 const HELLASWAG_VALIDATION = 9338;
 const ARC = { lignes: 2585, test: 1169 };
@@ -175,7 +182,7 @@ export const ANNUAIRE: readonly Fiche[] = [
     tonIAUsage: 'de son mélange',
     releveLe: RELEVE,
     source: FICHES_DES_SOURCES.web_fr.api.url,
-    sourceTaille: TAILLES_DES_SOURCES.web_fr.api.url,
+    sourceTaille: FINEWEB_2.source.url,
     appels: { taille: 'fineweb-gb' },
   },
   {

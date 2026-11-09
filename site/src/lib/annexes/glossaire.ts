@@ -37,7 +37,10 @@ export interface Terme {
   enFrancais?: string;
   /** Deux phrases au plus, 300 caractères au plus. */
   definition: string;
-  /** Les chapitres qui en parlent, dans l'ordre où la page les cite ; le premier l'explique. */
+  /**
+   * Les chapitres qui en parlent, dans l'ordre où la page les cite : en général celui qui
+   * l'explique d'abord (AdamW, « citée en 0.5, expliquée en 1.5 », fait exception).
+   */
   renvois: readonly Renvoi[];
   /** Des termes voisins du glossaire, par leur identifiant. */
   voirAussi?: readonly string[];

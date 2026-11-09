@@ -20,7 +20,7 @@ describe('GLOSSAIRE', () => {
         expect(NUMEROS_DU_PARCOURS, t.id).toContain(r.chapitre);
         expect(r.verbe, t.id).toMatch(/^\p{Ll}/u);
       }
-      // Un même chapitre une seule fois, dans l'ordre où le parcours les lit.
+      // Un même chapitre une seule fois par terme.
       const numeros = t.renvois.map((r) => r.chapitre);
       expect(new Set(numeros).size, t.id).toBe(numeros.length);
       for (const v of t.voirAussi ?? []) {
