@@ -1,8 +1,8 @@
 // Le glossaire du site : les mots du parcours, de la Partie 0 au chapitre 1.6, chacun
 // défini en deux phrases au plus et renvoyé aux chapitres qui l'expliquent.
 //
-// Chaque définition a été relue dans son chapitre (9 novembre 2026) et ne le contredit
-// pas. Pour 1.5 et 1.6, pas encore parus, elle suit le plan des chapitres
+// Chaque définition a été relue dans son chapitre (9 novembre 2026, puis de 1.1 à 1.6 au
+// bilan de la Partie 1, le 10) et ne le contredit pas. Pour 1.5 et 1.6, pas encore parus, elle suit le plan des chapitres
 // (docs/superpowers/plans/2026-11-08-forge-ia-v1-p5-partie-1.md, tâches 11 et 13) et le
 // code de forge qu'ils montreront : planning.py, boucle.py et sauvegarde.py pour 1.5,
 // perte.py et qcm.py pour 1.6. La page affiche leurs renvois « à venir », sans lien,
@@ -112,6 +112,15 @@ export const GLOSSAIRE: readonly Terme[] = [
     voirAussi: ['fusion', 'tokenizer', 'vocabulaire'],
   },
   {
+    id: 'carte-d-un-jeu-de-donnees',
+    terme: "carte d'un jeu de données",
+    anglais: 'dataset card',
+    definition:
+      "La page qui présente un jeu de données sur Hugging Face : ce qu'il contient, d'où il vient, sous quelle licence. Un modèle a aussi la sienne, sa carte de modèle ; rien à voir avec la carte graphique.",
+    renvois: [r('1.2', 'présentée')],
+    voirAussi: ['jeu-de-donnees', 'licence'],
+  },
+  {
     id: 'carte-graphique',
     terme: 'carte graphique',
     aussi: 'GPU',
@@ -216,6 +225,14 @@ export const GLOSSAIRE: readonly Terme[] = [
       "L'erreur d'un modèle qui donne des probabilités : −ln de la chance qu'il donnait à la bonne réponse, en moyenne sur ses prédictions. C'est elle que ton IA fait baisser pendant son entraînement.",
     renvois: [r('0.2', 'expliquée'), r('0.5', 'binaire')],
     voirAussi: ['perte', 'probabilite', 'perplexite'],
+  },
+  {
+    id: 'forge',
+    terme: 'forge',
+    definition:
+      "Le moteur de ton IA, écrit en Python : il télécharge et nettoie ses textes, apprend son tokenizer, l'entraîne, la sauvegarde et l'évalue. Les chapitres de la Partie 1 en lisent le code, pièce par pièce.",
+    renvois: [r('1.2', 'présenté')],
+    voirAussi: ['melange', 'tokenizer', 'sauvegarde'],
   },
   {
     id: 'forme',

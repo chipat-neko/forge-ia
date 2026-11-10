@@ -154,7 +154,8 @@ export const DATES = (() => {
   return {
     copieWikipedia: formaterDate(`${m[1]}-${m[2]}-${m[3]}`),
     cartes: unique([FINEWEB_2.source, LICENCES_DE_GITHUB_CODE.source, TAILLES_DES_SOURCES.code_python.page], 'les cartes des jeux'),
-    licences: unique(Object.values(LICENCES).map((l) => l.source), 'les licences'),
+    // Les licences et le billet de Creative Commons (étape 3) : leur date de lecture, dite une fois.
+    licences: unique([...Object.values(LICENCES).map((l) => l.source), WIKIPEDIA_EN_4_0.source], 'les licences et le billet de Creative Commons'),
   };
 })();
 
@@ -335,7 +336,7 @@ Le mélange est écrit une seule fois, dans forge, le moteur de ton IA : `MELANG
 
 <Etape numero={2} titre="Où trouver des textes">
 
-Personne n'écrit des milliards de pages pour entraîner une IA. Les textes existent déjà, publiés par d'autres, et des équipes les ont rassemblés en jeux de données. Ceux de ton IA sont publiés sur Hugging Face, un site qui héberge des jeux de données et des modèles. Ton IA y lit ses trois sources, en flux, sans jamais les télécharger en entier :
+Personne n'écrit des milliards de pages pour entraîner une IA. Les textes existent déjà, publiés par d'autres, et des équipes les ont rassemblés en jeux de données. Ceux de ton IA sont publiés sur Hugging Face, un site qui héberge des jeux de données et des modèles. Chaque jeu y a sa carte, la page qui le présente : ce qu'il contient, d'où il vient, sous quelle licence. Ton IA y lit ses trois sources, en flux, sans jamais les télécharger en entier :
 
 <TableauSources />
 
@@ -382,7 +383,7 @@ Non : `gpl-3.0` n'est pas dans la liste des {SEPT}, et le filtre écarte tout fi
 
 <Fragment slot="note">
 
-Les licences sont liées à leur texte, relu le {DATES.licences}. Les {SEPT} noms sont ceux de la colonne `license` du jeu, en minuscules.
+Les licences sont liées à leur texte, et l'annonce de Creative Commons à son billet, relus le {DATES.licences}. Les {SEPT} noms sont ceux de la colonne `license` du jeu, en minuscules.
 
 </Fragment>
 
@@ -510,7 +511,7 @@ Pour trouver ce carnet, il a fallu en essayer {VALIDATION.essais}, du numéro 0 
 
 <Etape numero={8} titre="Ce qu'on garde vraiment">
 
-Le projet a lu les trois sources pour de vrai, en flux, jusqu'à garder {PART.mio} Mio de texte de chacune. Pour le web, le tri n'écarte que les textes trop courts et les doublons : aucune licence ni aucun langage n'y sont filtrés.
+Le projet a lu les trois sources pour de vrai, en flux, jusqu'à garder {PART.mio} Mio de texte de chacune. Un Mio vaut 2²⁰ octets, un peu plus d'un million : c'est le Mo de la mémoire au chapitre 0.4. Pour le web, le tri n'écarte que les textes trop courts et les doublons : aucune licence ni aucun langage n'y sont filtrés.
 
 <Pari
   id="part"
@@ -535,7 +536,7 @@ Le code, lui, ne passe presque pas : sur {PART.codeLus} fichiers lus, {PART.code
 
 Dans ce petit aperçu, {PART.webValidation} documents du web sont mis de côté pour la validation : un échantillon trop petit pour en tirer une part.
 
-Ces quelques Mio ne sont qu'un aperçu. Le corpus principal de ton IA, prêt pour son entraînement, compte {CORPUS.gio} Gio de texte et {CORPUS.documents} de documents, rangés en {CORPUS.fragments} fragments : {CORPUS.web} du web, {CORPUS.wiki} de Wikipédia et {CORPUS.code} de code, à peu près les parts du mélange. Découpé en jetons, les morceaux du {LIENS.l13 ? <a href={LIENS.l13}>chapitre 1.3</a> : 'chapitre 1.3'}, il fait {CORPUS.train} de jetons d'entraînement et {CORPUS.val} de validation, un jeton valant en moyenne {CORPUS.octetsParJeton} octets de texte. Sur ce grand nombre, les {CORPUS.docsVal} documents de validation font {CORPUS.partVal} des documents : la part choisie par `est_validation`.
+Ces quelques Mio ne sont qu'un aperçu. Le corpus principal de ton IA, prêt pour son entraînement, compte {CORPUS.gio} Gio de texte et {CORPUS.documents} de documents, rangés en {CORPUS.fragments} fichiers, ses fragments : {CORPUS.web} du web, {CORPUS.wiki} de Wikipédia et {CORPUS.code} de code, à peu près les parts du mélange. Découpé en jetons, les morceaux du {LIENS.l13 ? <a href={LIENS.l13}>chapitre 1.3</a> : 'chapitre 1.3'}, il fait {CORPUS.train} de jetons d'entraînement et {CORPUS.val} de validation, un jeton valant en moyenne {CORPUS.octetsParJeton} octets de texte. Sur ce grand nombre, les {CORPUS.docsVal} documents de validation font {CORPUS.partVal} des documents : la part choisie par `est_validation`.
 
 </Etape>
 

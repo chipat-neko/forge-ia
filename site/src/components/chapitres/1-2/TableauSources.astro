@@ -42,7 +42,7 @@ const [web, wiki, code] = lignes;
 const unites = typographier(
   `En octets décimaux, l’unité de Hugging Face (un GB vaut un milliard d’octets), cela fait ${web.gb}, ` +
     `${wiki.gb} et ${code.gb}. Le site écrit ses tailles en Gio, des paquets de 2³⁰ octets, comme ses annexes : ` +
-    'un Gio vaut un peu plus qu’un GB.',
+    'c’est le Go de la mémoire au chapitre 0.4, et un Gio vaut un peu plus qu’un GB.',
 );
 // La date du relevé : celle des réponses de l'API, toutes lues le même jour.
 const dates = new Set(lignes.flatMap((l) => [TAILLES_DES_SOURCES[l.source].api.verifieLe, l.fiche.api.verifieLe]));
