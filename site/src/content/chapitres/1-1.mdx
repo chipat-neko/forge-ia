@@ -456,7 +456,7 @@ En 2003, Yoshua Bengio et trois collègues ont décrit ce mur, qu'on appelle la 
 
 Yoshua Bengio, Réjean Ducharme, Pascal Vincent et Christian Jauvin, [« A Neural Probabilistic Language Model »](https://www.jmlr.org/papers/v3/bengio03a.html), Journal of Machine Learning Research, 2003 (vérifié le 9 novembre 2026).
 
-Ton IA, dans sa plus grande taille, regarde jusqu'à {LABO.tonIA} jetons en arrière, pas {RARETE.n} caractères. Son réseau ne compte pas les contextes : il apprend à rapprocher ceux qui se ressemblent.
+Ton IA, dans sa plus grande taille, regarde jusqu'à {LABO.tonIA} morceaux de texte en arrière, pas {RARETE.n} caractères. Son réseau ne compte pas les contextes : il apprend à rapprocher ceux qui se ressemblent.
 
 </Fragment>
 
@@ -535,7 +535,7 @@ Les tests du projet vérifient chaque fonction. Celui-ci vérifie le lissage, su
 <CodeExplique fichier="projets/1.1-modele-de-langage/tests/test_ngrammes.py" region="test-uniforme">
   <li data-lignes="1">Le nom commence par `test_` : pytest le trouve tout seul, comme au chapitre 0.1.</li>
   <li data-lignes="2">Les comptes de « abab », avec 2 caractères de contexte : « ab » et « ba » sont connus.</li>
-  <li data-lignes="3-4">« bb » n'apparaît jamais. Les deux caractères de l'alphabet, « a » et « b », ont alors chacun la probabilité 0,5 : l'ensemble des probabilités ne contient que 0,5.</li>
+  <li data-lignes="3-4">« bb » n'apparaît jamais. Les deux caractères de l'alphabet, « a » et « b », ont alors chacun la probabilité 0,5. Ici, les accolades ne font pas un dictionnaire : `{p for _, p in d}` range les probabilités de `d` dans un ensemble, un `set` de Python, qui ne garde chaque valeur qu'une fois. Il ne contient que 0,5.</li>
 </CodeExplique>
 
 <RecupererProjet
