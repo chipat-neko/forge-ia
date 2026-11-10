@@ -1,0 +1,104 @@
+{
+ "nom": "ton-ia-mini",
+ "releve_le": "2026-11-03",
+ "pas": 6370,
+ "perte_val": 3.428356409072876,
+ "perplexite": 30.8259358618989,
+ "bits_par_octet": 1.1329971127196887,
+ "qcm": {
+  "hellaswag": {
+   "exactitude": 0.26183336902977083,
+   "exactitude_normalisee": 0.27211394302848574,
+   "hasard": 0.25,
+   "n": 9338,
+   "marge_95": 0.00891700146392906,
+   "marge_95_normalisee": 0.009026850179633426,
+   "marge_hasard": 0.008782734869282344,
+   "total_du_test": 9338,
+   "verdict": "au-dessus"
+  },
+  "arc": {
+   "exactitude": 0.17536355859709152,
+   "exactitude_normalisee": 0.23609923011120615,
+   "hasard": 0.2501568291987454,
+   "n": 1169,
+   "marge_95": 0.021799661603316943,
+   "marge_95_normalisee": 0.02434526885984062,
+   "marge_hasard": 0.024825917545327553,
+   "total_du_test": 1169,
+   "verdict": "pas-different"
+  }
+ },
+ "echantillons": [
+  {
+   "invite": "Il était une fois",
+   "suite": ", un jour, il était tombé en état. Il avait été secoué et la tête bandée. À la tête de son fils, il venait d'être blessé par un torse. Il avait cru que c'était un assassinat dans la salle du lycée, avec un ami, et qu'il",
+   "graine": 0,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "La capitale de la France est",
+   "suite": " la ville de la capitale, de ses habitants, de la région, de ses environs et de ses environs. Situé à quelques centaines de kilomètres du centre-ville de Bordeaux, ce centre de la région dispose d’un emplacement idéal pour les fêtes de fin d’année et d’une architecture nationale moderne. Sa",
+   "graine": 1,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "Pour faire un bon gâteau au chocolat, il faut",
+   "suite": " simplement la faire cuire au four et mettre au four au four, en remuant régulièrement, en fouettant légèrement et en remuant lentement. De plus, l’idéal est d’aller en poêle, avec un peu d’huile, un peu de crème fraiche à la cannelle. Il faut le laver",
+   "graine": 2,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "Le soleil se couchait sur la mer et",
+   "suite": " le soleil se couchait rapidement. Nous le voyons, il y avait de plus grands hommes qui se couchaient et ils l'attendaient et il les regardait. Il n'y voyait rien. Le soleil se couchait sur une table d'une main. La conversation avait alors duré très longtemps. On",
+   "graine": 3,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "Aujourd'hui, le gouvernement a annoncé",
+   "suite": " la suppression du site du conseil d'administration de DIN, sans qu'on sache rien. Nous avons déjà parlé de la suppression du site pour l'instant, mais il y a toujours des problèmes puisque nous savons que le gouvernement a trouvé l'opportunité de supprimer ces sites Web.\nNous nous sommes donc mis d'",
+   "graine": 4,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "Dans un petit village de Bretagne,",
+   "suite": " des milliers de personnes s’étaient tuées, samedi 22 janvier, dans une forêt sous la dalle des Trois-Files, aux côtés du chef d’une des deux familles de la forêt. À l’intérieur ils étaient venus prendre le temps de le voir, les deux derniers ayant été déportés,",
+   "graine": 5,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "La photosynthèse est le processus par lequel",
+   "suite": " l'on étudie la fonction de la fonction de l'individu et de la fonction de l'individu lui-même, qui permet d'agir, d'agir, de percevoir et d'agir, de modifier l'incontinence de la fonction de l'individu.\nPour la description d'une fonction, la question suivante est la",
+   "graine": 6,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "Bonjour, je voudrais savoir comment",
+   "suite": " je peux obtenir une réponse. Je recherche un prestataire qui me permet de gérer ma page de commande. Je suis désolé que le site d'aide à la création de liens internet ne sera pas en mesure de gérer mes favoris mais en donnant mon nom sur mon mail. Merci, j'espère qu'il m'",
+   "graine": 7,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "def factorielle(n):\n",
+   "suite": "    return n * N\n    return n\n\n# --- General Public License\n# --- General Public License --------------------------------------------------------------\n\ndef randomize():\n    u = '0.0.0.0'\n    u = os.path.join(u.rsurf(), '6.0.0",
+   "graine": 8,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "def moyenne(valeurs):\n    \"\"\"Renvoie la moyenne",
+   "suite": " aux autres membres de l'Association des agents permanents entre 1992 et 2001.\n    Returns:\n        A list of statistic groups available to a specific number of\n                terms, to compare their number of declans.\n        See: https://youtu.be/dc/q",
+   "graine": 9,
+   "n_jetons": 60,
+   "s_arrete": false
+  }
+ ]
+}

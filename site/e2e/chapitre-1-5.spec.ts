@@ -18,6 +18,7 @@ import { formaterPerte, nombre } from '../src/lib/nombres';
 import { trouverChapitre } from '../src/lib/parcours';
 import { CLONER_DEPOT, METTRE_A_JOUR_DEPOT } from '../src/lib/partie-0/commandes';
 import * as commandes from '../src/lib/partie-1/commandes';
+import { lireEchantillon } from '../src/lib/partie-1/evaluation';
 import { lireEntrainement } from '../src/lib/partie-1/journal';
 import { MESURES_PARTIE_1 } from '../src/lib/partie-1/mesures';
 import {
@@ -52,6 +53,9 @@ const FINE = '\u202F';
 // Playwright tourne dans site/ : lireEntrainement et lireEssaiDeReprise lisent le dépôt, un dossier plus haut.
 const MINI = lireEntrainement('ton-ia-mini')!;
 const TON_IA_15 = lireEntrainement('ton-ia-1.5');
+// Le texte que mini écrit dans l'ouverture : la suite d'un début fixe de son rapport d'évaluation (null si le relevé manque).
+const INVITE_DE_L_OUVERTURE = 'La capitale de la France est';
+const ECRIT_PAR_MINI = lireEchantillon('ton-ia-mini', INVITE_DE_L_OUVERTURE);
 const ESSAI = lireEssaiDeReprise();
 const COMPLET = PRESETS_MINI.complet;
 
@@ -182,8 +186,15 @@ test('ton IA, la vraie : « à mesurer » tant que son entraînement n’est pas
     await expect(etape8.locator('[data-a-mesurer]')).toHaveCount(0);
     await expect(etape8.locator('[data-courbe="ton-ia-1.5"]')).toBeVisible();
   }
-  // L'échantillon de l'ouverture vient du rapport d'évaluation de mini (tâche 12) : d'ici là, « à mesurer ».
-  await expect(page.locator('#etape-1 [data-echantillon="dernier"][data-a-mesurer]')).toBeVisible();
+  // L'échantillon de l'ouverture vient du relevé du rapport d'évaluation de mini (projet 1.6, evaluation.ts) : « à mesurer » seulement s'il manque.
+  const echantillon = page.locator('#etape-1 [data-echantillon="dernier"]');
+  if (ECRIT_PAR_MINI === null) {
+    await expect(echantillon.and(page.locator('[data-a-mesurer]'))).toBeVisible();
+  } else {
+    await expect(echantillon).toBeVisible();
+    await expect(echantillon).not.toHaveAttribute('data-a-mesurer', /.*/);
+    await expect(echantillon.locator('[data-test="echantillon-dernier"]')).toHaveText(INVITE_DE_L_OUVERTURE + ECRIT_PAR_MINI.suite);
+  }
   // Le texte de l'étape 8 ne donne aucun nombre de l'entraînement principal, seulement sa configuration.
   await expect(etape8).toContainText('Quand le PC servait à autre chose');
 });

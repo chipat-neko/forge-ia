@@ -1,0 +1,163 @@
+{
+ "nom": "ton-ia-mini",
+ "releve_le": "2026-11-10",
+ "appareil": "cpu",
+ "jeu": {
+  "nom": "openai/MMMLU",
+  "configuration": "FR_FR",
+  "partie": "test",
+  "adresse": "https://huggingface.co/datasets/openai/MMMLU",
+  "licence": "MIT",
+  "licence_verifiee_le": "2026-11-10",
+  "lu_le": "2026-11-10"
+ },
+ "n": 6,
+ "justes": 2,
+ "hasard": 0.25,
+ "questions": [
+  {
+   "contexte": "Question : La composition de base de l’ADN varie d’une espèce à l’autre. Lequel des ratios suivants restera constant dans l’ADN selon vous ?\nRéponse :",
+   "choix": [
+    " Cytosine : Adénine",
+    " Pyrimidine : Purine",
+    " Adénine : Guanine",
+    " Guanine : Désoxyribose"
+   ],
+   "scores": [
+    -40.45868682861328,
+    -41.04814910888672,
+    -39.70977783203125,
+    -40.35541915893555
+   ],
+   "scores_normalises": [
+    -2.022934341430664,
+    -2.052407455444336,
+    -2.0899883069490133,
+    -1.6814757982889812
+   ],
+   "prefere": 3,
+   "bonne": 1,
+   "juste": false
+  },
+  {
+   "contexte": "Question : L’IPC est calculé pour chacun\nRéponse :",
+   "choix": [
+    " à la semaine ; Le Bureau of Economic Analysis",
+    " au mois ; Le Bureau des analyses économiques",
+    " au mois ; Le Bureau des statistiques sur l’emploi",
+    " au trimestre ; Le Bureau des analyses économiques"
+   ],
+   "scores": [
+    -73.76290130615234,
+    -69.51690673828125,
+    -76.85155487060547,
+    -66.73922729492188
+   ],
+   "scores_normalises": [
+    -1.5367271105448406,
+    -1.4790831220910905,
+    -1.4500293371812352,
+    -1.2834466787484975
+   ],
+   "prefere": 3,
+   "bonne": 2,
+   "juste": false
+  },
+  {
+   "contexte": "Question : Ethan, un nouvel élève de 3 à 5 ans, ne parle pas et ne joue pas avec les autres élèves pendant les heures de classe. Laquelle des stratégies suivantes l’aidera le mieux à développer des relations interpersonnelles ?\nRéponse :",
+   "choix": [
+    " Faire preuve d’empathie envers Ethan en cas de conflit aux moments d’activité",
+    " Montrer comment faire preuve d’affection de façon appropriée en classe",
+    " Encourager les élèves à nommer et à discuter de leurs sentiments tout au long de la journée",
+    " Choisir un élève pour être le partenaire d'Ethan et participer au temps d’activité avec lui"
+   ],
+   "scores": [
+    -70.76533508300781,
+    -53.80683517456055,
+    -60.6674690246582,
+    -96.46228790283203
+   ],
+   "scores_normalises": [
+    -0.8525943985904556,
+    -0.7174244689941406,
+    -0.6254378249964763,
+    -0.9743665444730508
+   ],
+   "prefere": 2,
+   "bonne": 3,
+   "juste": false
+  },
+  {
+   "contexte": "Question : Collins suggère que la valeur morale des actions de bienveillance provient de\nRéponse :",
+   "choix": [
+    " la valeur intrinsèque des attitudes de bienveillance qui motivent les actions de bienveillance.",
+    " la mesure dans laquelle une action de bienveillance répond aux intérêts du bénéficiaire et la force de son intention de répondre aux intérêts du bénéficiaire.",
+    " la mesure dans laquelle ces actions produisent le plus grand bonheur chez le bénéficiaire des soins.",
+    " la valeur non instrumentale des actions de soins en tant que manifestations de biens intrinsèques pour la personne, tels que l’amour et le pardon."
+   ],
+   "scores": [
+    -49.377498626708984,
+    -78.34364318847656,
+    -72.34420013427734,
+    -109.48875427246094
+   ],
+   "scores_normalises": [
+    -0.509046377594938,
+    -0.4635718531862518,
+    -0.7023708750900713,
+    -0.729925028483073
+   ],
+   "prefere": 1,
+   "bonne": 1,
+   "juste": true
+  },
+  {
+   "contexte": "Question : Quelle enzyme est responsable de la copie des marques de méthylation du brin parental au brin d’ADN fille au cours de la réplication ?\nRéponse :",
+   "choix": [
+    " DNMT1",
+    " DNMT3a",
+    " DNMT3b",
+    " DNMT3L"
+   ],
+   "scores": [
+    -28.690298080444336,
+    -38.79740905761719,
+    -39.629669189453125,
+    -38.451873779296875
+   ],
+   "scores_normalises": [
+    -4.781716346740723,
+    -5.542487008231027,
+    -5.661381312779018,
+    -5.493124825613839
+   ],
+   "prefere": 0,
+   "bonne": 0,
+   "juste": true
+  },
+  {
+   "contexte": "Question : Il y a moins de 400 000 ans, l’évolution des hominidés est caractérisée par :\nRéponse :",
+   "choix": [
+    " la bipédie et une taille de cerveau relativement stable.",
+    " une légère baisse de la taille de cerveau moyenne.",
+    " une hausse rapide de la taille de cerveau.",
+    " une augmentation lente de la taille de cerveau et les premiers outils en pierre."
+   ],
+   "scores": [
+    -52.006160736083984,
+    -42.21532440185547,
+    -38.05432891845703,
+    -67.34835815429688
+   ],
+   "scores_normalises": [
+    -0.8966579437255859,
+    -0.79651555475199,
+    -0.8849843934524891,
+    -0.8314612117814429
+   ],
+   "prefere": 1,
+   "bonne": 2,
+   "juste": false
+  }
+ ]
+}

@@ -7,13 +7,14 @@
 // pari ouvre (le pari vient avant le résultat qu'il demande de deviner). Sans JavaScript, tout se
 // lit.
 //
-// Le texte que mini écrit au dernier pas viendra de son rapport d'évaluation
-// (projets/1.6-evaluation/mesures/evaluation-mini.json, tâche 12) : son journal n'a pas
-// d'échantillon, et son rapport n'en a qu'au dernier pas. D'ici là, il est « à mesurer »
-// (data-a-mesurer).
+// Le texte que mini écrit au dernier pas vient du relevé de son rapport d'évaluation
+// (projets/1.6-evaluation/mesures/evaluation-mini.json, par lireEchantillon) : son journal n'a pas
+// d'échantillon, et son rapport n'en a qu'au dernier pas. Si ce relevé manque, le texte est « à
+// mesurer » (data-a-mesurer).
 import { root } from 'astro:config/server';
 import Verrou from '../../gabarit/Verrou.astro';
 import { formaterPerte, nombre } from '../../../lib/nombres';
+import { lireEchantillon, lireEvaluation } from '../../../lib/partie-1/evaluation';
 import { lireEntrainement } from '../../../lib/partie-1/journal';
 import { typographier } from '../../../lib/typo';
 
@@ -30,11 +31,27 @@ const r = mini.resume;
 if (Math.abs(r.secondes_de_calcul / 3600 - 1) > 0.05) {
   throw new Error('Exemple devenu faux : la version d’une heure n’a plus duré une heure de calcul. Revoir OuvertureNaissance.astro.');
 }
-const premier = typographier(`Ses ${nombre(r.parametres)} paramètres sont tirés au hasard : elle ne sait encore rien.`);
+// Le texte écrit au dernier pas : la suite d'un début fixe de forge (l'un des dix de son évaluation), lue dans
+// le relevé de l'évaluation de mini. Ce relevé doit être celui de la sauvegarde du dernier pas.
+const INVITE = 'La capitale de la France est';
+const racine = new URL('../', root);
+const evaluation = lireEvaluation('ton-ia-mini', racine);
+if (evaluation !== null && evaluation.pas !== r.pas_faits) {
+  throw new Error(
+    `OuvertureNaissance : le relevé de l’évaluation de mini est celui du pas ${nombre(evaluation.pas)}, mais son entraînement ` +
+      `a fait ${nombre(r.pas_faits)} pas. Relance « python -m evaluation_pas_a_pas resumer » sur la sauvegarde du dernier pas.`,
+  );
+}
+const ecrit = lireEchantillon('ton-ia-mini', INVITE, racine);
+const premier = typographier(
+  `Ses ${nombre(r.parametres)} paramètres sont tirés au hasard : à ce pas, elle n’écrirait que des jetons tirés au hasard.`,
+);
 const dernier = typographier('Une heure de calcul plus tard, sur une carte graphique.');
+const quandElleEcrit = typographier(`Ce qu’elle écrit à ce pas, à partir de « ${INVITE} » :`);
 const echantillon = typographier('Ce qu’elle écrit à ce pas : à mesurer, avec le rapport de son évaluation.');
 const legende = typographier(
-  'La version d’une heure de ton IA, au premier pas et au dernier. Chaque perte est celle d’un seul pas, lue dans le journal de son entraînement.',
+  'La version d’une heure de ton IA, au premier pas et au dernier. Chaque perte est celle d’un seul pas, lue dans le journal de son entraînement.' +
+    (ecrit === null ? '' : ` Le texte est celui de son rapport d’évaluation, écrit avec la graine ${ecrit.graine}.`),
 );
 ---
 
@@ -57,7 +74,18 @@ const legende = typographier(
         <span class="valeur" data-test="perte-dernier-pas">{formaterPerte(r.perte_dernier_pas)}</span>
       </p>
       <p class="etat">{dernier}</p>
-      <p class="a-mesurer" data-a-mesurer data-echantillon="dernier">{echantillon}</p>
+      {
+        ecrit === null ? (
+          <p class="a-mesurer" data-a-mesurer data-echantillon="dernier">
+            {echantillon}
+          </p>
+        ) : (
+          <p class="ecrit" data-echantillon="dernier">
+            <span class="quand-elle-ecrit">{quandElleEcrit}</span>
+            <span class="suite" data-test="echantillon-dernier">{ecrit.invite}{ecrit.suite}</span>
+          </p>
+        )
+      }
     </div>
   </div>
   <figcaption>{legende}</figcaption>
@@ -118,6 +146,24 @@ const legende = typographier(
   .etat {
     font-size: 19px;
     line-height: 1.45;
+  }
+
+  .ecrit {
+    margin-top: 8px !important;
+    font-size: 19px;
+    line-height: 1.45;
+  }
+
+  .quand-elle-ecrit {
+    display: block;
+    font-style: italic;
+    color: var(--indigo-doux);
+  }
+
+  .suite {
+    display: block;
+    margin-top: 2px;
+    overflow-wrap: anywhere;
   }
 
   .a-mesurer {
