@@ -2,11 +2,11 @@
 // défini en deux phrases au plus et renvoyé aux chapitres qui l'expliquent.
 //
 // Chaque définition a été relue dans son chapitre (9 novembre 2026, puis de 1.1 à 1.6 au
-// bilan de la Partie 1, le 10) et ne le contredit pas. Pour 1.5 et 1.6, pas encore parus, elle suit le plan des chapitres
-// (docs/superpowers/plans/2026-11-08-forge-ia-v1-p5-partie-1.md, tâches 11 et 13) et le
-// code de forge qu'ils montreront : planning.py, boucle.py et sauvegarde.py pour 1.5,
-// perte.py et qcm.py pour 1.6. La page affiche leurs renvois « à venir », sans lien,
-// tant que chapitresParus() ne les connaît pas.
+// bilan de la Partie 1, le 10) et ne le contredit pas. Pour 1.5 et 1.6, pas encore parus,
+// elle suit leurs brouillons (src/brouillons/chapitres/) et le code de forge qu'ils
+// montrent : planning.py, boucle.py et sauvegarde.py pour 1.5, perte.py et qcm.py pour
+// 1.6. La page affiche leurs renvois « à venir », sans lien, tant que chapitresParus()
+// ne les connaît pas.
 //
 // Les textes sont bruts, comme ceux de parcours.ts : des espaces ordinaires devant
 // « ; : ! ? » et dans les guillemets, des apostrophes droites. La page leur applique
@@ -91,7 +91,7 @@ export const GLOSSAIRE: readonly Terme[] = [
     definition:
       "La perte ramenée à un octet de texte plutôt qu'à un jeton, et comptée en bits. Deux tokenizers ne découpent pas le même texte en autant de jetons : c'est cette mesure qui compare leurs modèles.",
     renvois: [r('1.6', 'expliqués')],
-    voirAussi: ['perte', 'perplexite', 'tokenizer'],
+    voirAussi: ['nat', 'perte', 'perplexite', 'tokenizer'],
   },
   {
     id: 'bloc',
@@ -165,6 +165,15 @@ export const GLOSSAIRE: readonly Terme[] = [
     voirAussi: ['carte-graphique', 'pytorch'],
   },
   {
+    id: 'decroissance-des-poids',
+    terme: 'décroissance des poids',
+    anglais: 'weight decay',
+    definition:
+      "Un réglage de l'optimiseur : à chaque pas, il tire doucement chaque poids vers 0. Forge ne l'applique qu'aux matrices de ton IA, pas aux poids de ses RMSNorm.",
+    renvois: [r('1.5', 'expliquée')],
+    voirAussi: ['adamw', 'optimiseur'],
+  },
+  {
     id: 'descente-de-gradient',
     terme: 'descente de gradient',
     anglais: 'gradient descent',
@@ -190,6 +199,15 @@ export const GLOSSAIRE: readonly Terme[] = [
       "Un texte présent plusieurs fois dans les données, comme une dépêche reprise par dix sites. Lu dix fois, il pèserait dix fois plus : forge ne garde chaque texte qu'une fois, reconnu par son empreinte.",
     renvois: [r('1.2', 'expliqué')],
     voirAussi: ['empreinte', 'jeu-de-donnees'],
+  },
+  {
+    id: 'echauffement',
+    terme: 'échauffement',
+    anglais: 'warmup',
+    definition:
+      "Les premiers pas d'un entraînement, où le taux d'apprentissage monte en ligne droite, de 0 à son maximum. Au début, les poids sont tirés au hasard et les gradients partent dans tous les sens : de grands pas déstabiliseraient le modèle.",
+    renvois: [r('1.5', 'expliqué')],
+    voirAussi: ['planning-du-taux', 'taux-d-apprentissage'],
   },
   {
     id: 'ecretage',
@@ -315,6 +333,23 @@ export const GLOSSAIRE: readonly Terme[] = [
     voirAussi: ['probabilite', 'perplexite'],
   },
   {
+    id: 'log-vraisemblance',
+    terme: 'log-vraisemblance',
+    anglais: 'log-likelihood',
+    definition:
+      "La somme des ln p des jetons d'un texte déjà écrit, chacun sachant tout ce qui le précède : c'est par elle qu'on mesure sa vraisemblance. Plus elle est haute, plus le modèle croit à ce texte.",
+    renvois: [r('1.6', 'expliquée')],
+    voirAussi: ['vraisemblance', 'qcm', 'perte'],
+  },
+  {
+    id: 'logits',
+    terme: 'logits',
+    definition:
+      'Les scores que le modèle donne à chaque jeton possible, à chaque position du texte, calculés avec la table du plongement. Softmax les change ensuite en probabilités.',
+    renvois: [r('1.4', 'expliqués'), r('1.6', 'repris')],
+    voirAussi: ['softmax', 'plongement', 'poids-lies'],
+  },
+  {
     id: 'lot',
     terme: 'lot',
     anglais: 'batch',
@@ -395,6 +430,14 @@ export const GLOSSAIRE: readonly Terme[] = [
     voirAussi: ['contexte', 'jeton', 'perplexite'],
   },
   {
+    id: 'nat',
+    terme: 'nat',
+    definition:
+      "L'unité d'une perte calculée avec ln, le logarithme naturel. Divisée par ln 2, la même perte se compte en bits.",
+    renvois: [r('1.6', 'expliqué')],
+    voirAussi: ['bits-par-octet', 'perte'],
+  },
+  {
     id: 'neurone',
     terme: 'neurone',
     anglais: 'neuron',
@@ -457,6 +500,15 @@ export const GLOSSAIRE: readonly Terme[] = [
     voirAussi: ['entropie-croisee', 'gradient', 'perplexite'],
   },
   {
+    id: 'planning-du-taux',
+    terme: 'planning du taux',
+    anglais: 'learning rate schedule',
+    definition:
+      "La règle qui donne le taux d'apprentissage de chaque pas, d'après son seul numéro. Celui de ton IA monte pendant l'échauffement, puis redescend en demi-vague de cosinus jusqu'au dernier pas.",
+    renvois: [r('1.5', 'expliqué')],
+    voirAussi: ['taux-d-apprentissage', 'echauffement'],
+  },
+  {
     id: 'plongement',
     terme: 'plongement',
     anglais: 'embedding',
@@ -464,6 +516,15 @@ export const GLOSSAIRE: readonly Terme[] = [
       "Le vecteur qui représente un jeton à l'entrée du modèle : sa ligne dans une table, tirée au hasard au départ et réglée par l'entraînement. Ton IA se sert de la même table à la sortie, pour noter chaque jeton possible.",
     renvois: [r('1.4', 'expliqué')],
     voirAussi: ['jeton', 'vecteur', 'transformer'],
+  },
+  {
+    id: 'poids-lies',
+    terme: 'poids liés',
+    anglais: 'tied weights',
+    definition:
+      "Une même table qui sert deux fois : à l'entrée, pour donner son vecteur à chaque jeton, et à la sortie, pour noter chaque jeton possible. Ton IA s'épargne ainsi une seconde table et tous ses paramètres.",
+    renvois: [r('1.4', 'expliqués')],
+    voirAussi: ['plongement', 'logits', 'parametre'],
   },
   {
     id: 'pre-entrainement',
@@ -506,7 +567,7 @@ export const GLOSSAIRE: readonly Terme[] = [
     definition:
       "Un questionnaire à choix multiples. Pour le faire passer à un modèle sans qu'il écrive un mot, on mesure la vraisemblance de chaque réponse écrite à la suite de la question, et il choisit la plus vraisemblable.",
     renvois: [r('1.6', 'expliqué')],
-    voirAussi: ['exactitude-normalisee', 'marge-du-hasard', 'contamination'],
+    voirAussi: ['vraisemblance', 'exactitude-normalisee', 'marge-du-hasard', 'contamination'],
   },
   {
     id: 'regle-de-la-chaine',
@@ -577,7 +638,7 @@ export const GLOSSAIRE: readonly Terme[] = [
     definition:
       "Le réglage qui fixe la longueur de chaque pas de descente. Trop grand, il fait sauter par-dessus le fond, ou s'en éloigner.",
     renvois: [r('0.2', 'expliqué'), r('1.5', 'planifié')],
-    voirAussi: ['descente-de-gradient', 'adamw'],
+    voirAussi: ['descente-de-gradient', 'planning-du-taux', 'adamw'],
   },
   {
     id: 'temperature',
@@ -656,6 +717,15 @@ export const GLOSSAIRE: readonly Terme[] = [
       'La liste de tous les jetons que connaît un tokenizer, chacun avec son numéro. Chaque fusion du BPE y ajoute un morceau, et les suites de jetons raccourcissent.',
     renvois: [r('1.3', 'expliqué')],
     voirAussi: ['jeton', 'fusion', 'tokenizer'],
+  },
+  {
+    id: 'vraisemblance',
+    terme: 'vraisemblance',
+    anglais: 'likelihood',
+    definition:
+      "La chance qu'un modèle donne à un texte déjà écrit, comme une réponse de QCM à la suite de sa question. On la mesure par sa log-vraisemblance.",
+    renvois: [r('1.6', 'expliquée')],
+    voirAussi: ['log-vraisemblance', 'qcm', 'probabilite'],
   },
 ];
 

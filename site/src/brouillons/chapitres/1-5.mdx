@@ -348,13 +348,13 @@ export const SUITE = (() => {
 
 Voici ton IA dans sa version d'une heure, la taille « {REGLAGES.taille} » : {REGLAGES.parametres} paramètres, le transformer du {LIENS.l14 ? <a href={LIENS.l14}>chapitre 1.4</a> : 'chapitre 1.4'} dans sa plus petite taille. Au premier pas, ils ne savent rien ; au dernier, le {REGLAGES.pasTotal}ᵉ, ils ont été corrigés à chaque pas, d'après tout ce qu'elle a lu.
 
-Entre les deux, le pré-entraînement : elle lit des textes, morceau par morceau, et apprend à prédire le jeton qui vient ensuite. C'est son premier entraînement, et le plus long. Ce chapitre l'ouvre pièce par pièce : la perte, le lot, le taux, l'optimiseur, puis la pause et la reprise. Un petit modèle refait la même recette dans ta page, et la version d'une heure se refait sur ta carte graphique. Ton IA, la vraie, suit le même chemin, en bien plus long.
+Entre les deux, le pré-entraînement : elle lit des textes, morceau par morceau, et apprend à prédire le jeton qui vient ensuite. C'est son premier entraînement, et le plus long. Ce chapitre l'ouvre pièce par pièce : la perte, le lot, le taux, AdamW, puis la pause et la reprise. Un petit modèle refait la même recette dans ta page, et la version d'une heure se refait sur ta carte graphique. Ton IA, la vraie, suit le même chemin, en bien plus long.
 
 </Etape>
 
 <Etape numero={2} titre="La perte au départ">
 
-À chaque position d'un texte, ton IA donne une probabilité à chacun des {DEPART.vocabulaire} jetons de son vocabulaire, celui du {LIENS.l13 ? <a href={LIENS.l13}>chapitre 1.3</a> : 'chapitre 1.3'}. Sa perte, c'est l'entropie croisée du {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : 'chapitre 0.2'} : <span class="formule-en-texte">−ln p</span>, où p est la probabilité qu'elle donnait au bon jeton, en moyenne sur tous les jetons d'un lot. Elle vaut 0 si ton IA était sûre du bon jeton, et grandit à mesure qu'elle lui en donnait moins.
+À chaque position d'un texte, ton IA donne une probabilité à chacun des {DEPART.vocabulaire} jetons de son vocabulaire, celui que forge a appris par BPE, comme au {LIENS.l13 ? <a href={LIENS.l13}>chapitre 1.3</a> : 'chapitre 1.3'}. Sa perte, c'est l'entropie croisée du {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : 'chapitre 0.2'} : <span class="formule-en-texte">−ln p</span>, où p est la probabilité qu'elle donnait au bon jeton, en moyenne sur tous les jetons d'un lot. Elle vaut 0 si ton IA était sûre du bon jeton, et grandit à mesure qu'elle lui en donnait moins.
 
 <Pari
   id="depart"
@@ -397,7 +397,7 @@ Le taux ne dépend que du numéro du pas. Après une pause, il repart donc au bo
 
 <Etape numero={4} titre="L'atelier : un petit modèle apprend">
 
-Ton IA met une heure à apprendre dans sa plus petite taille. Ce petit modèle-là apprend dans ta page, en moins d'une minute : un transformer minuscule, qui invente des prénoms, caractère par caractère. C'est la même recette que ton IA, en {ATELIER.parametres} paramètres : le même planning du taux, et le même optimiseur et le même écrêtage, ceux de l'étape 5. À chaque pas, il lit {ATELIER.lot} prénoms.
+Ton IA met une heure à apprendre dans sa plus petite taille. Ce petit modèle-là apprend dans ta page, en moins d'une minute : un transformer minuscule, qui invente des prénoms, caractère par caractère. C'est la même recette que ton IA, en {ATELIER.parametres} paramètres : le même planning du taux ; le même optimiseur et le même écrêtage, ceux de l'étape 5. À chaque pas, il lit {ATELIER.lot} prénoms.
 
 Son taux maximal est réglable. D'habitude, il vaut {ATELIER.taux}.
 

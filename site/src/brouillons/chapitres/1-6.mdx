@@ -313,7 +313,7 @@ Le projet calcule la perplexité ainsi :
 
 <Etape numero={3} titre="Bits par octet">
 
-Une perplexité de {HASARD.perplexite}, est-ce mieux que celle d'un autre modèle ? On ne peut pas toujours le dire. Elle se compte par jeton, et un jeton n'a pas la même taille d'un tokenizer à l'autre. Celui de ton IA, appris par BPE comme celui du {LIENS.l13 ? <a href={LIENS.l13}>chapitre 1.3</a> : 'chapitre 1.3'}, découpe le français en morceaux de quelques lettres ; un autre pourrait couper en lettres seules, ou en mots entiers. Pour comparer, on ramène la perte à un octet de texte, et on change son unité. Calculée avec ln, le logarithme naturel, comme jusqu'ici, la perte se compte en nats ; avec le logarithme de base 2, elle se compte en bits :
+Une perplexité de {HASARD.perplexite}, est-ce mieux que celle d'un autre modèle ? On ne peut pas toujours le dire. Elle se compte par jeton, et un jeton n'a pas la même taille d'un tokenizer à l'autre. Celui de ton IA, appris par BPE comme celui du {LIENS.l13 ? <a href={LIENS.l13}>chapitre 1.3</a> : 'chapitre 1.3'}, découpe le français en morceaux de quelques lettres ; un autre pourrait couper en lettres seules, ou en mots entiers. Pour comparer, on ramène la perte à un octet de texte, et on change son unité. Calculée avec ln, le logarithme naturel, comme jusqu'ici, la perte se compte en nats ; avec le logarithme de base 2, qui vaut ln divisé par ln 2, elle se compte en bits :
 
 <CodeExplique fichier="projets/1.6-evaluation/evaluation_pas_a_pas/pas_a_pas.py" region="bits">
   <li data-lignes="1">`bits_par_octet_a_la_main` reçoit la perte, en nats par jeton, et le nombre moyen d'octets de texte que couvre un jeton.</li>
@@ -339,7 +339,7 @@ C'est ce nombre-là qui se compare. Un modèle qui lirait le texte octet par oct
 
 <Etape numero={4} titre="Répondre sans parler">
 
-Un modèle de langage ne répond pas à une question : il donne une chance à chaque suite possible. Pour lui faire passer un QCM, on ne lui demande donc pas d'écrire sa réponse. On lui fait lire la question suivie de chaque réponse, l'une après l'autre, et on mesure la vraisemblance de chacune : la somme des <span class="formule-en-texte">ln p</span> de ses jetons, chacun sachant tout ce qui le précède. Sa réponse, c'est la plus vraisemblable. Voici le calcul, refait à la main :
+Un modèle de langage ne répond pas à une question : il donne une chance à chaque suite possible. Pour lui faire passer un QCM, on ne lui demande donc pas d'écrire sa réponse. On lui fait lire la question suivie de chaque réponse, l'une après l'autre, et on mesure la vraisemblance de chacune, la chance que le modèle lui donne, par sa log-vraisemblance : la somme des <span class="formule-en-texte">ln p</span> de ses jetons, chacun sachant tout ce qui le précède. Sa réponse, c'est la plus vraisemblable. Voici le calcul, refait à la main :
 
 <CodeExplique fichier="projets/1.6-evaluation/evaluation_pas_a_pas/pas_a_pas.py" region="qcm">
   <li data-lignes="1-2">`scores_a_la_main` reçoit le modèle, son tokenizer et une question : son début, `contexte`, et ses réponses possibles, `choix`. `torch.no_grad` : rien ne s'apprend ici, on mesure seulement.</li>
