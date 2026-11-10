@@ -29,6 +29,10 @@ import MiniJetons from '../../components/chapitres/1-3/MiniJetons.astro';
 import PhraseDecoupee from '../../components/chapitres/1-3/PhraseDecoupee.astro';
 import { NB_FUSIONS } from '../../components/chapitres/1-3/fusions';
 import { choixNombreDeJetons, tokenizer13, visible } from '../../lib/bpe';
+import { VOCABULAIRE_FORGE } from '../../lib/calculateur/ton-ia';
+import { chapitresParus } from '../../lib/chapitres-parus';
+import { nombre } from '../../lib/nombres';
+import { hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
 import { typographier } from '../../lib/typo';
 
 export const MOT = 'les forgerons';
@@ -52,6 +56,14 @@ export const collesDansMot = (() => {
     .map((jeton) => `« ${visible(jeton.texte)} » (fusion ${jeton.id - base + 1})`);
   const fin = liste.pop();
   return typographier(liste.length > 0 ? `${liste.join(', ')} et ${fin}` : fin);
+})();
+
+export const PARUS = await chapitresParus();
+
+export const SUITE = (() => {
+  // L'« À suivre » : le chapitre 1.4, un lien s'il a paru.
+  const { chapitre } = trouverChapitre('1.4');
+  return { titre: typographier(`« ${titreCourt(chapitre.titre)} »`), lien: PARUS.has(chapitre.numero) ? hrefChapitre(chapitre.numero) : null };
 })();
 
 <PhraseDecoupee phrase="Le forgeron frappe le métal" k={NB_FUSIONS} />
@@ -87,7 +99,9 @@ La méthode utilisée par presque tous les grands modèles, le BPE (<span lang="
 
 <Fragment slot="note">
 
-Le BPE a été inventé en 1994 pour compresser des fichiers. Il a été repris en 2015 pour la traduction automatique, puis par les modèles de langage.
+Le BPE a été inventé en 1994 pour compresser des données. Il a été repris en 2015 pour la traduction automatique, puis par les modèles de langage.
+
+Rico Sennrich, Barry Haddow et Alexandra Birch, <a href="https://arxiv.org/abs/1508.07909" lang="en">« Neural Machine Translation of Rare Words with Subword Units »</a>, arXiv 1508.07909, 2015. Sa section 3.2 part de l'algorithme de compression de Philip Gage, publié en 1994 (vérifié le 10 novembre 2026).
 
 </Fragment>
 
@@ -245,6 +259,8 @@ Le projet complet (apprentissage, découpage, tests) est sur GitHub, avec un not
 
 ### À suivre
 
-Ce découpeur pédagogique travaille sur les lettres. Celui de ton IA, que tu construiras dans la suite de ce chapitre, travaillera sur les octets, comme ceux des grands labos : il pourra écrire n'importe quel texte. Il prévoira aussi, dès le départ, les jetons spéciaux de la conversation et des outils : des jetons réservés qui marquent qui parle, et où commence l'appel d'un outil. Ils serviront quand ton IA apprendra à converser, puis à agir.
+Ce découpeur pédagogique travaille sur les lettres. Celui de ton IA, forge l'a appris de la même façon, sur un échantillon de ses textes, mais sur les octets, comme ceux des grands labos : il peut écrire n'importe quel texte, et compte {nombre(VOCABULAIRE_FORGE)} jetons. Il prévoit aussi, dès le départ, les jetons spéciaux de la conversation et des outils : des jetons réservés qui marquent qui parle, et où commence l'appel d'un outil. Ils serviront quand ton IA apprendra à converser, puis à agir.
+
+Ton IA sait maintenant changer un texte en une suite de numéros. Ce qu'elle en fait, c'est le chapitre 1.4, {SUITE.lien ? <a href={SUITE.lien}>{SUITE.titre}</a> : SUITE.titre}.
 
 </Etape>
