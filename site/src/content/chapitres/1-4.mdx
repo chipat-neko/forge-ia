@@ -2,7 +2,7 @@
 partie: 1
 numero: "1.4"
 titre: "Le transformer, pièce par pièce"
-chapeau: "Ton IA est un transformer : une pile de blocs qui retravaillent les vecteurs des jetons. Tu le démontes ici pièce par pièce, de l'attention aux résidus, puis tu comptes ses paramètres, et tu vérifies que les pièces refaites calculent comme forge."
+chapeau: "Ton IA est un transformer : une pile de blocs qui retravaillent les vecteurs des jetons. Tu le démontes ici pièce par pièce, de l'attention aux connexions résiduelles, puis tu comptes ses paramètres, et tu vérifies que les pièces refaites calculent comme forge."
 programme: "11 étapes, 5 paris, environ 35 minutes."
 acquis:
   - cle: attention
@@ -252,7 +252,7 @@ Voici ton IA dans sa plus grande taille, la taille « très grand ». Elle lit d
 
 Tout ce qu'elle saura tiendra dans ses paramètres, les nombres que l'entraînement règle un à un. Elle en a {TON_IA.total}, environ {TON_IA.quantite}. Ce chapitre les range pièce par pièce, et l'étape 8 te laisse les compter.
 
-Cette architecture s'appelle le transformer. Elle vient d'un article de 2017, signé par Ashish Vaswani et sept coauteurs, qui la disait fondée seulement sur l'attention, sans les réseaux récurrents ni les convolutions des modèles d'alors. L'article l'essayait sur la traduction ; ton IA n'en garde que la partie qui écrit la suite d'un texte, un « décodeur seul », comme dit forge. Trois de ses pièces sont venues après lui : RoPE, SwiGLU et RMSNorm, aux étapes 5 à 7.
+Cette architecture s'appelle le transformer. Elle vient d'un article de 2017, signé par Ashish Vaswani et sept coauteurs, qui la disait fondée seulement sur l'attention, sans les réseaux récurrents ni les convolutions, deux autres façons de relier les mots entre eux, qu'employaient les modèles d'alors. L'article l'essayait sur la traduction ; ton IA n'en garde que la partie qui écrit la suite d'un texte, un « décodeur seul », comme dit forge. Trois de ses pièces sont venues après lui : RoPE, SwiGLU et RMSNorm, aux étapes 5 à 7.
 
 <Fragment slot="note">
 
@@ -284,7 +284,7 @@ La même table sert deux fois : à l'entrée, pour donner son vecteur à chaque 
 
 <Fragment slot="note">
 
-Les extraits viennent de `pieces.py`, dans le projet du chapitre : chaque pièce de ton IA y est refaite en une fonction, sans `nn.Module`, pour se lire d'un bloc. L'étape 9 vérifie qu'elles calculent comme forge.
+Les extraits viennent de `pieces.py`, dans le projet du chapitre : chaque pièce de ton IA y est refaite en une fonction, sans `nn.Module`, le moule commun des couches de PyTorch, comme `nn.Linear` au chapitre 0.5, pour se lire d'un bloc. L'étape 9 vérifie qu'elles calculent comme forge.
 
 </Fragment>
 
@@ -398,7 +398,7 @@ Après l'attention, chaque jeton passe seul par un petit réseau, le MLP. Comme 
 
 Trois matrices au lieu de deux : pour garder à peu près les paramètres d'un MLP ordinaire, qui élargit le vecteur à quatre fois sa taille, la couche cachée de SwiGLU n'en fait que les 8/3, arrondis à un multiple de {TON_IA.pas} : {TON_IA.cachee} pour {TON_IA.dim}.
 
-Cette porte vient d'une famille d'idées qu'a essayée Noam Shazeer en 2020. Le résumé de son article la décrit ainsi : une unité linéaire à porte, ou GLU, est le produit, composante par composante, de deux projections, dont l'une passe d'abord par une sigmoïde ; et l'on peut mettre une autre fonction à la place de la sigmoïde. Essayées dans le MLP du transformer, certaines de ces variantes y font mieux, dit le résumé, que les fonctions ReLU ou GELU qu'on y mettait d'habitude. Il ne donne aucun chiffre. Le SwiGLU de forge est une variante de ce genre : sa porte passe par SiLU au lieu d'une sigmoïde.
+Cette porte vient d'une famille d'idées qu'a essayée Noam Shazeer en 2020. Le résumé de son article la décrit ainsi : une unité linéaire à porte, ou GLU, est le produit, composante par composante, de deux projections, dont l'une passe d'abord par une sigmoïde ; et l'on peut mettre une autre fonction à la place de la sigmoïde. Essayées dans le MLP du transformer, certaines de ces variantes y font mieux, dit le résumé, que les fonctions ReLU ou GELU qu'on y mettait d'habitude, deux courbes qui, comme SiLU, laissent passer les valeurs positives et étouffent les négatives. Il ne donne aucun chiffre. Le SwiGLU de forge est une variante de ce genre : sa porte passe par SiLU au lieu d'une sigmoïde.
 
 <Fragment slot="note">
 
