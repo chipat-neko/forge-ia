@@ -276,7 +276,7 @@ Ce chapitre met ton IA à l'épreuve, comme forge le fait à la fin de chaque en
 
 <Etape numero={2} titre="La perte sur un texte jamais lu">
 
-Au {LIENS.l11 ? <a href={LIENS.l11}>chapitre 1.1</a> : 'chapitre 1.1'}, tu as mesuré la surprise d'un modèle à n-grammes devant son texte de validation, caractère par caractère. Ton IA se mesure de la même façon, jeton par jeton. Forge lui fait lire des morceaux de ses textes de validation, qu'elle ne lit jamais pour apprendre, et fait la moyenne de sa perte : <span class="formule-en-texte">−ln p</span>, où p est la chance qu'elle donnait au vrai jeton suivant. Le projet du chapitre la refait à la main :
+Au {LIENS.l11 ? <a href={LIENS.l11}>chapitre 1.1</a> : 'chapitre 1.1'}, tu as mesuré, caractère par caractère, la surprise d'un modèle qui ne faisait que compter, devant son texte de validation. Ton IA se mesure de la même façon, jeton par jeton. Forge lui fait lire des morceaux de ses textes de validation, qu'elle ne lit jamais pour apprendre, et fait la moyenne de sa perte : <span class="formule-en-texte">−ln p</span>, où p est la chance qu'elle donnait au vrai jeton suivant. Le projet du chapitre la refait à la main :
 
 <CodeExplique fichier="projets/1.6-evaluation/evaluation_pas_a_pas/pas_a_pas.py" region="perte">
   <li data-lignes="1">`perte_a_la_main` reçoit `logits`, le score que le modèle donne à chacun de ses {HASARD.vocabulaire} jetons, à chaque position, et `cibles`, le vrai jeton suivant de chaque position.</li>
@@ -305,7 +305,7 @@ La perplexité se lit donc comme un nombre de choix. Celle de ton IA, {HASARD.pe
 Le projet calcule la perplexité ainsi :
 
 <CodeExplique fichier="projets/1.6-evaluation/evaluation_pas_a_pas/pas_a_pas.py" region="perplexite">
-  <li data-lignes="1-2">`perplexite_a_la_main` reçoit la perte. Sa docstring dit comment lire le résultat : la lecture du pari.</li>
+  <li data-lignes="1-2">`perplexite_a_la_main` reçoit la perte. Sa docstring, le texte entre triples guillemets qui ouvre une fonction pour la décrire, dit comment lire le résultat : la lecture du pari.</li>
   <li data-lignes="3">`math.exp`, l'exponentielle du {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : 'chapitre 0.2'} : l'exponentielle de {HASARD.perte} donne {HASARD.perplexite}.</li>
 </CodeExplique>
 
@@ -313,7 +313,7 @@ Le projet calcule la perplexité ainsi :
 
 <Etape numero={3} titre="Bits par octet">
 
-Une perplexité de {HASARD.perplexite}, est-ce mieux que celle d'un autre modèle ? On ne peut pas toujours le dire. Elle se compte par jeton, et un jeton n'a pas la même taille d'un tokenizer à l'autre. Celui de ton IA, construit au {LIENS.l13 ? <a href={LIENS.l13}>chapitre 1.3</a> : 'chapitre 1.3'}, découpe le français en morceaux de quelques lettres ; un autre pourrait couper en lettres seules, ou en mots entiers. Pour comparer, on ramène la perte à un octet de texte, et on la compte en bits :
+Une perplexité de {HASARD.perplexite}, est-ce mieux que celle d'un autre modèle ? On ne peut pas toujours le dire. Elle se compte par jeton, et un jeton n'a pas la même taille d'un tokenizer à l'autre. Celui de ton IA, appris par BPE comme celui du {LIENS.l13 ? <a href={LIENS.l13}>chapitre 1.3</a> : 'chapitre 1.3'}, découpe le français en morceaux de quelques lettres ; un autre pourrait couper en lettres seules, ou en mots entiers. Pour comparer, on ramène la perte à un octet de texte, et on change son unité. Calculée avec ln, le logarithme naturel, comme jusqu'ici, la perte se compte en nats ; avec le logarithme de base 2, elle se compte en bits :
 
 <CodeExplique fichier="projets/1.6-evaluation/evaluation_pas_a_pas/pas_a_pas.py" region="bits">
   <li data-lignes="1">`bits_par_octet_a_la_main` reçoit la perte, en nats par jeton, et le nombre moyen d'octets de texte que couvre un jeton.</li>

@@ -227,6 +227,15 @@ export const GLOSSAIRE: readonly Terme[] = [
     voirAussi: ['perte', 'probabilite', 'perplexite'],
   },
   {
+    id: 'exactitude-normalisee',
+    terme: 'exactitude normalisée',
+    anglais: 'normalized accuracy',
+    definition:
+      "La part des questions d'un QCM où le modèle préfère la bonne réponse, une fois chaque score divisé par les octets de sa réponse. Sans cette division, les réponses courtes, qui ont moins de jetons à deviner, gagneraient trop souvent.",
+    renvois: [r('1.6', 'expliquée')],
+    voirAussi: ['qcm', 'marge-du-hasard'],
+  },
+  {
     id: 'forge',
     terme: 'forge',
     definition:
@@ -497,7 +506,7 @@ export const GLOSSAIRE: readonly Terme[] = [
     definition:
       "Un questionnaire à choix multiples. Pour le faire passer à un modèle sans qu'il écrive un mot, on mesure la vraisemblance de chaque réponse écrite à la suite de la question, et il choisit la plus vraisemblable.",
     renvois: [r('1.6', 'expliqué')],
-    voirAussi: ['marge-du-hasard', 'contamination'],
+    voirAussi: ['exactitude-normalisee', 'marge-du-hasard', 'contamination'],
   },
   {
     id: 'regle-de-la-chaine',
