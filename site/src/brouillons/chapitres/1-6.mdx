@@ -32,6 +32,7 @@ import RecupererProjet from '../../components/gabarit/RecupererProjet.astro';
 import { VOCABULAIRE_FORGE } from '../../lib/calculateur/ton-ia';
 import { chapitresParus } from '../../lib/chapitres-parus';
 import { exigeur } from '../../lib/exiger';
+import { formaterDate } from '../../lib/calculateur/formats';
 import { formaterPerte, nombre, pourcent } from '../../lib/nombres';
 import { ANNEXES, hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
 import { EVALUATION_QCM, EVALUATION_RESUMER, EVALUATION_TESTS } from '../../lib/partie-1/commandes';
@@ -44,6 +45,7 @@ import {
   choixLangueFrenchBench,
   choixPerplexiteHasard,
   compteDuQcm,
+  enUnite,
   faitsDesBits,
   faitsDesEchantillons,
   faitsDuPariHasard,
@@ -59,6 +61,7 @@ import {
   MMMLU,
   PAGE_MMMLU,
   SOURCES_LABO_1_6,
+  SOURCES_LIMITES_1_6,
 } from '../../lib/partie-1/sources-1-6';
 import { typographier } from '../../lib/typo';
 
@@ -120,13 +123,11 @@ export const BITS = (() => {
   // Le pari « bits » : les bits par octet du rapport, face aux 8 bits d'un fichier.
   const f = faitsDesBits(MINI);
   exiger(choixBits(MINI).find((c) => c.juste)?.texte === 'Moins de 2', 'les bits par octet de ton IA ne sont plus sous 2 : l’explication commence par « Moins de 2 »');
-  // « bit » au singulier sous 2, « bits » au-delà.
-  const enBits = (x, d) => `${nombre(x, d)} ${Number(x.toFixed(d)) >= 2 ? 'bits' : 'bit'}`;
   return {
     fichier: nombre(BITS_PAR_OCTET_D_UN_FICHIER),
-    bits: enBits(f.bits, 3),
+    bits: enUnite(f.bits, 3, 'bit'),
     perte: formaterPerte(MINI.perte_val),
-    bitsParJeton: enBits(f.bitsParJeton, 3),
+    bitsParJeton: enUnite(f.bitsParJeton, 3, 'bit'),
     octetsParJeton: nombre(f.octetsParJeton, 1),
     fois: nombre(Math.round(f.foisPlusPetit)),
     perteParOctet: formaterPerte(f.perteParOctet),
@@ -138,7 +139,7 @@ export const BITS = (() => {
 export const ATELIER = (() => {
   // L'atelier : les questions de MMMLU, et ce que dit leur jeu.
   exiger(MMMLU.traduction.valeur === 'humaine', 'MMMLU n’est plus traduit par des traducteurs');
-  return { n: nombre(QCM.n), matieres: nombre(MMMLU.categories.valeur) };
+  return { n: nombre(QCM.n), matieres: nombre(MMMLU.categories.valeur), langues: nombre(MMMLU.langues.valeur) };
 })();
 
 export const DEFI = (() => {
@@ -166,7 +167,7 @@ export const MARGE = (() => {
   const atelier = margeHasard(c.n, 4);
   exiger(verdictQcm(c.justes / c.n, c.hasard / c.n, atelier) === 'pas-different', 'les justes de l’atelier ne sont plus dans la marge du hasard');
   // « Un tirage au sort la rate rarement de plus de 2 points sur des milliers de questions ; de dizaines sur six. »
-  const points = (x) => `${nombre(100 * x, 1)} ${Number((100 * x).toFixed(1)) >= 2 ? 'points' : 'point'}`;
+  const points = (x) => enUnite(100 * x, 1, 'point');
   return {
     nHella: nombre(h.n),
     nArc: nombre(a.n),
@@ -195,7 +196,7 @@ export const ECHANTILLONS = (() => {
   exiger(f.capitaleSansParis, 'ton IA écrit maintenant Paris après « La capitale de la France est »');
   exiger(f.photosyntheseHorsSujet, 'ton IA parle maintenant de lumière ou de plantes après « La photosynthèse »');
   exiger(f.soleilRepete >= 2, '« le soleil se couchait » ne revient plus dans la suite');
-  exiger(f.villageDate, 'le village de Bretagne n’a plus de date');
+  exiger(f.villageDate && f.villageFamilles, 'le village de Bretagne n’a plus de date, ou plus de familles');
   exiger(f.codeIndente && f.codeSansSuite && f.docstringEnAnglais, 'le code écrit par ton IA ne dit plus ce que dit l’étape 6');
   const enLettres = (n) => ({ 2: 'deux', 3: 'trois', 4: 'quatre', 8: 'huit' })[n] ?? nombre(n);
   return {
@@ -211,7 +212,12 @@ export const LIMITES = (() => {
   exiger(FRENCHBENCH.langueDOrigine.valeur === 'anglais' && FRENCHBENCH.traduction.valeur === 'automatique', 'FrenchBench n’est plus traduit de l’anglais par une machine');
   exiger(choixLangueFrenchBench().find((c) => c.juste)?.texte === 'ont été traduites de l’anglais par une machine', 'le juste du pari « limites » a changé');
   exiger(FRENCHBENCH.licence.valeur === null, 'les pages de FrenchBench indiquent maintenant une licence');
+  exiger(LLAMA_3_BANCS.seuilParTest.valeur, 'Meta ne choisit plus le seuil de contamination test par test');
+  const dates = [...new Set(SOURCES_LIMITES_1_6.map((x) => x.verifieLe))];
+  exiger(dates.length === 1, 'les sources de l’étape 7 n’ont plus toutes la même date de lecture');
   return {
+    sources: SOURCES_LIMITES_1_6,
+    luesLe: formaterDate(dates[0]),
     traducteur: FRENCHBENCH.traducteur.valeur,
     jugement: FRENCHBENCH.jugement.valeur,
     croissant: ARTICLE_CROISSANT.url,
@@ -231,6 +237,8 @@ export const LABO = (() => {
   exiger(familleDe('ARC Challenge') === 'maths et raisonnement', 'ARC Challenge n’est plus dans la famille des maths et du raisonnement');
   exiger(familleDe('MMLU') !== undefined, 'MMLU n’est plus dans le tableau 8');
   exiger(LLAMA_3_BANCS.z.valeur === Z_95, 'le 1,96 de Meta n’est plus celui de la marge de la mesure du projet');
+  exiger(LLAMA_3_BANCS.intervallesDesMoyennesSimples.valeur, 'Meta ne réserve plus ses intervalles aux scores qui sont des moyennes simples');
+  exiger(LLAMA_31_405B_BASE.mmluMoyenneParMatiere.valeur, 'le score MMLU de Llama 3.1 n’est plus une moyenne par matière');
   const noms = categories.map((c) => c.francais);
   const l = LLAMA_31_405B_BASE;
   const c = compteDuQcm(QCM);
@@ -260,7 +268,7 @@ export const SUITE = (() => {
 
 <OuvertureEvaluation />
 
-C'est la perplexité de la version d'une heure de ton IA, celle qui est née au {LIENS.l15 ? <a href={LIENS.l15}>chapitre 1.5</a> : 'chapitre 1.5'}. Plus elle est basse, moins ton IA hésite devant le jeton qui vient. Mais est-ce peu, est-ce beaucoup ? Un nombre seul ne dit rien : il lui faut des repères.
+C'est la perplexité de la version d'une heure de ton IA, celle qui est née au {LIENS.l15 ? <a href={LIENS.l15}>chapitre 1.5</a> : 'chapitre 1.5'}. Mais est-ce peu, est-ce beaucoup ? Un nombre seul ne dit rien : il lui faut des repères.
 
 Ce chapitre met ton IA à l'épreuve, comme forge le fait à la fin de chaque entraînement. Il mesure sa surprise devant des textes qu'elle n'a jamais lus, lui fait passer des questionnaires à choix multiples sans qu'elle écrive un mot, et lit ce qu'elle écrit. Chaque mesure se refait à la main dans le projet du chapitre. Et chacune a ses limites : c'est l'autre moitié du chapitre.
 
@@ -278,14 +286,7 @@ Au {LIENS.l11 ? <a href={LIENS.l11}>chapitre 1.1</a> : 'chapitre 1.1'}, tu as me
   <li data-lignes="13">−ln p, c'est le logarithme de la somme moins le score du vrai jeton. On en fait la moyenne sur toutes les positions.</li>
 </CodeExplique>
 
-Sur ses textes de validation, la version d'une heure a une perte de {HASARD.perte}. Sa perplexité en est l'exponentielle :
-
-<CodeExplique fichier="projets/1.6-evaluation/evaluation_pas_a_pas/pas_a_pas.py" region="perplexite">
-  <li data-lignes="1-2">`perplexite_a_la_main` reçoit la perte. Sa docstring dit comment lire le résultat.</li>
-  <li data-lignes="3">`math.exp`, l'exponentielle du {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : 'chapitre 0.2'} : l'exponentielle de {HASARD.perte} donne {HASARD.perplexite}.</li>
-</CodeExplique>
-
-Premier repère : un modèle qui ne saurait rien.
+Sur ses textes de validation, la version d'une heure a une perte de {HASARD.perte}. Sa perplexité en est l'exponentielle : {HASARD.perplexite}, celle de l'ouverture. Premier repère : un modèle qui ne saurait rien.
 
 <Pari
   id="hasard"
@@ -297,9 +298,16 @@ Premier repère : un modèle qui ne saurait rien.
 
 {HASARD.vocabulaire} : chaque jeton a une chance sur {HASARD.vocabulaire}, sa perte vaut <span class="formule-en-texte">ln {HASARD.vocabulaire}</span>, soit {HASARD.perteHasard}, et l'exponentielle défait le logarithme. La perplexité d'un modèle qui ne sait rien, c'est la taille de son vocabulaire : il hésite entre tous ses jetons. Au chapitre 1.1 déjà, un modèle qui ne saurait rien hésiterait entre tous les caractères de son alphabet.
 
-Celle de ton IA, {HASARD.perplexite}, est environ {HASARD.fois} fois plus petite : une heure d'entraînement lui a appris à écarter presque tous les jetons.
+La perplexité se lit donc comme un nombre de choix. Celle de ton IA, {HASARD.perplexite}, dit qu'à chaque jeton elle hésite autant que si elle tirait au sort entre {HASARD.hesitation} jetons : environ {HASARD.fois} fois moins que le hasard. Une heure d'entraînement lui a appris à écarter presque tous les jetons.
 
 </Pari>
+
+Le projet calcule la perplexité ainsi :
+
+<CodeExplique fichier="projets/1.6-evaluation/evaluation_pas_a_pas/pas_a_pas.py" region="perplexite">
+  <li data-lignes="1-2">`perplexite_a_la_main` reçoit la perte. Sa docstring dit comment lire le résultat : la lecture du pari.</li>
+  <li data-lignes="3">`math.exp`, l'exponentielle du {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : 'chapitre 0.2'} : l'exponentielle de {HASARD.perte} donne {HASARD.perplexite}.</li>
+</CodeExplique>
 
 </Etape>
 
@@ -340,11 +348,11 @@ Un modèle de langage ne répond pas à une question : il donne une chance à ch
   <li data-lignes="21-23">Le modèle lit le tout d'un coup, et donne un score à chaque jeton possible, à chaque position. `log_probas`, c'est ln p, calculé comme la perte de l'étape 2.</li>
   <li data-lignes="24-27">On additionne ln p de chaque jeton de la réponse, lu à la position d'avant, celle qui le prédit. C'est la log-vraisemblance de la réponse : plus elle est haute, plus le modèle y croit.</li>
   <li data-lignes="31-33">`octets_du_choix` compte les octets de la réponse, avec l'espace qui la colle à la question.</li>
-  <li data-lignes="36-42">Une réponse longue a plus de jetons à deviner, donc une somme plus basse : sans correction, les réponses courtes gagneraient. On divise donc chaque score par les octets de sa réponse, en nats par octet. Forge appelle « exactitude normalisée » le score qu'on obtient ainsi.</li>
-  <li data-lignes="45-47">La réponse préférée a le plus grand score ; à égalité, la première gagne.</li>
+  <li data-lignes="36-43">Une réponse longue a plus de jetons à deviner, donc une somme plus basse : sans correction, les réponses courtes gagneraient. On divise donc chaque score par les octets de sa réponse : un score par octet, en nats. Forge appelle « exactitude normalisée » la part des questions où ce score par octet désigne la bonne réponse.</li>
+  <li data-lignes="46-48">La réponse préférée a le plus grand score ; à égalité, la première gagne.</li>
 </CodeExplique>
 
-La version d'une heure de ton IA a noté ainsi {ATELIER.n} questions de <a href={LIMITES.mmmlu}>MMMLU</a>, tirées au hasard : des questions à quatre réponses, sur {ATELIER.matieres} matières, traduites en français par des traducteurs professionnels. Elles sont faites pour de grands modèles, et bien trop difficiles pour elle. Tu ne cherches pas la bonne réponse : devine celle qu'elle préfère.
+La version d'une heure de ton IA a noté ainsi {ATELIER.n} questions de <a href={LIMITES.mmmlu}>MMMLU</a>, tirées au hasard : des questions à quatre réponses, sur {ATELIER.matieres} matières, que des traducteurs professionnels ont traduites en {ATELIER.langues} langues, dont le français. Elles sont faites pour de grands modèles, et bien trop difficiles pour elle. Tu ne cherches pas la bonne réponse : devine celle qu'elle préfère.
 
 <Verrou nom="atelier" message="Fais ton pari à l'étape 3 : les questions se débloquent juste après.">
   <AtelierQcm client:load qcm={QCM} acquis="qcm" />
@@ -355,7 +363,7 @@ La version d'une heure de ton IA a noté ainsi {ATELIER.n} questions de <a href=
 
 <p>{DEFI.phrases}</p>
 
-Aurait-elle pu tomber juste par hasard ? Oui, même là où son avance est la plus nette. Avec quatre réponses, le hasard tombe juste une fois sur quatre, et une question seule ne départage pas le savoir de la chance. Une avance minuscule dit qu'un tirage au sort aurait fait aussi bien ; une avance nette dit qu'elle n'hésite pas, pas qu'elle sait. Pour trancher, il faut beaucoup de questions : ses {DEFI.justes} justes sur {DEFI.n} ne se distinguent pas du hasard, et l'étape suivante dit pourquoi.
+Aurait-elle pu tomber juste par hasard ? Oui, même là où son avance est la plus nette. Avec quatre réponses, le hasard tombe juste une fois sur quatre, et une question seule ne départage pas le savoir de la chance. Une avance minuscule dit qu'elle a presque hésité à égalité entre deux réponses ; une avance nette dit qu'elle n'hésite pas, pas qu'elle sait. Pour trancher, il faut beaucoup de questions : ses {DEFI.justes} justes sur {DEFI.n} ne se distinguent pas du hasard, et l'étape suivante dit pourquoi.
 
 </details>
 
@@ -419,11 +427,11 @@ Les chiffres disent si ton IA prédit bien. Ce qu'elle écrit montre comment. À
 
 Aucun ne s'arrête de lui-même : chacun va jusqu'à ses {ECHANTILLONS.jetons} jetons.
 
-Son français en a l'air : des phrases, des accords, des points et des virgules. Ton IA a appris la forme de la langue. Pas le sens : après « La capitale de la France est », elle ne dit pas Paris, et sa photosynthèse ne parle ni de lumière ni de plantes. Elle se répète : « le soleil se couchait » revient {ECHANTILLONS.soleil} fois dans sa suite. Et elle invente avec aplomb : son village de Bretagne a une date, des familles, un lieu.
+Son français en a l'air : des phrases, des accords, des points et des virgules. Ton IA a appris la forme de la langue. Pas le sens : après « La capitale de la France est », elle ne dit pas Paris, et sa photosynthèse ne parle ni de lumière ni de plantes. Elle se répète : « le soleil se couchait » revient {ECHANTILLONS.soleil} fois dans sa suite. Et elle invente avec aplomb : son village de Bretagne a sa date et ses familles.
 
-Le code, elle le reconnaît. Après `def factorielle(n):`, elle passe à la ligne et décale de quatre espaces, comme le veut Python. Puis tout se mélange : une licence, une autre fonction. Et la docstring commencée en français finit en anglais.
+Le code, elle le reconnaît. Après `def factorielle(n):` et son retour à la ligne, elle décale de quatre espaces, comme le veut Python. Puis tout se mélange : une licence, une autre fonction. Et la docstring commencée en français finit en anglais.
 
-Chaque texte est un tirage : avec une autre graine, il serait autre. C'est ce que disent aussi ses chiffres : une IA d'une heure prédit des mots plausibles, pas des faits.
+Chaque texte est un tirage : avec une autre graine, il serait autre. Sa perplexité mesure comment elle devine le jeton suivant, pas si ce qu'elle écrit est vrai : pour le savoir, il faut lire ses textes.
 
 </Etape>
 
@@ -438,7 +446,7 @@ Un score ne vaut pas mieux que son test. Ceux de ton IA ont leurs limites, et un
   acquis="limites"
 >
 
-Elles ont été traduites de l'anglais par une machine. HellaSwag et ARC-Challenge sont des tests anglais. Pour FrenchBench, l'équipe de <a href={LIMITES.croissant}>CroissantLLM</a> les a fait traduire par {LIMITES.traducteur}, puis a jugé elle-même ces traductions {LIMITES.jugement}. Une question mal traduite peut ne plus avoir de bonne réponse claire : le score de ton IA mesure aussi la traduction.
+Elles ont été traduites de l'anglais par une machine. HellaSwag et ARC-Challenge sont des tests anglais. Pour FrenchBench, l'équipe de <a href={LIMITES.croissant}>CroissantLLM</a> les a fait traduire par {LIMITES.traducteur}, puis a vérifié ces traductions à la main : {LIMITES.jugement}. Mais une question mal traduite peut avoir perdu sa bonne réponse claire : sur cette question-là, le score mesure la traduction plus que le modèle.
 
 </Pari>
 
@@ -446,9 +454,15 @@ Les pages de FrenchBench n'indiquent aucune licence : ce chapitre n'en reproduit
 
 La mesure est aussi « maison » : le gabarit des questions, le jeton de début et la division par les octets sont ceux de forge. Ses scores se comparent entre tes modèles et au hasard, pas aux scores publiés pour d'autres modèles.
 
-Reste la question la plus gênante : le test était-il déjà dans les textes d'entraînement ? Un modèle qui a lu les questions a pu en retenir les réponses, et son score ne dit plus ce qu'il sait. C'est la contamination. Pour <a href={LIMITES.llama}>Llama 3</a>, Meta l'a cherchée par suites de {LIMITES.ngramme} jetons : une question est contaminée quand une part de ses jetons appartient à une suite de {LIMITES.ngramme} jetons déjà vue dans son corpus d'entraînement. Pour HellaSwag, en anglais, {LIMITES.contamine} des questions l'étaient, et Meta estime le gain de score à {LIMITES.gain} points pour son plus grand modèle.
+Reste la question la plus gênante : le test était-il déjà dans les textes d'entraînement ? Un modèle qui a lu les questions a pu en retenir les réponses, et son score ne dit plus ce qu'il sait. C'est la contamination. Pour <a href={LIMITES.llama}>Llama 3</a>, Meta l'a cherchée par suites de {LIMITES.ngramme} jetons : une question compte comme contaminée quand assez de ses jetons appartiennent à des suites de {LIMITES.ngramme} jetons déjà vues dans son corpus d'entraînement, avec un seuil choisi pour chaque test. Pour HellaSwag, en anglais, {LIMITES.contamine} des questions l'étaient, et Meta estime le gain de score à {LIMITES.gain} points pour son plus grand modèle.
 
-Les textes de ton IA viennent du web en français, de Wikipédia et de code Python. Forge n'y a pas cherché les questions de FrenchBench : une contamination n'est pas exclue. Son score de HellaSwag, à peine au-dessus du hasard, n'en dit donc pas plus qu'il ne montre.
+Les textes de ton IA viennent du web en français, de Wikipédia et de code Python. Forge n'y a pas cherché les questions de FrenchBench : une contamination n'est pas exclue. Elle gonflerait son score de HellaSwag ; à {MARGE.ecartHella} au-dessus du hasard, il n'y aurait pas grand-chose à gonfler, mais rien ne prouve que ce score soit propre.
+
+<Fragment slot="note">
+
+<p>{typographier(`Sources de cette étape, lues le ${LIMITES.luesLe} : `)}{LIMITES.sources.map((x, i) => <span>{i > 0 ? ', ' : ''}<a href={x.url}>{typographier(x.titre)}</a></span>)}.</p>
+
+</Fragment>
 
 </Etape>
 
@@ -468,9 +482,9 @@ Ton IA passe deux QCM. Avant tout réglage, Meta a fait passer à Llama 3 {LABO.
 
 <EncadreLabo sources={SOURCES_LABO_1_6}>
 
-Pour Llama 3, Meta range ses bancs d'essai en {LABO.familles} familles : {LABO.liste}, comme MMLU. ARC-Challenge, que ton IA passe aussi en français, est dans la famille des maths et du raisonnement. Chaque score y a son intervalle de confiance à 95&#8239;%, calculé comme la précision de la mesure de ton projet : <span class="formule-en-texte">{LABO.z} × √(S (1 − S) / N)</span>. Meta reconnaît que cette formule suppose des scores répartis en cloche, ce qu'ils ne sont pas, mais ses essais disent que l'approximation est bonne.
+Pour Llama 3, Meta range ses bancs d'essai en {LABO.familles} familles : {LABO.liste}, comme MMLU. ARC-Challenge, que ton IA passe aussi en français, est dans la famille des maths et du raisonnement. Chaque score qui est une moyenne simple y a son intervalle de confiance à 95&#8239;%, calculé comme la précision de la mesure de ton projet : <span class="formule-en-texte">{LABO.z} × √(S (1 − S) / N)</span>. Meta reconnaît que cette formule suppose des scores répartis en cloche, ce qu'ils ne sont pas, mais ses essais disent que l'approximation est bonne.
 
-Sur MMLU, dont l'atelier t'a montré {LABO.nAtelier} questions traduites, Llama 3.1 405B pré-entraîné trouve {LABO.mmlu} des bonnes réponses ; sur ARC-Challenge, {LABO.arc}. La version d'une heure de ton IA : {LABO.justes} sur {LABO.nAtelier}, et {LABO.arcMini} sur ARC-Challenge, {LABO.verdictArc}. Mais ces chiffres ne se comparent pas. Meta pose ses questions en anglais, et montre {LABO.mmluExemples} exemples résolus avant chaque question de MMLU, {LABO.arcExemples} avant celles d'ARC-Challenge ; ton IA n'en voit aucun, et lit une traduction.
+Sur MMLU, dont l'atelier t'a montré {LABO.nAtelier} questions traduites, Llama 3.1 405B pré-entraîné répond juste à {LABO.mmlu} des questions, en moyenne sur ses matières ; sur ARC-Challenge, à {LABO.arc}. La version d'une heure de ton IA : {LABO.justes} sur {LABO.nAtelier}, et {LABO.arcMini} sur ARC-Challenge, {LABO.verdictArc}. Mais ces chiffres ne se comparent pas. Meta pose ses questions en anglais, et montre {LABO.mmluExemples} exemples résolus avant chaque question de MMLU, {LABO.arcExemples} avant celles d'ARC-Challenge ; ton IA n'en voit aucun, et lit une traduction.
 
 </EncadreLabo>
 

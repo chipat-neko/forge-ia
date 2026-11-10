@@ -58,6 +58,9 @@ describe('les faits de labo du chapitre 1.6', () => {
     expect(LLAMA_3_BANCS.z.valeur).toBe(Z_95);
     expect(LLAMA_3_BANCS.ngramme.valeur).toBe(8);
     expect(LLAMA_3_BANCS.hellaswagContamine.valeur).toBe(85);
+    // Les nuances que le chapitre dit : intervalles des seules moyennes simples, seuil de contamination par test.
+    expect(LLAMA_3_BANCS.intervallesDesMoyennesSimples.valeur).toBe(true);
+    expect(LLAMA_3_BANCS.seuilParTest.valeur).toBe(true);
     expect(LLAMA_3_BANCS.gainHellaswag405B.valeur).toBe(14.3);
     for (const [, r] of Object.entries(LLAMA_3_BANCS)) expect(r.url).toBe(ARTICLE_LLAMA_3.url);
   });
@@ -65,6 +68,7 @@ describe('les faits de labo du chapitre 1.6', () => {
   it('Llama 3.1 405B pré-entraîné : MMLU 85,2 en 5 exemples, ARC-Challenge 96,1 en 25, lus dans sa carte de modèle', () => {
     expect(Object.fromEntries(Object.entries(LLAMA_31_405B_BASE).map(([cle, r]) => [cle, r.valeur]))).toStrictEqual({
       mmlu: 85.2,
+      mmluMoyenneParMatiere: true,
       mmluExemples: 5,
       arc: 96.1,
       arcExemples: 25,
@@ -76,7 +80,9 @@ describe('les faits de labo du chapitre 1.6', () => {
     expect(FRENCHBENCH.langueDOrigine.valeur).toBe('anglais');
     expect(FRENCHBENCH.traduction.valeur).toBe('automatique');
     expect(FRENCHBENCH.traducteur.valeur).toBe('GPT-3.5');
-    expect(FRENCHBENCH.jugement.valeur).toBe('loin d’être parfaites');
+    // La phrase entière : loin d'être parfaites, mais suffisantes pour mesurer les modèles.
+    expect(FRENCHBENCH.jugement.valeur).toBe('loin d’être parfaites, mais suffisantes pour que ces jeux donnent une mesure approchée correcte des modèles');
+    expect(FRENCHBENCH.jugement.ou).toContain('far from perfect but sufficient for these datasets to act as a correct performance proxy');
     expect(FRENCHBENCH.licence.valeur).toBeNull();
     expect(FRENCHBENCH.traduction.url).toBe(ARTICLE_CROISSANT.url);
     expect(ARTICLE_CROISSANT.url).toBe('https://arxiv.org/abs/2402.00786');

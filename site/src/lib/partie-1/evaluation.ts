@@ -114,6 +114,21 @@ export const FICHIERS_QCM = Object.freeze({
 
 export type NomEvaluation = keyof typeof FICHIERS_EVALUATION;
 
+/** Les versions de ton IA que le chapitre 1.6 évalue : « mini », sa version d'une heure, et « 1.5 », ton IA, la vraie. */
+export type VersionEvaluee = 'mini' | '1.5';
+
+/** Le relevé de chaque version (les props `nom` de TableauEvaluation et EchantillonsEvaluation). */
+export const CLES_DES_VERSIONS: Readonly<Record<VersionEvaluee, NomEvaluation>> = Object.freeze({
+  mini: 'ton-ia-mini',
+  '1.5': 'ton-ia-1.5',
+});
+
+/** Comment le chapitre nomme chaque version, au fil d'une phrase. */
+export const QUI_EST_EVALUE: Readonly<Record<VersionEvaluee, string>> = Object.freeze({
+  mini: 'la version d’une heure de ton IA',
+  '1.5': 'ton IA',
+});
+
 const REFAIRE =
   'Relance le relevé avec « python -m evaluation_pas_a_pas » (voir le README de projets/1.6-evaluation), ' +
   'ou corrige le fichier.';

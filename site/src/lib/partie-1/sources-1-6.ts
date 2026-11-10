@@ -23,7 +23,8 @@
 // - l'article de CroissantLLM (arXiv 2402.00786, version HTML v5), qui a créé FrenchBench :
 //   section 4.2.2 (« FrenchBench Multiple Choice ») : « These datasets correspond to machine
 //   translations made by GPT3.5 of HellaSwag and Arc-C to French », et « Manual verification of the
-//   translation quality indicates the translations to be far from perfect » ; section 4.1 : « In
+//   translation quality indicates the translations to be far from perfect but sufficient for these
+//   datasets to act as a correct performance proxy » ; section 4.1 : « In
 //   English, we evaluate on standard LLM evaluation benchmarks », dont HellaSwag et Arc-C ;
 // - les pages de manu/french_bench_hellaswag et manu/french_bench_arc_challenge sur Hugging Face :
 //   aucune licence, et « README.md exists but content is empty » ;
@@ -118,8 +119,15 @@ export const LLAMA_3_BANCS = Object.freeze({
   ),
   /** Le 1,96 de leurs intervalles de confiance à 95 % : CI(S) = 1.96 × √(S × (1 − S) / N). */
   z: releve(1.96, ARTICLE_LLAMA_3, 'section 5.1.1 (« CI(S) = 1.96 × √(S × (1 − S) / N) »)'),
+  /** Seuls les scores qui sont des moyennes simples ont leur intervalle. */
+  intervallesDesMoyennesSimples: releve(true, ARTICLE_LLAMA_3, 'section 5.1.1 (« We omit CIs for benchmark scores that are not simple averages »)'),
   /** La longueur des suites de jetons que la recherche de contamination compare : des 8-grammes. */
   ngramme: releve(8, ARTICLE_LLAMA_3, 'section 5.1.4 (« 8-gram overlap »)'),
+  /**
+   * Un exemple est contaminé quand la part de ses jetons pris dans de tels 8-grammes dépasse un seuil, choisi test
+   * par test.
+   */
+  seuilParTest: releve(true, ARTICLE_LLAMA_3, 'section 5.1.4 (seuil choisi pour chaque jeu, « based on which value shows the maximal significant estimated performance gain »)'),
   /** La part des questions de HellaSwag comptées comme contaminées, en pour cent. */
   hellaswagContamine: releve(85, ARTICLE_LLAMA_3, 'section 5.1.4, tableau 15 (HellaSwag, colonne « Contam. »)'),
   /** Le gain de score que la contamination de HellaSwag aurait donné au 405B, estimé en points. */
@@ -130,6 +138,8 @@ export const LLAMA_3_BANCS = Object.freeze({
 export const LLAMA_31_405B_BASE = Object.freeze({
   /** MMLU, en pour cent. */
   mmlu: releve(85.2, CARTE_LLAMA_31, 'Base pretrained models, ligne MMLU (macro_avg/acc_char), colonne Llama 3.1 405B'),
+  /** Le score de MMLU est une moyenne par matière (« macro_avg »). */
+  mmluMoyenneParMatiere: releve(true, CARTE_LLAMA_31, 'Base pretrained models, ligne MMLU, colonne Metric (« macro_avg/acc_char »)'),
   /** Le nombre d'exemples résolus donnés avant chaque question de MMLU. */
   mmluExemples: releve(5, CARTE_LLAMA_31, 'Base pretrained models, ligne MMLU, colonne « # Shots »'),
   /** ARC-Challenge, en pour cent. */
@@ -150,7 +160,12 @@ export const FRENCHBENCH = Object.freeze({
   /** Le modèle qui les a traduites. */
   traducteur: releve('GPT-3.5', ARTICLE_CROISSANT, 'section 4.2.2 (« made by GPT3.5 »)'),
   /** Ce que l'équipe de CroissantLLM dit de ces traductions, après les avoir vérifiées à la main. */
-  jugement: releve('loin d’être parfaites', ARTICLE_CROISSANT, 'section 4.2.2 (« Manual verification of the translation quality indicates the translations to be far from perfect »)'),
+  jugement: releve(
+    'loin d’être parfaites, mais suffisantes pour que ces jeux donnent une mesure approchée correcte des modèles',
+    ARTICLE_CROISSANT,
+    'section 4.2.2 (« Manual verification of the translation quality indicates the translations to be far from perfect but ' +
+      'sufficient for these datasets to act as a correct performance proxy »)',
+  ),
   /** La licence que donnent leurs pages : aucune. */
   licence: releve<string | null>(null, PAGE_FRENCHBENCH_HELLASWAG, 'pages des deux jeux : aucune licence, « README.md exists but content is empty »'),
 });

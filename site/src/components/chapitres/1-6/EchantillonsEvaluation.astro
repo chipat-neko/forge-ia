@@ -15,21 +15,20 @@
 //   <EchantillonsEvaluation nom="mini" />
 import { root } from 'astro:config/server';
 import { nombre } from '../../../lib/nombres';
-import { lireEvaluation, type NomEvaluation } from '../../../lib/partie-1/evaluation';
+import { CLES_DES_VERSIONS, lireEvaluation, QUI_EST_EVALUE, type VersionEvaluee } from '../../../lib/partie-1/evaluation';
 import { typographier } from '../../../lib/typo';
 
 interface Props {
   /** « mini », la version d'une heure de ton IA, ou « 1.5 », ton IA, la vraie. */
-  nom: 'mini' | '1.5';
+  nom: VersionEvaluee;
 }
 
 const { nom } = Astro.props;
-const CLES: Record<Props['nom'], NomEvaluation> = { mini: 'ton-ia-mini', '1.5': 'ton-ia-1.5' };
-const cle = CLES[nom];
+const cle = CLES_DES_VERSIONS[nom];
 if (cle === undefined) throw new Error(`EchantillonsEvaluation : nom « ${String(nom)} » inconnu. Donne « mini » ou « 1.5 ».`);
 // Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
 const evaluation = lireEvaluation(cle, new URL('../', root));
-const qui = nom === 'mini' ? 'la version d’une heure de ton IA' : 'ton IA';
+const qui = QUI_EST_EVALUE[nom];
 const absent = typographier(`Les textes qu’écrit ${qui} : à mesurer, avec le rapport de son évaluation.`);
 const legende =
   evaluation === null

@@ -14,22 +14,21 @@
 //   <TableauEvaluation nom="1.5" />
 import { root } from 'astro:config/server';
 import { nombre, pourcent } from '../../../lib/nombres';
-import { lireEvaluation, type NomEvaluation, type NomTestQcm } from '../../../lib/partie-1/evaluation';
+import { CLES_DES_VERSIONS, lireEvaluation, QUI_EST_EVALUE, type NomTestQcm, type VersionEvaluee } from '../../../lib/partie-1/evaluation';
 import { verdictEnPhrase } from '../../../lib/partie-1/paris-1-6';
 import { typographier } from '../../../lib/typo';
 
 interface Props {
   /** « mini », la version d'une heure de ton IA, ou « 1.5 », ton IA, la vraie. */
-  nom: 'mini' | '1.5';
+  nom: VersionEvaluee;
 }
 
 const { nom } = Astro.props;
-const CLES: Record<Props['nom'], NomEvaluation> = { mini: 'ton-ia-mini', '1.5': 'ton-ia-1.5' };
-const cle = CLES[nom];
+const cle = CLES_DES_VERSIONS[nom];
 if (cle === undefined) throw new Error(`TableauEvaluation : nom « ${String(nom)} » inconnu. Donne « mini » ou « 1.5 ».`);
 // Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
 const evaluation = lireEvaluation(cle, new URL('../', root));
-const qui = nom === 'mini' ? 'la version d’une heure de ton IA' : 'ton IA';
+const qui = QUI_EST_EVALUE[nom];
 const titre = evaluation === null ? '' : typographier(`L’évaluation de ${qui}, au pas ${nombre(evaluation.pas)}`);
 const absent = typographier(`L’évaluation de ${qui}, sa perte, sa perplexité et ses QCM : à mesurer, quand son entraînement sera fini.`);
 const NOMS_DES_TESTS: Record<NomTestQcm, string> = { hellaswag: 'HellaSwag', arc: 'ARC-Challenge' };

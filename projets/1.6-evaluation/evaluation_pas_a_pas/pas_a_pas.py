@@ -62,7 +62,7 @@ def scores_a_la_main(modele, tokenizer, qcm: QCM) -> list[float]:
     position `t` donne un score à chaque jeton possible pour la position `t + 1` : la
     log-vraisemblance du choix est la somme, sur ses jetons, de `ln(probabilité du jeton sachant ce
     qui précède)`. Le modèle n'écrit rien : il juge seulement un texte déjà écrit. Rend les mêmes
-    nombres que `forge.evaluation.qcm.scores_qcm` (à 10⁻⁵ près en relatif\u202f: forge arrondit les scores en
+    nombres que `forge.evaluation.qcm.scores_qcm` (à 10⁻⁵ près en relatif : forge arrondit les scores en
     float32 avant sa softmax, et lit plusieurs séquences d'un coup).
     """
     longueur = modele.config.longueur_contexte
@@ -93,7 +93,8 @@ def scores_par_octet(qcm: QCM, scores: list[float]) -> list[float]:
     """Chaque log-vraisemblance divisée par les octets de son choix : des nats par octet.
 
     Un choix long a plus de jetons à deviner, donc une log-vraisemblance plus basse : sans cette
-    division, les réponses courtes gagneraient. C'est « l'exactitude normalisée » du rapport.
+    division, les réponses courtes gagneraient. « L'exactitude normalisée » du rapport est la part des
+    questions où ce score par octet désigne la bonne réponse.
     """
     return [score / octets_du_choix(choix) for score, choix in zip(scores, qcm.choix)]
 

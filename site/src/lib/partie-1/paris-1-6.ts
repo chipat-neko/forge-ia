@@ -41,6 +41,14 @@ function rangDeTranche(tranches: readonly Tranche[], x: number): number {
   return rang;
 }
 
+/**
+ * Un nombre et son unité, accordée comme en français : le pluriel à partir de 2, une fois le nombre arrondi
+ * (« 0,05 nat », « 1,133 bit », « 4,946 bits », « 2,2 points »). `pluriel` par défaut : l'unité suivie d'un « s ».
+ */
+export function enUnite(x: number, decimales: number, unite: string, pluriel = `${unite}s`): string {
+  return `${nombre(x, decimales)} ${Math.abs(Number(x.toFixed(decimales))) >= 2 ? pluriel : unite}`;
+}
+
 // ---------- Étape 2 : le pari « hasard » ----------
 
 /** Les perplexités proposées par le pari, de la plus petite à la plus grande. */
@@ -293,10 +301,6 @@ export function analyseDuDefi(qcm: QcmExemples): { questions: AnalyseDeQuestion[
   return { questions, n: c.n, verdict: verdictQcm(c.justes / c.n, c.hasard / c.n, margeHasard(c.n, choix)) };
 }
 
-/** « nat » ou « nats » : le pluriel à partir de 2. */
-function nats(x: number, decimales: number): string {
-  return `${nombre(x, decimales)} ${Math.abs(Number(x.toFixed(decimales))) >= 2 ? 'nats' : 'nat'}`;
-}
 
 /** La place d'une avance parmi toutes les questions, en mots. */
 function placeDeLAvance(rang: number, n: number): string {
@@ -314,7 +318,7 @@ function placeDeLAvance(rang: number, n: number): string {
 export function phrasesDuDefi(analyse: { questions: AnalyseDeQuestion[]; n: number }): string[] {
   return analyse.questions.map((a) => {
     const phrase =
-      `À la question ${nombre(a.indice + 1)}, la bonne réponse devance la suivante de ${nats(a.avance, 2)} par octet${FINE}: ` +
+      `À la question ${nombre(a.indice + 1)}, la bonne réponse devance la suivante de ${enUnite(a.avance, 2, 'nat')} par octet${FINE}: ` +
       `c’est ${placeDeLAvance(a.rang, analyse.n)} des ${nombre(analyse.n)} questions.`;
     if (a.sansNormaliser === a.prefere) return phrase;
     // Le plus grand score brut n'est pas la bonne réponse : sans diviser par les octets, elle se trompait.
@@ -379,6 +383,8 @@ export interface FaitsDesEchantillons {
   soleilRepete: number;
   /** Après « Dans un petit village de Bretagne, », la suite donne un nombre (une date). */
   villageDate: boolean;
+  /** Et elle parle de familles. */
+  villageFamilles: boolean;
 }
 
 /** L'échantillon d'une invite, ou une erreur qui nomme l'invite. */
@@ -410,6 +416,7 @@ export function faitsDesEchantillons(e: Evaluation): FaitsDesEchantillons {
     photosyntheseHorsSujet: !/lumi|plante|soleil|chlorophylle/i.test(echantillon(e, 'La photosynthèse est le processus par lequel').suite),
     soleilRepete: soleil.split('le soleil se couchait').length - 1,
     villageDate: /\d/.test(echantillon(e, 'Dans un petit village de Bretagne,').suite),
+    villageFamilles: /famille/i.test(echantillon(e, 'Dans un petit village de Bretagne,').suite),
   };
 }
 

@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
+  CLES_DES_VERSIONS,
   FICHIERS_EVALUATION,
   FICHIERS_QCM,
   lireEchantillon,
@@ -14,6 +15,7 @@ import {
   lireQcm,
   marge95,
   margeHasard,
+  QUI_EST_EVALUE,
   verdictQcm,
   verifierEvaluation,
   verifierQcm,
@@ -113,6 +115,12 @@ describe('les relevés de « mini »', () => {
     // Ton IA, la vraie : les relevés que la tâche 15 du plan 5 écrira, lus par le chapitre 1.6 (« à mesurer » d'ici là).
     expect(FICHIERS_EVALUATION['ton-ia-1.5']).toBe('projets/1.6-evaluation/mesures/evaluation-1.5.json');
     expect(FICHIERS_QCM['ton-ia-1.5']).toBe('projets/1.6-evaluation/mesures/qcm-1.5.json');
+  });
+
+  it('les deux versions évaluées par le chapitre : leur relevé et leur nom', () => {
+    expect(CLES_DES_VERSIONS).toStrictEqual({ mini: 'ton-ia-mini', '1.5': 'ton-ia-1.5' });
+    for (const cle of Object.values(CLES_DES_VERSIONS)) expect(FICHIERS_EVALUATION[cle]).toBeDefined();
+    expect(QUI_EST_EVALUE).toStrictEqual({ mini: 'la version d’une heure de ton IA', '1.5': 'ton IA' });
   });
 
   it('marge.ts, sans import, est le jumeau que réexporte evaluation.ts', async () => {

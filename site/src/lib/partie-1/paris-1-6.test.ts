@@ -3,11 +3,12 @@
 // MMMLU qu'elle a notés), lus sur le disque, de la règle de forge (verdictQcm) et des sources
 // relevées (sources-1-6.ts).
 
+import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Choix } from '../choix';
 import { VOCABULAIRE_FORGE } from '../calculateur/ton-ia';
 import { nombre } from '../nombres';
-import { lireEvaluation, lireQcm, type Evaluation, type QcmExemples } from './evaluation';
+import { FICHIERS_EVALUATION, FICHIERS_QCM, lireEvaluation, lireQcm, type Evaluation, type QcmExemples } from './evaluation';
 import { margeHasard, verdictQcm } from './marge';
 import {
   analyseDuDefi,
@@ -18,6 +19,7 @@ import {
   choixPerplexiteHasard,
   choixPrefere,
   compteDuQcm,
+  enUnite,
   etatDuDefi,
   faitsDesBits,
   faitsDesEchantillons,
@@ -58,10 +60,23 @@ describe('les relevés que lit le chapitre', () => {
     expect(QCM.n).toBe(6);
   });
 
-  it('ton IA, la vraie, n’est pas encore relevée : le chapitre la dit « à mesurer »', () => {
-    // La tâche 15 du plan 5 écrira ces fichiers ; d'ici là, rien ne doit les remplacer.
-    expect(lireEvaluation('ton-ia-1.5')).toBeNull();
-    expect(lireQcm('ton-ia-1.5')).toBeNull();
+  it('ton IA, la vraie : « à mesurer » tant que ses relevés manquent, lus dès qu’ils existent', () => {
+    // La tâche 15 du plan 5 écrira ces fichiers : le test suit le disque, comme le parcours du chapitre.
+    const evaluation = existsSync(`../${FICHIERS_EVALUATION['ton-ia-1.5']}`);
+    const qcm = existsSync(`../${FICHIERS_QCM['ton-ia-1.5']}`);
+    expect(lireEvaluation('ton-ia-1.5') === null).toBe(!evaluation);
+    expect(lireQcm('ton-ia-1.5') === null).toBe(!qcm);
+  });
+});
+
+describe('une seule règle pour le pluriel des unités', () => {
+  it('le pluriel à partir de 2, une fois le nombre arrondi', () => {
+    expect(enUnite(0.0455, 2, 'nat')).toBe('0,05 nat');
+    expect(enUnite(1.133, 3, 'bit')).toBe('1,133 bit');
+    expect(enUnite(4.946, 3, 'bit')).toBe('4,946 bits');
+    expect(enUnite(1.996, 2, 'point')).toBe('2,00 points');
+    expect(enUnite(1.994, 2, 'point')).toBe('1,99 point');
+    expect(enUnite(2, 0, 'cheval', 'chevaux')).toBe('2 chevaux');
   });
 });
 
@@ -269,6 +284,7 @@ describe('étape 6 : les échantillons', () => {
       photosyntheseHorsSujet: true,
       soleilRepete: 2,
       villageDate: true,
+      villageFamilles: true,
     });
   });
 

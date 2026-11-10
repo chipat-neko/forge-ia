@@ -9,7 +9,7 @@
   // d'une heure de ton IA a notées (mesures/qcm-mini.json du projet 1.6), une à
   // la fois. Le lecteur lit la question telle qu'elle l'a lue, puis parie sur
   // la réponse qu'elle préfère. Alors seulement, les barres se dévoilent : le
-  // score normalisé de chaque réponse (sa vraisemblance divisée par ses
+  // score par octet de chaque réponse (sa log-vraisemblance divisée par ses
   // octets), la préférence de ton IA, et la bonne réponse, en menthe si ton IA
   // l'a trouvée, en corail sinon. « Question suivante » ; à la fin, le compte :
   // ton IA, et ce que donne le hasard en moyenne.
@@ -21,8 +21,13 @@
   // À placer dans le MDX avec client:load, dans un <Verrou> :
   //   <AtelierQcm client:load qcm={QCM} acquis="qcm" />
   // L'acquis est gagné au compte final, quand les questions ont toutes leur pari.
-  // Sans JavaScript, Astro rend la première question dévoilée : sa question, ses
-  // réponses, leurs barres et la bonne réponse restent lisibles.
+  //
+  // Le HTML d'Astro contient la première question dévoilée (scores, préférence,
+  // bonne réponse), mais l'état caché est celui par défaut : les styles ne la
+  // dévoilent que sous @media (scripting: none), comme Pari.astro. Sans
+  // JavaScript, elle se lit en entier ; avec, rien ne paraît avant le pari, même
+  // avant l'hydratation. Une fois hydraté, l'atelier ne garde dans la page que ce
+  // qui est dévoilé.
   import { tick, untrack } from 'svelte';
   import { nombre } from '../../../lib/nombres';
   import type { QcmExemples } from '../../../lib/partie-1/evaluation';
@@ -51,7 +56,8 @@
     throw new Error(`AtelierQcm : une question a plus de ${LETTRES.length} réponses ; ajoute des lettres à LETTRES.`);
   }
 
-  // Avant l'hydratation (et donc sans JavaScript), la question est dévoilée : rien ne se cache.
+  // Avant l'hydratation (et donc sans JavaScript), la page contient la question dévoilée ; les styles la
+  // cachent, sauf sans JavaScript.
   let monte = $state(false);
   $effect(() => {
     monte = true;
@@ -60,19 +66,23 @@
   let indice = $state(0);
   let paris = $state<(number | null)[]>(Array.from({ length: N }, () => null));
   let zoneQuestion: HTMLElement | undefined = $state();
+  let boutonSuivant: HTMLButtonElement | undefined = $state();
+  let zoneApres: HTMLElement | undefined = $state();
 
   const question = $derived(QCM.questions[indice]);
   const choix = $derived(CHOIX[indice]);
   const largeurs = $derived(LARGEURS[indice]);
   const pari = $derived(paris[indice]);
-  const revele = $derived(!monte || pari !== null);
+  // revele : le lecteur a parié, la question se dévoile. montre : ce que la page contient (avant l'hydratation, tout).
+  const revele = $derived(pari !== null);
+  const montre = $derived(!monte || revele);
   const vues = $derived(paris.flatMap((p, i) => (p === null ? [] : [i])));
   const fini = $derived(paris.every((p) => p !== null));
   const defi = $derived(etatDuDefi(vues, QCM));
 
   /** « réponse D » : une réponse désignée par sa lettre. */
   const reponse = (j: number) => `réponse ${LETTRES[j]}`;
-  /** Un score normalisé, en nats par octet, avec deux décimales. */
+  /** Un score par octet, en nats, avec deux décimales. */
   const score = (s: number) => nombre(s, 2);
 
   const texteIA = $derived(
@@ -84,7 +94,7 @@
     pari === null ? '' : pari === question.prefere ? `Ton pari est juste${FINE}: tu as deviné sa préférence.` : `Ton pari est raté${FINE}: elle en préfère une autre.`,
   );
 
-  function parier(j: number): void {
+  async function parier(j: number): Promise<void> {
     if (!monte || paris[indice] !== null) return;
     paris[indice] = j;
     if (paris.every((p) => p !== null) && cleAcquis !== undefined && !acquisAnnonce) {
@@ -92,6 +102,9 @@
       const detail: DetailAcquis = { cle: cleAcquis };
       window.dispatchEvent(new CustomEvent('forge:acquis', { detail }));
     }
+    // Le bouton choisi devient inactif : le focus passe à la suite (la question suivante, ou l'avis et le compte).
+    await tick();
+    (boutonSuivant ?? zoneApres)?.focus();
   }
 
   async function suivante(): Promise<void> {
@@ -118,19 +131,32 @@
 
   <p class="consigne" id="qcm-consigne">
     {#if revele}
-      Les réponses, et leur score pour ton IA{FINE}:
+      Les réponses, et leur score par octet pour ton IA{FINE}:
     {:else}
-      Quelle réponse ton IA préfère-t-elle{FINE}? Parie avant de voir ses scores.
+      <span class="si-js">Quelle réponse ton IA préfère-t-elle{FINE}? Parie avant de voir ses scores.</span>
+      <span class="sans-js">Les réponses, et leur score par octet pour ton IA{FINE}:</span>
     {/if}
   </p>
 
-  <table class="reponses" aria-labelledby="qcm-consigne" data-test="qcm-reponses">
-    <tbody>
+  <!-- Sur un téléphone, les lignes passent en blocs (display: block) : WebKit retire alors leur rôle aux éléments
+       du tableau. Les rôles écrits ici le gardent. -->
+  <!-- svelte-ignore a11y_no_redundant_roles -->
+  <table class="reponses" role="table" aria-labelledby="qcm-consigne" data-test="qcm-reponses">
+    <!-- svelte-ignore a11y_no_redundant_roles -->
+    <tbody role="rowgroup">
       {#each choix as c, j (`${indice}-${j}`)}
-        {@const prefere = revele && j === question.prefere}
-        {@const bonne = revele && j === question.bonne}
-        <tr data-reponse={j} data-prefere={prefere ? '' : undefined} data-bonne={bonne ? '' : undefined} data-juste={c.juste ? '' : undefined}>
-          <th scope="row">
+        {@const prefere = montre && j === question.prefere}
+        {@const bonne = montre && j === question.bonne}
+        <!-- svelte-ignore a11y_no_redundant_roles -->
+        <tr
+          role="row"
+          data-reponse={j}
+          data-prefere={prefere ? '' : undefined}
+          data-bonne={bonne ? '' : undefined}
+          data-juste={c.juste ? '' : undefined}
+        >
+          <!-- svelte-ignore a11y_no_redundant_roles -->
+          <th scope="row" role="rowheader">
             <button
               type="button"
               class="pari-reponse"
@@ -144,17 +170,25 @@
               <span class="texte" data-pagefind-ignore>{c.texte}</span>
             </button>
           </th>
-          <td class="scores" class:floues={!revele} inert={!revele} aria-hidden={revele ? undefined : 'true'} data-test="qcm-barres">
+          <!-- svelte-ignore a11y_no_redundant_roles -->
+          <td
+            role="cell"
+            class="scores"
+            class:floues={!revele}
+            inert={monte && !revele}
+            aria-hidden={monte && !revele ? 'true' : undefined}
+            data-test="qcm-barres"
+          >
             <span class="ligne-barre">
               <span class="piste" aria-hidden="true">
                 <span
                   class="barre"
                   class:bonne-juste={bonne && question.juste}
                   class:bonne-fausse={bonne && !question.juste}
-                  style:width={`${((revele ? largeurs[j] : 0.6) * 100).toFixed(1)}%`}
+                  style:--largeur={`${((montre ? largeurs[j] : 0.6) * 100).toFixed(1)}%`}
                 ></span>
               </span>
-              <span class="score" data-test="qcm-score">{revele ? score(question.scores_normalises[j]) : '?'}</span>
+              <span class="score" data-test="qcm-score">{montre ? score(question.scores_normalises[j]) : '?'}</span>
             </span>
             {#if prefere || bonne}
               <span class="marques">
@@ -169,11 +203,11 @@
   </table>
   <div class="legende-barres">
     Chaque barre{FINE}: la vraisemblance de la réponse, octet par octet, rapportée à celle que ton IA préfère.
-    Le nombre est son score, en nats par octet{FINE}: plus il est haut, plus elle y croit.
+    Le nombre est son score par octet, en nats{FINE}: plus il est haut, plus elle y croit.
   </div>
 
-  <div class="apres" role="status">
-    {#if revele}
+  <div class="apres" class:cache={!revele} role="status" tabindex="-1" bind:this={zoneApres}>
+    {#if montre}
       {#if pari !== null}<p class="pari-du-lecteur" data-test="qcm-pari">{textePari}</p>{/if}
       <p class="avis-ia" class:juste={question.juste} class:faux={!question.juste} data-test="qcm-verdict">{texteIA}</p>
       {#if fini && monte}<p class="compte" data-test="qcm-compte">{COMPTE}</p>{/if}
@@ -181,7 +215,9 @@
   </div>
 
   {#if monte && pari !== null && indice < N - 1}
-    <button type="button" class="bouton-relief suivante" data-test="qcm-suivante" onclick={suivante}>Question suivante</button>
+    <button type="button" class="bouton-relief suivante" data-test="qcm-suivante" onclick={suivante} bind:this={boutonSuivant}
+      >Question suivante</button
+    >
   {/if}
 
   <div class="defi" class:reussi={defi.reussi} data-defi>
@@ -302,11 +338,69 @@
     font-size: 15px;
   }
 
-  /* Avant le pari, les barres sont floues, et toutes de la même longueur : elles ne disent rien. */
+  /* Avant le pari, les barres sont floues, toutes de la même longueur et de la même couleur, sans marque :
+     elles ne disent rien. C'est l'état par défaut ; seul @media (scripting: none) le dévoile (plus bas). */
   .scores.floues {
     filter: blur(3px);
     opacity: 0.4;
     user-select: none;
+  }
+
+  .scores.floues .barre {
+    width: 60%;
+    background: var(--indigo-doux);
+  }
+
+  .scores.floues .marques {
+    visibility: hidden;
+  }
+
+  .apres.cache,
+  .consigne .sans-js {
+    display: none;
+  }
+
+  .apres:focus-visible {
+    outline: 3px solid var(--indigo);
+    outline-offset: 2px;
+  }
+
+  /* Sans JavaScript, on ne peut pas parier : la première question se lit dévoilée, comme les paris (Pari.astro). */
+  @media (scripting: none) {
+    .scores.floues {
+      filter: none;
+      opacity: 1;
+      user-select: auto;
+    }
+
+    .scores.floues .barre {
+      width: var(--largeur, 60%);
+      background: var(--indigo-doux);
+    }
+
+    .scores.floues .barre.bonne-juste {
+      background: var(--menthe);
+    }
+
+    .scores.floues .barre.bonne-fausse {
+      background: var(--corail);
+    }
+
+    .scores.floues .marques {
+      visibility: visible;
+    }
+
+    .apres.cache {
+      display: block;
+    }
+
+    .consigne .si-js {
+      display: none;
+    }
+
+    .consigne .sans-js {
+      display: inline;
+    }
   }
 
   /* La barre et son score sur une ligne ; la préférence et la bonne réponse dessous. */
@@ -330,6 +424,7 @@
 
   .barre {
     display: block;
+    width: var(--largeur, 60%);
     height: 10px;
     min-width: 2px;
     background: var(--indigo-doux);

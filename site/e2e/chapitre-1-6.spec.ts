@@ -32,7 +32,7 @@ import {
   texteDuCompte,
   verdictEnPhrase,
 } from '../src/lib/partie-1/paris-1-6';
-import { FRENCHBENCH, LLAMA_3_BANCS, LLAMA_31_405B_BASE, SOURCES_LABO_1_6 } from '../src/lib/partie-1/sources-1-6';
+import { FRENCHBENCH, LLAMA_3_BANCS, LLAMA_31_405B_BASE, SOURCES_LABO_1_6, SOURCES_LIMITES_1_6 } from '../src/lib/partie-1/sources-1-6';
 import { extraireRegion } from '../src/lib/regions';
 import { typographier } from '../src/lib/typo';
 import {
@@ -99,6 +99,11 @@ test('chapitre 1.6 complet', async ({ page }, info) => {
   await expect(page.locator('header')).toContainText(`Partie 1, chapitre 1.6 sur ${total}`);
   if (info.project.name === 'mobile') expect(page.viewportSize()?.width).toBe(390);
   await expect(page.locator('.pari[data-pari]')).toHaveCount(4);
+  // Le programme (« 10 étapes, 4 paris ») compte les étapes et les paris de la page.
+  const etapes = await page.locator('.etape h2').count();
+  const nParis = await page.locator('.pari[data-pari]').count();
+  expect(await page.locator('.programme').textContent()).toContain(`${etapes} étapes, ${nParis} paris`);
+  expect(etapes).toBe(10);
   await page.locator('[data-pari="hasard"] [data-juste]').click();
   await page.locator('[data-pari="bits"] [data-juste]').click();
   await expect(page.locator('[data-verrou="atelier"]')).not.toHaveAttribute('inert', '');
@@ -152,21 +157,35 @@ test('l’atelier : le pari avant les barres, les barres floues tant qu’on n�
       await expect(barres.nth(j).locator('[data-test="qcm-score"]')).toHaveText('?');
     }
     await expect(barres.nth(0)).toHaveCSS('filter', /blur/);
+    // Toutes pareilles : même longueur affichée, même couleur, aucune marque.
+    const avant = await barres.locator('.barre').evaluateAll((b) =>
+      b.map((e) => `${Math.round(e.getBoundingClientRect().width)} ${getComputedStyle(e).backgroundColor}`),
+    );
+    expect(new Set(avant).size, avant.join(' | ')).toBe(1);
+    expect(await barres.locator('.marques').count()).toBe(0);
     await expect(atelier.locator('[data-test="qcm-prefere"], [data-test="qcm-bonne"], [data-test="qcm-verdict"]')).toHaveCount(0);
     await expect(atelier.locator('[data-test="qcm-suivante"]')).toHaveCount(0);
     // Les réponses : celles du relevé, sans leur espace de tête.
     expect(await atelier.locator('[data-test="qcm-choix"] .texte').allTextContents()).toStrictEqual(q.choix.map((c) => c.trim()));
-    // Le pari : une réponse au hasard du parcours, la dernière.
+    // Le pari : la dernière réponse, au clavier pour une question sur deux (Entrée sur le bouton).
     const pari = q.choix.length - 1;
-    await atelier.locator('[data-test="qcm-choix"]').nth(pari).click();
+    const bouton = atelier.locator('[data-test="qcm-choix"]').nth(pari);
+    if (i % 2 === 0) {
+      await bouton.focus();
+      await page.keyboard.press('Enter');
+    } else {
+      await bouton.click();
+    }
     vues.push(i);
+    // Le bouton choisi devient inactif : le focus passe à « Question suivante », ou, à la dernière, à l'avis et au compte.
+    await expect(i < QCM.n - 1 ? atelier.locator('[data-test="qcm-suivante"]') : atelier.locator('.apres')).toBeFocused();
     // Après : les scores normalisés, les longueurs de largeursDesBarres, la préférence et la bonne réponse.
     const largeurs = largeursDesBarres(q.scores_normalises);
     for (let j = 0; j < q.choix.length; j++) {
       await expect(barres.nth(j)).not.toHaveClass(/floues/);
       await expect(barres.nth(j).locator('[data-test="qcm-score"]')).toHaveText(nombre(q.scores_normalises[j], 2));
       const style = (await barres.nth(j).locator('.barre').getAttribute('style')) ?? '';
-      const largeur = Number(/width:\s*([\d.]+)%/.exec(style)?.[1]);
+      const largeur = Number(/--largeur:\s*([\d.]+)%/.exec(style)?.[1]);
       expect(largeur, `question ${i + 1}, réponse ${j} : ${style}`).toBe(Number((largeurs[j] * 100).toFixed(1)));
     }
     await expect(lignes.nth(q.prefere).locator('[data-test="qcm-prefere"]')).toHaveText('préférée par ton IA');
@@ -227,9 +246,11 @@ test('l’ouverture et le tableau de la version d’une heure disent ce que dit 
   await page.goto(PAGE);
   const ouverture = page.locator('[data-test="ouverture"]');
   await expect(ouverture.locator('[data-test="perplexite-mini"]')).toHaveText(nombre(MINI.perplexite, 1));
-  await expect(ouverture.locator('[data-test="sens-perplexite"]')).toContainText(`entre ${faitsDuPariHasard(MINI).hesitation} jetons`);
-  // L'ouverture ne donne pas la réponse du pari « hasard » : ni le vocabulaire, ni sa perte.
+  await expect(ouverture.locator('[data-test="sens-perplexite"]')).toContainText('moins ton IA hésite');
+  // L'ouverture ne donne pas la réponse du pari « hasard » : ni le vocabulaire, ni la lecture « tirer au sort entre N jetons ».
   await expect(ouverture).not.toContainText(nombre(VOCABULAIRE_FORGE));
+  await expect(ouverture).not.toContainText('au sort');
+  await expect(ouverture).not.toContainText(`${faitsDuPariHasard(MINI).hesitation} jetons`);
   const tableau = page.locator('[data-evaluation="ton-ia-mini"]');
   const mesures = tableau.locator('[data-test="evaluation-mesures"] tbody tr td');
   expect(await mesures.allTextContents()).toStrictEqual([
@@ -294,6 +315,9 @@ test('les choix des paris viennent des relevés, des sources et de la règle de 
   const h = MINI.qcm.hellaswag;
   await expect(page.locator('[data-pari="marge"]')).toContainText(nombre(100 * h.marge_hasard, 1));
   await expect(page.locator('[data-pari="limites"]')).toContainText(FRENCHBENCH.traducteur.valeur);
+  await expect(page.locator('[data-pari="limites"]')).toContainText(typographier(FRENCHBENCH.jugement.valeur));
+  // La lecture « tirer au sort entre N jetons » vient dans l'explication du pari « hasard ».
+  await expect(page.locator('[data-pari="hasard"]')).toContainText(`au sort entre ${faitsDuPariHasard(MINI).hesitation} jetons`);
   // La marge de l'atelier : celle du hasard sur ses six questions.
   await expect(page.locator('#etape-5')).toContainText(`${nombre(100 * margeHasard(QCM.n), 1)} points`);
 });
@@ -347,6 +371,33 @@ test('l’encadré du labo : les chiffres de sources-1-6, et leurs sources', asy
   await expect(etape7).toContainText(`${nombre(LLAMA_3_BANCS.ngramme.valeur)} jetons`);
   await expect(etape7).toContainText(`${nombre(LLAMA_3_BANCS.hellaswagContamine.valeur)}${FINE}%`);
   await expect(etape7).toContainText(nombre(LLAMA_3_BANCS.gainHellaswag405B.valeur, 1));
+  // Ses sources, avec leur date.
+  for (const x of SOURCES_LIMITES_1_6) await expect(etape7.locator(`.note a[href="${x.url}"]`)).toHaveCount(1);
+  await expect(etape7.locator('.note')).toContainText('lues le 10');
+});
+
+test('rien avant le pari « hasard » ne donne sa réponse', async ({ page }) => {
+  await page.goto(PAGE);
+  // Le texte affiché avant le pari, dans l'ordre de la page : tête, ouverture, étape 1, début de l'étape 2.
+  const avant = await page.evaluate(() => {
+    const pari = document.querySelector('[data-pari="hasard"]')!;
+    const morceaux: string[] = [];
+    const marcheur = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = marcheur.nextNode(); n; n = marcheur.nextNode()) {
+      if (n.parentElement?.closest('script, style')) continue;
+      if (pari.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_PRECEDING) morceaux.push(n.textContent ?? '');
+    }
+    return morceaux.join(' ').replace(/[ \t\n]+/g, ' ');
+  });
+  expect(avant).toContain('Premier repère');
+  // Ni la règle (la perplexité, un nombre de choix également probables, « tirer au sort entre N »), ni la réponse
+  // (32 768 dans une même phrase que la perplexité). Le vocabulaire seul peut paraître : la question le donne.
+  for (const regle of [/au sort entre/i, /(également|aussi) probables/i, /entre combien/i, /hésit\w* (autant|comme|entre)/i, /nombre de choix/i]) {
+    expect(avant, String(regle)).not.toMatch(regle);
+  }
+  for (const phrase of avant.split(/[.!?…]/)) {
+    expect(/perplexit/i.test(phrase) && phrase.includes(nombre(VOCABULAIRE_FORGE)), phrase).toBe(false);
+  }
 });
 
 test('sans JavaScript, tout se lit : les explications, la première question dévoilée, les tableaux', async ({ browser, baseURL }) => {
@@ -359,9 +410,14 @@ test('sans JavaScript, tout se lit : les explications, la première question dé
   const atelier = page.locator('[data-atelier-qcm]');
   const q = QCM.questions[0];
   await expect(atelier.locator('[data-test="qcm-contexte"]')).toHaveText(q.contexte);
-  await expect(atelier.locator('[data-test="qcm-barres"]').first()).not.toHaveClass(/floues/);
+  // L'état caché est celui par défaut ; @media (scripting: none) le dévoile.
+  await expect(atelier.locator('[data-test="qcm-barres"]').first()).toHaveCSS('filter', 'none');
   await expect(atelier.locator('[data-test="qcm-score"]').first()).toHaveText(nombre(q.scores_normalises[0], 2));
   await expect(atelier.locator('[data-test="qcm-verdict"]')).toBeVisible();
+  await expect(atelier.locator('[data-test="qcm-prefere"]')).toBeVisible();
+  await expect(atelier.locator('[data-test="qcm-bonne"]')).toBeVisible();
+  await expect(atelier.locator('.consigne .sans-js')).toBeVisible();
+  await expect(atelier.locator('.consigne .si-js')).toBeHidden();
   await expect(page.locator('[data-evaluation="ton-ia-mini"]')).toBeVisible();
   await expect(page.locator('[data-echantillons="ton-ia-mini"]')).toBeVisible();
   await verifierSansDebordement(page);
