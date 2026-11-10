@@ -56,7 +56,7 @@ export const GLOSSAIRE: readonly Terme[] = [
     definition:
       "La recette qui corrige les poids de ton IA à chaque pas. Au lieu de reculer chaque poids du taux fois sa pente, elle règle la longueur de son pas d'après ses pentes passées.",
     renvois: [r('0.5', 'citée'), r('1.5', 'expliquée')],
-    voirAussi: ['descente-de-gradient', 'taux-d-apprentissage', 'pas-d-entrainement'],
+    voirAussi: ['optimiseur', 'descente-de-gradient', 'taux-d-apprentissage', 'pas-d-entrainement'],
   },
   {
     id: 'attention',
@@ -400,6 +400,15 @@ export const GLOSSAIRE: readonly Terme[] = [
     definition:
       "Un cahier de code qui s'ouvre dans Colab, le service de Google qui fait tourner Python dans ton navigateur. Les chapitres en ont un, pour refaire leurs calculs sans rien installer.",
     renvois: [r('0.1', 'présenté')],
+  },
+  {
+    id: 'optimiseur',
+    terme: 'optimiseur',
+    anglais: 'optimizer',
+    definition:
+      "La recette qui corrige les poids à chaque pas, d'après leur gradient : la descente de gradient en est la plus simple. Celui de ton IA est AdamW.",
+    renvois: [r('1.5', 'expliqué')],
+    voirAussi: ['adamw', 'descente-de-gradient', 'taux-d-apprentissage'],
   },
   {
     id: 'parametre',

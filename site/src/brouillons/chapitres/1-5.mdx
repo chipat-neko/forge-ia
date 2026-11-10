@@ -397,7 +397,7 @@ Le taux ne dépend que du numéro du pas. Après une pause, il repart donc au bo
 
 <Etape numero={4} titre="L'atelier : un petit modèle apprend">
 
-Ton IA met une heure à apprendre dans sa plus petite taille. Ce petit modèle-là apprend dans ta page, en moins d'une minute : un transformer minuscule, qui invente des prénoms, caractère par caractère. C'est la même recette que ton IA, en {ATELIER.parametres} paramètres : le même optimiseur, le même écrêtage, le même planning du taux. À chaque pas, il lit {ATELIER.lot} prénoms.
+Ton IA met une heure à apprendre dans sa plus petite taille. Ce petit modèle-là apprend dans ta page, en moins d'une minute : un transformer minuscule, qui invente des prénoms, caractère par caractère. C'est la même recette que ton IA, en {ATELIER.parametres} paramètres : le même planning du taux, et le même optimiseur et le même écrêtage, ceux de l'étape 5. À chaque pas, il lit {ATELIER.lot} prénoms.
 
 Son taux maximal est réglable. D'habitude, il vaut {ATELIER.taux}.
 
@@ -440,7 +440,7 @@ Le petit modèle calcule dans ton navigateur, sur le processeur : rien ne passe 
 
 <Etape numero={5} titre="AdamW et l'écrêtage">
 
-La descente de gradient du {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : 'chapitre 0.2'} recule chaque poids du taux fois sa pente. Ton IA, elle, utilise AdamW : pour chaque poids, il garde deux moyennes, celle de ses pentes récentes et celle de leurs carrés. Il avance d'après la première, divisée par la racine de la seconde. Un poids dont la pente garde le même signe avance d'à peu près le taux à chaque pas ; un poids dont la pente change sans cesse de signe avance moins. Voici comment forge le crée :
+La descente de gradient du {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : 'chapitre 0.2'} recule chaque poids du taux fois sa pente. C'est l'optimiseur le plus simple : la recette qui corrige les poids à chaque pas. Ton IA, elle, utilise AdamW : pour chaque poids, il garde deux moyennes, celle de ses pentes récentes et celle de leurs carrés. Il avance d'après la première, divisée par la racine de la seconde. Un poids dont la pente garde le même signe avance d'à peu près le taux à chaque pas ; un poids dont la pente change sans cesse de signe avance moins. Voici comment forge le crée :
 
 <CodeExplique fichier="projets/forge/forge/entrainement/boucle.py" symbole="_creer_optimiseur">
   <li data-lignes="1">`_creer_optimiseur` reçoit le modèle, la configuration de l'entraînement et l'appareil.</li>
