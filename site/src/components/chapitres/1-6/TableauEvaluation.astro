@@ -1,0 +1,238 @@
+---
+// Le rapport d'évaluation d'une version de ton IA, lu à la construction dans son relevé
+// (projets/1.6-evaluation/mesures/evaluation-<nom>.json, par lireEvaluation) : la perte de
+// validation, la perplexité et les bits par octet, puis les deux QCM de FrenchBench, avec
+// l'exactitude normalisée et la précision de la mesure, le hasard et sa marge, et le verdict de
+// forge, mis en phrase (verdictEnPhrase), jamais affiché brut.
+//
+// Deux tableaux typographiés, sans cadre, comme ceux des autres chapitres (TableauSessions).
+//
+// Tant que le relevé manque (ton IA, la vraie, jusqu'à la tâche 16 du plan 5), le composant
+// affiche « à mesurer », marqué data-a-mesurer.
+//
+//   <TableauEvaluation nom="mini" />
+//   <TableauEvaluation nom="1.5" />
+import { root } from 'astro:config/server';
+import { nombre, pourcent } from '../../../lib/nombres';
+import { lireEvaluation, type NomEvaluation, type NomTestQcm } from '../../../lib/partie-1/evaluation';
+import { verdictEnPhrase } from '../../../lib/partie-1/paris-1-6';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  /** « mini », la version d'une heure de ton IA, ou « 1.5 », ton IA, la vraie. */
+  nom: 'mini' | '1.5';
+}
+
+const { nom } = Astro.props;
+const CLES: Record<Props['nom'], NomEvaluation> = { mini: 'ton-ia-mini', '1.5': 'ton-ia-1.5' };
+const cle = CLES[nom];
+if (cle === undefined) throw new Error(`TableauEvaluation : nom « ${String(nom)} » inconnu. Donne « mini » ou « 1.5 ».`);
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const evaluation = lireEvaluation(cle, new URL('../', root));
+const qui = nom === 'mini' ? 'la version d’une heure de ton IA' : 'ton IA';
+const titre = evaluation === null ? '' : typographier(`L’évaluation de ${qui}, au pas ${nombre(evaluation.pas)}`);
+const absent = typographier(`L’évaluation de ${qui}, sa perte, sa perplexité et ses QCM : à mesurer, quand son entraînement sera fini.`);
+const NOMS_DES_TESTS: Record<NomTestQcm, string> = { hellaswag: 'HellaSwag', arc: 'ARC-Challenge' };
+const TESTS: NomTestQcm[] = ['hellaswag', 'arc'];
+const FINE = '\u202F';
+/** Une marge en points de pourcentage, avec une décimale. */
+const points = (m: number) => `±${FINE}${nombre(100 * m, 1)}`;
+const idMesures = `evaluation-${cle}-mesures`;
+const idQcm = `evaluation-${cle}-qcm`;
+---
+
+{
+  evaluation === null ? (
+    <p class="a-mesurer" data-a-mesurer data-evaluation-absente={cle}>
+      {absent}
+    </p>
+  ) : (
+    <figure class="tableau-evaluation" data-evaluation={cle}>
+      <figcaption>
+        <span class="objet">{titre}</span>
+        {typographier('Mesurée par forge sur des textes et des questions que ton IA n’a jamais lus.')}
+      </figcaption>
+      <table id={idMesures} aria-label={typographier('La perte, la perplexité et les bits par octet')} data-test="evaluation-mesures">
+        <thead>
+          <tr>
+            <th scope="col">Mesure</th>
+            <th scope="col" class="nombre">
+              Valeur
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-mesure="perte">
+            <th scope="row">
+              Perte de validation<small>{typographier('en nats par jeton, sur les textes de validation')}</small>
+            </th>
+            <td class="nombre">{nombre(evaluation.perte_val, 3)}</td>
+          </tr>
+          <tr data-mesure="perplexite">
+            <th scope="row">
+              Perplexité<small>{typographier('l’exponentielle de la perte')}</small>
+            </th>
+            <td class="nombre">{nombre(evaluation.perplexite, 1)}</td>
+          </tr>
+          <tr data-mesure="bits">
+            <th scope="row">
+              Bits par octet<small>{typographier('la perte ramenée à un octet de texte, en bits')}</small>
+            </th>
+            <td class="nombre">{nombre(evaluation.bits_par_octet, 3)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <table id={idQcm} aria-label={typographier('Les QCM de FrenchBench, face au hasard')} data-test="evaluation-qcm">
+        <thead>
+          <tr>
+            <th scope="col">Test</th>
+            <th scope="col" class="nombre">
+              Ton IA
+            </th>
+            <th scope="col" class="nombre">
+              Hasard
+            </th>
+            <th scope="col">Verdict</th>
+          </tr>
+        </thead>
+        <tbody>
+          {TESTS.map((t) => {
+            const m = evaluation.qcm[t];
+            return (
+              <tr data-test-qcm={t} data-verdict={m.verdict}>
+                <th scope="row">
+                  {NOMS_DES_TESTS[t]}
+                  <small>{`${nombre(m.n)} questions`}</small>
+                </th>
+                <td class="nombre">
+                  {pourcent(m.exactitude_normalisee, 1)}
+                  <small>{points(m.marge_95_normalisee)}</small>
+                </td>
+                <td class="nombre">
+                  {pourcent(m.hasard, 1)}
+                  <small>{points(m.marge_hasard)}</small>
+                </td>
+                <td class="verdict">{verdictEnPhrase(m.verdict)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div class="legende">
+        {typographier(
+          'Ton IA : son exactitude normalisée, ± la précision de la mesure. Hasard : ce qu’un tirage au sort trouverait en moyenne, ' +
+            `± la marge du hasard. Les marges sont en points, à 95${FINE}%. Le verdict compare l’écart au hasard à la marge du hasard.`,
+        )}
+      </div>
+    </figure>
+  )
+}
+
+<style>
+  .tableau-evaluation {
+    margin: 1.4em 0 1.2em;
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--indigo-doux);
+    margin-bottom: 10px;
+  }
+
+  /* Pas de classe « titre » : la règle globale .titre du gabarit s'y appliquerait. */
+  figcaption .objet {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--indigo);
+    margin-bottom: 4px;
+  }
+
+  /* Des tableaux typographiés, sans cadre : un trait d'encre en haut, des filets brume entre les lignes. */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 17px;
+    line-height: 1.35;
+    border-top: 2px solid var(--indigo);
+  }
+
+  table + table {
+    margin-top: 1.2em;
+  }
+
+  thead th {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--indigo-doux);
+    text-align: left;
+    vertical-align: bottom;
+    padding: 6px 0 4px 16px;
+    border-bottom: 2px solid var(--indigo);
+  }
+
+  thead th:first-child {
+    padding-left: 0;
+  }
+
+  tbody th {
+    font-family: var(--titres);
+    font-weight: 600;
+    text-align: left;
+    vertical-align: baseline;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--brume);
+  }
+
+  td {
+    vertical-align: baseline;
+    padding: 7px 0 7px 16px;
+    border-bottom: 1px solid var(--brume);
+  }
+
+  small {
+    display: block;
+    font-family: var(--titres);
+    font-weight: 400;
+    font-size: 14px;
+    color: var(--indigo-doux);
+  }
+
+  thead th.nombre,
+  td.nombre {
+    text-align: right;
+  }
+
+  td.nombre {
+    white-space: nowrap;
+    font-family: var(--titres);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .legende {
+    margin: 10px 0 0;
+    font-family: var(--titres);
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--indigo-doux);
+  }
+
+  .a-mesurer {
+    font-style: italic;
+    color: var(--indigo-doux);
+  }
+
+  @media (max-width: 720px) {
+    table {
+      font-size: 16px;
+    }
+
+    thead th,
+    td {
+      padding-left: 10px;
+    }
+  }
+</style>

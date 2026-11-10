@@ -1,0 +1,129 @@
+---
+// Les textes qu'une version de ton IA a écrits pendant son évaluation, lus à la construction dans
+// le relevé de son rapport (projets/1.6-evaluation/mesures/evaluation-<nom>.json, par
+// lireEvaluation) : les dix débuts fixes de forge (forge/evaluation/echantillons.py), chacun suivi
+// de ce qu'elle a écrit. Ils se montrent tous, tels quels, dans l'ordre du rapport : aucun n'est
+// choisi.
+//
+// Le début, donné par forge, est en italique ; la suite est d'elle. Les débuts de fonction Python
+// et leur suite s'affichent comme du code. Ces textes ne sont pas du texte du site : ils portent
+// data-pagefind-ignore, et les parcours ne leur appliquent pas la typographie.
+//
+// Tant que le relevé manque (ton IA, la vraie, jusqu'à la tâche 16 du plan 5), le composant
+// affiche « à mesurer », marqué data-a-mesurer.
+//
+//   <EchantillonsEvaluation nom="mini" />
+import { root } from 'astro:config/server';
+import { nombre } from '../../../lib/nombres';
+import { lireEvaluation, type NomEvaluation } from '../../../lib/partie-1/evaluation';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  /** « mini », la version d'une heure de ton IA, ou « 1.5 », ton IA, la vraie. */
+  nom: 'mini' | '1.5';
+}
+
+const { nom } = Astro.props;
+const CLES: Record<Props['nom'], NomEvaluation> = { mini: 'ton-ia-mini', '1.5': 'ton-ia-1.5' };
+const cle = CLES[nom];
+if (cle === undefined) throw new Error(`EchantillonsEvaluation : nom « ${String(nom)} » inconnu. Donne « mini » ou « 1.5 ».`);
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const evaluation = lireEvaluation(cle, new URL('../', root));
+const qui = nom === 'mini' ? 'la version d’une heure de ton IA' : 'ton IA';
+const absent = typographier(`Les textes qu’écrit ${qui} : à mesurer, avec le rapport de son évaluation.`);
+const legende =
+  evaluation === null
+    ? ''
+    : typographier(
+        `Ce qu’écrit ${qui} au pas ${nombre(evaluation.pas)}, à la suite des ${nombre(evaluation.echantillons.length)} débuts de forge. ` +
+          'Le début est en italique ; la suite est d’elle.',
+      );
+---
+
+{
+  evaluation === null ? (
+    <p class="a-mesurer" data-a-mesurer data-echantillons-absents={cle}>
+      {absent}
+    </p>
+  ) : (
+    <figure class="echantillons" data-echantillons={cle}>
+      <figcaption>{legende}</figcaption>
+      <ol>
+        {evaluation.echantillons.map((e) =>
+          e.invite.startsWith('def ') ? (
+            <li data-echantillon data-pagefind-ignore>
+              <pre class="code"><code><i class="debut">{e.invite}</i>{e.suite}</code></pre>
+            </li>
+          ) : (
+            <li data-echantillon data-pagefind-ignore>
+              <div class="prose"><i class="debut">{e.invite}</i>{e.suite}</div>
+            </li>
+          ),
+        )}
+      </ol>
+    </figure>
+  )
+}
+
+<style>
+  .echantillons {
+    margin: 1.4em 0 1.2em;
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--indigo-doux);
+    margin-bottom: 10px;
+  }
+
+  /* Une liste sous un trait d'encre, un texte par ligne, séparés par des filets brume. */
+  ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 2px solid var(--indigo);
+  }
+
+  li {
+    margin: 0;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--brume);
+  }
+
+  /* Le début en italique est plus étroit : un peu de marge à droite garde les lignes à la longueur du texte. */
+  .prose {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+    padding-right: 1.5em;
+  }
+
+  .debut {
+    color: var(--indigo-doux);
+  }
+
+  /* Le code garde ses retraits, mais revient à la ligne plutôt que d'élargir la page. */
+  pre.code {
+    margin: 0;
+    padding: 12px 14px;
+    background: var(--brume-claire);
+    border-radius: 10px;
+    font-family: var(--mono);
+    font-size: 15px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  pre.code code {
+    font: inherit;
+    background: none;
+    padding: 0;
+  }
+
+  .a-mesurer {
+    font-style: italic;
+    color: var(--indigo-doux);
+  }
+</style>

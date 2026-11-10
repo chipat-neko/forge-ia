@@ -90,3 +90,21 @@ export const ENTRAINER_COURT: readonly string[] = Object.freeze([COURT_DONNEES, 
 export const PAUSE = 'Ctrl+C met en pause';
 /** Reprendre exactement là où la pause s'est arrêtée : la commande d'entraînement, avec `--reprendre`. */
 export const REPRENDRE = 'uv run --extra gpu python -m forge entrainer --config configs/mini.toml --reprendre';
+
+// ---------- Chapitre 1.6 : l'évaluation, avec la version d'une heure ----------
+// Les sous-commandes resumer et qcm-exemples, et leurs options, sont celles de
+// projets/1.6-evaluation/evaluation_pas_a_pas/__main__.py ; ces commandes sont celles du README
+// du projet, et elles écrivent les relevés que lit le chapitre (FICHIERS_EVALUATION, FICHIERS_QCM
+// d'evaluation.ts) : commandes.test.ts le vérifie. Les deux premières visent le rapport et la
+// sauvegarde du dernier pas de la version d'une heure, sur le PC de l'auteur (chemins D:\).
+
+/** Entrer dans le projet du chapitre 1.6, depuis le dossier où le dépôt a été cloné. */
+export const ALLER_AU_PROJET_1_6 = 'cd forge-ia/projets/1.6-evaluation';
+/** Le relevé du rapport d'évaluation de la version d'une heure : la commande qui a écrit mesures/evaluation-mini.json. */
+export const EVALUATION_RESUMER =
+  'uv run --extra cpu python -m evaluation_pas_a_pas resumer --rapport D:\\forge-ia-donnees\\entrainements\\ton-ia-mini\\evaluation\\etape-0006370\\rapport.json --json mesures/evaluation-mini.json';
+/** Six questions de MMMLU notées par la version d'une heure, sur le processeur : la commande qui a écrit mesures/qcm-mini.json. */
+export const EVALUATION_QCM =
+  'uv run --extra cpu python -m evaluation_pas_a_pas qcm-exemples --sauvegarde D:\\forge-ia-donnees\\entrainements\\ton-ia-mini\\sauvegardes\\etape-0006370.pt --appareil cpu --json mesures/qcm-mini.json';
+/** Lancer les tests du projet 1.6, avec la version de PyTorch pour le processeur. */
+export const EVALUATION_TESTS = 'uv run --extra cpu pytest -q';

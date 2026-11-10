@@ -9,6 +9,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CLONER_DEPOT, METTRE_A_JOUR_DEPOT } from '../partie-0/commandes';
 import * as commandes from './commandes';
+import { FICHIERS_EVALUATION, FICHIERS_QCM } from './evaluation';
 import { FICHIERS_ENTRAINEMENT } from './journal';
 import { MESURES_PARTIE_1 } from './mesures';
 import { GRAINE_INITIALE, LONGUEUR_SUITE, N_INITIAL, TEMPERATURE_INITIALE } from './paris-1-1';
@@ -303,5 +304,62 @@ describe('commandes de la version d’une heure de ton IA', () => {
   it('REPRENDRE est la commande d’entraînement avec --reprendre', () => {
     expect(commandes.REPRENDRE).toBe(`${commandes.COURT_ENTRAINER} --reprendre`);
     expect(README_FORGE).toContain('`--reprendre`');
+  });
+});
+
+// Le chapitre 1.6 : les sous-commandes resumer et qcm-exemples de
+// projets/1.6-evaluation/evaluation_pas_a_pas/__main__.py, vérifiées contre ce script, le README du
+// projet, et les relevés que lit le chapitre (FICHIERS_EVALUATION, FICHIERS_QCM).
+describe('commandes du chapitre 1.6', () => {
+  const PROJET = `${RACINE}/projets/1.6-evaluation`;
+  const MAIN = readFileSync(`${PROJET}/evaluation_pas_a_pas/__main__.py`, 'utf8').replace(/\r\n?/g, '\n');
+  const README = readFileSync(`${PROJET}/README.md`, 'utf8').replace(/\r\n?/g, '\n');
+  const PYPROJECT = readFileSync(`${PROJET}/pyproject.toml`, 'utf8').replace(/\r\n?/g, '\n');
+
+  it('les commandes, à l’identique', () => {
+    expect(commandes.ALLER_AU_PROJET_1_6).toBe('cd forge-ia/projets/1.6-evaluation');
+    expect(commandes.EVALUATION_RESUMER).toBe(
+      'uv run --extra cpu python -m evaluation_pas_a_pas resumer --rapport D:\\forge-ia-donnees\\entrainements\\ton-ia-mini\\evaluation\\etape-0006370\\rapport.json --json mesures/evaluation-mini.json',
+    );
+    expect(commandes.EVALUATION_QCM).toBe(
+      'uv run --extra cpu python -m evaluation_pas_a_pas qcm-exemples --sauvegarde D:\\forge-ia-donnees\\entrainements\\ton-ia-mini\\sauvegardes\\etape-0006370.pt --appareil cpu --json mesures/qcm-mini.json',
+    );
+    expect(commandes.EVALUATION_TESTS).toBe('uv run --extra cpu pytest -q');
+  });
+
+  it('resumer et qcm-exemples sont des commandes du script, avec leurs options', () => {
+    expect(MAIN).toContain('add_parser("resumer"');
+    expect(MAIN).toContain('add_parser("qcm-exemples"');
+    for (const option of ['--rapport', '--json']) {
+      expect(commandes.EVALUATION_RESUMER).toContain(`${option} `);
+      expect(MAIN, option).toContain(`resume.add_argument("${option}"`);
+    }
+    // qcm-exemples prend les options des commandes qui chargent un modèle (ajouter_modele).
+    expect(MAIN).toContain('ajouter_modele(exemples)');
+    for (const option of ['--sauvegarde', '--appareil', '--json']) {
+      expect(commandes.EVALUATION_QCM).toContain(`${option} `);
+      expect(MAIN, option).toContain(`commande.add_argument("${option}"`);
+    }
+    // Le projet utilise PyTorch : chaque commande prend la version pour le processeur, un extra du projet.
+    expect(PYPROJECT).toContain('cpu = ["torch==');
+    for (const c of [commandes.EVALUATION_RESUMER, commandes.EVALUATION_QCM, commandes.EVALUATION_TESTS]) {
+      expect(c.startsWith('uv run --extra cpu '), c).toBe(true);
+    }
+  });
+
+  it('elles écrivent les relevés que lit le chapitre', () => {
+    const projet = 'projets/1.6-evaluation/';
+    expect(`${projet}${/--json (\S+)/.exec(commandes.EVALUATION_RESUMER)![1]}`).toBe(FICHIERS_EVALUATION['ton-ia-mini']);
+    expect(`${projet}${/--json (\S+)/.exec(commandes.EVALUATION_QCM)![1]}`).toBe(FICHIERS_QCM['ton-ia-mini']);
+    // Le rapport et la sauvegarde sont ceux du dernier pas de la version d'une heure.
+    expect(commandes.EVALUATION_RESUMER).toContain('entrainements\\ton-ia-mini\\evaluation\\etape-0006370\\rapport.json');
+    expect(commandes.EVALUATION_QCM).toContain('entrainements\\ton-ia-mini\\sauvegardes\\etape-0006370.pt');
+  });
+
+  it('ce sont les commandes du README du projet', () => {
+    expect(README).toContain(`${commandes.ALLER_AU_PROJET_1_6}\n`);
+    expect(README).toContain(`${commandes.EVALUATION_RESUMER}\n`);
+    expect(README).toContain(`${commandes.EVALUATION_QCM}\n`);
+    expect(README).toContain(`${commandes.EVALUATION_TESTS}\n`);
   });
 });

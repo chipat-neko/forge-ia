@@ -1,0 +1,113 @@
+---
+// L'ouverture du chapitre 1.6 : la perplexité de la version d'une heure de ton IA (la taille
+// « mini »), et ce qu'elle veut dire. Elle vient du relevé de son rapport d'évaluation
+// (projets/1.6-evaluation/mesures/evaluation-mini.json, par lireEvaluation), écrit par forge au
+// dernier pas de son entraînement.
+//
+// Le pari de l'étape 2 demande la perplexité du hasard, pas celle-ci : l'ouverture ne dit ni la
+// taille du vocabulaire, ni la perte du hasard.
+import { root } from 'astro:config/server';
+import { nombre } from '../../../lib/nombres';
+import { lireEvaluation } from '../../../lib/partie-1/evaluation';
+import { faitsDuPariHasard } from '../../../lib/partie-1/paris-1-6';
+import { typographier } from '../../../lib/typo';
+
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const mini = lireEvaluation('ton-ia-mini', new URL('../', root));
+if (mini === null) {
+  throw new Error(
+    'OuvertureEvaluation : le relevé de l’évaluation de la version d’une heure (projets/1.6-evaluation/mesures/evaluation-mini.json) manque. ' +
+      'Il est versionné : récupère-le, ou relance « python -m evaluation_pas_a_pas resumer » (README du projet 1.6).',
+  );
+}
+const { hesitation } = faitsDuPariHasard(mini);
+const quoi = typographier('Sur des textes qu’elle n’a jamais lus');
+const sens = typographier(
+  `À chaque jeton, elle hésite autant que si elle tirait au sort entre ${nombre(hesitation)} jetons.`,
+);
+const legende = typographier(
+  `La version d’une heure de ton IA, au pas ${nombre(mini.pas)}, le dernier de son entraînement : la perplexité de son rapport d’évaluation.`,
+);
+---
+
+<figure class="ouverture-evaluation" data-test="ouverture">
+  <div class="mesure">
+    <p class="quoi">{quoi}</p>
+    <p class="valeur">
+      <span class="nom">perplexité</span>
+      <span class="chiffre" data-test="perplexite-mini">{nombre(mini.perplexite, 1)}</span>
+    </p>
+    <p class="sens" data-test="sens-perplexite">{sens}</p>
+  </div>
+  <figcaption>{legende}</figcaption>
+</figure>
+
+<style>
+  .ouverture-evaluation {
+    margin: 40px 0 1.2em;
+  }
+
+  /* Une mesure sous un trait d'encre, comme l'ouverture du chapitre 1.5. */
+  .mesure {
+    border-top: 2px solid var(--indigo);
+    padding-top: 14px;
+  }
+
+  .mesure p {
+    margin: 0;
+  }
+
+  .quoi {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--indigo-doux);
+  }
+
+  .valeur {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-family: var(--titres);
+    margin: 4px 0 6px !important;
+  }
+
+  .valeur .nom {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--indigo-doux);
+  }
+
+  .valeur .chiffre {
+    font-size: 56px;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: var(--indigo);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sens {
+    font-size: 19px;
+    line-height: 1.45;
+    max-width: 30em;
+  }
+
+  figcaption {
+    margin-top: 14px;
+    font-family: var(--titres);
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--indigo-doux);
+  }
+
+  @media (max-width: 720px) {
+    .valeur .chiffre {
+      font-size: 46px;
+    }
+
+    .sens {
+      font-size: 18px;
+    }
+  }
+</style>

@@ -11,19 +11,22 @@
 // Le jumeau refait les deux calculs du Python (evaluation_pas_a_pas/pas_a_pas.py, région « marge »),
 // avec les mêmes opérations dans le même ordre : marge95 (la marge de Wald, une racine carrée, exacte
 // dans les deux langages) et verdictQcm (la règle du rapport de forge : l'exactitude NORMALISÉE comparée
-// au hasard, avec la marge du HASARD). Les tests les comparent, sans tolérance, à la grille de
-// projets/1.6-evaluation/tests/attendus.json.
+// au hasard, avec la marge du HASARD). Il vit dans marge.ts, sans import, pour que l'atelier des QCM
+// (dans le navigateur) s'en serve sans node:fs ; ce module le réexporte. Les tests les comparent, sans
+// tolérance, à la grille de projets/1.6-evaluation/tests/attendus.json.
 //
-// Tant qu'un fichier manque, lireEvaluation, lireQcm et lireEchantillon rendent null.
+// Tant qu'un fichier manque, lireEvaluation, lireQcm et lireEchantillon rendent null : c'est le cas de
+// ton IA, la vraie (ton-ia-1.5), jusqu'à son relevé (tâche 15 du plan 5).
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { marge95, verdictQcm, type Verdict } from './marge';
+
+export { marge95, margeHasard, verdictQcm, Z_95 } from './marge';
+export type { Verdict } from './marge';
 
 const FINE = '\u202F';
-
-/** Où est l'exactitude par rapport au hasard : au-dessus, à moins d'une marge (pas-different), ou en dessous. */
-export type Verdict = 'au-dessus' | 'pas-different' | 'en-dessous';
 
 /** Les deux tests de FrenchBench que le rapport de forge mesure. */
 export type NomTestQcm = 'hellaswag' | 'arc';
@@ -100,11 +103,13 @@ export interface QcmExemples {
 /** Les relevés d'évaluation, en chemins depuis la racine du dépôt. */
 export const FICHIERS_EVALUATION = Object.freeze({
   'ton-ia-mini': 'projets/1.6-evaluation/mesures/evaluation-mini.json',
+  'ton-ia-1.5': 'projets/1.6-evaluation/mesures/evaluation-1.5.json',
 } as const);
 
 /** Les relevés de QCM notés, en chemins depuis la racine du dépôt. */
 export const FICHIERS_QCM = Object.freeze({
   'ton-ia-mini': 'projets/1.6-evaluation/mesures/qcm-mini.json',
+  'ton-ia-1.5': 'projets/1.6-evaluation/mesures/qcm-1.5.json',
 } as const);
 
 export type NomEvaluation = keyof typeof FICHIERS_EVALUATION;
@@ -115,36 +120,6 @@ const REFAIRE =
 const DOSSIER_DU_PROJET = 'projets/1.6-evaluation';
 const TESTS: readonly NomTestQcm[] = ['hellaswag', 'arc'];
 const VERDICTS: readonly string[] = ['au-dessus', 'pas-different', 'en-dessous'];
-
-// --- Le jumeau : la marge et le verdict --------------------------------------------------------
-
-/** 1,96 : l'intervalle à 95 % d'une loi normale va de −1,96 à +1,96 écarts-types. */
-export const Z_95 = 1.96;
-
-/**
- * La demi-largeur de l'intervalle à 95 % d'une exactitude mesurée sur `n` questions (marge de Wald) :
- * 1,96 × √(p (1 − p) / n). Elle s'annule quand l'exactitude vaut 0 ou 1.
- */
-export function marge95(exactitude: number, n: number): number {
-  return Z_95 * Math.sqrt((exactitude * (1 - exactitude)) / n);
-}
-
-/** La demi-largeur de l'intervalle à 95 % d'un tirage au sort sur `n` questions de `choix` choix chacune. */
-export function margeHasard(n: number, choix = 4): number {
-  const p = 1 / choix;
-  return (Z_95 * Math.sqrt(n * (p * (1 - p)))) / n;
-}
-
-/**
- * Le verdict de forge (forge.evaluation.rapport.verdict) : l'exactitude (normalisée) moins le hasard,
- * comparée à la marge du HASARD (margeHasard, ou `marge_hasard` du rapport), pas à celle de la mesure.
- */
-export function verdictQcm(exactitude: number, hasard: number, marge: number): Verdict {
-  const ecart = exactitude - hasard;
-  if (ecart > marge) return 'au-dessus';
-  if (ecart < -marge) return 'en-dessous';
-  return 'pas-different';
-}
 
 // --- Vérifier un relevé ------------------------------------------------------------------------
 

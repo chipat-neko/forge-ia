@@ -1,0 +1,509 @@
+---
+partie: 1
+numero: "1.6"
+titre: "Évaluer son modèle"
+chapeau: "Ton IA écrit, mais que vaut ce qu'elle écrit ? Tu mesures sa surprise devant des textes qu'elle n'a jamais lus, tu lui fais passer un questionnaire sans qu'elle écrive un mot, et tu apprends à dire quand un score ne vaut pas mieux qu'un tirage au sort."
+programme: "10 étapes, 4 paris, environ 35 minutes."
+acquis:
+  - cle: hasard
+    texte: "Un modèle qui tire chaque jeton au hasard a une perplexité égale à la taille de son vocabulaire."
+    ou: "à l'étape 2"
+  - cle: bits
+    texte: "Les bits par octet comparent des modèles qui ne découpent pas le texte de la même façon."
+    ou: "à l'étape 3"
+  - cle: qcm
+    texte: "Un modèle répond à un QCM sans écrire un mot : on compare la vraisemblance de chaque réponse."
+    ou: "à l'étape 4, au bout de l'atelier"
+  - cle: marge
+    texte: "Un score ne dit quelque chose que s'il s'écarte du hasard de plus que la marge du hasard."
+    ou: "à l'étape 5"
+  - cle: limites
+    texte: "Un score ne vaut pas mieux que son test : traduit par une machine, ou déjà lu pendant l'entraînement, il en dit moins."
+    ou: "à l'étape 7"
+---
+
+import { root } from 'astro:config/server';
+import AtelierQcm from '../../components/chapitres/1-6/AtelierQcm.svelte';
+import EchantillonsEvaluation from '../../components/chapitres/1-6/EchantillonsEvaluation.astro';
+import OuvertureEvaluation from '../../components/chapitres/1-6/OuvertureEvaluation.astro';
+import TableauEvaluation from '../../components/chapitres/1-6/TableauEvaluation.astro';
+import BlocCommande from '../../components/gabarit/BlocCommande.astro';
+import RecupererProjet from '../../components/gabarit/RecupererProjet.astro';
+import { VOCABULAIRE_FORGE } from '../../lib/calculateur/ton-ia';
+import { chapitresParus } from '../../lib/chapitres-parus';
+import { exigeur } from '../../lib/exiger';
+import { formaterPerte, nombre, pourcent } from '../../lib/nombres';
+import { ANNEXES, hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
+import { EVALUATION_QCM, EVALUATION_RESUMER, EVALUATION_TESTS } from '../../lib/partie-1/commandes';
+import { lireEvaluation, lireQcm, margeHasard, verdictQcm, Z_95 } from '../../lib/partie-1/evaluation';
+import {
+  analyseDuDefi,
+  BITS_PAR_OCTET_D_UN_FICHIER,
+  choixAuDessusDuHasard,
+  choixBits,
+  choixLangueFrenchBench,
+  choixPerplexiteHasard,
+  compteDuQcm,
+  faitsDesBits,
+  faitsDesEchantillons,
+  faitsDuPariHasard,
+  phrasesDuDefi,
+  verdictEnPhrase,
+} from '../../lib/partie-1/paris-1-6';
+import {
+  ARTICLE_CROISSANT,
+  ARTICLE_LLAMA_3,
+  FRENCHBENCH,
+  LLAMA_3_BANCS,
+  LLAMA_31_405B_BASE,
+  MMMLU,
+  PAGE_MMMLU,
+  SOURCES_LABO_1_6,
+} from '../../lib/partie-1/sources-1-6';
+import { typographier } from '../../lib/typo';
+
+export const exiger = exigeur('le texte du chapitre 1.6 (1-6.mdx)');
+
+export const PARUS = await chapitresParus();
+
+export const LIENS = (() => {
+  // L'annuaire des données a sa page (ANNEXES) : l'étape 7 mène à son groupe « évaluation ».
+  const annuaire = ANNEXES.find((a) => a.titre === 'Annuaire des données')?.href ?? null;
+  exiger(annuaire !== null, 'l’annexe de l’annuaire des données n’a plus de page : l’étape 7 y mène');
+  return {
+    // Les chapitres 0.2, 1.1 et 1.3 ont paru ; 1.5 est encore un brouillon : un lien ne vise qu'un chapitre paru.
+    l02: PARUS.has('0.2') ? hrefChapitre('0.2') : null,
+    l11: PARUS.has('1.1') ? hrefChapitre('1.1') : null,
+    l13: PARUS.has('1.3') ? hrefChapitre('1.3') : null,
+    l15: PARUS.has('1.5') ? hrefChapitre('1.5') : null,
+    annuaire: `${annuaire}#g-evaluation`,
+  };
+})();
+
+export const RACINE = new URL('../', root); // Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+
+export const MINI = (() => {
+  // La version d'une heure de ton IA (« mini ») : le relevé de son rapport d'évaluation, versionné par le projet 1.6.
+  const e = lireEvaluation('ton-ia-mini', RACINE);
+  exiger(e !== null, 'le relevé de l’évaluation de la version d’une heure (mesures/evaluation-mini.json du projet 1.6) manque');
+  return e;
+})();
+
+export const QCM = (() => {
+  // Les questions de MMMLU qu'elle a notées, sur le processeur.
+  const q = lireQcm('ton-ia-mini', RACINE);
+  exiger(q !== null, 'le relevé des QCM de la version d’une heure (mesures/qcm-mini.json du projet 1.6) manque');
+  exiger(q.jeu.nom === 'openai/MMMLU' && q.jeu.licence === MMMLU.licence.valeur, 'les questions de l’atelier ne sont plus celles de MMMLU, sous licence MIT');
+  // « des questions à quatre réponses » (étape 4) et « une fois sur quatre » (le défi).
+  exiger(q.questions.every((x) => x.choix.length === 4), 'les questions de l’atelier n’ont plus toutes quatre réponses');
+  return q;
+})();
+
+export const HASARD = (() => {
+  // Le pari « hasard » : la perplexité d'un modèle qui tire au hasard parmi les jetons de forge.
+  const f = faitsDuPariHasard(MINI);
+  exiger(choixPerplexiteHasard().find((c) => c.juste)?.texte === nombre(VOCABULAIRE_FORGE), 'le juste du pari « hasard » n’est plus la taille du vocabulaire');
+  // « Une heure d'entraînement lui a appris à écarter presque tous les jetons » : plus de mille fois moins que le hasard.
+  exiger(f.fois > 1000, 'la perplexité de ton IA n’est plus mille fois plus petite que celle du hasard');
+  return {
+    question: `Un modèle qui tire chaque jeton au hasard parmi les ${nombre(f.vocabulaire)} a une perplexité de…`,
+    vocabulaire: nombre(f.vocabulaire),
+    perteHasard: formaterPerte(f.perteHasard),
+    perte: formaterPerte(MINI.perte_val),
+    perplexite: nombre(f.perplexite, 1),
+    hesitation: nombre(f.hesitation),
+    fois: nombre(Math.round(f.fois)),
+  };
+})();
+
+export const BITS = (() => {
+  // Le pari « bits » : les bits par octet du rapport, face aux 8 bits d'un fichier.
+  const f = faitsDesBits(MINI);
+  exiger(choixBits(MINI).find((c) => c.juste)?.texte === 'Moins de 2', 'les bits par octet de ton IA ne sont plus sous 2 : l’explication commence par « Moins de 2 »');
+  // « bit » au singulier sous 2, « bits » au-delà.
+  const enBits = (x, d) => `${nombre(x, d)} ${Number(x.toFixed(d)) >= 2 ? 'bits' : 'bit'}`;
+  return {
+    fichier: nombre(BITS_PAR_OCTET_D_UN_FICHIER),
+    bits: enBits(f.bits, 3),
+    perte: formaterPerte(MINI.perte_val),
+    bitsParJeton: enBits(f.bitsParJeton, 3),
+    octetsParJeton: nombre(f.octetsParJeton, 1),
+    fois: nombre(Math.round(f.foisPlusPetit)),
+    perteParOctet: formaterPerte(f.perteParOctet),
+    perplexiteParOctet: nombre(f.perplexiteParOctet, 1),
+    perplexite: nombre(MINI.perplexite, 1),
+  };
+})();
+
+export const ATELIER = (() => {
+  // L'atelier : les questions de MMMLU, et ce que dit leur jeu.
+  exiger(MMMLU.traduction.valeur === 'humaine', 'MMMLU n’est plus traduit par des traducteurs');
+  return { n: nombre(QCM.n), matieres: nombre(MMMLU.categories.valeur) };
+})();
+
+export const DEFI = (() => {
+  // La réponse du défi : ce que disent les scores des questions où ton IA a juste (paris-1-6.ts).
+  const a = analyseDuDefi(QCM);
+  const c = compteDuQcm(QCM);
+  exiger(a.questions.some((q) => q.rang >= a.n - 1), 'aucune question juste n’a plus une avance parmi les plus minces : « un tirage au sort aurait fait aussi bien » est à revoir');
+  exiger(a.questions.some((q) => q.rang === 1), 'aucune question juste n’a plus l’avance la plus nette : « même là où son avance est la plus nette » est à revoir');
+  exiger(a.verdict === 'pas-different', 'les justes de ton IA dans l’atelier ne sont plus dans la marge du hasard');
+  return { phrases: typographier(phrasesDuDefi(a).join(' ')), justes: nombre(c.justes), n: nombre(c.n) };
+})();
+
+export const MARGE = (() => {
+  // Le pari « marge » et la marge du hasard : HellaSwag, ARC-Challenge, et l'atelier.
+  const h = MINI.qcm.hellaswag;
+  const a = MINI.qcm.arc;
+  exiger(choixAuDessusDuHasard(MINI).find((c) => c.juste)?.texte === 'Au-dessus du hasard', 'HellaSwag n’est plus au-dessus du hasard : l’explication du pari « marge » commence par là');
+  exiger(a.verdict === 'pas-different' && a.exactitude_normalisee < a.hasard, 'ARC-Challenge n’est plus sous le hasard, à moins d’une marge');
+  // La note : la marge du projet (quatre réponses à chaque question) est celle de forge pour HellaSwag…
+  exiger(h.hasard === 0.25 && Math.abs(margeHasard(h.n) - h.marge_hasard) <= 1e-12 * h.marge_hasard, 'la marge du hasard du projet n’est plus celle de forge pour HellaSwag');
+  // … et certaines questions d'ARC-Challenge n'ont pas quatre réponses.
+  exiger(a.hasard !== 0.25, 'toutes les questions d’ARC-Challenge ont maintenant quatre réponses : la note de l’étape 5 est à revoir');
+  // L'atelier : six questions, la marge du hasard, et le verdict de ses justes.
+  const c = compteDuQcm(QCM);
+  const atelier = margeHasard(c.n, 4);
+  exiger(verdictQcm(c.justes / c.n, c.hasard / c.n, atelier) === 'pas-different', 'les justes de l’atelier ne sont plus dans la marge du hasard');
+  // « Un tirage au sort la rate rarement de plus de 2 points sur des milliers de questions ; de dizaines sur six. »
+  const points = (x) => `${nombre(100 * x, 1)} ${Number((100 * x).toFixed(1)) >= 2 ? 'points' : 'point'}`;
+  return {
+    nHella: nombre(h.n),
+    nArc: nombre(a.n),
+    hella: pourcent(h.exactitude_normalisee, 1),
+    hasard: pourcent(h.hasard),
+    ecartHella: points(h.exactitude_normalisee - h.hasard),
+    margeHella: points(h.marge_hasard),
+    precisionHella: points(h.marge_95_normalisee),
+    arc: pourcent(a.exactitude_normalisee, 1),
+    ecartArc: points(a.hasard - a.exactitude_normalisee),
+    margeArc: points(a.marge_hasard),
+    z: nombre(Z_95, 2),
+    nAtelier: nombre(c.n),
+    justes: nombre(c.justes),
+    partAtelier: pourcent(c.justes / c.n, 1),
+    margeAtelier: points(atelier),
+  };
+})();
+
+export const ECHANTILLONS = (() => {
+  // Ce que disent les échantillons de la version d'une heure : chaque phrase de l'étape 6 a sa garde.
+  const f = faitsDesEchantillons(MINI);
+  exiger(f.aucunNeSArrete, 'un échantillon s’arrête maintenant de lui-même');
+  exiger(f.debutsDeCode === 2, 'les débuts de forge n’ont plus deux débuts de fonction Python');
+  exiger(f.prosePonctuee, 'un texte en français n’a plus de points ni de virgules');
+  exiger(f.capitaleSansParis, 'ton IA écrit maintenant Paris après « La capitale de la France est »');
+  exiger(f.photosyntheseHorsSujet, 'ton IA parle maintenant de lumière ou de plantes après « La photosynthèse »');
+  exiger(f.soleilRepete >= 2, '« le soleil se couchait » ne revient plus dans la suite');
+  exiger(f.villageDate, 'le village de Bretagne n’a plus de date');
+  exiger(f.codeIndente && f.codeSansSuite && f.docstringEnAnglais, 'le code écrit par ton IA ne dit plus ce que dit l’étape 6');
+  const enLettres = (n) => ({ 2: 'deux', 3: 'trois', 4: 'quatre', 8: 'huit' })[n] ?? nombre(n);
+  return {
+    francais: enLettres(f.nombre - f.debutsDeCode),
+    code: enLettres(f.debutsDeCode),
+    jetons: nombre(f.jetons),
+    soleil: enLettres(f.soleilRepete),
+  };
+})();
+
+export const LIMITES = (() => {
+  // Le pari « limites » et ce que les chiffres ne disent pas : FrenchBench, MMMLU, la contamination de Llama 3.
+  exiger(FRENCHBENCH.langueDOrigine.valeur === 'anglais' && FRENCHBENCH.traduction.valeur === 'automatique', 'FrenchBench n’est plus traduit de l’anglais par une machine');
+  exiger(choixLangueFrenchBench().find((c) => c.juste)?.texte === 'ont été traduites de l’anglais par une machine', 'le juste du pari « limites » a changé');
+  exiger(FRENCHBENCH.licence.valeur === null, 'les pages de FrenchBench indiquent maintenant une licence');
+  return {
+    traducteur: FRENCHBENCH.traducteur.valeur,
+    jugement: FRENCHBENCH.jugement.valeur,
+    croissant: ARTICLE_CROISSANT.url,
+    mmmlu: PAGE_MMMLU.url,
+    licenceMmmlu: MMMLU.licence.valeur,
+    llama: ARTICLE_LLAMA_3.url,
+    ngramme: nombre(LLAMA_3_BANCS.ngramme.valeur),
+    contamine: pourcent(LLAMA_3_BANCS.hellaswagContamine.valeur / 100),
+    gain: nombre(LLAMA_3_BANCS.gainHellaswag405B.valeur, 1),
+  };
+})();
+
+export const LABO = (() => {
+  // Les bancs de Llama 3 et les scores de Llama 3.1 405B pré-entraîné (sources-1-6.ts), face à ton IA.
+  const categories = LLAMA_3_BANCS.categories.valeur;
+  const familleDe = (banc) => categories.find((c) => c.bancs.includes(banc))?.francais;
+  exiger(familleDe('ARC Challenge') === 'maths et raisonnement', 'ARC Challenge n’est plus dans la famille des maths et du raisonnement');
+  exiger(familleDe('MMLU') !== undefined, 'MMLU n’est plus dans le tableau 8');
+  exiger(LLAMA_3_BANCS.z.valeur === Z_95, 'le 1,96 de Meta n’est plus celui de la marge de la mesure du projet');
+  const noms = categories.map((c) => c.francais);
+  const l = LLAMA_31_405B_BASE;
+  const c = compteDuQcm(QCM);
+  return {
+    familles: nombre(categories.length),
+    bancs: nombre(categories.reduce((n, c) => n + c.bancs.length, 0)),
+    liste: `${noms.slice(0, -1).join(', ')} et ${noms.at(-1)}`,
+    z: nombre(Z_95, 2),
+    mmlu: pourcent(l.mmlu.valeur / 100, 1),
+    arc: pourcent(l.arc.valeur / 100, 1),
+    mmluExemples: nombre(l.mmluExemples.valeur),
+    arcExemples: nombre(l.arcExemples.valeur),
+    nAtelier: nombre(c.n),
+    justes: nombre(c.justes),
+    arcMini: pourcent(MINI.qcm.arc.exactitude_normalisee, 1),
+    verdictArc: verdictEnPhrase(MINI.qcm.arc.verdict),
+  };
+})();
+
+export const SUITE = (() => {
+  // L'« À suivre » : le chapitre 1.7, un lien s'il a paru.
+  const { chapitre } = trouverChapitre('1.7');
+  return { titre: typographier(`« ${titreCourt(chapitre.titre)} »`), lien: PARUS.has(chapitre.numero) ? hrefChapitre(chapitre.numero) : null };
+})();
+
+<Etape numero={1} titre="Ce que sait ton IA">
+
+<OuvertureEvaluation />
+
+C'est la perplexité de la version d'une heure de ton IA, celle qui est née au {LIENS.l15 ? <a href={LIENS.l15}>chapitre 1.5</a> : 'chapitre 1.5'}. Plus elle est basse, moins ton IA hésite devant le jeton qui vient. Mais est-ce peu, est-ce beaucoup ? Un nombre seul ne dit rien : il lui faut des repères.
+
+Ce chapitre met ton IA à l'épreuve, comme forge le fait à la fin de chaque entraînement. Il mesure sa surprise devant des textes qu'elle n'a jamais lus, lui fait passer des questionnaires à choix multiples sans qu'elle écrive un mot, et lit ce qu'elle écrit. Chaque mesure se refait à la main dans le projet du chapitre. Et chacune a ses limites : c'est l'autre moitié du chapitre.
+
+</Etape>
+
+<Etape numero={2} titre="La perte sur un texte jamais lu">
+
+Au {LIENS.l11 ? <a href={LIENS.l11}>chapitre 1.1</a> : 'chapitre 1.1'}, tu as mesuré la surprise d'un modèle à n-grammes devant son texte de validation, caractère par caractère. Ton IA se mesure de la même façon, jeton par jeton. Forge lui fait lire des morceaux de ses textes de validation, qu'elle ne lit jamais pour apprendre, et fait la moyenne de sa perte : <span class="formule-en-texte">−ln p</span>, où p est la chance qu'elle donnait au vrai jeton suivant. Le projet du chapitre la refait à la main :
+
+<CodeExplique fichier="projets/1.6-evaluation/evaluation_pas_a_pas/pas_a_pas.py" region="perte">
+  <li data-lignes="1">`perte_a_la_main` reçoit `logits`, le score que le modèle donne à chacun de ses {HASARD.vocabulaire} jetons, à chaque position, et `cibles`, le vrai jeton suivant de chaque position.</li>
+  <li data-lignes="9-10">On retire à tous les scores le plus grand. Les probabilités ne changent pas, et l'exponentielle ne déborde jamais.</li>
+  <li data-lignes="11">Le logarithme de la somme des exponentielles : le dénominateur de la softmax, qui change les scores en probabilités.</li>
+  <li data-lignes="12">`gather` prend, à chaque position, le score du vrai jeton suivant.</li>
+  <li data-lignes="13">−ln p, c'est le logarithme de la somme moins le score du vrai jeton. On en fait la moyenne sur toutes les positions.</li>
+</CodeExplique>
+
+Sur ses textes de validation, la version d'une heure a une perte de {HASARD.perte}. Sa perplexité en est l'exponentielle :
+
+<CodeExplique fichier="projets/1.6-evaluation/evaluation_pas_a_pas/pas_a_pas.py" region="perplexite">
+  <li data-lignes="1-2">`perplexite_a_la_main` reçoit la perte. Sa docstring dit comment lire le résultat.</li>
+  <li data-lignes="3">`math.exp`, l'exponentielle du {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : 'chapitre 0.2'} : l'exponentielle de {HASARD.perte} donne {HASARD.perplexite}.</li>
+</CodeExplique>
+
+Premier repère : un modèle qui ne saurait rien.
+
+<Pari
+  id="hasard"
+  question={HASARD.question}
+  precision="Il donne la même chance à chaque jeton de son vocabulaire, quel que soit le texte."
+  choix={choixPerplexiteHasard()}
+  acquis="hasard"
+>
+
+{HASARD.vocabulaire} : chaque jeton a une chance sur {HASARD.vocabulaire}, sa perte vaut <span class="formule-en-texte">ln {HASARD.vocabulaire}</span>, soit {HASARD.perteHasard}, et l'exponentielle défait le logarithme. La perplexité d'un modèle qui ne sait rien, c'est la taille de son vocabulaire : il hésite entre tous ses jetons. Au chapitre 1.1 déjà, un modèle qui ne saurait rien hésiterait entre tous les caractères de son alphabet.
+
+Celle de ton IA, {HASARD.perplexite}, est environ {HASARD.fois} fois plus petite : une heure d'entraînement lui a appris à écarter presque tous les jetons.
+
+</Pari>
+
+</Etape>
+
+<Etape numero={3} titre="Bits par octet">
+
+Une perplexité de {HASARD.perplexite}, est-ce mieux que celle d'un autre modèle ? On ne peut pas toujours le dire. Elle se compte par jeton, et un jeton n'a pas la même taille d'un tokenizer à l'autre. Celui de ton IA, construit au {LIENS.l13 ? <a href={LIENS.l13}>chapitre 1.3</a> : 'chapitre 1.3'}, découpe le français en morceaux de quelques lettres ; un autre pourrait couper en lettres seules, ou en mots entiers. Pour comparer, on ramène la perte à un octet de texte, et on la compte en bits :
+
+<CodeExplique fichier="projets/1.6-evaluation/evaluation_pas_a_pas/pas_a_pas.py" region="bits">
+  <li data-lignes="1">`bits_par_octet_a_la_main` reçoit la perte, en nats par jeton, et le nombre moyen d'octets de texte que couvre un jeton.</li>
+  <li data-lignes="3">Diviser par ln 2 change les nats en bits : le logarithme de base 2 au lieu du logarithme naturel. Diviser par les octets d'un jeton ramène la perte à un octet.</li>
+</CodeExplique>
+
+<Pari
+  id="bits"
+  question="Combien de bits par octet compte-t-on pour ton IA, sur ses textes de validation ?"
+  precision={`Un fichier range chaque octet de texte sur ${BITS.fichier} bits. Les bits par octet d'un modèle disent combien il lui en faudrait, s'il rangeait le texte d'après ses prédictions.`}
+  choix={choixBits(MINI)}
+  acquis="bits"
+  ouvre="atelier"
+>
+
+Moins de 2 : {BITS.bits} par octet. Sa perte, {BITS.perte} nats par jeton, fait {BITS.bitsParJeton} par jeton. Un jeton de ton IA couvre en moyenne {BITS.octetsParJeton} octets de texte, d'où {BITS.bits} par octet. Rangé d'après ses prédictions, un texte qu'elle n'a jamais lu prendrait en théorie environ {BITS.fois} fois moins de place que dans un fichier.
+
+</Pari>
+
+C'est ce nombre-là qui se compare. Un modèle qui lirait le texte octet par octet, et le prédirait exactement aussi bien que ton IA, aurait lui aussi {BITS.bits} par octet. Mais sa perte par jeton ne serait que de {BITS.perteParOctet}, et sa perplexité de {BITS.perplexiteParOctet}. À côté des {BITS.perplexite} de ton IA, il aurait l'air bien meilleur, pour la même prédiction. Les bits par octet ne dépendent pas du découpage : c'est la mesure à prendre entre deux modèles qui ne découpent pas le texte de la même façon.
+
+</Etape>
+
+<Etape numero={4} titre="Répondre sans parler">
+
+Un modèle de langage ne répond pas à une question : il donne une chance à chaque suite possible. Pour lui faire passer un QCM, on ne lui demande donc pas d'écrire sa réponse. On lui fait lire la question suivie de chaque réponse, l'une après l'autre, et on mesure la vraisemblance de chacune : la somme des <span class="formule-en-texte">ln p</span> de ses jetons, chacun sachant tout ce qui le précède. Sa réponse, c'est la plus vraisemblable. Voici le calcul, refait à la main :
+
+<CodeExplique fichier="projets/1.6-evaluation/evaluation_pas_a_pas/pas_a_pas.py" region="qcm">
+  <li data-lignes="1-2">`scores_a_la_main` reçoit le modèle, son tokenizer et une question : son début, `contexte`, et ses réponses possibles, `choix`. `torch.no_grad` : rien ne s'apprend ici, on mesure seulement.</li>
+  <li data-lignes="12-15">La longueur du contexte du modèle, l'appareil, le jeton qui marque le début d'un texte, et la question encodée en jetons.</li>
+  <li data-lignes="17-20">Pour chaque réponse : le jeton de début, la question, puis la réponse, d'un seul tenant, coupés à la longueur du contexte. `premiere` est la position du premier jeton de la réponse.</li>
+  <li data-lignes="21-23">Le modèle lit le tout d'un coup, et donne un score à chaque jeton possible, à chaque position. `log_probas`, c'est ln p, calculé comme la perte de l'étape 2.</li>
+  <li data-lignes="24-27">On additionne ln p de chaque jeton de la réponse, lu à la position d'avant, celle qui le prédit. C'est la log-vraisemblance de la réponse : plus elle est haute, plus le modèle y croit.</li>
+  <li data-lignes="31-33">`octets_du_choix` compte les octets de la réponse, avec l'espace qui la colle à la question.</li>
+  <li data-lignes="36-42">Une réponse longue a plus de jetons à deviner, donc une somme plus basse : sans correction, les réponses courtes gagneraient. On divise donc chaque score par les octets de sa réponse, en nats par octet. Forge appelle « exactitude normalisée » le score qu'on obtient ainsi.</li>
+  <li data-lignes="45-47">La réponse préférée a le plus grand score ; à égalité, la première gagne.</li>
+</CodeExplique>
+
+La version d'une heure de ton IA a noté ainsi {ATELIER.n} questions de <a href={LIMITES.mmmlu}>MMMLU</a>, tirées au hasard : des questions à quatre réponses, sur {ATELIER.matieres} matières, traduites en français par des traducteurs professionnels. Elles sont faites pour de grands modèles, et bien trop difficiles pour elle. Tu ne cherches pas la bonne réponse : devine celle qu'elle préfère.
+
+<Verrou nom="atelier" message="Fais ton pari à l'étape 3 : les questions se débloquent juste après.">
+  <AtelierQcm client:load qcm={QCM} acquis="qcm" />
+</Verrou>
+
+<details class="reponse-defi">
+<summary><span class="bascule-soleil">La réponse du défi</span></summary>
+
+<p>{DEFI.phrases}</p>
+
+Aurait-elle pu tomber juste par hasard ? Oui, même là où son avance est la plus nette. Avec quatre réponses, le hasard tombe juste une fois sur quatre, et une question seule ne départage pas le savoir de la chance. Une avance minuscule dit qu'un tirage au sort aurait fait aussi bien ; une avance nette dit qu'elle n'hésite pas, pas qu'elle sait. Pour trancher, il faut beaucoup de questions : ses {DEFI.justes} justes sur {DEFI.n} ne se distinguent pas du hasard, et l'étape suivante dit pourquoi.
+
+</details>
+
+<Fragment slot="note">
+
+Chaque réponse de l'atelier se choisit d'un clic, ou au clavier : Tab, puis Entrée. Le texte des questions est celui de MMMLU, sans retouche ; « Question : » et « Réponse : » sont ajoutés par le projet, comme forge le fait pour ARC-Challenge.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={5} titre="Le hasard et la marge">
+
+Au hasard, sur des questions à quatre réponses, on tombe juste une fois sur quatre en moyenne. Mais pas exactement : sur quelques questions, un tirage au sort s'en écarte facilement ; sur des milliers, il tombe tout près. Avant de dire qu'un modèle sait quelque chose, il faut savoir de combien le hasard peut s'écarter.
+
+Forge a fait passer à ton IA les questions de FrenchBench, en français : {MARGE.nHella} questions de HellaSwag, où il faut choisir la suite la plus plausible d'un court texte, et {MARGE.nArc} questions de sciences d'ARC-Challenge. Sur HellaSwag, la version d'une heure trouve la bonne réponse {MARGE.hella} du temps.
+
+<Pari
+  id="marge"
+  question="Sur HellaSwag, son score est…"
+  precision={`${MARGE.hella} de bonnes réponses sur ${MARGE.nHella} questions à quatre réponses, quand le hasard en trouverait ${MARGE.hasard} en moyenne.`}
+  choix={choixAuDessusDuHasard(MINI)}
+  acquis="marge"
+>
+
+Au-dessus du hasard. Un tirage au sort sur {MARGE.nHella} questions tomberait, 95 fois sur 100, à moins de {MARGE.margeHella} de {MARGE.hasard} : c'est la marge du hasard. Ton IA est {MARGE.ecartHella} au-dessus, plus que cette marge : elle a appris quelque chose.
+
+Sur ARC-Challenge, elle trouve {MARGE.arc}, {MARGE.ecartArc} sous le hasard. Mais sur {MARGE.nArc} questions, la marge du hasard est de {MARGE.margeArc} : son score ne se distingue pas du hasard. Sur ces questions de sciences, elle n'a rien appris de mesurable.
+
+</Pari>
+
+D'où vient cette marge ? Chaque question tirée au sort est juste avec la chance p, un quart. Sur n questions, la part des justes varie d'un tirage à l'autre d'environ <span class="formule-en-texte">√(p (1 − p) / n)</span> : c'est son écart type. Et 95 fois sur 100, elle reste à moins de {MARGE.z} écarts types de p. Le projet la refait, avec le verdict :
+
+<CodeExplique fichier="projets/1.6-evaluation/evaluation_pas_a_pas/pas_a_pas.py" region="marge">
+  <li data-lignes="1">Les trois verdicts possibles.</li>
+  <li data-lignes="3-4">`Z_95` : {MARGE.z}, l'écart, en écarts types, qui contient 95 tirages sur 100.</li>
+  <li data-lignes="7-14">`marge_95`, la précision d'une mesure : la même formule, avec l'exactitude mesurée au lieu du hasard. Pour HellaSwag, {MARGE.precisionHella}. Mais elle s'annule à 0 ou 100&#8239;% de bonnes réponses : elle ne sert pas à juger.</li>
+  <li data-lignes="17-26">`marge_hasard`, la marge du hasard : p vaut un sur le nombre de réponses. Elle ne dépend que des questions, jamais des réponses du modèle.</li>
+  <li data-lignes="29-42">`verdict` : l'exactitude normalisée moins le hasard, comparée à la marge du hasard. Au-delà, au-dessus ou en dessous du hasard ; en deçà, pas différent. C'est la règle du rapport de forge.</li>
+</CodeExplique>
+
+Voici tout le rapport d'évaluation de la version d'une heure, tel que forge l'a écrit :
+
+<TableauEvaluation nom="mini" />
+
+Et l'atelier ? Sur {MARGE.nAtelier} questions, la marge du hasard est de {MARGE.margeAtelier}. Les {MARGE.justes} justes de ton IA, {MARGE.partAtelier}, ne disent donc rien : il faudrait des milliers de questions.
+
+<Fragment slot="note">
+
+Le projet suppose quatre réponses à chaque question, quand forge additionne les variances des questions une à une, car certaines questions d'ARC-Challenge n'en ont pas quatre : sur HellaSwag, les deux donnent la même marge.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={6} titre="Lire les échantillons">
+
+Les chiffres disent si ton IA prédit bien. Ce qu'elle écrit montre comment. À chaque évaluation, forge lui donne les mêmes débuts : {ECHANTILLONS.francais} débuts de phrase en français, puis {ECHANTILLONS.code} débuts de fonction Python. Elle écrit {ECHANTILLONS.jetons} jetons à la suite de chacun, tirés avec un peu de hasard. Les voici tous, tels quels :
+
+<EchantillonsEvaluation nom="mini" />
+
+Aucun ne s'arrête de lui-même : chacun va jusqu'à ses {ECHANTILLONS.jetons} jetons.
+
+Son français en a l'air : des phrases, des accords, des points et des virgules. Ton IA a appris la forme de la langue. Pas le sens : après « La capitale de la France est », elle ne dit pas Paris, et sa photosynthèse ne parle ni de lumière ni de plantes. Elle se répète : « le soleil se couchait » revient {ECHANTILLONS.soleil} fois dans sa suite. Et elle invente avec aplomb : son village de Bretagne a une date, des familles, un lieu.
+
+Le code, elle le reconnaît. Après `def factorielle(n):`, elle passe à la ligne et décale de quatre espaces, comme le veut Python. Puis tout se mélange : une licence, une autre fonction. Et la docstring commencée en français finit en anglais.
+
+Chaque texte est un tirage : avec une autre graine, il serait autre. C'est ce que disent aussi ses chiffres : une IA d'une heure prédit des mots plausibles, pas des faits.
+
+</Etape>
+
+<Etape numero={7} titre="Ce que les chiffres ne disent pas">
+
+Un score ne vaut pas mieux que son test. Ceux de ton IA ont leurs limites, et un rapport ne les dit pas tout seul.
+
+<Pari
+  id="limites"
+  question="Les questions de FrenchBench, qui notent ton IA…"
+  choix={choixLangueFrenchBench()}
+  acquis="limites"
+>
+
+Elles ont été traduites de l'anglais par une machine. HellaSwag et ARC-Challenge sont des tests anglais. Pour FrenchBench, l'équipe de <a href={LIMITES.croissant}>CroissantLLM</a> les a fait traduire par {LIMITES.traducteur}, puis a jugé elle-même ces traductions {LIMITES.jugement}. Une question mal traduite peut ne plus avoir de bonne réponse claire : le score de ton IA mesure aussi la traduction.
+
+</Pari>
+
+Les pages de FrenchBench n'indiquent aucune licence : ce chapitre n'en reproduit donc aucune question. L'atelier prend celles de <a href={LIMITES.mmmlu}>MMMLU</a> : MMLU traduit par des traducteurs professionnels, sous licence {LIMITES.licenceMmmlu}. Leurs fiches sont dans l’<a href={LIENS.annuaire}>annuaire des données</a>.
+
+La mesure est aussi « maison » : le gabarit des questions, le jeton de début et la division par les octets sont ceux de forge. Ses scores se comparent entre tes modèles et au hasard, pas aux scores publiés pour d'autres modèles.
+
+Reste la question la plus gênante : le test était-il déjà dans les textes d'entraînement ? Un modèle qui a lu les questions a pu en retenir les réponses, et son score ne dit plus ce qu'il sait. C'est la contamination. Pour <a href={LIMITES.llama}>Llama 3</a>, Meta l'a cherchée par suites de {LIMITES.ngramme} jetons : une question est contaminée quand une part de ses jetons appartient à une suite de {LIMITES.ngramme} jetons déjà vue dans son corpus d'entraînement. Pour HellaSwag, en anglais, {LIMITES.contamine} des questions l'étaient, et Meta estime le gain de score à {LIMITES.gain} points pour son plus grand modèle.
+
+Les textes de ton IA viennent du web en français, de Wikipédia et de code Python. Forge n'y a pas cherché les questions de FrenchBench : une contamination n'est pas exclue. Son score de HellaSwag, à peine au-dessus du hasard, n'en dit donc pas plus qu'il ne montre.
+
+</Etape>
+
+<Etape numero={8} titre="Ton IA, la vraie">
+
+La version d'une heure n'était qu'une répétition. Ton IA, la vraie, passera les mêmes épreuves au dernier pas de son entraînement : la même perte sur les mêmes textes de validation, les mêmes QCM, les mêmes débuts.
+
+<TableauEvaluation nom="1.5" />
+
+<EchantillonsEvaluation nom="1.5" />
+
+</Etape>
+
+<Etape numero={9} titre="Chez un grand labo">
+
+Ton IA passe deux QCM. Avant tout réglage, Meta a fait passer à Llama 3 {LABO.bancs} bancs d'essai, des QCM et bien d'autres.
+
+<EncadreLabo sources={SOURCES_LABO_1_6}>
+
+Pour Llama 3, Meta range ses bancs d'essai en {LABO.familles} familles : {LABO.liste}, comme MMLU. ARC-Challenge, que ton IA passe aussi en français, est dans la famille des maths et du raisonnement. Chaque score y a son intervalle de confiance à 95&#8239;%, calculé comme la précision de la mesure de ton projet : <span class="formule-en-texte">{LABO.z} × √(S (1 − S) / N)</span>. Meta reconnaît que cette formule suppose des scores répartis en cloche, ce qu'ils ne sont pas, mais ses essais disent que l'approximation est bonne.
+
+Sur MMLU, dont l'atelier t'a montré {LABO.nAtelier} questions traduites, Llama 3.1 405B pré-entraîné trouve {LABO.mmlu} des bonnes réponses ; sur ARC-Challenge, {LABO.arc}. La version d'une heure de ton IA : {LABO.justes} sur {LABO.nAtelier}, et {LABO.arcMini} sur ARC-Challenge, {LABO.verdictArc}. Mais ces chiffres ne se comparent pas. Meta pose ses questions en anglais, et montre {LABO.mmluExemples} exemples résolus avant chaque question de MMLU, {LABO.arcExemples} avant celles d'ARC-Challenge ; ton IA n'en voit aucun, et lit une traduction.
+
+</EncadreLabo>
+
+<Fragment slot="note">
+
+Les familles sont celles du tableau 8 de l'article de Meta sur Llama 3 ; les scores de Llama 3.1 405B, ceux de sa carte de modèle, pour le modèle pré-entraîné.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={10} titre="Le projet">
+
+<RecupererProjet
+  projet="1.6-evaluation"
+  intro="Le projet du chapitre est dans le dépôt du site : les mesures refaites à la main, le résumé du rapport de forge, et les questions de MMMLU notées par ton IA."
+  suite="Puis, dans le dossier du projet, lance ses tests :"
+/>
+
+<BlocCommande commandes={[EVALUATION_TESTS]} ou="un terminal, dans le dossier du projet" />
+
+Ils comparent chaque mesure refaite à celle de forge, sur le processeur. Si tu as entraîné la version d'une heure au chapitre 1.5, relève son rapport d'évaluation et fais-lui noter des questions de MMMLU, comme le projet l'a fait :
+
+<BlocCommande commandes={[EVALUATION_RESUMER, EVALUATION_QCM]} ou="un terminal, dans le dossier du projet" />
+
+Les chemins en `D:\` sont ceux du PC de l'auteur : remplace-les par ceux de ton entraînement. La seconde commande lit les questions de MMMLU sur Hugging Face : il lui faut le réseau. Le projet utilise PyTorch, comme ceux des chapitres 1.4 et 1.5 : `--extra cpu` prend sa version pour le processeur, qui suffit ici.
+
+Le projet complet, avec un notebook qui refait l'évaluation pas à pas, est sur GitHub :
+
+<LiensProjet projet="1.6-evaluation" />
+
+### À suivre
+
+Ton IA complète un texte, et tu sais maintenant mesurer ce qu'elle vaut. Mais elle ne répond pas encore à une question : elle la continue. Le chapitre 1.7, {SUITE.lien ? <a href={SUITE.lien}>{SUITE.titre}</a> : SUITE.titre}, à venir, lui apprendra à te répondre.
+
+</Etape>

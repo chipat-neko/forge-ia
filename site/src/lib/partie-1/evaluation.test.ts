@@ -110,6 +110,17 @@ describe('les relevés de « mini »', () => {
   it('gardent leurs chemins', () => {
     expect(FICHIERS_EVALUATION['ton-ia-mini']).toBe('projets/1.6-evaluation/mesures/evaluation-mini.json');
     expect(FICHIERS_QCM['ton-ia-mini']).toBe('projets/1.6-evaluation/mesures/qcm-mini.json');
+    // Ton IA, la vraie : les relevés que la tâche 15 du plan 5 écrira, lus par le chapitre 1.6 (« à mesurer » d'ici là).
+    expect(FICHIERS_EVALUATION['ton-ia-1.5']).toBe('projets/1.6-evaluation/mesures/evaluation-1.5.json');
+    expect(FICHIERS_QCM['ton-ia-1.5']).toBe('projets/1.6-evaluation/mesures/qcm-1.5.json');
+  });
+
+  it('marge.ts, sans import, est le jumeau que réexporte evaluation.ts', async () => {
+    const marge = await import('./marge');
+    expect(marge95).toBe(marge.marge95);
+    expect(margeHasard).toBe(marge.margeHasard);
+    expect(verdictQcm).toBe(marge.verdictQcm);
+    expect(readFileSync('src/lib/partie-1/marge.ts', 'utf8')).not.toMatch(/^import /m);
   });
 });
 
