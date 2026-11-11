@@ -50,6 +50,10 @@ forge charge un modèle :
 - `forge.tokenizer.bpe_octets` : `TokenizerOctets`, qui charge le tokenizer figé
   de « ton IA ».
 
+Ses tests importent aussi `forge.evaluation.perte` (`perplexite` et `bits_par_octet`, la
+référence des mesures refaites à la main), `forge.evaluation.qcm` (`_marge_95` et
+`_marge_hasard`) et `forge.evaluation.rapport.verdict`, et `import forge`.
+
 Il ne modifie aucun fichier de forge. Il reprend aussi, par copie, le choix
 de l'appareil du projet 0.3 (voir « Les copies »).
 
@@ -79,7 +83,7 @@ uv run --extra cpu python -m evaluation_pas_a_pas suivants --sauvegarde <etape.p
 ```
 
 - `resumer` lit le `rapport.json` que `python -m forge evaluer` écrit, et en tire le relevé que le site lit
-  (voir « Les relevés »). Rien n'est recalculé. Les sauvegardes et les rapports de « mini » sont hors du dépôt
+  (voir « Les mesures et les sorties »). Rien n'est recalculé. Les sauvegardes et les rapports de « mini » sont hors du dépôt
   (sous `FORGE_DONNEES`, `D:\forge-ia-donnees` sur le PC de l'auteur) : sans eux, les commandes ne se rejouent
   pas, mais les fichiers relevés sont dans le dépôt.
 - `qcm-exemples` lit `--n` questions de MMMLU (6 par défaut, tirées avec `--graine`, 0 par défaut) **en flux**
@@ -150,7 +154,8 @@ qui manque arrête la construction. Ce projet n'a pas de dossier `sorties/`.
 
 Les chiffres de `mesures/evaluation-mini.json` sont ceux de
 `docs/mesures/ton-ia-mini.md` : perplexité 30,8, 1,133 bit par octet, HellaSwag
-27,2 % (au-dessus du hasard), ARC 23,6 % (pas différent du hasard). Le fichier a
+27,2 % d'exactitude normalisée (au-dessus du hasard), ARC 23,6 % d'exactitude normalisée
+(pas différent du hasard). Le fichier a
 `nom`, `releve_le`, `pas`, `perte_val`, `perplexite`, `bits_par_octet`, `qcm` et
 `echantillons` (les dix textes). Chaque test de `qcm` (`hellaswag`, `arc`) garde
 les clés du rapport de forge (`exactitude`, `exactitude_normalisee`, `hasard`,

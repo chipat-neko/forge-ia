@@ -17,7 +17,8 @@ mêmes textes.
 ## Ce qu'il prend à forge
 
 Rien. Ce projet n'importe pas `forge`, le moteur de « ton IA » (`projets/forge`),
-et ne dépend d'aucun autre projet : son `pyproject.toml` ne déclare aucune dépendance d'exécution (seul pytest sert aux tests).
+et ne dépend d'aucun autre projet : son `pyproject.toml` ne déclare aucune dépendance
+d'exécution (seul pytest sert aux tests).
 Le modèle à n-grammes est le plus petit modèle de langage possible, celui qu'on
 refait avant d'ouvrir le moteur. Il reprend seulement le hasard reproductible du
 projet 0.2 (voir « Le hasard » plus bas).

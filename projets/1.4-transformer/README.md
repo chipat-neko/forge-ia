@@ -172,9 +172,9 @@ uv run --extra cpu python -m transformer_pas_a_pas comparer --enregistrer sortie
 ```
 
 Le chapitre la lit telle quelle : rien n'est recopié à la main. Ce projet n'a
-pas de dossier `mesures/`. Les écarts sont de 10⁻¹⁴ au plus (certaines pièces sortent à 0) ; leur dernier chiffre peut changer d'une
-machine à l'autre, et aucun test ne le fige : le test exige seulement qu'ils
-restent sous 10⁻¹².
+pas de dossier `mesures/`. Les écarts sont de 10⁻¹⁴ au plus (certaines pièces sortent
+à 0) ; leur dernier chiffre peut changer d'une machine à l'autre, et aucun test ne
+le fige : le test exige seulement qu'ils restent sous 10⁻¹².
 
 ## Les attendus de référence
 

@@ -40,6 +40,9 @@ Le vrai code d'entraînement et de lecture du journal, rien n'est réécrit :
 - `forge.suivi` : `lire_journal`, `PERTES_RECENTES` et `_FINS_DE_SESSION`
   (comment forge lit son propre journal et finit une session).
 
+Ses tests importent aussi `forge.entrainement.ChargeurJetons` (lire les fragments de jetons
+de l'essai), `ConfigEntrainement`, `ConfigModele` et `nombre_parametres`, et `TokenizerOctets`.
+
 Il lit aussi le texte du chapitre 1.1
 (`projets/1.1-modele-de-langage/donnees/texte-du-site.txt`) pour préparer les
 données de l'essai.
@@ -177,7 +180,8 @@ Le chapitre 1.5 montre :
 | `forge/entrainement/boucle.py` (dans forge) | `_creer_optimiseur` et `_pas_d_optimisation` |
 
 Les régions de `pre_entrainement/journal.py` (`sessions`, `courbe`) et
-`pre_entrainement/essai.py` (`essai-donnees`, `essai-reprise`) ne sont pas
+`pre_entrainement/essai.py` (`essai-donnees`, `essai-reprise`), ainsi que
+`appareil` (`pre_entrainement/appareil.py`), ne sont pas
 montrées en code : le chapitre en montre les résultats, par les relevés
 ci-dessous.
 
