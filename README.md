@@ -47,9 +47,23 @@ Chaque chapitre de la Partie 0, « Les bases », a le sien :
 | `projets/0.4-tenseurs` | 0.4, Tenseurs et calcul sur GPU | crée des tenseurs, prévoit leurs formes, compte leur mémoire, chronomètre le processeur et la carte |
 | `projets/0.5-reseau` | 0.5, Premier réseau de neurones | un neurone à seuil, puis un réseau entraîné à la main et avec PyTorch |
 
+Ceux de la Partie 1, « Créer son IA de zéro », ont aussi le leur, un par
+chapitre. Les chapitres 1.1 à 1.4 sont en ligne (par exemple
+<https://chipat-neko.github.io/forge-ia/partie-1/1-1/>). Les chapitres 1.5 et
+1.6 paraîtront après la fin de l'entraînement de « ton IA » : leurs projets sont
+prêts, leurs adresses n'existent pas encore.
+
+| Projet | Chapitre | Ce qu'il fait |
+| --- | --- | --- |
+| `projets/1.1-modele-de-langage` | 1.1, Ce qu'est vraiment un modèle de langage | un modèle qui compte quel caractère suit chaque groupe de caractères, devine la suite d'un texte et en écrit une |
+| `projets/1.2-donnees` | 1.2, Les données | trie les documents d'une source avec le vrai code de forge (trop courts, doublons, licences), met de côté la validation et compte ce qui reste |
+| `projets/1.3-tokenizer` | 1.3, Le tokenizer | un tokenizer BPE minuscule : il apprend à couper un texte en jetons, en collant les paires les plus fréquentes |
+| `projets/1.4-transformer` | 1.4, Le transformer, pièce par pièce | refait chaque pièce du transformer de « ton IA » sur des tenseurs et vérifie qu'elle donne les mêmes nombres que forge |
+| `projets/1.5-pre-entrainement` | 1.5, Le pré-entraînement sur ton GPU | lit le journal d'un entraînement et fait un petit essai de pause et de reprise exacte |
+| `projets/1.6-evaluation` | 1.6, Évaluer son modèle | refait la perte, la perplexité et la notation d'un QCM à la main, lit le rapport d'évaluation et regarde dans le modèle |
+
 Les autres :
 
-- `projets/1.3-tokenizer` : le tokenizer BPE du chapitre 1.3 ;
 - `projets/mini-modele` : le jumeau Python des démos du mini-modèle
   (l'avant-goût de 0.5, puis 1.5) ;
 - `projets/forge` : le moteur de « ton IA », l'IA que le site entraîne.
@@ -64,7 +78,7 @@ tokenizer :
 cd projets/1.3-tokenizer; uv run pytest
 ```
 
-Les projets qui utilisent PyTorch (0.3, 0.4, 0.5 et `forge`) demandent en
+Les projets qui utilisent PyTorch (0.3, 0.4, 0.5, 1.4, 1.5, 1.6 et `forge`) demandent en
 plus un extra : `--extra cpu` pour la version de PyTorch pour le
 processeur, `--extra gpu` pour celle de la carte NVIDIA. Par exemple :
 

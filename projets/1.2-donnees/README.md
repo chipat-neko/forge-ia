@@ -8,14 +8,35 @@ cru : il appelle `forge.donnees` (`nettoyer`, `empreinte_du_texte_nettoye`,
 `est_validation`, `SOURCES`), dans l'ordre où le téléchargement de forge les
 appelle.
 
-C'est le projet du chapitre 1.2 de La Forge IA, « Les données ». Le site en
-propose un jumeau en TypeScript pour le nettoyage et le tri
+C'est le projet du chapitre 1.2 de La Forge IA, « Les données », en ligne à
+l'adresse <https://chipat-neko.github.io/forge-ia/partie-1/1-2/> (les mots
+techniques sont expliqués dans le glossaire,
+<https://chipat-neko.github.io/forge-ia/annexes/glossaire/>, et les sources de
+données dans l'annuaire, <https://chipat-neko.github.io/forge-ia/annexes/annuaire/>).
+Le site en propose un jumeau en TypeScript pour le nettoyage et le tri
 (`site/src/lib/partie-1/nettoyeur.ts`), qui doit donner exactement les mêmes
 textes nettoyés, les mêmes empreintes et les mêmes verdicts.
 
 Le projet dépend de forge (`../forge`), mais il n'installe pas PyTorch : c'est
 un extra de forge, que ce projet ne demande pas. Aucun `--extra` n'est
 nécessaire, ni pour lancer le projet ni pour le tester.
+
+## Ce qu'il prend à forge
+
+Tout le nettoyage, rien n'est réécrit. Le projet importe, de `forge.donnees` :
+
+- `nettoyage` : `nettoyer` et `empreinte_du_texte_nettoye` (le nettoyage et
+  l'empreinte SHA-1 d'un texte), plus `_normaliser` et `empreinte` pour les
+  valeurs de référence du site ;
+- `melange` : `est_validation` (le tri entre entraînement et validation) et
+  `MELANGE_PAR_DEFAUT` (le mélange par défaut des sources) ;
+- `sources` : `SOURCES` et `Source` (les trois sources de ton IA : le web
+  français, Wikipédia en français et du code Python permissif) ;
+- `telechargement` : `lecteur_hugging_face`, le lecteur en flux de l'aperçu.
+
+Il prend aussi `forge.chemins.racine_donnees` (le dossier `FORGE_DONNEES`).
+Ce que le projet ajoute lui-même est petit : `trier` (un verdict par document),
+`apercu` (les comptes par source) et `volumes` (les volumes d'un corpus encodé).
 
 ## Lancer
 
@@ -100,12 +121,18 @@ exemples.
 
 ## Ce que montre le chapitre
 
-Le chapitre 1.2 montre le code du projet, tiré des régions balisées par
-`# region: <nom>` et `# fin: <nom>` :
+Le chapitre 1.2 montre, tirées des repères `# region: <nom>` et
+`# fin: <nom>` ou des fonctions elles-mêmes (`symbole=`) :
 
-| Fichier | Région |
+| Fichier | Ce que le chapitre en montre |
 | --- | --- |
-| `donnees_pas_a_pas/trier.py` | `nettoyer`, `licence`, `doublons`, `validation`, `trier`, `compter` |
+| `donnees_pas_a_pas/trier.py` | la région `doublons` |
+| `forge/donnees/nettoyage.py` (dans forge) | `_normaliser`, `nettoyer`, `empreinte_du_texte_nettoye` |
+| `forge/donnees/sources.py` (dans forge) | `_garder_python_permissif` |
+| `forge/donnees/melange.py` (dans forge) | `est_validation` |
+
+Les autres régions de `trier.py` (`nettoyer`, `licence`, `validation`, `trier`
+et `compter`) ne sont pas montrées par le chapitre : elles servent au notebook.
 
 ## Ce que contient le paquet
 
@@ -153,9 +180,17 @@ uv run python -m donnees_pas_a_pas.attendus
 
 ## Les mesures et les sorties
 
-- `sorties/apercu.txt` et `mesures/apercu.json` : ce que `apercu --octets 5M` a
-  relevé, avec sa date.
-- `mesures/corpus-principal.json` : ce que `volumes --donnees principal` a lu dans
-  les jetons de « ton IA ».
+Chacun de ces fichiers porte sa date de relevé (champ `releve_le`, ou première
+ligne `# relevé le AAAA-MM-JJ`). Le chapitre les lit tels quels : rien n'est
+recopié à la main.
 
-Le chapitre les lit tels quels : rien n'est recopié à la main.
+| Fichier | D'où il vient | Relevé le |
+| --- | --- | --- |
+| `sorties/apercu.txt` | la sortie de `apercu --octets 5M --enregistrer`, lue en flux sur Hugging Face | 09/11/2026 |
+| `mesures/apercu.json` | le même relevé, écrit par `apercu --json` | 09/11/2026 |
+| `mesures/corpus-principal.json` | ce que `volumes --donnees principal` a lu dans `.complet` et `index.json` des jetons de « ton IA » (`FORGE_DONNEES/jetons/principal/`) | 09/11/2026 |
+
+Les trois ont été relevés sur le PC de l'auteur : l'aperçu a besoin d'Internet,
+et les volumes du corpus encodé de « ton IA », qui ne se trouve pas dans le dépôt.
+Sans eux, les commandes ne se rejouent pas, mais les fichiers relevés sont dans
+le dépôt.

@@ -6,8 +6,19 @@ petit corpus français (`donnees/corpus.txt`) et repose sur l'algorithme BPE
 (Byte Pair Encoding, « codage par paires d'octets ») : on part des lettres,
 puis on colle à chaque tour la paire de symboles voisins la plus fréquente.
 
-C'est le projet de l'étape 1.3 de La Forge IA. Le site en propose un jumeau
-en TypeScript qui doit donner exactement les mêmes résultats.
+C'est le projet du chapitre 1.3 de La Forge IA, « Le tokenizer », en ligne à
+l'adresse <https://chipat-neko.github.io/forge-ia/partie-1/1-3/> (les mots
+techniques sont expliqués dans le glossaire :
+<https://chipat-neko.github.io/forge-ia/annexes/glossaire/>). Le site en
+propose un jumeau en TypeScript qui doit donner exactement les mêmes résultats.
+
+## Ce qu'il prend à forge
+
+Rien. Ce projet n'importe pas `forge`, le moteur de « ton IA »
+(`projets/forge`) : le tokenizer de ton IA, appris par forge, est un autre
+programme (un BPE sur les octets, bien plus gros). Celui-ci est écrit pour être
+lu : sa seule dépendance est la bibliothèque `regex`, qui comprend `\p{L}`
+(« une lettre ») là où `re` de Python ne le comprend pas.
 
 ## Lancer
 
@@ -53,3 +64,16 @@ uv run python -m tokenizer_pedagogique.attendus
 
 Un test vérifie que le fichier est à jour : si le code change, il échoue
 tant que le fichier n'est pas régénéré.
+
+## Ce que montre le chapitre
+
+Le chapitre 1.3 montre deux régions de `tokenizer_pedagogique/bpe.py`, tirées
+des repères `# region: <nom>` et `# fin: <nom>` : `compter` (compter les paires
+de symboles voisins) et `choisir` (choisir la paire à fusionner, avec la règle
+d'égalité ci-dessus).
+
+## Les mesures et les sorties
+
+Ce projet n'a ni dossier `mesures/` ni dossier `sorties/` : aucun relevé n'est
+fait à une date donnée. Le corpus d'apprentissage est `donnees/corpus.txt`, et
+les nombres du chapitre viennent de `tests/attendus.json`, que le Python écrit.

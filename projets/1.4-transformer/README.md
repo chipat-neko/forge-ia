@@ -8,7 +8,11 @@ pures sur des tenseurs (aucun `nn.Module`, aucun
 que chaque pièce donne les mêmes nombres que le module correspondant de forge,
 à 10⁻¹² près.
 
-C'est le projet du chapitre 1.4 de La Forge IA, « Le transformer ». Comme les
+C'est le projet du chapitre 1.4 de La Forge IA, « Le transformer, pièce par
+pièce », en ligne à l'adresse
+<https://chipat-neko.github.io/forge-ia/partie-1/1-4/> (les mots techniques
+sont expliqués dans le glossaire :
+<https://chipat-neko.github.io/forge-ia/annexes/glossaire/>). Comme les
 projets 0.3 à 0.5, il utilise PyTorch, en deux versions au choix : celle pour
 carte NVIDIA (extra `gpu`, CUDA 13.2) et celle pour le processeur seul (extra
 `cpu`). Tous ses calculs tournent sur le processeur : le modèle de comparaison
@@ -16,6 +20,16 @@ est minuscule (vecteurs de 32 nombres), la carte n'y gagnerait rien.
 
 Il dépend de forge par chemin (`forge-ia = { path = "../forge", editable = true }`
 dans `pyproject.toml`) : il faut donc le dépôt entier, pas seulement ce dossier.
+
+## Ce qu'il prend à forge
+
+Les modules à comparer, et rien d'autre. Le projet importe de `forge.modele` :
+`Transformer` et `ConfigModele` (le modèle construit pour la comparaison),
+`PRESETS`, `nombre_parametres` et `largeur_cachee` (les cinq tailles et leurs
+comptes), `rope_cos_sin` et `appliquer_rope` (les angles et la rotation de
+RoPE, que `comparer` appelle pour refaire les mêmes passages en float32). Il ne
+modifie aucun fichier de forge. Les pièces de `pieces.py`, elles, n'importent
+pas forge : elles ne prennent que des tenseurs.
 
 ## Installer uv
 
@@ -134,15 +148,31 @@ Aucun test n'a besoin de la carte graphique.
 RoPE n'a aucun paramètre et il n'y a aucun biais. La somme vaut
 `forge.modele.config.nombre_parametres`, pour chaque preset.
 
-## La sortie
+## Ce que montre le chapitre
 
-`sorties/comparaison.txt` est la sortie de `comparer`, écrite par :
+Le chapitre 1.4 montre, tirées des repères `# region: <nom>` et
+`# fin: <nom>` ou des fonctions elles-mêmes (`symbole=`) :
+
+| Fichier | Ce que le chapitre en montre |
+| --- | --- |
+| `transformer_pas_a_pas/pieces.py` | les régions `plongement`, `modele` et `attention` |
+| `tests/test_pieces.py` | la région `test-egalite` |
+| `forge/modele/transformer.py` (dans forge) | `MLP.forward` et `Bloc.forward` |
+
+Les autres régions de `pieces.py` (`rmsnorm`, `rope`, `masque`, `swiglu`,
+`bloc`) ne sont pas montrées : elles servent au notebook et aux figures.
+
+## Les mesures et les sorties
+
+`sorties/comparaison.txt` est la sortie de `comparer`, relevée le 09/11/2026
+(sa première ligne : `# relevé le 2026-11-09`). Elle a été écrite par :
 
 ```bash
 uv run --extra cpu python -m transformer_pas_a_pas comparer --enregistrer sorties/comparaison.txt
 ```
 
-Les écarts sont de 10⁻¹⁴ au plus (certaines pièces sortent à 0) ; leur dernier chiffre peut changer d'une
+Le chapitre la lit telle quelle : rien n'est recopié à la main. Ce projet n'a
+pas de dossier `mesures/`. Les écarts sont de 10⁻¹⁴ au plus (certaines pièces sortent à 0) ; leur dernier chiffre peut changer d'une
 machine à l'autre, et aucun test ne le fige : le test exige seulement qu'ils
 restent sous 10⁻¹².
 

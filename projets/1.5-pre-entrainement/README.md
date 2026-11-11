@@ -11,7 +11,12 @@ paquet `forge`, dans `projets/forge`) :
   60 pas, fait d'un trait, puis refait en l'arrêtant à mi-chemin et en le reprenant. Sur le processeur,
   les deux finissent sur la même perte, au bit près.
 
-C'est le projet du chapitre 1.5 de La Forge IA, « Le pré-entraînement ». Comme les projets 0.3 à 0.5
+C'est le projet du chapitre 1.5 de La Forge IA, « Le pré-entraînement sur ton
+GPU ». Ce chapitre n'est pas encore en ligne : il paraîtra après la fin de
+l'entraînement de « ton IA », avec ses vrais chiffres, et son adresse
+(`partie-1/1-5/` sur le site) n'existe pas encore. Les mots techniques sont
+expliqués dans le glossaire :
+<https://chipat-neko.github.io/forge-ia/annexes/glossaire/>. Comme les projets 0.3 à 0.5
 et 1.4, il utilise PyTorch, en deux versions au choix : celle pour carte NVIDIA (extra `gpu`, CUDA
 13.2) et celle pour le processeur seul (extra `cpu`). Les commandes ci-dessous prennent le processeur,
 qui suffit à tout ce qu'il calcule ; l'essai peut aussi tourner sur la carte (`--appareil cuda` avec
@@ -20,6 +25,24 @@ l'extra `gpu`).
 Il dépend de forge par chemin (`forge-ia = { path = "../forge", editable = true }` dans
 `pyproject.toml`) : il faut donc le dépôt entier, pas seulement ce dossier. L'essai lit aussi le texte
 du chapitre 1.1 (`projets/1.1-modele-de-langage/donnees/texte-du-site.txt`).
+
+## Ce qu'il prend à forge
+
+Le vrai code d'entraînement et de lecture du journal, rien n'est réécrit :
+
+- `forge.entrainement` : `ConfigEntrainement`, `entrainer` (avec son option
+  `arreter_apres`, qui sert à l'essai de pause) et `lire_config` (le fichier
+  TOML d'un entraînement) ;
+- `forge.modele` : `ConfigModele` et `nombre_parametres` ;
+- `forge.tokenizer` : `TokenizerOctets`, qui charge le tokenizer figé de
+  « ton IA » (`forge/ressources/tokenizer-ton-ia-v1.json`, qui ne se modifie
+  jamais) ;
+- `forge.suivi` : `lire_journal`, `PERTES_RECENTES` et `_FINS_DE_SESSION`
+  (comment forge lit son propre journal et finit une session).
+
+Il lit aussi le texte du chapitre 1.1
+(`projets/1.1-modele-de-langage/donnees/texte-du-site.txt`) pour préparer les
+données de l'essai.
 
 ## Installer uv
 
@@ -59,7 +82,10 @@ uv run --extra cpu python -m pre_entrainement courbe --journal D:\forge-ia-donne
   `{"nom", "releve_le", "resume", "sessions", "courbe"}` : c'est ainsi que
   `mesures/ton-ia-mini.json` a été écrit. Le journal de « mini » est hors du dépôt (sous
   `FORGE_DONNEES`, `D:\forge-ia-donnees` sur le PC de l'auteur) : sans lui, la commande ne se
-  rejoue pas, mais le fichier relevé est dans le dépôt.
+  rejoue pas, mais le fichier relevé est dans le dépôt. Sous Linux ou Mac, la
+  commande a la même forme, avec des `/` dans les chemins (par exemple
+  `--config ../forge/configs/mini.toml`) et le journal sous ton propre
+  `FORGE_DONNEES`.
 
 ## Le journal
 
@@ -140,16 +166,43 @@ d'erreur en français, les copies exactes, les régions du paquet, les relevés 
 Le test marqué `gpu` (`test_essai_sur_la_carte`) refait l'essai sur la carte graphique ; sans CUDA, il
 est sauté. Tous les autres tournent sur le processeur.
 
-## Les relevés
+## Ce que montre le chapitre
 
-- `mesures/ton-ia-mini.json` : le journal de la version d'une heure de « ton IA », relevé par `courbe`
-  (6 370 pas, 60 min 17 s de calcul, sans pause) ;
-- `sorties/essai-processeur.txt` et `mesures/essai-processeur.json` : l'essai sur le processeur, écrit
-  par `essai`. Sa durée change d'une machine à l'autre ; ses pertes aussi, à la dernière décimale, selon
-  le nombre de fils du processeur. L'égalité des deux pertes, elle, ne change pas.
+Le chapitre 1.5 montre :
 
-Le site lit ces fichiers à la construction (`site/src/lib/partie-1/journal.ts`) et les vérifie : un
-champ qui manque arrête la construction.
+| Fichier | Ce que le chapitre en montre |
+| --- | --- |
+| `tests/test_essai.py` | la région `test-reprise` |
+| `forge/entrainement/planning.py` (dans forge) | `taux` |
+| `forge/entrainement/boucle.py` (dans forge) | `_creer_optimiseur` et `_pas_d_optimisation` |
+
+Les régions de `pre_entrainement/journal.py` (`sessions`, `courbe`) et
+`pre_entrainement/essai.py` (`essai-donnees`, `essai-reprise`) ne sont pas
+montrées en code : le chapitre en montre les résultats, par les relevés
+ci-dessous.
+
+## Les mesures et les sorties
+
+Chaque fichier porte sa date de relevé (champ `releve_le`, ou première ligne
+`# relevé le AAAA-MM-JJ`). Le site les lit à la construction
+(`site/src/lib/partie-1/journal.ts`) et les vérifie : un champ qui manque
+arrête la construction.
+
+| Fichier | D'où il vient | Relevé le |
+| --- | --- | --- |
+| `mesures/ton-ia-mini.json` | le journal de la version d'une heure de « ton IA » (le modèle « mini », entraîné le 03/11/2026), lu par `courbe` ; 6 370 pas, 60 min 17 s de calcul, sans pause | 09/11/2026 |
+| `mesures/essai-processeur.json` | l'essai de pause et de reprise sur le processeur, écrit par `essai --json` | 09/11/2026 |
+| `sorties/essai-processeur.txt` | la sortie du même essai, écrite par `essai --enregistrer` | 09/11/2026 |
+
+L'essai a tourné sur le processeur de l'auteur (16 cœurs logiques). Sa durée
+change d'une machine à l'autre ; ses pertes aussi, à la dernière décimale, selon
+le nombre de fils du processeur. L'égalité des deux pertes, elle, ne change pas.
+
+### Ce qui viendra de ton IA
+
+Les relevés de la vraie « ton IA » (`mesures/ton-ia-1.5.json`, et l'essai sur la
+carte graphique) seront versés après la fin de son entraînement, avant la
+parution du chapitre ; jusque-là, rien n'en est inventé ici.
 
 ## Le notebook
 

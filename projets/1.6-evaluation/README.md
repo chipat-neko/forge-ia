@@ -17,13 +17,41 @@ pas à pas et à la main, les mesures que fait forge (le paquet `forge`, dans `p
 - il **regarde dans le modèle** : les cartes d'attention d'une phrase, et les jetons que le modèle juge les
   plus probables pour la suite.
 
-C'est le projet du chapitre 1.6 de La Forge IA, « L'évaluation ». Comme les projets 0.3 à 0.5, 1.4 et 1.5, il
+C'est le projet du chapitre 1.6 de La Forge IA, « Évaluer son modèle ». Ce
+chapitre n'est pas encore en ligne : il paraîtra après la fin de l'entraînement
+de « ton IA », avec ses vrais chiffres, et son adresse (`partie-1/1-6/` sur le
+site) n'existe pas encore. Les mots techniques sont expliqués dans le glossaire :
+<https://chipat-neko.github.io/forge-ia/annexes/glossaire/>. Comme les projets 0.3 à 0.5, 1.4 et 1.5, il
 utilise PyTorch, en deux versions au choix : celle pour carte NVIDIA (extra `gpu`, CUDA 13.2) et celle pour le
 processeur seul (extra `cpu`). Les commandes ci-dessous prennent le processeur, qui suffit à tout ce que ce
 projet calcule.
 
 Il dépend de forge par chemin (`forge-ia = { path = "../forge", editable = true }` dans `pyproject.toml`) : il
 faut donc le dépôt entier, pas seulement ce dossier.
+
+## Ce qu'il prend à forge
+
+Les mesures de forge, qu'il refait à la main puis compare, et la façon dont
+forge charge un modèle :
+
+- `forge.evaluation.qcm` : `QCM`, `JETON_DE_DEBUT` et `scores_qcm` (la notation
+  d'un QCM par log-vraisemblance, à laquelle les scores refaits à la main sont
+  comparés) ;
+- `forge.evaluation.rapport` : `VERSION_DU_RAPPORT` (le format du
+  `rapport.json` que `resumer` lit) ; la règle du verdict est celle de
+  `forge.evaluation.rapport.verdict` ;
+- `forge.entrainement.sauvegarde` : `charger` et `charger_derniere`, et
+  `forge.entrainement.boucle.VERSION_DE_LA_SAUVEGARDE` (charger une sauvegarde
+  `etape-*.pt` ou `meilleur.pt`) ;
+- `forge.modele` : `ConfigModele`, `Transformer`, et, de
+  `forge.modele.transformer`, `rope_cos_sin` et `appliquer_rope` (les cartes
+  d'attention refont le calcul de l'attention de forge pour en montrer les
+  poids) ;
+- `forge.tokenizer.bpe_octets` : `TokenizerOctets`, qui charge le tokenizer figé
+  de « ton IA ».
+
+Il ne modifie aucun fichier de forge. Il reprend aussi, par copie, le choix
+de l'appareil du projet 0.3 (voir « Les copies »).
 
 ## Installer uv
 
@@ -61,6 +89,8 @@ uv run --extra cpu python -m evaluation_pas_a_pas suivants --sauvegarde <etape.p
 - `cartes` écrit les poids d'attention d'une phrase pour une couche (`--couche`, à partir de 0) et une tête
   (`--tete`, à partir de 0). `suivants` écrit les `--k` jetons (10 par défaut) que le modèle juge les plus
   probables après la phrase.
+- Sous Linux ou Mac, les commandes ont la même forme, avec des `/` dans les
+  chemins et les sauvegardes et rapports sous ton propre `FORGE_DONNEES`.
 - `--sauvegarde` est une sauvegarde de forge (`etape-*.pt`, `meilleur.pt`). `--tokenizer` donne un autre
   tokenizer que le tokenizer figé de « ton IA » (`forge/ressources/tokenizer-ton-ia-v1.json`).
 - Sans `--appareil`, le projet prend la carte si PyTorch la voit, sinon le processeur (ou ce que dit la
@@ -98,23 +128,52 @@ Les autres fichiers du paquet :
 | `regarder.py` | `cartes`, `suivants` | `cartes_attention(modele, ids, couche)` et `suivants(modele, tokenizer, phrase, k)` |
 | `attendus.py` | | écrit `tests/attendus.json`, la grille des marges et des verdicts que le site vérifie |
 
-## Les relevés
+## Ce que montre le chapitre
 
-- `mesures/evaluation-mini.json` : le rapport d'évaluation de la version d'une heure de « ton IA » (le
-  modèle « mini », pas 6 370), écrit par `resumer`. Les chiffres sont ceux de `docs/mesures/ton-ia-mini.md` :
-  perplexité 30,8, 1,133 bit par octet, HellaSwag 27,2 % (au-dessus du hasard), ARC 23,6 % (pas différent du
-  hasard). Il a `nom`, `releve_le` (la date du rapport), `pas`, `perte_val`, `perplexite`, `bits_par_octet`,
-  `qcm` et `echantillons` (les dix textes). Chaque test de `qcm` (`hellaswag`, `arc`) garde les clés du rapport
-  de forge (`exactitude`, `exactitude_normalisee`, `hasard`, `n`, `marge_95`, `marge_95_normalisee`,
-  `marge_hasard`, `total_du_test`) et reçoit son `verdict`.
-- `mesures/qcm-mini.json` : six questions de MMMLU en français, notées par « mini » sur le processeur, écrit
-  par `qcm-exemples`. Il a `nom`, `releve_le`, `appareil`, `jeu` (`nom`, `configuration`, `partie`,
-  `adresse`, `licence`, `licence_verifiee_le`, `lu_le`), `n`, `justes`, `hasard`, et `questions` : pour
-  chacune, `contexte`, `choix`, `scores` (les log-vraisemblances), `scores_normalises`, `prefere`, `bonne`
-  et `juste`. Les lignes de MMMLU dont deux réponses sont identiques ou vides sont ignorées au tirage.
+Le chapitre 1.6 montre cinq régions de `evaluation_pas_a_pas/pas_a_pas.py`,
+tirées des repères `# region: <nom>` et `# fin: <nom>` : `perte`, `perplexite`,
+`bits`, `qcm` et `marge`. Les autres régions (`sauvegarde`, `resumer`,
+`noter-exemples`, `cartes`, `suivants`, `appareil` et `test-cartes`) ne sont pas
+montrées en code : le chapitre en montre les résultats, par les relevés
+ci-dessous.
 
-Le site lit ces fichiers à la construction (`site/src/lib/partie-1/evaluation.ts`) et les vérifie : un champ
-qui manque arrête la construction.
+## Les mesures et les sorties
+
+Chaque fichier porte sa date (champ `releve_le`). Le site les lit à la
+construction (`site/src/lib/partie-1/evaluation.ts`) et les vérifie : un champ
+qui manque arrête la construction. Ce projet n'a pas de dossier `sorties/`.
+
+| Fichier | D'où il vient | Date du champ `releve_le` |
+| --- | --- | --- |
+| `mesures/evaluation-mini.json` | le rapport d'évaluation de la version d'une heure de « ton IA » (le modèle « mini », pas 6 370), écrit par `resumer` | 03/11/2026, la date du rapport de forge ; le fichier est entré dans le dépôt le 10/11/2026 |
+| `mesures/qcm-mini.json` | six questions de MMMLU en français, notées par « mini » sur le processeur, écrit par `qcm-exemples` | 10/11/2026 |
+
+Les chiffres de `mesures/evaluation-mini.json` sont ceux de
+`docs/mesures/ton-ia-mini.md` : perplexité 30,8, 1,133 bit par octet, HellaSwag
+27,2 % (au-dessus du hasard), ARC 23,6 % (pas différent du hasard). Le fichier a
+`nom`, `releve_le`, `pas`, `perte_val`, `perplexite`, `bits_par_octet`, `qcm` et
+`echantillons` (les dix textes). Chaque test de `qcm` (`hellaswag`, `arc`) garde
+les clés du rapport de forge (`exactitude`, `exactitude_normalisee`, `hasard`,
+`n`, `marge_95`, `marge_95_normalisee`, `marge_hasard`, `total_du_test`) et
+reçoit son `verdict`.
+
+`mesures/qcm-mini.json` a `nom`, `releve_le`, `appareil`, `jeu` (`nom`,
+`configuration`, `partie`, `adresse`, `licence`, `licence_verifiee_le`, `lu_le`),
+`n`, `justes`, `hasard`, et `questions` : pour chacune, `contexte`, `choix`,
+`scores` (les log-vraisemblances), `scores_normalises`, `prefere`, `bonne` et
+`juste`. Les lignes de MMMLU dont deux réponses sont identiques ou vides sont
+ignorées au tirage.
+
+Les sauvegardes et les rapports de « mini » ne sont pas dans le dépôt : les
+relevés ont été faits sur le PC de l'auteur.
+
+### Ce qui viendra de ton IA
+
+Les cartes d'attention de la vraie « ton IA », ses mesures, et l'option
+`--modele` des commandes `qcm-exemples`, `cartes` et `suivants` (qui prendra le
+dossier des poids publiés de « ton IA ») viendront après la fin de son
+entraînement, avant la parution du chapitre ; jusque-là, rien n'en est inventé
+ici.
 
 ### MMMLU
 
@@ -186,7 +245,7 @@ uv run --extra cpu pytest -q
 ```
 
 Le test `test_cartes_redonnent_la_sortie_de_l_attention` est encadré par `# region: test-cartes` /
-`# fin: test-cartes`, pour que le chapitre le montre. Les autres tests comparent chaque fonction à forge,
+`# fin: test-cartes` (le chapitre ne le montre pas encore). Les autres tests comparent chaque fonction à forge,
 vérifient le résumé sur un rapport factice au format de forge (`VERSION_DU_RAPPORT = 1`), le tirage et la
 notation des questions de MMMLU (sans réseau), les messages d'erreur en français, les copies exactes, les
 régions du paquet, les relevés enregistrés, la grille `tests/attendus.json` et le notebook.

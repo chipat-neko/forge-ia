@@ -6,9 +6,21 @@ suite d'un texte, et pour en écrire une. Il apprend sur le texte du site
 lui-même, les chapitres 0.1 à 0.5 et 1.3 de La Forge IA.
 
 C'est le projet du chapitre 1.1 de La Forge IA, « Ce qu'est vraiment un modèle
-de langage ». Il n'utilise que la bibliothèque standard de Python. Le site en
-propose un jumeau en TypeScript, pour sa figure, qui doit donner exactement les
-mêmes nombres et les mêmes textes.
+de langage », en ligne à l'adresse
+<https://chipat-neko.github.io/forge-ia/partie-1/1-1/> (les mots techniques
+sont expliqués dans le glossaire :
+<https://chipat-neko.github.io/forge-ia/annexes/glossaire/>). Il n'utilise que
+la bibliothèque standard de Python. Le site en propose un jumeau en
+TypeScript, pour sa figure, qui doit donner exactement les mêmes nombres et les
+mêmes textes.
+
+## Ce qu'il prend à forge
+
+Rien. Ce projet n'importe pas `forge`, le moteur de « ton IA » (`projets/forge`),
+et ne dépend d'aucun autre projet : son `pyproject.toml` ne déclare aucune dépendance d'exécution (seul pytest sert aux tests).
+Le modèle à n-grammes est le plus petit modèle de langage possible, celui qu'on
+refait avant d'ouvrir le moteur. Il reprend seulement le hasard reproductible du
+projet 0.2 (voir « Le hasard » plus bas).
 
 ## Lancer
 
@@ -74,15 +86,18 @@ par `git show`.
 
 ## Ce que montre le chapitre
 
-Le chapitre 1.1 montre le code du projet, tiré des régions balisées par
+Le chapitre 1.1 montre six régions du code du projet, tirées des repères
 `# region: <nom>` et `# fin: <nom>` : `compter`, `distribution`, `poids`,
-`generer`, `perplexite` et `test-uniforme`. Les autres régions sont prêtes pour
-les chapitres et le notebook.
+`generer` et `perplexite` (dans `modele_de_langage/ngrammes.py`), et
+`test-uniforme` (dans `tests/test_ngrammes.py`). Les autres régions
+(`tirer`, `tirage`, et `hasard` dans `modele_de_langage/hasard.py`) ne sont pas
+montrées : elles servent aux notebooks et aux figures.
 
-| Fichier | Région |
-| --- | --- |
-| `modele_de_langage/ngrammes.py` | `compter`, `distribution`, `poids`, `tirer`, `generer`, `tirage`, `perplexite` |
-| `tests/test_ngrammes.py` | `test-uniforme` |
+| Fichier | Régions montrées par le chapitre | Autres régions |
+| --- | --- | --- |
+| `modele_de_langage/ngrammes.py` | `compter`, `distribution`, `poids`, `generer`, `perplexite` | `tirer`, `tirage` |
+| `modele_de_langage/hasard.py` | | `hasard` |
+| `tests/test_ngrammes.py` | `test-uniforme` | |
 
 ## Ce que contient le paquet
 
@@ -130,3 +145,10 @@ Un test vérifie que le fichier est à jour : si le code ou le texte change, il
 Windows n'ont pas la même bibliothèque mathématique) : elle est comparée à
 10⁻⁹ près, tout le reste au bit près. Le site ne recalcule pas la perplexité :
 il lit les valeurs du Python.
+
+## Les mesures et les sorties
+
+Ce projet n'a ni dossier `mesures/` ni dossier `sorties/` : aucun relevé n'est
+fait à une date donnée. Les nombres du chapitre viennent de `tests/attendus.json`
+(le Python, sur le texte figé au commit `ae8d9a4`), et le chapitre ne recopie
+rien à la main.
