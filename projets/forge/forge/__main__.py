@@ -1,8 +1,8 @@
 """Point d'entrée en ligne de commande : `python -m forge <commande>`.
 
 Les commandes `donnees`, `tokenizer`, `compression`, `encoder`, `mesurer`,
-`entrainer`, `evaluer` et `suivi` s'y branchent une par une, au fil des tâches
-du plan (chacune ajoute son sous-parseur dans `construire_parseur`). Toutes sont là.
+`entrainer`, `evaluer`, `exporter` et `suivi` s'y branchent une par une, au fil des
+tâches du plan (chacune ajoute son sous-parseur dans `construire_parseur`). Toutes sont là.
 """
 
 import argparse
@@ -659,6 +659,58 @@ def _ajouter_evaluer(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_evaluer)
 
 
+def _commande_exporter(choix: argparse.Namespace) -> int:
+    """`forge exporter` : les fichiers à publier (poids en safetensors bf16, configuration, tokenizer)."""
+    # Imports ici : PyTorch est long à charger, les autres commandes n'en ont pas besoin.
+    from forge.chemins import PlaceInsuffisante
+    from forge.exporter import empreinte_sha256, exporter
+
+    try:
+        ecrits = exporter(Path(choix.sauvegarde), choix.sortie, choix.poids)
+    except (FileNotFoundError, PermissionError, PlaceInsuffisante, ValueError) as erreur:
+        print(f"Erreur : {erreur}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print("Export interrompu : aucun fichier n'est à moitié écrit. Relance la même commande.", file=sys.stderr)
+        return 130
+    print(f"Fichiers écrits dans {choix.sortie} :")
+    for chemin in ecrits:
+        octets = chemin.stat().st_size
+        en_octets = f"{octets:,}".replace(",", "\u202f")  # espace fine entre les milliers
+        en_mo = f"{octets / 1024**2:.1f}".replace(".", ",")
+        print(f"  {chemin.name} : {en_octets} octets ({en_mo} Mo), SHA-256 {empreinte_sha256(chemin)}")
+    return 0
+
+
+def _ajouter_exporter(sous_parseurs) -> None:
+    commande = _nouvelle_commande(
+        sous_parseurs,
+        "exporter",
+        "Prépare les fichiers à publier d'une sauvegarde de ton IA : les poids en safetensors (bf16), "
+        "config.json et le tokenizer, vérifié par son empreinte SHA-256.",
+    )
+    commande.add_argument(
+        "--sauvegarde",
+        required=True,
+        metavar="FICHIER",
+        help="sauvegarde de l'entraînement (meilleur.pt ou etape-*.pt), ou son dossier sauvegardes/ (dernière étape)",
+    )
+    commande.add_argument(
+        "--sortie",
+        required=True,
+        type=Path,
+        metavar="DOSSIER",
+        help="dossier où écrire les trois fichiers (créé au besoin ; un fichier du même nom est remplacé)",
+    )
+    commande.add_argument(
+        "--poids",
+        default="ton-ia-1.5.safetensors",
+        metavar="NOM",
+        help="nom du fichier des poids, qui finit par .safetensors (ton-ia-1.5.safetensors par défaut)",
+    )
+    commande.set_defaults(fonction=_commande_exporter)
+
+
 def _commande_suivi(choix: argparse.Namespace) -> int:
     """`forge suivi` : où en est l'entraînement, lu dans son journal."""
     # Le suivi n'importe pas PyTorch : il reste léger, on peut le lancer pendant l'entraînement.
@@ -721,6 +773,7 @@ def construire_parseur() -> argparse.ArgumentParser:
     _ajouter_mesurer(sous_parseurs)
     _ajouter_entrainer(sous_parseurs)
     _ajouter_evaluer(sous_parseurs)
+    _ajouter_exporter(sous_parseurs)
     _ajouter_suivi(sous_parseurs)
     return parseur
 
