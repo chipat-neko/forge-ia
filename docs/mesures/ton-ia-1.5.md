@@ -30,10 +30,12 @@ l'Explorateur de Windows et les autres documents de ce dossier). Les pertes sont
   **0,802 bit par octet**. Aux QCM français : HellaSwag **34,8 %** contre 25,0 % au hasard
   (**au-dessus du hasard**, de 9,8 points), ARC-Challenge 25,1 % contre 25,0 % (**pas différent du
   hasard**).
-- **Ce que cela donne :** un français bien plus sûr que celui de « mini », des phrases correctes
-  et un sujet tenu sur deux ou trois phrases, quelques faits justes (« La capitale de la France est
-  Paris »). Mais **ce qu'elle dit n'est pas fiable**, elle se contredit vite, et son code ne fait
-  pas ce que son nom annonce (voir « Les échantillons » et « Ce que ton IA sait faire »).
+- **Ce que cela donne :** un français bien plus sûr que celui de « mini » : des phrases le plus
+  souvent correctes, mais pas toujours sensées, et quelques faits justes (« La capitale de la France
+  est Paris »). Dans la moitié des dix échantillons, elle garde le sujet jusqu'au bout ; dans l'autre
+  moitié, elle se contredit, change de sujet ou écrit des phrases qui n'ont pas de sens. **Ce qu'elle
+  dit n'est pas fiable**, et ses deux fonctions Python ne font pas ce que leur nom annonce (voir « Les
+  échantillons » et « Ce que ton IA sait faire »).
 - **Les fichiers à publier** sont prêts dans `D:\forge-ia-donnees\publication\ton-ia-1.5\` : les poids en
   bf16 (`ton-ia-1.5.safetensors`, 827,0 Mo), `config.json`, le tokenizer, ce rapport, le rapport
   d'évaluation et une fiche `LISEZMOI.md`. Chacun fait moins de 2 Go.
@@ -188,11 +190,11 @@ ligne « début », le pas 1 seul). Le temps est le temps de calcul, sans le
 
 ### La carte ou le processeur : l'essai chronométré
 
-Ta règle : avant un travail de plus de 30 minutes, un essai chronométré sur la carte graphique et sur
-le processeur, puis on prend le plus rapide. L'essai est une évaluation complète de `meilleur.pt`, mais
-avec 20 questions de chaque QCM (`--qcm 20`) : la perte sur les 1 024 morceaux (128 lots de 8
-morceaux de 2 048 jetons), les 40 questions et les dix échantillons. Le processeur avait 10 minutes au
-plus.
+La règle du projet : avant un travail de plus de 30 minutes, un essai chronométré sur la carte
+graphique et sur le processeur, puis on prend le plus rapide. L'essai est une évaluation complète de
+`meilleur.pt`, mais avec 20 questions de chaque QCM (`--qcm 20`) : la perte sur les 1 024 morceaux
+(128 lots de 8 morceaux de 2 048 jetons), les 40 questions et les dix échantillons. Le processeur
+avait 10 minutes au plus.
 
 | | Carte graphique (RTX 5070 Ti, bf16) | Processeur (Ryzen 7 9800X3D, 32 bits) |
 | --- | ---: | ---: |
@@ -370,8 +372,9 @@ Ce qu'on y voit :
   quelques fautes près, celles du web (« canne a pêche », « ce soucis »). Le ton suit le début donné :
   conte, presse (« la suppression de 300 emplois en cinq ans »), résumé de roman ou de film (« Trois
   amis d'enfance… »), message de forum (« Bonjour, je voudrais savoir comment je peux obtenir une
-  remise… »), recette (« Méthode de préparation »). Elle garde le sujet sur deux ou trois phrases, ce
-  que « mini » ne faisait pas.
+  remise… »), recette (« Méthode de préparation »). Dans cinq échantillons (3, 5, 6, 8 et 9), elle
+  garde le sujet jusqu'à la coupure ; « mini » perdait le fil en deux phrases. Dans les cinq autres
+  (1, 2, 4, 7 et 10), elle se contredit, change de sujet ou écrit des phrases qui n'ont pas de sens.
 - **Quelques faits justes.** « La capitale de la France est Paris », puis « Budapest est une ville de
   Hongrie » : vrai. « mini » écrivait « la ville de la capitale ».
 - **Mais ce qu'elle dit n'est pas fiable.** La recette du gâteau au chocolat demande de la pâte à
@@ -395,10 +398,11 @@ centaines ou des milliers de fois plus de texte. Ton IA 1.5 n'est pas un assista
 
 **Ce qu'elle sait faire**
 
-- Écrire un français correct et naturel, dans le ton du début qu'on lui donne (récit, presse, forum,
-  recette), en gardant le sujet deux ou trois phrases.
-- Prolonger un début de fonction Python par du code qui a la bonne forme (indentation, `return`,
-  docstring), et parfois juste pour un cas très simple (`addition`, dans la section 6).
+- Écrire des phrases françaises le plus souvent correctes, mais pas toujours sensées, dans le ton du
+  début qu'on lui donne (récit, presse, forum).
+- Garder le sujet jusqu'à la fin du texte dans la moitié des échantillons (3, 5, 6, 8 et 9).
+- Prolonger un début de fonction Python par du texte qui a la forme du code (indentation, `return`).
+  Mais les deux fonctions des échantillons sont fausses (section 4).
 - Retrouver quelques faits très fréquents dans ses textes (Paris, capitale de la France).
 - Prédire le jeton suivant bien mieux que « mini » : une perplexité de 11,2 au lieu de 30,8, et
   choisir la bonne fin d'histoire dans 34,8 % des questions de HellaSwag, contre 25 % au hasard.
@@ -411,7 +415,8 @@ centaines ou des milliers de fois plus de texte. Ton IA 1.5 n'est pas un assista
 - **Dire des choses vraies de façon fiable.** Elle invente des chiffres, des faits et des recettes ; ce
   qu'elle écrit est vraisemblable, pas vérifié.
 - **Rester cohérente longtemps.** Au-delà de quelques phrases, elle se contredit ou change de sujet.
-- **Écrire du code qui marche**, sauf pour des fonctions très simples.
+- **Écrire du code qui marche** : `factorielle` renvoie toujours 0, et la docstring de `moyenne`
+  part en prose sur des élections.
 - **Réussir un QCM de sciences** : ARC-Challenge est au niveau du hasard.
 - **Lire plus de 2 048 jetons d'un coup** (environ 8 900 octets de texte, à 4,35 octets par jeton) :
   au-delà, le début est oublié.
@@ -475,8 +480,9 @@ def addition_with_newlines(a, b):
 def addition_with_space_after_insert(a
 ```
 
-Le premier texte est le début de l'échantillon 1 de l'évaluation, au caractère près. Le second montre
-une fonction très simple écrite juste, puis des copies sans intérêt.
+Le premier texte est le début de l'échantillon 1 de l'évaluation, au caractère près. Le second est un
+essai à part, hors de l'évaluation et sans valeur de mesure : une seule génération, où la fonction
+`addition` est juste, suivie de copies sans intérêt.
 
 Pour recharger ton IA :
 

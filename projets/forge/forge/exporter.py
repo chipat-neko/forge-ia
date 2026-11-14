@@ -173,7 +173,9 @@ def exporter(sauvegarde: Path, dossier: Path, nom_des_poids: str = NOM_DES_POIDS
     verifier_place(octets, dossier)
     dossier.mkdir(parents=True, exist_ok=True)
     chemins = [dossier / nom_des_poids, dossier / NOM_DE_LA_CONFIG, dossier / TOKENIZER.name]
-    informations = {"format": "pt", "pas": str(pas)}  # « pt » : des tenseurs de PyTorch
+    informations = {"format": "pt"}  # « pt » : des tenseurs de PyTorch
+    if pas is not None:  # une sauvegarde sans pas n'en écrit pas (jamais « None »)
+        informations["pas"] = str(pas)
     _ecrire_d_un_coup(chemins[0], lambda chemin: save_file(poids, chemin, metadata=informations))
     texte = json.dumps(dataclasses.asdict(config), ensure_ascii=False, indent=2) + "\n"
     _ecrire_d_un_coup(chemins[1], lambda chemin: _ecrire_texte(chemin, texte))

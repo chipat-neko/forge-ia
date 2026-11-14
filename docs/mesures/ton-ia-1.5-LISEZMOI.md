@@ -16,9 +16,11 @@ le français et le code Python. Cette version est celle du chapitre 1.5 : elle
   l'entraînement a duré 11 j 3 h 43 min.
 - **Une perplexité de 11,2.** Pour deviner le jeton suivant, ton IA hésite en moyenne comme entre 11
   choix également probables. Au hasard, ce serait 32 768.
-- **0,802 bit par octet.** C'est la même mesure, ramenée à un octet de texte : plus c'est bas, mieux
-  le modèle prédit.
-- **Des QCM en français** (FrenchBench, des traductions automatiques) :
+- **0,802 bit par octet.** C'est l'erreur de prédiction, ramenée à un octet de texte : plus c'est
+  bas, mieux le modèle prédit.
+- **Des QCM en français.** Un QCM est un questionnaire à choix multiples : pour chaque question, il
+  faut choisir la bonne réponse parmi plusieurs. Ceux-ci viennent de FrenchBench, des traductions
+  automatiques en français :
   - HellaSwag (choisir la bonne fin d'une histoire, parmi 4) : 34,8 % de bonnes réponses, contre
     25,0 % au hasard. C'est mieux que le hasard. Ce score corrige l'avantage des réponses courtes ;
     sans cette correction, il est de 29,7 %.
@@ -29,12 +31,12 @@ Ces mesures viennent de `rapport.json`, joint. Le récit complet est dans `ton-i
 
 ## Ce que ton IA sait faire
 
-- Prolonger un texte en français correct, dans le ton du début donné : récit, article de presse,
-  message de forum, recette.
-- Garder le même sujet pendant deux ou trois phrases.
+- Écrire des phrases en français, le plus souvent correctes, mais pas toujours sensées.
+- Prendre le ton du début donné : récit, article de presse, message de forum.
+- Garder le sujet, mais seulement une fois sur deux : dans 5 des 10 textes de l'évaluation. Dans les
+  5 autres, elle se contredit ou change de sujet.
 - Retrouver quelques faits très connus. Exemple : « La capitale de la France est Paris ».
-- Écrire du code Python qui a la bonne forme. Une fonction très simple est parfois juste, comme
-  `addition(a, b)`, qui renvoie `a + b`.
+- Écrire du texte qui a la forme du code Python : des lignes bien décalées, un `return`.
 
 ## Ce qu'elle ne sait pas faire
 
@@ -43,7 +45,8 @@ Ces mesures viennent de `rapport.json`, joint. Le récit complet est dans `ton-i
 - **Dire des choses vraies à coup sûr.** Elle invente des chiffres, des faits et des recettes. Ce
   qu'elle écrit a l'air vrai, mais rien n'est vérifié.
 - **Rester cohérente longtemps.** Après quelques phrases, elle se contredit ou change de sujet.
-- **Écrire du code qui marche**, sauf pour des fonctions très simples.
+- **Écrire du code qui marche.** Dans les deux essais de code de l'évaluation, la fonction écrite est
+  fausse.
 - **Répondre à des questions de sciences** mieux que le hasard.
 - **Lire un long texte.** Au-delà de 2 048 jetons (environ 8 900 octets de texte), elle oublie le
   début.
@@ -74,9 +77,11 @@ la range qu'une fois, sous le nom `plongement.weight`.
 ## Charger ton IA
 
 Il te faut le code du modèle : le paquet `forge` du dépôt
-[chipat-neko/forge-ia](https://github.com/chipat-neko/forge-ia), dans `projets/forge`. Depuis ce
-dossier, `uv run --extra cpu python ton_script.py` installe PyTorch et safetensors, puis lance ton
-script (avec une carte NVIDIA : `--extra gpu`).
+[chipat-neko/forge-ia](https://github.com/chipat-neko/forge-ia), dans `projets/forge`. Il te faut aussi
+PyTorch, la bibliothèque Python qui fait les calculs du modèle, et safetensors, qui lit le fichier des
+poids. L'outil `uv` installe tout cela pour toi : depuis `projets/forge`,
+`uv run --extra cpu python ton_script.py` installe ce qu'il faut, puis lance ton script (avec une
+carte NVIDIA : `--extra gpu`).
 
 1. Mets les trois fichiers du modèle dans un même dossier, et écris son chemin dans `dossier` (ici
    `ton-ia-1.5`, dans le dossier d'où tu lances le script).
@@ -115,7 +120,9 @@ graine, même texte (sur un même appareil).
 ## Licences
 
 - **Les poids** (`ton-ia-1.5.safetensors`) sont sous **licence MIT**, comme le code du dépôt (voir le
-  fichier `LICENSE` du dépôt). La configuration et le tokenizer aussi.
+  fichier `LICENSE` du dépôt). La configuration et le tokenizer aussi. La licence MIT te permet de les
+  utiliser, de les copier, de les modifier et de les partager, même pour vendre, à condition de garder
+  la mention du droit d'auteur et le texte de la licence. Elle ne donne aucune garantie.
 - **Les données d'entraînement** gardent leurs propres licences :
   - le français du web : `HuggingFaceFW/fineweb-2` (partie `fra_Latn`), sous **ODC-By 1.0** ;
   - Wikipédia en français : `wikimedia/wikipedia`, version `20231101.fr`, sous **CC BY-SA 3.0** et

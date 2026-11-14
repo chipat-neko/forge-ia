@@ -135,6 +135,14 @@ def test_le_modele_recharge_donne_les_memes_logits_qu_en_bf16(tmp_path, sauvegar
     assert torch.equal(obtenus, attendus)
 
 
+def test_une_sauvegarde_sans_pas_n_ecrit_pas_de_pas_dans_les_metadonnees(tmp_path):
+    etat, _ = etat_de_test(tmp_path)
+    del etat["pas"]
+    exporter(ecrire_sauvegarde(tmp_path, etat), tmp_path / "publication")
+    with safe_open(tmp_path / "publication" / NOM_DES_POIDS, "pt") as fichier:
+        assert fichier.metadata() == {"format": "pt"}  # jamais « None »
+
+
 def test_le_prefixe_de_torch_compile_est_retire(tmp_path):
     etat, modele = etat_de_test(tmp_path)
     etat["modele"] = {f"_orig_mod.{nom}": tenseur for nom, tenseur in etat["modele"].items()}
