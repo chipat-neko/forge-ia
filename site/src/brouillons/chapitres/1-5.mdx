@@ -368,9 +368,18 @@ export const RESUME_15 = (() => {
   exiger(r.perte_premier_pas > TON_IA_15.courbe.hasard && r.perte_premier_pas - TON_IA_15.courbe.hasard < 0.5, 'la perte du premier pas de ton IA n’est plus un peu au-dessus du hasard');
   // « Sa perte de validation a baissé à chaque mesure, sans exception. »
   exiger(v.every(([, x], i) => i === 0 || x < v[i - 1][1]), 'la perte de validation de ton IA ne baisse plus à chaque mesure');
-  // « Au premier dixième de l'entraînement, elle a déjà fait l'essentiel de sa descente. »
-  const dixieme = v.find(([pas]) => pas >= r.pas_total / 10);
-  exiger(dixieme !== undefined && v[0][1] - dixieme[1] > 2 * (dixieme[1] - r.validation_finale), 'au premier dixième, la perte de validation n’a plus fait l’essentiel de sa descente');
+  // « Comme celle de la version d'une heure, elle part du hasard et chute très vite : au premier dixième de
+  // l'entraînement, l'essentiel de la descente est fait. » Vrai des deux courbes : de la première validation à celle
+  // du premier dixième, la perte de validation descend plus de deux fois autant qu'ensuite, jusqu'à la fin.
+  const descenteRapide = (e) => {
+    const vs = e.courbe.validations;
+    const d = vs.find(([pas]) => pas >= e.resume.pas_total / 10);
+    return d !== undefined && vs[0][1] - d[1] > 2 * (d[1] - e.resume.validation_finale);
+  };
+  exiger(descenteRapide(TON_IA_15), 'au premier dixième, la perte de validation de ton IA n’a plus fait l’essentiel de sa descente');
+  exiger(descenteRapide(MINI), 'au premier dixième, la perte de validation de la version d’une heure n’a plus fait l’essentiel de sa descente');
+  // « Comme celle de la version d'une heure, elle part du hasard » : la perte du premier pas de mini est au-dessus de ln V, à moins de 0,2 (DEPART, choixPerteDepartTonIA).
+  exiger(MINI.resume.perte_premier_pas > MINI.courbe.hasard, 'la perte du premier pas de la version d’une heure n’est plus au-dessus du hasard');
   // « Elle ne relit jamais un texte : son corpus a plus de jetons qu'elle n'en lit. »
   exiger(CORPUS_PRINCIPAL.dossier === 'principal' && r.jetons_vus < CORPUS_PRINCIPAL.jetons_train, 'ton IA lit maintenant plus de jetons que son corpus n’en a : elle relit des textes');
   // « L'écart entre les deux pertes reste petit. »
@@ -597,7 +606,7 @@ Sur la carte graphique de l'auteur, le même essai a donné ceci :
   absent="À mesurer : l'essai de pause et de reprise sur la carte graphique."
 />
 
-Les trois entraînements y ont pris {CARTE.carte}, contre {CARTE.processeur} sur le processeur (relevé du {CARTE.leProcesseur}) : environ {CARTE.fois} fois moins. La carte avait d'abord été échauffée, en {CARTE.echauffement}, hors du chronomètre : les premiers calculs d'une carte sont plus lents que les suivants. Ce jour-là, l'écart des deux pertes est nul. Mais rien ne le garantit : la carte n'a pas de calculs déterministes. Certains y additionnent dans un ordre qui varie, et deux entraînements identiques peuvent alors différer un peu. La reprise, elle, repart toujours exactement du point sauvegardé. Le projet ne demande l'écart nul que sur le processeur.
+Les trois entraînements y ont pris {CARTE.carte}, contre {CARTE.processeur} sur le processeur (relevé du {CARTE.leProcesseur}) : environ {CARTE.fois} fois moins. La carte avait d'abord été échauffée, en {CARTE.echauffement}, hors du chronomètre : les premiers calculs d'une carte sont plus lents que les suivants. Ce jour-là, l'écart des deux pertes est nul. Mais certains calculs de la carte ne sont pas déterministes : ils additionnent dans un ordre qui peut varier d'un entraînement à l'autre, et deux entraînements identiques peuvent alors différer un peu. L'écart nul de cet essai n'est donc pas garanti. La reprise, elle, repart toujours exactement du point sauvegardé. Le projet ne demande l'écart nul que sur le processeur.
 
 Avec forge, c'est la même chose, en grand. Pendant l'entraînement de la version d'une heure, que l'étape suivante te fait lancer, {PAUSE} : le pas en cours se termine, tout est sauvegardé, puis forge affiche la commande de reprise et s'arrête. Pour reprendre exactement là :
 

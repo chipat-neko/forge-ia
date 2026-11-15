@@ -16,7 +16,7 @@ import { test, expect, type Page } from '@playwright/test';
 import type { Choix } from '../src/lib/choix';
 import { largeurCachee, nombreParametres, PRESETS_FORGE } from '../src/lib/calculateur/ton-ia';
 import { depuisHex } from '../src/lib/mini-modele/calcul';
-import { nombre } from '../src/lib/nombres';
+import { nombre, pourcent } from '../src/lib/nombres';
 import { lireCartes } from '../src/lib/partie-1/evaluation';
 import { trouverChapitre } from '../src/lib/parcours';
 import { MESURES_PARTIE_1 } from '../src/lib/partie-1/mesures';
@@ -161,6 +161,9 @@ async function aiguillesQuiGlissent(page: Page): Promise<number> {
 }
 
 test('chapitre 1.4 complet', async ({ page }, info) => {
+  // Quatre îlots à hydrater, cinq paris, puis axe et les contrôles de toute la page, dont la carte de ton IA
+  // (196 cases) : plus que les 30 s par défaut sur un PC chargé (dépassées deux fois, le 15 novembre 2026).
+  test.setTimeout(60_000);
   await page.goto(PAGE);
   await attendreHydratation(page);
   const { total } = trouverChapitre('1.4');
@@ -486,8 +489,13 @@ test('les vraies cartes de ton IA : les têtes du fichier, chacune dans un vrai 
     await expect(cartes.locator('[data-test="cartes-resume"]')).toContainText(`${nombre(100 * c.jeton_d_avant)}${FINE}%`);
     await expect(cartes.locator('[data-test="cartes-titre"]')).toContainText(`tête ${nombre(c.tete + 1)}`);
   }
-  // Le bloc : celui du fichier, compté à partir de 1 pour le lecteur.
+  // Le bloc : celui du fichier, compté à partir de 1 pour le lecteur, et le texte le dit.
   await expect(cartes.locator('[data-test="cartes-titre"]')).toContainText(`bloc ${nombre(CARTES.couche + 1)} sur ${nombre(CARTES.couches)}`);
+  await expect(etape).toContainText('on les compte à partir de 1');
+  // La part moyenne de l'attention posée sur le jeton de début, dans le bloc : calculée depuis le fichier.
+  let debut = 0;
+  for (const r of CARTES.choix.regards_de_la_couche) debut += r.debut;
+  await expect(etape).toContainText(`en moyenne ${pourcent(debut / CARTES.choix.regards_de_la_couche.length)} de leur attention`);
   // La légende dit d'où viennent les nombres.
   const legende = (await cartes.locator('[data-test="cartes-legende"]').textContent()) ?? '';
   expect(legende.replace(/\s+/g, ' ')).toContain('calculés sur le processeur par cartes_attention, depuis les poids publiés de ton-ia-1.5');

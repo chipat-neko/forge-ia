@@ -269,9 +269,10 @@ test('l’essai sur la carte graphique de l’auteur : sa sortie telle quelle, e
   expect(texte).toContain(`${nombre(ESSAI.secondes, 1)}${FINE}s`);
   expect(texte).toContain(`${nombre(ESSAI.secondes / ESSAI_CARTE.secondes, 1)} fois`);
   expect(texte).toContain(`${nombre(ESSAI_CARTE.secondes_echauffement!, 1)}${FINE}s`);
-  // L'écart nul de ce jour-là n'est pas une promesse : la carte n'a pas de calculs déterministes.
+  // L'écart nul de ce jour-là n'est pas une promesse : certains calculs de la carte ne sont pas déterministes.
   expect(ESSAI_CARTE.ecart).toBe(0);
-  await expect(etape6).toContainText('déterministes');
+  await expect(etape6).toContainText('certains calculs de la carte ne sont pas déterministes');
+  await expect(etape6).toContainText('L’écart nul de cet essai n’est donc pas garanti.');
 });
 
 test('les commandes affichées sont celles de commandes.ts, et les chemins de l’auteur sont signalés', async ({ page }) => {

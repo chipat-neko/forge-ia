@@ -310,6 +310,8 @@ test('ton IA, la vraie : l’atelier refait sur ses notes des six mêmes questio
   await expect(page.locator('[data-atelier-qcm="ton-ia-mini"]')).toHaveAttribute('data-question', '0');
   // Son acquis ne se gagne qu'à l'étape 4.
   await expect(page.locator('#recap [data-acquis="qcm"]')).toHaveAttribute('data-gagne', 'non');
+  // Fin des animations (le verdict, la couleur de la bonne réponse) : axe mesure alors les vraies couleurs.
+  await attendreAnimations(page);
   await verifierAxe(page);
   await verifierSansDebordement(page);
 });

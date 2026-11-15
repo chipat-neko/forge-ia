@@ -150,26 +150,30 @@ export const CARTES = (() => {
   exiger(forger > 0 && c.jetons[forger + 1] === 'on', '« forgeron » n’est plus coupé en « forger » et « on »');
   const avant = c.cartes.find((x) => x.role === 'jeton-d-avant');
   const loin = c.cartes.find((x) => x.role === 'loin');
-  // « Chaque jeton regarde surtout celui qui le précède » : de « forger » au point, la plus grande part de chaque ligne.
-  const plusRegarde = (poids, i) => poids[i].indexOf(Math.max(...poids[i]));
+  // « Chaque jeton regarde surtout celui qui le précède » : de « forger » au point, plus de 60 % de chaque ligne
+  // va au jeton d'avant (le moins, relevé le 15/11/2026 : 74 %, pour le premier « le »).
+  const SURTOUT = 0.6;
   for (let i = forger; i < c.jetons.length; i++) {
-    exiger(plusRegarde(avant.poids, i) === i - 1, `dans la tête du jeton d’avant, « ${c.jetons[i]} » ne regarde plus surtout le jeton d’avant`);
+    exiger(avant.poids[i][i - 1] > SURTOUT, `dans la tête du jeton d’avant, « ${c.jetons[i]} » donne moins de 60 % de son attention au jeton d’avant`);
   }
-  // « Vers la fin de la phrase, trois jetons de suite regardent surtout la fin du verbe « chauffe », son « e » » : « puis », « il », « le ».
+  // « Les jetons « puis » et « il » y donnent chacun plus de la moitié de leur attention à « e », la fin du verbe
+  // « chauffe » » : plus de 60 % chacun, pour la marge (relevé du 15/11/2026 : 90 % et 70 %), et « e » est loin derrière eux.
   const e = c.jetons.indexOf('e');
   exiger(e > 0 && c.jetons[e - 1] === ' chauff', '« chauffe » n’est plus coupé en « chauff » et « e »');
   const puis = c.jetons.indexOf(' puis');
   const il = c.jetons.indexOf(' il');
-  exiger(puis > e && il === puis + 1, '« puis » n’est plus suivi de « il »');
-  for (const i of [puis, il, il + 1]) {
-    exiger(plusRegarde(loin.poids, i) === e, `dans la tête qui regarde le plus loin, « ${c.jetons[i]} » ne regarde plus surtout « e »`);
+  exiger(puis > e + 1 && il === puis + 1, '« puis » et « il » ne viennent plus, l’un après l’autre, loin après « e »');
+  for (const i of [puis, il]) {
+    exiger(loin.poids[i][e] > SURTOUT, `dans la tête qui regarde le plus loin, « ${c.jetons[i]} » donne moins de 60 % de son attention à « e »`);
   }
-  exiger(c.jetons[il + 1] === ' le', '« il » n’est plus suivi de « le »');
   // Le texte écrit le jeton de début en code, `<|fin_texte|>` : celui des cartes (vérifié par lireCartes).
   exiger(JETON_DE_DEBUT === '<|fin_texte|>', 'le jeton de début n’est plus <|fin_texte|> : l’étape 5 l’écrit');
-  // « Beaucoup ne font rien de lisible » : plus de la moitié des têtes du bloc posent plus de la moitié de leur attention sur le jeton de début.
-  const reposent = c.choix.regards_de_la_couche.filter((r) => r.debut > 0.5).length;
-  exiger(2 * reposent > c.tetes, 'moins de la moitié des têtes du bloc reposent maintenant sur le jeton de début');
+  // « Beaucoup ne font rien de lisible : les têtes de ce bloc posent en moyenne N % de leur attention sur le jeton
+  // de début. » La moyenne se lit dans le fichier, sans seuil qui tienne à un cheveu ; « beaucoup » : plus de 40 %.
+  let debut = 0;
+  for (const r of c.choix.regards_de_la_couche) debut += r.debut;
+  debut /= c.choix.regards_de_la_couche.length;
+  exiger(debut > 0.4, 'les têtes du bloc posent maintenant en moyenne moins de 40 % de leur attention sur le jeton de début');
   return {
     cartes: c,
     jetons: nombre(c.jetons.length - 1),
@@ -178,7 +182,7 @@ export const CARTES = (() => {
     tetes: nombre(c.tetes),
     avant: nombre(avant.tete + 1),
     loin: nombre(loin.tete + 1),
-    reposent: nombre(reposent),
+    debut: pourcent(debut),
     couche: String(c.couche),
     avantProjet: String(avant.tete),
     loinProjet: String(loin.tete),
@@ -410,13 +414,13 @@ Les tests du projet le vérifient : les poids de chaque ligne font 1, et changer
 
 L'exemple de l'étape 3 était écrit à la main. Ton IA, elle, a appris ses poids : l'auteur l'a entraînée sur sa carte graphique, avec la recette du {CARTES.l15 ? <a href={CARTES.l15}>chapitre 1.5</a> : 'chapitre 1.5'}, et l'a <a href={CARTES.release}>publiée sur GitHub</a>. Voici ses vraies cartes, pour la phrase de l'exemple, avec son point. Son tokenizer la découpe en {CARTES.jetons} jetons : « forgeron » y fait deux morceaux, « forger » et « on ».
 
-Chacun de ses {CARTES.blocs} blocs a {CARTES.tetes} têtes. Le projet du {CARTES.l16 ? <a href={CARTES.l16}>chapitre 1.6</a> : 'chapitre 1.6'} en a gardé deux, dans le bloc {CARTES.bloc} : la tête du modèle qui regarde le plus le jeton juste avant, et, dans le même bloc, celle qui regarde le plus loin en arrière. Choisis la tête à montrer :
+Chacun de ses {CARTES.blocs} blocs a {CARTES.tetes} têtes ; ici, on les compte à partir de 1. Le projet du {CARTES.l16 ? <a href={CARTES.l16}>chapitre 1.6</a> : 'chapitre 1.6'} en a gardé deux, dans le bloc {CARTES.bloc} : la tête du modèle qui regarde le plus le jeton juste avant, et, dans le même bloc, celle qui regarde le plus loin en arrière. Choisis la tête à montrer :
 
 <CartesTonIA client:load cartes={CARTES.cartes} />
 
-Dans la tête {CARTES.avant}, chaque jeton regarde surtout celui qui le précède : elle apporte à chaque jeton ce qui vient juste avant lui. La tête {CARTES.loin} regarde plus loin. Vers la fin de la phrase, trois jetons de suite regardent surtout la fin du verbe « chauffe », son « e ».
+Dans la tête {CARTES.avant}, chaque jeton regarde surtout celui qui le précède : elle apporte à chaque jeton ce qui vient juste avant lui. La tête {CARTES.loin} regarde plus loin en arrière. Les jetons « puis » et « il » y donnent chacun plus de la moitié de leur attention à « e », la fin du verbe « chauffe ».
 
-Personne n'a dit à ces têtes quoi chercher. Elles n'ont pas de nom : « de qui on parle », dans l'exemple, était un nom donné à la main. Et beaucoup ne font rien de lisible : dans ce bloc, {CARTES.reposent} têtes sur {CARTES.tetes} posent plus de la moitié de leur attention sur le jeton de début, `<|fin_texte|>`, quand rien d'autre ne les intéresse.
+Personne n'a dit à ces têtes quoi chercher. Elles n'ont pas de nom : « de qui on parle », dans l'exemple, était un nom donné à la main. Et beaucoup ne font rien de lisible : dans ce bloc, les têtes posent en moyenne {CARTES.debut} de leur attention sur le jeton de début, `<|fin_texte|>`, quand rien d'autre ne les intéresse.
 
 <Fragment slot="note">
 
