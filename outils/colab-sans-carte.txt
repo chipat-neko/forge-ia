@@ -24,10 +24,17 @@
 # pip-freeze.gpu.txt de googlecolab/backend-info, relu le 09/11/2026). Le notebook 1.2 s'en
 # sert pour lire les sources en flux sur Hugging Face ; avec FORGE_IA_LOCAL, il lit les
 # exemples du projet et n'en a pas besoin.
+#
+# safetensors : la version de l'image de Colab (safetensors==0.8.0 dans pip-freeze.txt comme dans
+# pip-freeze.gpu.txt de googlecolab/backend-info, relu le 15/11/2026 : dernier commit 55454a9 du
+# 12/11/2026), qui est aussi celle des verrous de forge, de 1.5 et de 1.6. Les notebooks 1.5 et 1.6
+# lisent avec elle les poids publiés de ton IA (la version ton-ia-1.5), par charger_ton_ia du
+# projet 1.6 ; le job notebooks-colab les leur donne par FORGE_IA_MODELE.
 numpy==2.4.6
 ipykernel==6.17.1
 nbclient
 nbformat
 regex
 datasets==4.8.5
+safetensors==0.8.0
 pytest==8.4.2

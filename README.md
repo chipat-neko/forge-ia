@@ -117,18 +117,31 @@ Colab : ils sont exécutés automatiquement, de deux façons.
   télécharger. Il échoue si une cellule lève une erreur, ou si le notebook
   affiche « Même … que la page du site : non ».
 
+Les notebooks 1.5 et 1.6 font aussi écrire la version publiée de ton IA (la
+Release `ton-ia-1.5`) : sur Colab, ils téléchargent ses fichiers une seule
+fois. Lancés avec `FORGE_IA_LOCAL`, ils ne téléchargent rien : la variable
+`FORGE_IA_MODELE` leur donne le dossier de cette version, déjà téléchargé,
+et sans elle ils s'arrêtent en disant quoi faire. Le job `notebooks-colab` la
+télécharge avec `gh release download`, la garde en cache sous son étiquette,
+et la leur donne ainsi ; les `test_notebook.py` de leurs projets leur donnent
+à la place un petit modèle tiré au hasard, publié de la même façon.
+
 La carte graphique de Colab, elle, n'est pas testée : un notebook qui utilise
 la carte tourne aussi sur la RTX 5070 Ti avant sa parution.
 
 Les mêmes commandes en local, dans PowerShell, depuis la racine du dépôt.
 `env-forge.ps1` place d'abord le cache d'uv dans le dossier des données
-(`FORGE_DONNEES`) ; l'environnement `.colab` n'est pas versionné.
+(`FORGE_DONNEES`) ; l'environnement `.colab` n'est pas versionné. La version
+publiée de ton IA ne se télécharge qu'une fois, dans le cache du dossier des
+données.
 
 ```powershell
 . .\outils\env-forge.ps1
 uv venv --python 3.13 .colab
 uv pip install --python .colab --index-url https://download.pytorch.org/whl/cpu torch==2.14.1
 uv pip install --python .colab -r outils/colab-sans-carte.txt
+gh release download ton-ia-1.5 --dir "$env:FORGE_DONNEES\cache\ton-ia-1.5"
+$env:FORGE_IA_MODELE = "$env:FORGE_DONNEES\cache\ton-ia-1.5"
 .colab\Scripts\python outils\executer_notebooks.py
 ```
 

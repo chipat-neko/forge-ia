@@ -227,7 +227,13 @@ l'échauffement de la carte (`secondes_echauffement`, à part).
 
 `notebooks/1.5-pre-entrainement.ipynb` refait l'essai pas à pas : la perte d'un modèle neuf (ln V), le
 planning du taux, 60 pas d'entraînement, la pause et la reprise (même perte), puis ce qu'il faut pour
-la version d'une heure. Il se termine par un exercice : retrouver le pas de la pause dans un journal.
+la version d'une heure. À l'étape 6, il télécharge une fois la version publiée de ton IA (la Release
+`ton-ia-1.5`), la charge avec `charger_ton_ia` du projet 1.6 (ajouté à `sys.path`), lit
+`mesures/ton-ia-1.5.json` et lui fait écrire la suite de trois débuts de phrase (`generer` de forge, 30
+jetons au plus). Il se termine par un exercice : retrouver le pas de la pause dans un journal.
 Il tourne sur la carte graphique si Colab en donne une, sinon sur le processeur, et dit sur quoi il a
 tourné. Il n'installe que la petite bibliothèque `regex` (ni PyTorch, déjà là, ni forge, qui vient du
-dépôt cloné). Le test `tests/test_notebook.py` l'exécute de bout en bout, sans carte.
+dépôt cloné). Lancé avec `FORGE_IA_LOCAL`, il ne télécharge rien : `FORGE_IA_MODELE` lui donne le dossier
+de la version publiée, déjà téléchargé (sinon l'étape 6 s'arrête et dit quoi faire). Le test
+`tests/test_notebook.py` l'exécute de bout en bout, sans carte, avec pour `FORGE_IA_MODELE` un petit
+modèle tiré au hasard, publié comme `ton-ia-1.5` par `forge.exporter`.

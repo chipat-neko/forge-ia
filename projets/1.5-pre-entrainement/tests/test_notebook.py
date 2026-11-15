@@ -3,17 +3,26 @@
 Rien n'est publié sans avoir tourné : le test exécute une copie en mémoire du
 notebook (le fichier du dépôt reste sans sorties) dans le noyau « python3 » de
 l'environnement uv, avec FORGE_IA_LOCAL à la racine du dépôt : le notebook
-prend le code du projet et de forge, sans rien télécharger. Il tourne sur le
-processeur : la carte graphique est cachée, et le notebook le dit.
+prend le code du projet et de forge, sans rien télécharger. Pour l'étape 6, à la
+place des poids de la version publiée ton-ia-1.5, FORGE_IA_MODELE lui donne un
+petit modèle tiré au hasard, publié de la même façon par forge.exporter. Il tourne
+sur le processeur : la carte graphique est cachée, et le notebook le dit.
 """
 
+import dataclasses
 import json
 import pathlib
 import re
 
 import nbformat
 import pytest
+import torch
+from forge.entrainement.boucle import VERSION_DE_LA_SAUVEGARDE
+from forge.evaluation.echantillons import INVITES
+from forge.exporter import exporter
+from forge.modele import ConfigModele, Transformer, nombre_parametres
 from nbclient import NotebookClient
+from nbclient.exceptions import CellExecutionError
 
 PROJET = pathlib.Path(__file__).resolve().parents[1]
 RACINE = pathlib.Path(__file__).resolve().parents[3]
@@ -21,14 +30,50 @@ NOTEBOOK = RACINE / "notebooks" / "1.5-pre-entrainement.ipynb"
 MINI_MD = RACINE / "docs" / "mesures" / "ton-ia-mini.md"
 # La ligne de l'exercice au-dessus de laquelle le lecteur écrit sa fonction.
 REPERE = "# Ne change rien en dessous"
+# Le modèle factice de l'étape 6 : minuscule, mais avec le vocabulaire du tokenizer de ton IA.
+CONFIG_FACTICE = ConfigModele(dim=32, couches=2, tetes=4, longueur_contexte=64)
+
+
+@pytest.fixture(scope="module")
+def ton_ia_factice(tmp_path_factory) -> pathlib.Path:
+    """Un petit modèle tiré au hasard, publié par forge.exporter comme la version ton-ia-1.5.
+
+    Les mêmes trois fichiers (configuration, poids en bf16 sans `sortie.weight`, tokenizer de ton IA),
+    pour que le notebook le charge par le même chemin que les vrais poids, sans les télécharger.
+    """
+    racine = tmp_path_factory.mktemp("ton-ia-factice")
+    with torch.random.fork_rng():
+        torch.manual_seed(0)
+        modele = Transformer(CONFIG_FACTICE)
+    sauvegarde = racine / "meilleur.pt"
+    torch.save(
+        {
+            "version": VERSION_DE_LA_SAUVEGARDE,
+            "pas": 7,
+            "modele": modele.state_dict(),
+            "config_modele": dataclasses.asdict(CONFIG_FACTICE),
+        },
+        sauvegarde,
+    )
+    dossier = racine / "ton-ia-1.5"
+    exporter(sauvegarde, dossier)
+    return dossier
 
 
 @pytest.fixture(autouse=True)
-def environnement(monkeypatch):
-    # Le noyau hérite de ces variables : le dépôt local, et aucune carte visible.
+def environnement(monkeypatch, ton_ia_factice):
+    # Le noyau hérite de ces variables : le dépôt local, le modèle factice, et aucune carte visible.
     monkeypatch.setenv("FORGE_IA_LOCAL", str(RACINE))
-    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    monkeypatch.setenv("FORGE_IA_MODELE", str(ton_ia_factice))
+    # CUDA_VISIBLE_DEVICES=-1 cache la carte quand il y en a une (avec l'extra gpu), comme dans 0.4 et 0.5.
+    # Une valeur vide ne suffit pas : sous Windows, une variable vide compte comme absente.
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "-1")
     monkeypatch.setenv("FORGE_APPAREIL", "cpu")
+
+
+def entier(n: int) -> str:
+    """Un entier comme le notebook l'écrit, avec une espace ordinaire entre les milliers (voir sorties_de)."""
+    return f"{n:,}".replace(",", " ")
 
 
 def sorties_de(nb) -> str:
@@ -68,6 +113,18 @@ def test_notebook_s_execute_de_bout_en_bout():
     assert "La reprise est exacte : oui" in sorties
     # 5. La version d'une heure, relevée dans le dépôt.
     assert "6 370 pas sur 6 370, 834 928 640 jetons vus, 0 pause." in sorties
+    # 6. Ton IA : le dossier de FORGE_IA_MODELE (ici le modèle factice), rien de téléchargé, le tokenizer
+    # vérifié, le relevé de son entraînement, puis trois suites écrites sur le processeur.
+    assert "Téléchargement de" not in sorties
+    assert "Empreinte SHA-256 du tokenizer : 3001e7ab…21ba, la même que celle de forge : True" in sorties
+    assert f"Ton IA a {entier(nombre_parametres(CONFIG_FACTICE))} paramètres, chargés sur le processeur en" in sorties
+    assert "16 540 pas sur 16 540, 8 671 723 520 jetons vus." in sorties
+    assert "139,1 h de calcul, pauses non comptées, à 17 316 jetons par seconde." in sorties
+    assert "13 sessions : 12 pauses, et 12 reprises avec --reprendre." in sorties
+    suites = sorties.split("Température 0,8, tirage parmi les 50 jetons les plus probables, graine 0.", 1)[1]
+    for invite in INVITES[:3]:
+        assert f"  {invite!r} → " in suites, invite
+    assert "3 suites de 30 jetons au plus, écrites en " in suites and " s sur le processeur." in suites
     # L'exercice, dans son état de départ, n'est pas encore réussi.
     assert "Pas encore" in sorties
     assert "Défi réussi" not in sorties
@@ -129,3 +186,33 @@ def test_notebook_n_installe_ni_torch_ni_forge_et_ne_force_pas_la_carte():
     assert re.findall(r"!pip install.*", code) == ["!pip install --quiet regex"]
     # Il choisit la carte seulement si PyTorch la voit (choisir_appareil), jamais de force.
     assert "choisir_appareil()" in code and '"cuda"' in code
+
+
+def test_notebook_telecharge_ton_ia_une_seule_fois_et_la_charge_par_le_projet_1_6():
+    brut = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+    code = "\n".join("".join(c["source"]) for c in brut["cells"] if c["cell_type"] == "code")
+    # Une seule adresse de téléchargement, celle de la version publiée ; un fichier déjà là est sauté.
+    assert code.count("releases/download/") == 1
+    assert "https://github.com/chipat-neko/forge-ia/releases/download/{VERSION}/{nom}" in code
+    assert 'VERSION = "ton-ia-1.5"' in code
+    assert "if chemin.exists():" in code
+    # Avec FORGE_IA_MODELE, le dossier déjà téléchargé est pris tel quel.
+    assert 'os.environ.get("FORGE_IA_MODELE")' in code
+    # Le chargement est celui du projet 1.6 (charger_ton_ia vérifie l'empreinte du tokenizer), sans copie.
+    assert '"projets" / "1.6-evaluation"' in code
+    assert "from evaluation_pas_a_pas.ton_ia import" in code and "charger_ton_ia(dossier_ton_ia, appareil)" in code
+    assert "load_file" not in code and "safetensors" not in code
+
+
+def test_lance_par_les_tests_sans_forge_ia_modele_il_ne_telecharge_rien(monkeypatch):
+    # Avec FORGE_IA_LOCAL et sans FORGE_IA_MODELE, la cellule de l'étape 6 s'arrête et dit quoi faire,
+    # au lieu de télécharger les poids de ton IA pendant les tests.
+    monkeypatch.delenv("FORGE_IA_MODELE")
+    nb = nbformat.read(NOTEBOOK, as_version=4)
+    codes = [c for c in nb.cells if c.cell_type == "code"]
+    ton_ia = next(c for c in codes if "charger_ton_ia(" in c.source)
+    nb.cells = [codes[0], ton_ia]
+    with pytest.raises(CellExecutionError) as erreur:
+        executer(nb)
+    assert "FORGE_IA_MODELE" in str(erreur.value) and "gh release download ton-ia-1.5" in str(erreur.value)
+    assert "Téléchargement de" not in sorties_de(nb)

@@ -10,7 +10,9 @@ celui de l'environnement .colab, qui reproduit l'image de Colab sans carte
 Chaque notebook est exécuté dans une copie en mémoire (le fichier du dépôt reste
 sans sorties), dans le noyau « python3 » de ce même Python, avec FORGE_IA_LOCAL
 à la racine du dépôt : il prend le code du dépôt, et n'installe ni ne
-télécharge rien.
+télécharge rien. Les notebooks 1.5 et 1.6 demandent en plus FORGE_IA_MODELE,
+le dossier de la version publiée ton-ia-1.5, déjà téléchargé (voir
+« Notebooks » dans le README) : le noyau hérite de cette variable.
 
 Un notebook échoue s'il ne se lit pas, si une cellule lève une erreur ou
 dépasse son délai, si le noyau s'arrête, ou si une de ses sorties contient une

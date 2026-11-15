@@ -324,6 +324,12 @@ sont sautés. Tous les autres tournent sur le processeur.
 par octet, un QCM noté sans que le modèle écrive un mot, la marge et le verdict, puis la lecture d'échantillons.
 Le modèle est celui de l'essai du chapitre 1.5, entraîné dans le notebook (60 pas, quelques secondes) : il est
 donc très mauvais, et c'est ce qui rend les mesures instructives. Le notebook ajoute `projets/1.5-pre-entrainement`
-à `sys.path` pour le fabriquer (`preparer_essai` et `essai_pause_reprise`). Il calcule toujours sur le processeur :
-le modèle est minuscule, et le processeur donne partout les mêmes nombres. Il n'installe que la petite
-bibliothèque `regex`. Le test `tests/test_notebook.py` l'exécute de bout en bout, sans carte.
+à `sys.path` pour le fabriquer (`preparer_essai` et `essai_pause_reprise`). À l'étape 6, il télécharge une fois
+la version publiée de ton IA (la Release `ton-ia-1.5`), la charge avec `charger_ton_ia`, lit
+`mesures/evaluation-1.5.json` (verdicts refaits avec `verdict`), puis lui fait écrire la suite de trois débuts de
+phrase (`generer` de forge, 30 jetons au plus) et regarde ses `suivants` après « Il était une ». Il calcule
+toujours sur le processeur : le petit modèle est minuscule, et le processeur donne partout les mêmes nombres ;
+ton IA, elle, n'écrit que quelques phrases courtes. Il n'installe que la petite bibliothèque `regex`. Lancé avec
+`FORGE_IA_LOCAL`, il ne télécharge rien : `FORGE_IA_MODELE` lui donne le dossier de la version publiée, déjà
+téléchargé (sinon l'étape 6 s'arrête et dit quoi faire). Le test `tests/test_notebook.py` l'exécute de bout en
+bout, sans carte, avec pour `FORGE_IA_MODELE` le petit modèle de `modele_factice`, publié comme `ton-ia-1.5`.

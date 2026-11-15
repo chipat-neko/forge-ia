@@ -74,6 +74,9 @@ jobs:
   # numpy, le noyau et pytest de Colab (outils/colab-sans-carte.txt). La carte de Colab,
   # elle, n'est pas testée. Les mêmes commandes se lancent en local : voir « Notebooks »
   # dans le README. Les tests d'outils/ (l'exécuteur des notebooks) tournent avant.
+  # Les notebooks 1.5 et 1.6 font écrire la version publiée de ton IA (la Release
+  # ton-ia-1.5, environ 830 Mo) : elle est téléchargée une fois, gardée en cache sous son
+  # étiquette, et donnée aux notebooks par FORGE_IA_MODELE (sans elle, ils s'arrêtent).
   notebooks-colab:
     name: Notebooks comme sur Colab, sans carte
     runs-on: ubuntu-latest
@@ -90,5 +93,19 @@ jobs:
           uv pip install --python .colab -r outils/colab-sans-carte.txt
       - name: Tests de l'exécuteur des notebooks
         run: .colab/bin/python -m pytest -q outils
+      # La clé porte l'étiquette de la Release : une autre version publiée aura son propre cache.
+      - name: Version publiée de ton IA, depuis le cache
+        id: cache-ton-ia
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/ton-ia-1.5
+          key: release-ton-ia-1.5
+      - name: Téléchargement de la version publiée de ton IA (ton-ia-1.5)
+        if: steps.cache-ton-ia.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download ton-ia-1.5 --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/ton-ia-1.5"
       - name: Exécution des notebooks
+        env:
+          FORGE_IA_MODELE: ${{ runner.temp }}/ton-ia-1.5
         run: .colab/bin/python outils/executer_notebooks.py
