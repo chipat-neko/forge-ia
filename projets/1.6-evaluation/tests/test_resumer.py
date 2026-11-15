@@ -156,8 +156,11 @@ def virgule(x: float, decimales: int) -> str:
 
 def test_le_releve_de_mini_dit_ce_que_dit_le_document():
     chemin = PROJET / "mesures" / "evaluation-mini.json"
-    if not chemin.exists():
-        pytest.skip("Le relevé de « mini » n'est pas encore écrit (voir le README du projet).")
+    # Le relevé fait partie de l'état publié (le chapitre 1.6 le lit) : son absence est une panne.
+    assert chemin.exists(), (
+        "mesures/evaluation-mini.json manque. Reprends-le du dépôt (git checkout -- mesures/evaluation-mini.json), "
+        "ou refais-le depuis le rapport de « mini » avec la commande « resumer » du README du projet."
+    )
     if not MINI_MD.exists():
         pytest.skip("Projet téléchargé seul : docs/mesures/ton-ia-mini.md n'est pas là pour comparer.")
     releve = json.loads(chemin.read_text(encoding="utf-8"))
@@ -177,8 +180,12 @@ def test_le_releve_de_mini_dit_ce_que_dit_le_document():
 
 def test_le_releve_de_ton_ia_dit_ce_que_dit_le_document():
     chemin = PROJET / "mesures" / "evaluation-1.5.json"
-    if not chemin.exists():
-        pytest.skip("Le relevé de ton IA n'est pas encore écrit (voir le README du projet).")
+    # Le relevé fait partie de l'état publié (le chapitre 1.6 le lit) : son absence est une panne.
+    assert chemin.exists(), (
+        "mesures/evaluation-1.5.json manque. Reprends-le du dépôt (git checkout -- mesures/evaluation-1.5.json), "
+        "ou refais-le depuis le rapport.json de la version ton-ia-1.5 avec la commande « resumer … --nom ton-ia-1.5 » "
+        "du README du projet."
+    )
     if not TON_IA_MD.exists():
         pytest.skip("Projet téléchargé seul : docs/mesures/ton-ia-1.5.md n'est pas là pour comparer.")
     releve = json.loads(chemin.read_text(encoding="utf-8"))

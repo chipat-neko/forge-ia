@@ -111,6 +111,8 @@ def test_notebook_telecharge_ton_ia_une_seule_fois_et_la_charge_par_le_projet():
     assert "https://github.com/chipat-neko/forge-ia/releases/download/{VERSION}/{nom}" in code
     assert 'VERSION = "ton-ia-1.5"' in code
     assert "if chemin.exists():" in code
+    # Une connexion figée s'arrête au bout d'une minute au lieu de bloquer la cellule, et le délai d'avant revient.
+    assert "socket.setdefaulttimeout(60)" in code and "socket.setdefaulttimeout(delai_d_avant)" in code
     # Avec FORGE_IA_MODELE, le dossier déjà téléchargé est pris tel quel.
     assert 'os.environ.get("FORGE_IA_MODELE")' in code
     # Le chargement est celui du projet (charger_ton_ia vérifie l'empreinte du tokenizer), sans copie, sur le processeur.
@@ -131,6 +133,35 @@ def test_lance_par_les_tests_sans_forge_ia_modele_il_ne_telecharge_rien(monkeypa
         executer(nb)
     assert "FORGE_IA_MODELE" in str(erreur.value) and "gh release download ton-ia-1.5" in str(erreur.value)
     assert "Téléchargement de" not in sorties_de(nb)
+
+
+def test_une_coupure_du_reseau_dit_de_relancer_la_cellule(monkeypatch, tmp_path):
+    # Revue finale du plan 5, m5 : le réseau coupe pendant le téléchargement de la version publiée. La cellule
+    # annonce la taille du fichier avant le premier octet, puis dit en français de la relancer, sans trace de
+    # urllib. Une cellule ajoutée remplace urlretrieve par une coupure, après l'annonce de 5 Mo.
+    monkeypatch.delenv("FORGE_IA_MODELE")
+    nb = nbformat.read(NOTEBOOK, as_version=4)
+    codes = [c for c in nb.cells if c.cell_type == "code"]
+    ton_ia = next(c for c in codes if "charger_ton_ia(" in c.source)
+    coupure = nbformat.v4.new_code_cell(
+        "import urllib.error\n"
+        "import urllib.request\n"
+        f"os.chdir({str(tmp_path)!r})\n"
+        "depot_local = None  # le carnet se croit dans Colab : il télécharge\n"
+        "def coupe(adresse, fichier, annoncer):\n"
+        "    annoncer(0, 8192, 5 * 1024**2)\n"
+        "    raise urllib.error.ContentTooShortError('retrieval incomplete: got only 8192 out of 5242880 bytes', None)\n"
+        "urllib.request.urlretrieve = coupe\n"
+    )
+    nb.cells = [codes[0], coupure, ton_ia]
+    with pytest.raises(CellExecutionError) as erreur:
+        executer(nb)
+    message = str(erreur.value).replace("\u202f", " ")
+    assert "Le téléchargement de config.json a été coupé (<urlopen error retrieval incomplete" in message
+    assert "Relance la cellule : les fichiers déjà complets ne se retéléchargent pas." in message
+    assert "Téléchargement de config.json (5,0 Mo)…" in sorties_de(nb)
+    # Rien n'a pris le nom d'un fichier complet : seul le .partiel pourrait rester.
+    assert not (tmp_path / "ton-ia-1.5" / "config.json").exists()
 
 
 def test_notebook_est_enregistre_sans_sorties():

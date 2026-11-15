@@ -130,8 +130,11 @@ def test_noter_exemples_ne_fait_ecrire_aucun_mot():
 
 def test_le_releve_de_mini_a_sa_licence_et_son_adresse():
     chemin = PROJET / "mesures" / "qcm-mini.json"
-    if not chemin.exists():
-        pytest.skip("Le relevé des QCM de MMMLU n'est pas encore écrit (voir le README du projet).")
+    # Le relevé fait partie de l'état publié (le chapitre 1.6 le lit) : son absence est une panne.
+    assert chemin.exists(), (
+        "mesures/qcm-mini.json manque. Reprends-le du dépôt (git checkout -- mesures/qcm-mini.json), ou refais-le "
+        "avec la commande « qcm-exemples » du README du projet (il lui faut le réseau)."
+    )
     releve = json.loads(chemin.read_text(encoding="utf-8"))
     assert releve["nom"] == "ton-ia-mini" and releve["appareil"] == "cpu"
     assert releve["jeu"]["licence"] == "MIT" and releve["jeu"]["adresse"] == "https://huggingface.co/datasets/openai/MMMLU"
@@ -144,8 +147,12 @@ def test_le_releve_de_mini_a_sa_licence_et_son_adresse():
 
 def test_le_releve_de_ton_ia_note_les_questions_de_mini():
     chemin, mini = PROJET / "mesures" / "qcm-1.5.json", PROJET / "mesures" / "qcm-mini.json"
-    if not (chemin.exists() and mini.exists()):
-        pytest.skip("Les relevés des QCM de MMMLU ne sont pas encore écrits (voir le README du projet).")
+    # Les deux relevés font partie de l'état publié (le chapitre 1.6 les lit) : leur absence est une panne.
+    for fichier in (chemin, mini):
+        assert fichier.exists(), (
+            f"mesures/{fichier.name} manque. Reprends-le du dépôt (git checkout -- mesures/{fichier.name}), ou refais-le "
+            "avec la commande « qcm-exemples » du README du projet (il lui faut le réseau)."
+        )
     releve = json.loads(chemin.read_text(encoding="utf-8"))
     de_mini = json.loads(mini.read_text(encoding="utf-8"))
     assert releve["nom"] == "ton-ia-1.5" and releve["appareil"] == "cpu"

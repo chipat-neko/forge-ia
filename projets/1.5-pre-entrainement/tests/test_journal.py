@@ -228,8 +228,11 @@ def test_le_releve_de_ton_ia_dit_ce_que_dit_le_document():
     projet = pathlib.Path(__file__).resolve().parents[1]
     chemin = projet / "mesures" / "ton-ia-1.5.json"
     document = projet.parents[1] / "docs" / "mesures" / "ton-ia-1.5.md"
-    if not chemin.exists():
-        pytest.skip("Le relevé de ton IA n'est pas encore écrit (voir le README du projet).")
+    # Le relevé fait partie de l'état publié (le chapitre 1.5 le lit) : son absence est une panne.
+    assert chemin.exists(), (
+        "mesures/ton-ia-1.5.json manque. Reprends-le du dépôt (git checkout -- mesures/ton-ia-1.5.json), ou refais-le "
+        "depuis le journal de l'entraînement avec la commande « courbe … --nom ton-ia-1.5 » du README du projet."
+    )
     if not document.exists():
         pytest.skip("Projet téléchargé seul : docs/mesures/ton-ia-1.5.md n'est pas là pour comparer.")
     releve = json.loads(chemin.read_text(encoding="utf-8"))

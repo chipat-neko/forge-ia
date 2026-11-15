@@ -11,7 +11,8 @@ processeur, refait chacune de ses pièces avec `pieces.py`, et affiche le plus g
 chaque pièce, puis le verdict « identique à forge à 10⁻¹² près ». Il rend le code 1 si une pièce
 s'écarte de plus. `compter` donne les paramètres d'une taille de forge, famille par famille.
 Avec `--enregistrer FICHIER`, `comparer` écrit aussi sa sortie dans FICHIER (UTF-8), précédée de
-la date du relevé.
+la date du relevé. Sans PyTorch (la commande lancée sans `--extra cpu`), le script le dit, sans trace
+Python, et rend le code 2.
 """
 
 import argparse
@@ -20,14 +21,21 @@ import os
 import sys
 from pathlib import Path
 
-import torch
-from forge.modele.config import PRESETS, ConfigModele, nombre_parametres
+try:
+    import torch
+    from forge.modele.config import PRESETS, ConfigModele, nombre_parametres
 
-from transformer_pas_a_pas.compter import repartition
+    from transformer_pas_a_pas.compter import repartition
+except ImportError as erreur:  # PyTorch (ou forge) manque : main() le dit, sans trace
+    MANQUE: ImportError | None = erreur
+else:
+    MANQUE = None
 
 FINE = "\u202f"  # l'espace fine insécable de la typographie française
 SEUIL = 1e-12
-CONFIG_DE_COMPARAISON = ConfigModele(dim=32, couches=2, tetes=4, longueur_contexte=16, taille_vocabulaire=50)
+CONFIG_DE_COMPARAISON = (
+    ConfigModele(dim=32, couches=2, tetes=4, longueur_contexte=16, taille_vocabulaire=50) if MANQUE is None else None
+)
 GRAINE = 0
 NOMS_DES_PIECES = {
     "rmsnorm": "RMSNorm",
@@ -133,9 +141,17 @@ def main(argv: list[str] | None = None) -> int:
     comparer.add_argument("--enregistrer", metavar="FICHIER", help="écrit aussi la sortie dans FICHIER (UTF-8), précédée de la date du relevé")
     comparer.set_defaults(fonction=commande_comparer)
     compter = commandes.add_parser("compter", help="compte les paramètres d'une taille de forge")
-    compter.add_argument("--preset", choices=list(PRESETS), default="tres_grand", help="la taille de forge (par défaut tres_grand)")
+    tailles = list(PRESETS) if MANQUE is None else None  # sans forge, les tailles sont inconnues : MANQUE le dit
+    compter.add_argument("--preset", choices=tailles, default="tres_grand", help="la taille de forge (par défaut tres_grand)")
     compter.set_defaults(fonction=commande_compter)
     options = lecteur.parse_args(argv)
+    if MANQUE is not None:
+        print(
+            f"Un module manque ({MANQUE}). Lance le script avec la version de PyTorch de ton poste{FINE}: "
+            "`uv run --extra cpu python -m transformer_pas_a_pas …`, ou `--extra gpu` avec une carte NVIDIA.",
+            file=sys.stderr,
+        )
+        return 2
     return options.fonction(options)
 
 

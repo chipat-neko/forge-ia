@@ -168,8 +168,12 @@ def test_regions_de_essai():
 def test_le_releve_de_l_essai_sur_la_carte():
     projet = pathlib.Path(__file__).resolve().parents[1]
     chemin, texte = projet / "mesures" / "essai-rtx-5070-ti.json", projet / "sorties" / "essai-rtx-5070-ti.txt"
-    if not chemin.exists():
-        pytest.skip("L'essai sur la carte n'est pas encore relevé (voir le README du projet).")
+    # Les deux fichiers font partie de l'état publié (le chapitre 1.5 les lit) : leur absence est une panne.
+    for fichier in (chemin, texte):
+        assert fichier.exists(), (
+            f"{fichier.parent.name}/{fichier.name} manque. Reprends-le du dépôt (git checkout -- {fichier.parent.name}/{fichier.name}), "
+            "ou refais l'essai sur une carte NVIDIA avec la commande « essai --appareil cuda » du README du projet."
+        )
     releve = json.loads(chemin.read_text(encoding="utf-8"))
     assert releve["appareil"] == "cuda" and releve["pas_total"] == 60 and releve["pas_de_la_pause"] == 30
     assert releve["ecart"] == abs(releve["perte_un_trait"] - releve["perte_reprise"]) and releve["ecart"] < 0.1

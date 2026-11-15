@@ -202,8 +202,12 @@ SORTIES = pathlib.Path(__file__).resolve().parents[1] / "sorties"
 
 def lire_sortie(nom: str) -> dict:
     chemin = SORTIES / nom
-    if not chemin.exists():
-        pytest.skip(f"sorties/{nom} n'est pas encore écrit (voir le README du projet).")
+    # Les sorties de ton IA font partie de l'état publié (les chapitres 1.1 et 1.4 les lisent) : leur absence
+    # est une panne.
+    assert chemin.exists(), (
+        f"sorties/{nom} manque. Reprends-le du dépôt (git checkout -- sorties/{nom}), ou refais-le avec la version "
+        "ton-ia-1.5 et la commande « cartes » ou « suivants » du README du projet."
+    )
     octets = chemin.read_bytes()
     assert b"\r" not in octets and octets.endswith(b"}\n")
     donnees = json.loads(octets)
