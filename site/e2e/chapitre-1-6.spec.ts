@@ -1,5 +1,5 @@
-// Parcours du chapitre 1.6, « Évaluer son modèle » : un brouillon (src/brouillons/chapitres/1-6.mdx)
-// tant qu'il n'a pas paru, construit à son adresse définitive avec FORGE_ESSAIS=1.
+// Parcours du chapitre 1.6, « Évaluer son modèle » (src/content/chapitres/1-6.mdx), paru le 15 novembre
+// 2026 ; un brouillon (src/brouillons/chapitres/1-6.mdx) jusque-là, construit avec FORGE_ESSAIS=1.
 //
 // Les attendus viennent des relevés du projet 1.6, lus sur le disque (evaluation.ts), des paris et de
 // l'atelier (paris-1-6.ts), des commandes (commandes.ts), des sources (sources-1-6.ts) et du code
@@ -17,7 +17,7 @@ import { formaterPerte, nombre, pourcent } from '../src/lib/nombres';
 import { trouverChapitre } from '../src/lib/parcours';
 import { CLONER_DEPOT, METTRE_A_JOUR_DEPOT } from '../src/lib/partie-0/commandes';
 import * as commandes from '../src/lib/partie-1/commandes';
-import { lireEvaluation, lireQcm, margeHasard } from '../src/lib/partie-1/evaluation';
+import { lireEvaluation, lireQcm, margeHasard, VERSION_PUBLIEE } from '../src/lib/partie-1/evaluation';
 import {
   analyseDuDefi,
   choixAuDessusDuHasard,
@@ -68,6 +68,13 @@ const COMMANDES_DES_BLOCS = [
   [CLONER_DEPOT, commandes.ALLER_AU_PROJET_1_6],
   [commandes.EVALUATION_TESTS],
   [commandes.EVALUATION_RESUMER, commandes.EVALUATION_QCM],
+  [
+    commandes.TELECHARGER_TON_IA,
+    commandes.EVALUATION_RESUMER_TON_IA,
+    commandes.EVALUATION_QCM_TON_IA,
+    commandes.EVALUATION_CARTES_TON_IA,
+    commandes.EVALUATION_SUIVANTS_TON_IA,
+  ],
 ];
 
 /**
@@ -135,7 +142,7 @@ test('chapitre 1.6 complet', async ({ page }, info) => {
   await page.locator('[data-pari="marge"] [data-juste]').click();
   await page.locator('[data-pari="limites"] [data-juste]').click();
   await expect(page.locator('#recap [data-total]')).toContainText('5 sur 5');
-  // Le pied suit les fichiers : 1.5 et 1.7 sont « à venir » tant qu'ils n'ont pas paru.
+  // Le pied suit les fichiers : 1.5 a paru, 1.7 est « à venir » tant qu'il n'a pas paru.
   await verifierVoisin(page, 'precedent', '1-5.mdx', '/forge-ia/partie-1/1-5/');
   await verifierVoisin(page, 'suivant', '1-7.mdx', '/forge-ia/partie-1/1-7/');
   await verifierLiensVersParus(page.locator('main'), PAGE);
@@ -273,6 +280,12 @@ test('ton IA, la vraie : son rapport et ses dix textes, tels quels', async ({ pa
   // Ce que ces textes disent de ses limites : elle ne répond pas à une question, et son code ne marche pas.
   await expect(etape8).toContainText('ne répond pas');
   await expect(etape8).toContainText('toujours 0');
+  // La légende ne dit pas que ton IA n'a jamais lu les questions de FrenchBench, et l'étape 8 rappelle la
+  // réserve de l'étape 7 (la contamination), avec son avance sur le hasard (revue finale du plan 5, I2).
+  await expect(tableau.locator('figcaption')).toContainText('et sur les questions de FrenchBench');
+  await expect(etape8).toContainText('La réserve de l’étape 7 vaut pour elle aussi');
+  const avance = e.qcm.hellaswag.exactitude_normalisee - e.qcm.hellaswag.hasard;
+  await expect(etape8).toContainText(`Sur ses ${nombre(100 * avance, 1)} points d’avance`);
   // L'évaluation de ton IA est plus haut que celle de la version d'une heure, sur les deux mesures du texte.
   expect(e.perplexite).toBeLessThan(MINI.perplexite);
   expect(e.qcm.hellaswag.exactitude_normalisee).toBeGreaterThan(MINI.qcm.hellaswag.exactitude_normalisee);
@@ -414,12 +427,18 @@ test('les commandes affichées sont celles de commandes.ts, et les chemins de l�
     .locator('.bloc-commande pre code')
     .evaluateAll((codes) => codes.map((c) => (c.textContent ?? '').split('\n')));
   expect(blocs).toEqual(COMMANDES_DES_BLOCS);
-  // Le bloc qui contient des chemins D:\ est suivi d'une phrase qui dit de les remplacer.
-  expect(commandes.EVALUATION_RESUMER).toContain('D:\\');
-  const figure = page.locator('.bloc-commande').filter({ hasText: commandes.EVALUATION_RESUMER });
-  const suite = figure.locator('xpath=following-sibling::p[1]');
-  await expect(suite).toContainText('PC de l’auteur');
-  await expect(suite).toContainText('remplace');
+  // Chaque bloc qui contient des chemins D:\ est suivi d'une phrase qui dit de les remplacer : celui de la
+  // version d'une heure, et celui de ton IA, la vraie (revue finale du plan 5, m6).
+  for (const commande of [commandes.EVALUATION_RESUMER, commandes.TELECHARGER_TON_IA]) {
+    expect(commande).toContain('D:\\');
+    const figure = page.locator('.bloc-commande').filter({ hasText: commande });
+    await expect(figure).toHaveCount(1);
+    const suite = figure.locator('xpath=following-sibling::p[1]');
+    await expect(suite).toContainText('PC de l’auteur');
+    await expect(suite).toContainText('remplace');
+  }
+  // Sans gh, la page de la version publiée.
+  await expect(page.locator(`#etape-10 a[href="${VERSION_PUBLIEE.adresse}"]`)).toHaveCount(1);
   await expect(page.getByRole('link', { name: 'Le projet complet' })).toHaveAttribute(
     'href',
     'https://github.com/chipat-neko/forge-ia/tree/main/projets/1.6-evaluation',

@@ -9,7 +9,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CLONER_DEPOT, METTRE_A_JOUR_DEPOT } from '../partie-0/commandes';
 import * as commandes from './commandes';
-import { FICHIERS_EVALUATION, FICHIERS_QCM } from './evaluation';
+import { FICHIERS_EVALUATION, FICHIERS_QCM, FICHIERS_SORTIES_TON_IA, lireCartes, lireSuivants, VERSION_PUBLIEE } from './evaluation';
 import { FICHIERS_ENTRAINEMENT } from './journal';
 import { MESURES_PARTIE_1 } from './mesures';
 import { GRAINE_INITIALE, LONGUEUR_SUITE, N_INITIAL, TEMPERATURE_INITIALE } from './paris-1-1';
@@ -373,5 +373,75 @@ describe('commandes du chapitre 1.6', () => {
     expect(README).toContain(`${commandes.EVALUATION_RESUMER}\n`);
     expect(README).toContain(`${commandes.EVALUATION_QCM}\n`);
     expect(README).toContain(`${commandes.EVALUATION_TESTS}\n`);
+  });
+});
+
+// Ton IA, la vraie (la version publiée ton-ia-1.5) : le téléchargement et les quatre commandes du projet 1.6
+// qui ont écrit ses relevés, vérifiés contre le __main__.py et le README du projet, et contre les fichiers que
+// lisent les chapitres 1.6 (étape 8), 1.4 (étape 5) et 1.1 (étape 9). Le chapitre 1.6 les montre à son étape 10.
+describe('commandes de ton IA, la vraie', () => {
+  const PROJET = `${RACINE}/projets/1.6-evaluation`;
+  const MAIN = readFileSync(`${PROJET}/evaluation_pas_a_pas/__main__.py`, 'utf8').replace(/\r\n?/g, '\n');
+  const README = readFileSync(`${PROJET}/README.md`, 'utf8').replace(/\r\n?/g, '\n');
+  const DOSSIER_TON_IA = 'D:\\forge-ia-donnees\\cache\\ton-ia-1.5';
+  const DU_MODELE = [
+    commandes.EVALUATION_QCM_TON_IA,
+    commandes.EVALUATION_CARTES_TON_IA,
+    commandes.EVALUATION_SUIVANTS_TON_IA,
+  ];
+  /** La valeur d'une option d'une commande : le mot qui la suit, ou la phrase entre guillemets. */
+  const option = (commande: string, nom: string) => new RegExp(`--${nom} (?:"([^"]*)"|(\\S+))`).exec(commande)?.slice(1).find((x) => x !== undefined);
+
+  it('le téléchargement prend la version publiée, dans le dossier que lisent les autres commandes', () => {
+    expect(commandes.TELECHARGER_TON_IA).toBe(`gh release download ${VERSION_PUBLIEE.nom} --dir ${DOSSIER_TON_IA}`);
+    expect(VERSION_PUBLIEE.adresse.endsWith(`/releases/tag/${VERSION_PUBLIEE.nom}`)).toBe(true);
+    for (const c of DU_MODELE) expect(option(c, 'modele'), c).toBe(DOSSIER_TON_IA);
+    expect(option(commandes.EVALUATION_RESUMER_TON_IA, 'rapport')).toBe(`${DOSSIER_TON_IA}\\rapport.json`);
+  });
+
+  it('resumer, qcm-exemples, cartes et suivants sont des commandes du script, avec leurs options', () => {
+    for (const sous of ['resumer', 'qcm-exemples', 'cartes', 'suivants']) expect(MAIN, sous).toContain(`add_parser("${sous}"`);
+    // resumer prend --nom : sans lui, le relevé prendrait le nom du dossier de l'entraînement (« ton-ia »).
+    expect(option(commandes.EVALUATION_RESUMER_TON_IA, 'nom')).toBe(VERSION_PUBLIEE.nom);
+    expect(MAIN).toContain('resume.add_argument("--nom"');
+    // Les commandes qui chargent un modèle prennent --modele (ajouter_modele), sur le processeur.
+    expect(MAIN).toContain('"--modele",');
+    for (const c of DU_MODELE) expect(option(c, 'appareil'), c).toBe('cpu');
+    // cartes --choisir : le bloc et les deux têtes du chapitre 1.4, sans --couche ni --tete.
+    expect(MAIN).toContain('"--choisir",');
+    expect(commandes.EVALUATION_CARTES_TON_IA).toContain(' --choisir ');
+    expect(commandes.EVALUATION_CARTES_TON_IA).not.toMatch(/--couche|--tete/);
+    for (const c of [commandes.EVALUATION_RESUMER_TON_IA, ...DU_MODELE]) expect(c.startsWith('uv run --extra cpu '), c).toBe(true);
+  });
+
+  it('elles écrivent les fichiers que lisent les chapitres 1.6, 1.4 et 1.1', () => {
+    const projet = 'projets/1.6-evaluation/';
+    expect(`${projet}${option(commandes.EVALUATION_RESUMER_TON_IA, 'json')}`).toBe(FICHIERS_EVALUATION['ton-ia-1.5']);
+    expect(`${projet}${option(commandes.EVALUATION_QCM_TON_IA, 'json')}`).toBe(FICHIERS_QCM['ton-ia-1.5']);
+    expect(`${projet}${option(commandes.EVALUATION_CARTES_TON_IA, 'json')}`).toBe(FICHIERS_SORTIES_TON_IA.cartes);
+    expect(`${projet}${option(commandes.EVALUATION_SUIVANTS_TON_IA, 'json')}`).toBe(FICHIERS_SORTIES_TON_IA.suivants);
+  });
+
+  it('leurs phrases sont celles des sorties que montrent les chapitres', () => {
+    const cartes = lireCartes(RACINE);
+    const suivants = lireSuivants(RACINE);
+    expect(option(commandes.EVALUATION_CARTES_TON_IA, 'phrase')).toBe(cartes.phrase);
+    expect(option(commandes.EVALUATION_SUIVANTS_TON_IA, 'phrase')).toBe(suivants.phrase);
+    // Sans --k, suivants en garde 10 : ceux du tableau du chapitre 1.1.
+    expect(commandes.EVALUATION_SUIVANTS_TON_IA).not.toContain('--k');
+    expect(MAIN).toContain('suivant.add_argument("--k", type=int, default=10,');
+    expect(suivants.suivants).toHaveLength(10);
+  });
+
+  it('ce sont les commandes du README du projet', () => {
+    for (const c of [
+      commandes.TELECHARGER_TON_IA,
+      commandes.EVALUATION_RESUMER_TON_IA,
+      commandes.EVALUATION_QCM_TON_IA,
+      commandes.EVALUATION_CARTES_TON_IA,
+      commandes.EVALUATION_SUIVANTS_TON_IA,
+    ]) {
+      expect(README, c).toContain(`${c}\n`);
+    }
   });
 });

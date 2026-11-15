@@ -15,8 +15,10 @@
 // (dans le navigateur) s'en serve sans node:fs ; ce module le réexporte. Les tests les comparent, sans
 // tolérance, à la grille de projets/1.6-evaluation/tests/attendus.json.
 //
-// Tant qu'un fichier manque, lireEvaluation, lireQcm et lireEchantillon rendent null : c'était le cas de
-// ton IA, la vraie (ton-ia-1.5), jusqu'à son relevé (tâche 15 du plan 5).
+// Si un fichier manque, lireEvaluation, lireQcm et lireEchantillon rendent null : c'était le cas de
+// ton IA, la vraie (ton-ia-1.5), jusqu'à son relevé (tâche 15 du plan 5). Depuis la parution de 1.6, les
+// quatre relevés sont versionnés : le chapitre refuse un null par exiger, et la garde de parution
+// (e2e/parution.spec.ts) refuse toute valeur « à mesurer ».
 //
 // Ce module lit aussi les deux sorties de ton IA que montrent les chapitres 1.4 et 1.1 :
 // sorties/cartes-ton-ia.json (ses cartes d'attention pour une phrase, la couche et les deux têtes

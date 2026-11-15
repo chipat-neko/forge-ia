@@ -2,11 +2,12 @@
 // défini en deux phrases au plus et renvoyé aux chapitres qui l'expliquent.
 //
 // Chaque définition a été relue dans son chapitre (9 novembre 2026, puis de 1.1 à 1.6 au
-// bilan de la Partie 1, le 10) et ne le contredit pas. Pour 1.5 et 1.6, pas encore parus,
-// elle suit leurs brouillons (src/brouillons/chapitres/) et le code de forge qu'ils
-// montrent : planning.py, boucle.py et sauvegarde.py pour 1.5, perte.py et qcm.py pour
-// 1.6. La page affiche leurs renvois « à venir », sans lien, tant que chapitresParus()
-// ne les connaît pas.
+// bilan de la Partie 1, le 10) et ne le contredit pas. Pour 1.5 et 1.6, encore en brouillon
+// à ce bilan, elle suit aussi le code de forge qu'ils montrent : planning.py, boucle.py et
+// sauvegarde.py pour 1.5, perte.py et qcm.py pour 1.6. Les deux chapitres ont paru le
+// 15 novembre 2026, et la revue finale du plan 5 a relu les termes de la Partie 1 face aux
+// chapitres parus. La page fait un lien de chaque renvoi à un chapitre que chapitresParus()
+// connaît, et dit les autres « à venir », sans lien.
 //
 // Les textes sont bruts, comme ceux de parcours.ts : des espaces ordinaires devant
 // « ; : ! ? » et dans les guillemets, des apostrophes droites. La page leur applique

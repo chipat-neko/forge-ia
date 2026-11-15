@@ -7,8 +7,12 @@
 //
 // Deux tableaux typographiés, sans cadre, comme ceux des autres chapitres (TableauSessions).
 //
-// Tant que le relevé manque (ton IA, la vraie, jusqu'à la tâche 16 du plan 5), le composant
-// affiche « à mesurer », marqué data-a-mesurer.
+// Si le relevé manque, le composant affiche « à mesurer », marqué data-a-mesurer : c'était le cas de
+// ton IA, la vraie, jusqu'à la tâche 16 du plan 5. Le relevé est versionné depuis, et la garde de
+// parution (e2e/parution.spec.ts) refuse cette valeur dans un chapitre paru.
+//
+// La légende ne dit pas que ton IA n'a jamais lu les questions de FrenchBench : forge ne les a pas
+// cherchées dans ses textes (étape 7 du chapitre).
 //
 //   <TableauEvaluation nom="mini" />
 //   <TableauEvaluation nom="1.5" />
@@ -49,7 +53,7 @@ const idQcm = `evaluation-${cle}-qcm`;
     <figure class="tableau-evaluation" data-evaluation={cle}>
       <figcaption>
         <span class="objet">{titre}</span>
-        {typographier('Mesurée par forge sur des textes et des questions que ton IA n’a jamais lus.')}
+        {typographier('Mesurée par forge sur des textes que ton IA n’a jamais lus, et sur les questions de FrenchBench.')}
       </figcaption>
       <table id={idMesures} aria-label={typographier('La perte, la perplexité et les bits par octet')} data-test="evaluation-mesures">
         <thead>

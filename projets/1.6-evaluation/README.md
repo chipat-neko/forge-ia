@@ -18,10 +18,9 @@ pas à pas et à la main, les mesures que fait forge (le paquet `forge`, dans `p
 - il **regarde dans le modèle** : les cartes d'attention d'une phrase, et les jetons que le modèle juge les
   plus probables pour la suite (`sorties/cartes-ton-ia.json`, `sorties/ton-ia-suivants.json`).
 
-C'est le projet du chapitre 1.6 de La Forge IA, « Évaluer son modèle ». Ce
-chapitre n'est pas encore en ligne : il paraîtra après la fin de l'entraînement
-de « ton IA », avec ses vrais chiffres, et son adresse (`partie-1/1-6/` sur le
-site) n'existe pas encore. Les mots techniques sont expliqués dans le glossaire :
+C'est le projet du chapitre 1.6 de La Forge IA, « Évaluer son modèle », en
+ligne à l'adresse <https://chipat-neko.github.io/forge-ia/partie-1/1-6/>, avec
+les vrais chiffres de l'évaluation de « ton IA ». Les mots techniques sont expliqués dans le glossaire :
 <https://chipat-neko.github.io/forge-ia/annexes/glossaire/>. Comme les projets 0.3 à 0.5, 1.4 et 1.5, il
 utilise PyTorch, en deux versions au choix : celle pour carte NVIDIA (extra `gpu`, CUDA 13.2) et celle pour le
 processeur seul (extra `cpu`). Les commandes ci-dessous prennent le processeur, qui suffit à tout ce que ce

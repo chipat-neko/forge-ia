@@ -7,8 +7,9 @@
 //
 // Un tableau typographié, sans cadre, comme ceux des autres chapitres (TableauChronos).
 //
-// Tant que le relevé manque (ton-ia-1.5 jusqu'à la tâche 16), le composant affiche « à mesurer »,
-// marqué data-a-mesurer.
+// Si le relevé manque, le composant affiche « à mesurer », marqué data-a-mesurer : c'était le cas de
+// ton-ia-1.5 jusqu'à la tâche 16. Le relevé est versionné depuis, et la garde de parution
+// (e2e/parution.spec.ts) refuse cette valeur dans un chapitre paru.
 //
 //   <TableauSessions nom="ton-ia-mini" titre="Les sessions de la version d'une heure" />
 import { root } from 'astro:config/server';

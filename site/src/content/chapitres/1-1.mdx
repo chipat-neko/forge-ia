@@ -326,6 +326,8 @@ export const TON_IA = (() => {
     release: VERSION_PUBLIEE.adresse,
     l15: PARUS.has('1.5') ? hrefChapitre('1.5') : null,
     l16: PARUS.has('1.6') ? hrefChapitre('1.6') : null,
+    // L'étape 10 de 1.6 donne la commande qui a relevé ces jetons (commandes.ts, EVALUATION_SUIVANTS_TON_IA).
+    commande: PARUS.has('1.6') ? `${hrefChapitre('1.6')}#etape-10` : null,
   };
 })();
 
@@ -576,7 +578,7 @@ Ton IA existe déjà : l'auteur l'a entraînée sur sa carte graphique, avec la 
 
 Ce ne sont plus des caractères : chacun de ses choix est un mot entier, avec l'espace qui le précède. Là où le modèle de l'atelier continue souvent en « frappelle », ton IA propose des mots qui vont après « frappe le » : bois, sol, métal. Le fer, que frappe un forgeron, n'arrive qu'en quatrième.
 
-Elle hésite pourtant : son premier choix n'a que {TON_IA.premier} des chances, et ses {TON_IA.n} premiers, ensemble, {TON_IA.total}. Le reste se partage entre les {TON_IA.autres} autres jetons de son vocabulaire. Sur des textes qu'elle n'a jamais lus, sa perplexité est de {TON_IA.perplexite} : elle hésite en moyenne autant que si elle tirait au sort entre {TON_IA.hesitation} jetons. Le {TON_IA.l16 ? <a href={TON_IA.l16}>chapitre 1.6</a> : 'chapitre 1.6'} la mesure.
+Elle hésite pourtant : son premier choix n'a que {TON_IA.premier} des chances, et ses {TON_IA.n} premiers, ensemble, {TON_IA.total}. Le reste se partage entre les {TON_IA.autres} autres jetons de son vocabulaire. Sur des textes qu'elle n'a jamais lus, sa perplexité est de {TON_IA.perplexite} : elle hésite en moyenne autant que si elle tirait au sort entre {TON_IA.hesitation} jetons. Le {TON_IA.l16 ? <a href={TON_IA.l16}>chapitre 1.6</a> : 'chapitre 1.6'} la mesure, et son {TON_IA.commande ? <a href={TON_IA.commande}>étape 10</a> : 'étape 10'} donne la commande qui relève ces jetons.
 
 </Etape>
 

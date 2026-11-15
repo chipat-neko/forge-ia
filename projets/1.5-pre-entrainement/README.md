@@ -14,10 +14,10 @@ paquet `forge`, dans `projets/forge`) :
   l'auteur (`mesures/essai-rtx-5070-ti.json`).
 
 C'est le projet du chapitre 1.5 de La Forge IA, « Le pré-entraînement sur ton
-GPU ». Ce chapitre n'est pas encore en ligne : il paraîtra après la fin de
-l'entraînement de « ton IA », avec ses vrais chiffres, et son adresse
-(`partie-1/1-5/` sur le site) n'existe pas encore. Les mots techniques sont
-expliqués dans le glossaire :
+GPU », en ligne à l'adresse
+<https://chipat-neko.github.io/forge-ia/partie-1/1-5/>, avec les vrais chiffres
+de l'entraînement de « ton IA ». Les mots techniques sont expliqués dans le
+glossaire :
 <https://chipat-neko.github.io/forge-ia/annexes/glossaire/>. Comme les projets 0.3 à 0.5
 et 1.4, il utilise PyTorch, en deux versions au choix : celle pour carte NVIDIA (extra `gpu`, CUDA
 13.2) et celle pour le processeur seul (extra `cpu`). Les commandes ci-dessous prennent le processeur,

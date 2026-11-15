@@ -161,7 +161,7 @@ test('chapitre 1.1 complet', async ({ page }, info) => {
   // Le pied suit les fichiers : 1.2 est « à venir » tant qu'il n'a pas paru, 0.5 est un lien.
   await verifierVoisin(page, 'suivant', '1-2.mdx', '/forge-ia/partie-1/1-2/');
   await verifierVoisin(page, 'precedent', '0-5.mdx', '/forge-ia/partie-0/0-5/');
-  // Aucun lien vers un chapitre qui n'a pas paru : les renvois à 1.2, 1.4 et 1.5 sont du texte.
+  // Aucun lien vers un chapitre qui n'a pas paru : un renvoi à un chapitre à venir est du texte.
   await verifierLiensVersParus(page.locator('main'), PAGE);
   await attendreAnimations(page);
   await verifierAxe(page);
@@ -400,6 +400,8 @@ test('ton IA prédit la suite : ses dix jetons, lus dans le fichier du projet 1.
   await expect(tableau.locator('figcaption')).toContainText('sur le processeur');
   await expect(tableau.locator('figcaption')).toContainText('15 novembre 2026');
   await expect(etape.locator(`a[href="${RELEASE}"]`)).toHaveCount(1);
+  // La commande qui relève ces jetons est à l'étape 10 de 1.6, qui a paru : un lien (revue finale du plan 5, m6).
+  await expect(etape.locator('a[href="/forge-ia/partie-1/1-6/#etape-10"]')).toHaveText('étape 10');
   // Les jetons ne sont pas du texte du chapitre : la recherche les ignore.
   await expect(tableau.locator('[data-jeton][data-pagefind-ignore]')).toHaveCount(SUIVANTS.suivants.length);
   await verifierAxe(page);

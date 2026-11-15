@@ -35,8 +35,18 @@ import { exigeur } from '../../lib/exiger';
 import { formaterDate } from '../../lib/calculateur/formats';
 import { formaterPerte, nombre, pourcent } from '../../lib/nombres';
 import { ANNEXES, hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
-import { COURT_EVALUER, EVALUATION_QCM, EVALUATION_RESUMER, EVALUATION_TESTS } from '../../lib/partie-1/commandes';
-import { lireEvaluation, lireQcm, margeHasard, verdictQcm, Z_95 } from '../../lib/partie-1/evaluation';
+import {
+  COURT_EVALUER,
+  EVALUATION_CARTES_TON_IA,
+  EVALUATION_QCM,
+  EVALUATION_QCM_TON_IA,
+  EVALUATION_RESUMER,
+  EVALUATION_RESUMER_TON_IA,
+  EVALUATION_SUIVANTS_TON_IA,
+  EVALUATION_TESTS,
+  TELECHARGER_TON_IA,
+} from '../../lib/partie-1/commandes';
+import { lireEvaluation, lireQcm, margeHasard, verdictQcm, VERSION_PUBLIEE, Z_95 } from '../../lib/partie-1/evaluation';
 import {
   analyseDuDefi,
   BITS_PAR_OCTET_D_UN_FICHIER,
@@ -75,10 +85,11 @@ export const LIENS = (() => {
   const annuaire = ANNEXES.find((a) => a.titre === 'Annuaire des données')?.href ?? null;
   exiger(annuaire !== null, 'l’annexe de l’annuaire des données n’a plus de page : l’étape 7 y mène');
   return {
-    // Les chapitres 0.2, 1.1 et 1.3 ont paru ; 1.5 est encore un brouillon : un lien ne vise qu'un chapitre paru.
+    // Les chapitres 0.2, 1.1, 1.3, 1.4 et 1.5 ont paru (1.5 en même temps que celui-ci) : un lien ne vise qu'un chapitre paru.
     l02: PARUS.has('0.2') ? hrefChapitre('0.2') : null,
     l11: PARUS.has('1.1') ? hrefChapitre('1.1') : null,
     l13: PARUS.has('1.3') ? hrefChapitre('1.3') : null,
+    l14: PARUS.has('1.4') ? hrefChapitre('1.4') : null,
     l15: PARUS.has('1.5') ? hrefChapitre('1.5') : null,
     annuaire: `${annuaire}#g-evaluation`,
   };
@@ -248,6 +259,9 @@ export const TON_IA = (() => {
   // « Sur HellaSwag, elle est au-dessus du hasard, et bien plus loin que la version d'une heure. »
   const avance = (x) => x.qcm.hellaswag.exactitude_normalisee - x.qcm.hellaswag.hasard;
   exiger(e.qcm.hellaswag.verdict === 'au-dessus' && avance(e) > 2 * avance(MINI), 'sur HellaSwag, ton IA n’est plus au-dessus du hasard, bien plus loin que la version d’une heure');
+  // La réserve de l'étape 7, pour elle : « Sur ses N points d'avance, une contamination aurait bien plus à gonfler
+  // que sur les M points de la version d'une heure. » Son avance est plus du double (9,8 et 2,2 points, dans les relevés).
+  exiger(avance(MINI) > 0 && avance(e) > 2 * avance(MINI), 'l’avance de ton IA sur HellaSwag n’est plus le double de celle de la version d’une heure : la réserve de l’étape 8 sur la contamination est à revoir');
   // « Sur ARC-Challenge, elle ne fait pas mieux qu'un tirage au sort. »
   exiger(e.qcm.arc.verdict === 'pas-different', 'sur ARC-Challenge, ton IA se distingue maintenant du hasard');
 
@@ -290,7 +304,7 @@ export const TON_IA = (() => {
   exiger(q.n === 6 && e.echantillons.length === 10, 'ton IA n’a plus noté six questions, ou n’a plus dix textes : l’étape 8 les compte en lettres');
   const c = compteDuQcm(q);
   exiger(verdictQcm(c.justes / c.n, c.hasard / c.n, margeHasard(c.n, 4)) === 'pas-different', 'les justes de ton IA dans l’atelier ne sont plus dans la marge du hasard');
-  return { evaluation: e, qcm: q };
+  return { evaluation: e, qcm: q, ecartHella: enUnite(100 * avance(e), 1, 'point') };
 })();
 
 export const LABO = (() => {
@@ -519,7 +533,7 @@ La mesure est aussi « maison » : le gabarit des questions, le jeton de début 
 
 Reste la question la plus gênante : le test était-il déjà dans les textes d'entraînement ? Un modèle qui a lu les questions a pu en retenir les réponses, et son score ne dit plus ce qu'il sait. C'est la contamination. Pour <a href={LIMITES.llama}>Llama 3</a>, Meta l'a cherchée par suites de {LIMITES.ngramme} jetons : une question compte comme contaminée quand assez de ses jetons appartiennent à des suites de {LIMITES.ngramme} jetons déjà vues dans son corpus d'entraînement, avec un seuil choisi pour chaque test. Pour HellaSwag, en anglais, {LIMITES.contamine} des questions l'étaient, et Meta estime le gain de score à {LIMITES.gain} points pour son plus grand modèle.
 
-Les textes de ton IA viennent du web en français, de Wikipédia et de code Python. Forge n'y a pas cherché les questions de FrenchBench : une contamination n'est pas exclue. Elle gonflerait son score de HellaSwag ; à {MARGE.ecartHella} au-dessus du hasard, il n'y aurait pas grand-chose à gonfler, mais rien ne prouve que ce score soit propre.
+Les textes de ton IA viennent du web en français, de Wikipédia et de code Python. Forge n'y a pas cherché les questions de FrenchBench : une contamination n'est pas exclue. Elle gonflerait son score de HellaSwag. Pour la version d'une heure, à {MARGE.ecartHella} au-dessus du hasard, il n'y aurait pas grand-chose à gonfler, mais rien ne prouve que ce score soit propre. L'étape suivante y revient pour ton IA, la vraie.
 
 <Fragment slot="note">
 
@@ -536,6 +550,8 @@ La version d'une heure n'était qu'une répétition. Ton IA, la vraie, a passé 
 <TableauEvaluation nom="1.5" />
 
 Elle hésite bien moins que la version d'une heure : sa perplexité et ses bits par octet sont plus bas. Mais la comparaison n'est qu'indicative. Ses textes de validation ne sont pas ceux de la version d'une heure, et elle lit des morceaux quatre fois plus longs, ce qui l'aide à prédire. Les QCM, eux, sont les mêmes questions, notées de la même façon. Sur HellaSwag, elle est au-dessus du hasard, et bien plus loin que la version d'une heure. Sur ARC-Challenge, ses questions de sciences, elle ne fait pas mieux qu'un tirage au sort.
+
+La réserve de l'étape 7 vaut pour elle aussi : rien ne prouve que les questions de HellaSwag n'étaient pas dans ses textes. Sur ses {TON_IA.ecartHella} d'avance, une contamination aurait bien plus à gonfler que sur les {MARGE.ecartHella} de la version d'une heure.
 
 Voici ses dix textes, tous, tels quels, à partir des mêmes débuts :
 
@@ -590,6 +606,12 @@ Ils comparent chaque mesure refaite à celle de forge, sur le processeur. Si tu 
 <BlocCommande commandes={[EVALUATION_RESUMER, EVALUATION_QCM]} ou="un terminal, dans le dossier du projet" />
 
 Les chemins en `D:\` sont ceux du PC de l'auteur : remplace-les par ceux de ton entraînement. La seconde commande lit les questions de MMMLU sur Hugging Face : il lui faut le réseau. Le projet utilise PyTorch, comme ceux des chapitres 1.4 et 1.5 : `--extra cpu` prend sa version pour le processeur, qui suffit ici.
+
+Ton IA, la vraie, se relève de la même façon, à partir de sa version publiée. La première commande la télécharge avec `gh`, l'outil de GitHub pour le terminal ; sans lui, prends ses fichiers à la main sur <a href={VERSION_PUBLIEE.adresse}>la page de la version</a>. Les suivantes refont ses relevés : son rapport d'évaluation et ses six questions de l'étape 8, puis ses cartes d'attention, montrées au {LIENS.l14 ? <a href={LIENS.l14}>chapitre 1.4</a> : 'chapitre 1.4'}, et ses jetons suivants, au {LIENS.l11 ? <a href={LIENS.l11}>chapitre 1.1</a> : 'chapitre 1.1'} :
+
+<BlocCommande commandes={[TELECHARGER_TON_IA, EVALUATION_RESUMER_TON_IA, EVALUATION_QCM_TON_IA, EVALUATION_CARTES_TON_IA, EVALUATION_SUIVANTS_TON_IA]} ou="un terminal, dans le dossier du projet" />
+
+Ici aussi, le dossier en `D:\` est celui du PC de l'auteur : remplace-le par celui où tu as téléchargé ton IA. `--nom ton-ia-1.5` donne au relevé le nom de la version publiée, et `cartes --choisir` choisit lui-même le bloc et les deux têtes que montre le chapitre 1.4. Comme pour la version d'une heure, `qcm-exemples` lit les questions de MMMLU sur Hugging Face.
 
 Le projet complet, avec un notebook qui refait l'évaluation pas à pas, est sur GitHub :
 

@@ -189,6 +189,8 @@ export const CARTES = (() => {
     release: VERSION_PUBLIEE.adresse,
     l15: PARUS.has('1.5') ? hrefChapitre('1.5') : null,
     l16: PARUS.has('1.6') ? hrefChapitre('1.6') : null,
+    // L'étape 10 de 1.6 donne la commande qui a relevé ces cartes (commandes.ts, EVALUATION_CARTES_TON_IA).
+    commande: PARUS.has('1.6') ? `${hrefChapitre('1.6')}#etape-10` : null,
   };
 })();
 
@@ -424,7 +426,7 @@ Personne n'a dit à ces têtes quoi chercher. Elles n'ont pas de nom : « de qui
 
 <Fragment slot="note">
 
-Le jeton de début, `<|fin_texte|>`, est celui que ton IA a lu avant chaque texte pendant son entraînement. Le projet du chapitre 1.6 compte les blocs et les têtes à partir de 0 : pour lui, c'est la couche {CARTES.couche}, têtes {CARTES.avantProjet} et {CARTES.loinProjet}.
+Le jeton de début, `<|fin_texte|>`, est celui que ton IA a lu avant chaque texte pendant son entraînement. Le projet du chapitre 1.6 compte les blocs et les têtes à partir de 0 : pour lui, c'est la couche {CARTES.couche}, têtes {CARTES.avantProjet} et {CARTES.loinProjet}. Le chapitre 1.6 donne, à son {CARTES.commande ? <a href={CARTES.commande}>étape 10</a> : 'étape 10'}, la commande qui relève ces cartes.
 
 </Fragment>
 
@@ -507,7 +509,7 @@ Le <code class="insecable">x +</code> s'appelle une connexion résiduelle. Il a 
 <Pari
   id="residus"
   question={`Sans le \`x\u00A0+\`, que devient l’entrée ?`}
-  precision={`Deux suites de ${RES.jetons} jetons tirés au hasard ne diffèrent que par leur dernier jeton. Elles traversent les ${RES.couches} blocs d’un transformer de la taille mini, aux poids tirés au hasard comme forge les tire au départ, avant tout entraînement, mais sans le \`x\u00A0+\`. À la dernière position, que reste-t-il de leur différence ?`}
+  precision={`Deux suites de ${RES.jetons} jetons tirés au hasard ne diffèrent que par leur dernier jeton. Elles passent par les ${RES.couches} blocs d’un transformer de la taille mini, aux poids tirés au hasard comme forge les tire au départ, avant tout entraînement, mais sans le \`x\u00A0+\`. À la dernière position, que reste-t-il de leur différence ?`}
   choix={CHOIX.residus}
   acquis="residus"
 >
@@ -623,6 +625,6 @@ Le projet complet, avec un notebook qui refait les pièces une à une, est sur G
 
 ### À suivre
 
-Ton IA a sa forme : {TON_IA.total} paramètres tirés au hasard, qui ne savent encore rien. Il reste à les régler, en lui faisant lire ses textes : c'est le chapitre 1.5, {SUITE.lien ? <a href={SUITE.lien}>{SUITE.titre}</a> : SUITE.titre}.
+La forme de ton IA tient dans {TON_IA.total} paramètres ; avant l'entraînement, ils sont tirés au hasard et ne savent rien. Ceux des cartes de l'étape 5 ont été réglés en lui faisant lire ses textes : c'est l'objet du chapitre 1.5, {SUITE.lien ? <a href={SUITE.lien}>{SUITE.titre}</a> : SUITE.titre}.
 
 </Etape>

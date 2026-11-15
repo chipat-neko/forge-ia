@@ -1,10 +1,18 @@
-// Les mesures et les sorties des projets de la Partie 1 que les chapitres lisent à la
+// Les mesures et les sorties des projets 1.2, 1.4 et 1.5 que les chapitres lisent à la
 // construction : leurs fichiers, en chemins depuis la racine du dépôt.
 //
 // FICHIERS_PARTIE_1 (fichiers.ts) ne liste que les attendus de parité, ceux que la page
 // d'essai refait dans le navigateur. Ce qui a été mesuré (l'aperçu des sources, les volumes du
-// corpus) ou affiché par une commande est ici : un chapitre le lit tel quel, le site ne le
-// refait pas. Les lecteurs de ces fichiers sont ceux des chapitres qui s'en servent.
+// corpus, les essais de pause et de reprise) ou affiché par une commande est ici : un chapitre
+// le lit tel quel, le site ne le refait pas. Les lecteurs de ces fichiers sont ceux des
+// chapitres qui s'en servent.
+//
+// Les relevés de ton IA, eux, sont listés à côté de leurs lecteurs :
+// - les journaux d'entraînement (1.5) : FICHIERS_ENTRAINEMENT, dans journal.ts ;
+// - les évaluations et les QCM notés (1.6) : FICHIERS_EVALUATION et FICHIERS_QCM, dans
+//   evaluation.ts ;
+// - ses cartes d'attention et ses jetons suivants, relevés par le projet 1.6 et montrés par
+//   1.4 et 1.1 : FICHIERS_SORTIES_TON_IA, dans evaluation.ts.
 //
 // Ce module n'importe rien (ni .json, ni ?raw, ni node:fs) : un parcours Playwright peut
 // l'importer.

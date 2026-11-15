@@ -1,6 +1,6 @@
-// Parcours du chapitre 1.5, « Le pré-entraînement sur ton GPU » : un brouillon
-// (src/brouillons/chapitres/1-5.mdx) tant qu'il n'a pas paru, construit à son adresse
-// définitive avec FORGE_ESSAIS=1.
+// Parcours du chapitre 1.5, « Le pré-entraînement sur ton GPU » (src/content/chapitres/1-5.mdx),
+// paru le 15 novembre 2026 ; un brouillon (src/brouillons/chapitres/1-5.mdx) jusque-là, construit
+// avec FORGE_ESSAIS=1.
 //
 // Les attendus viennent des relevés du projet 1.5, lus sur le disque (journal.ts, paris-1-5.ts),
 // des commandes (commandes.ts), des sources (sources-1-5.ts) et du code montré, relu dans les
@@ -128,7 +128,7 @@ test('chapitre 1.5 complet', async ({ page }, info) => {
   await expect(page.locator('#recap [data-total]')).toContainText('6 sur 6');
   // Plus rien « à mesurer » : ton IA, la vraie, est relevée.
   await expect(page.locator('[data-a-mesurer]')).toHaveCount(0);
-  // Le pied suit les fichiers : 1.4 a paru, 1.6 est « à venir » tant qu'il n'a pas paru.
+  // Le pied suit les fichiers : 1.4 et 1.6 ont paru, ce sont des liens.
   await verifierVoisin(page, 'precedent', '1-4.mdx', '/forge-ia/partie-1/1-4/');
   await verifierVoisin(page, 'suivant', '1-6.mdx', '/forge-ia/partie-1/1-6/');
   await verifierLiensVersParus(page.locator('main'), PAGE);

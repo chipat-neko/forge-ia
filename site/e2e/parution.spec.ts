@@ -8,8 +8,9 @@
 // - Un chapitre paru ne renvoie, par un lien, qu'à des chapitres parus : un
 //   renvoi à un chapitre à venir s'écrit en texte.
 //
-// Les tests suivent les fichiers présents sur le disque : le git mv d'une
-// parution ne les oblige pas à changer. Sans aucun brouillon, le dernier est sauté.
+// Les tests suivent les fichiers présents sur le disque, un par chapitre paru :
+// le git mv d'une parution ne les oblige pas à changer. Sans aucun brouillon, le
+// dernier est sauté (src/brouillons/chapitres/ ne garde alors que son .gitkeep).
 import { existsSync, readdirSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { verifierLiensVersParus } from './outils';
@@ -28,20 +29,19 @@ function adresses(dossier: string): string[] {
 const PARUS = adresses('src/content/chapitres');
 const BROUILLONS = adresses('src/brouillons/chapitres');
 
-test('un chapitre paru n’a plus aucune valeur « à mesurer »', async ({ page }) => {
+test('des chapitres parus sont trouvés dans src/content/chapitres', () => {
   expect(PARUS.length, 'aucun chapitre paru trouvé dans src/content/chapitres').toBeGreaterThan(0);
-  for (const adresse of PARUS) {
-    expect((await page.goto(adresse))?.status(), adresse).toBe(200);
-    await expect(page.locator('[data-a-mesurer]'), adresse).toHaveCount(0);
-  }
 });
 
-test('un chapitre paru ne renvoie qu’à des chapitres parus', async ({ page }) => {
-  for (const adresse of PARUS) {
-    await page.goto(adresse);
+// Un test par chapitre paru, chacun avec son propre délai (revue finale du plan 5, m9) : un seul test
+// qui les visitait tous approchait de ses 30 s, et chaque chapitre de la vague 2 l'en aurait rapproché.
+for (const adresse of PARUS) {
+  test(`${adresse} : plus aucune valeur « à mesurer », et des liens vers des chapitres parus seulement`, async ({ page }) => {
+    expect((await page.goto(adresse))?.status(), adresse).toBe(200);
+    await expect(page.locator('[data-a-mesurer]'), adresse).toHaveCount(0);
     await verifierLiensVersParus(page.locator('body'), adresse);
-  }
-});
+  });
+}
 
 test('chaque brouillon se construit à son adresse', async ({ page }) => {
   test.skip(BROUILLONS.length === 0, 'aucun brouillon');

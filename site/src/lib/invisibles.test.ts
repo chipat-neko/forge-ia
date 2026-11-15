@@ -178,8 +178,10 @@ describe('caractères invisibles', () => {
     expect(A_LIRE.filter((f) => f.includes('/.') || f.includes('node_modules'))).toEqual([]);
   });
 
+  // Ce test lit des centaines de fichiers sur le disque : seul, il tient en moins d'une seconde, mais pendant que
+  // pytest lit le même disque, il a dépassé les 5 s par défaut de Vitest (revue finale du plan 5, m7). D'où 30 s.
   it('aucun caractère invisible littéral dans les fichiers du plan 4', () => {
     const fautes = A_LIRE.flatMap(fautesDuFichier);
     expect(fautes, fautes.join('\n')).toEqual([]);
-  });
+  }, 30_000);
 });

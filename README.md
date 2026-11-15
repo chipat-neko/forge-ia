@@ -48,10 +48,11 @@ Chaque chapitre de la Partie 0, « Les bases », a le sien :
 | `projets/0.5-reseau` | 0.5, Premier réseau de neurones | un neurone à seuil, puis un réseau entraîné à la main et avec PyTorch |
 
 Ceux de la Partie 1, « Créer son IA de zéro », ont aussi le leur, un par
-chapitre. Les chapitres 1.1 à 1.4 sont en ligne (par exemple
-<https://chipat-neko.github.io/forge-ia/partie-1/1-1/>). Les chapitres 1.5 et
-1.6 paraîtront après la fin de l'entraînement de « ton IA » : leurs projets sont
-prêts, leurs adresses n'existent pas encore.
+chapitre. La Partie 1 est en ligne en entier, de
+<https://chipat-neko.github.io/forge-ia/partie-1/1-1/> à
+<https://chipat-neko.github.io/forge-ia/partie-1/1-6/>. Les chapitres 1.5 et
+1.6 montrent « ton IA », la vraie : ses poids sont publiés dans la version
+`ton-ia-1.5` du dépôt (<https://github.com/chipat-neko/forge-ia/releases/tag/ton-ia-1.5>).
 
 | Projet | Chapitre | Ce qu'il fait |
 | --- | --- | --- |
@@ -175,7 +176,10 @@ Pour faire paraître un chapitre :
 3. Rien à changer dans les parcours : ils lisent les fichiers sur le
    disque, et voient d'eux-mêmes le chapitre paru (le pied des chapitres
    voisins, l'accueil, la recherche). Seuls leurs commentaires qui le disent
-   « à venir » sont à relire.
+   « à venir » sont à relire. Relire aussi ce qui annonce le chapitre hors
+   du site : ce README, celui du projet du chapitre et son notebook, qui
+   peuvent encore le dire à venir. `site/src/lib/annonces.test.ts` le vérifie
+   pour les README.
 4. Si le chapitre contient le mini-modèle (0.5), écarter
    `dist/_astro/travailleur-*.js` de la recherche du prénom dans
    `.github/workflows/site.yml`, comme le dit son commentaire.

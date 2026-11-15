@@ -190,7 +190,7 @@ test('chapitre 1.4 complet', async ({ page }, info) => {
   await page.keyboard.press('ArrowLeft');
   await expect(page.locator('#recap [data-acquis="atelier"]')).toHaveAttribute('data-gagne', 'oui');
   await expect(page.locator('#recap [data-total]')).toContainText('6 sur 6');
-  // Le pied suit les fichiers : 1.3 a paru, 1.5 est « à venir » tant qu'il n'a pas paru.
+  // Le pied suit les fichiers : 1.3 et 1.5 ont paru, ce sont des liens.
   await verifierVoisin(page, 'precedent', '1-3.mdx', '/forge-ia/partie-1/1-3/');
   await verifierVoisin(page, 'suivant', '1-5.mdx', '/forge-ia/partie-1/1-5/');
   await verifierLiensVersParus(page.locator('main'), PAGE);
@@ -501,6 +501,8 @@ test('les vraies cartes de ton IA : les têtes du fichier, chacune dans un vrai 
   expect(legende.replace(/\s+/g, ' ')).toContain('calculés sur le processeur par cartes_attention, depuis les poids publiés de ton-ia-1.5');
   await expect(cartes.locator('[data-test="cartes-legende"] code', { hasText: 'cartes_attention' })).toHaveCount(1);
   await expect(etape.locator('a[href="https://github.com/chipat-neko/forge-ia/releases/tag/ton-ia-1.5"]')).toHaveCount(1);
+  // La commande qui relève ces cartes est à l'étape 10 de 1.6, qui a paru : un lien (revue finale du plan 5, m6).
+  await expect(etape.locator('a[href="/forge-ia/partie-1/1-6/#etape-10"]')).toHaveText('étape 10');
   // Les teintes : du lavande pâle à l'indigo, d'autant plus indigo que le poids est grand ; le texte passe
   // en papier sur les cases sombres.
   const fonds = await cartes.locator('table tbody td:not([data-masque])').evaluateAll((tds) =>

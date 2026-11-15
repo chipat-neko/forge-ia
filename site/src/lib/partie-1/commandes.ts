@@ -112,3 +112,27 @@ export const EVALUATION_QCM =
   'uv run --extra cpu python -m evaluation_pas_a_pas qcm-exemples --sauvegarde D:\\forge-ia-donnees\\entrainements\\ton-ia-mini\\sauvegardes\\etape-0006370.pt --appareil cpu --json mesures/qcm-mini.json';
 /** Lancer les tests du projet 1.6, avec la version de PyTorch pour le processeur. */
 export const EVALUATION_TESTS = 'uv run --extra cpu pytest -q';
+
+// ---------- Ton IA, la vraie (la version publiée ton-ia-1.5), dans le projet 1.6 ----------
+// Le téléchargement de la version publiée sur GitHub (avec l'outil gh), puis les commandes qui ont écrit
+// ses relevés : son rapport d'évaluation et ses six questions de MMMLU (chapitre 1.6, étape 8), ses
+// cartes d'attention (chapitre 1.4, étape 5) et ses jetons suivants (chapitre 1.1, étape 9). Ce sont
+// celles du README du projet 1.6, et elles écrivent les fichiers que lisent ces chapitres
+// (FICHIERS_EVALUATION, FICHIERS_QCM et FICHIERS_SORTIES_TON_IA d'evaluation.ts) : commandes.test.ts le
+// vérifie. Le dossier D:\forge-ia-donnees\cache\ton-ia-1.5 est celui du PC de l'auteur. Le chapitre 1.6
+// les montre à son étape 10 ; les chapitres 1.1 et 1.4 y renvoient.
+
+/** Télécharger tous les fichiers de la version publiée (dont les poids, leur configuration, le tokenizer et le rapport d'évaluation) dans un dossier. */
+export const TELECHARGER_TON_IA = 'gh release download ton-ia-1.5 --dir D:\\forge-ia-donnees\\cache\\ton-ia-1.5';
+/** Le relevé du rapport d'évaluation publié avec les poids, sous le nom de la version : mesures/evaluation-1.5.json. */
+export const EVALUATION_RESUMER_TON_IA =
+  'uv run --extra cpu python -m evaluation_pas_a_pas resumer --rapport D:\\forge-ia-donnees\\cache\\ton-ia-1.5\\rapport.json --nom ton-ia-1.5 --json mesures/evaluation-1.5.json';
+/** Les six mêmes questions de MMMLU, notées par ton IA sur le processeur : mesures/qcm-1.5.json. */
+export const EVALUATION_QCM_TON_IA =
+  'uv run --extra cpu python -m evaluation_pas_a_pas qcm-exemples --modele D:\\forge-ia-donnees\\cache\\ton-ia-1.5 --appareil cpu --json mesures/qcm-1.5.json';
+/** Ses cartes d'attention pour la phrase de l'exemple du chapitre 1.4, le bloc et les deux têtes choisis par --choisir. */
+export const EVALUATION_CARTES_TON_IA =
+  'uv run --extra cpu python -m evaluation_pas_a_pas cartes --modele D:\\forge-ia-donnees\\cache\\ton-ia-1.5 --phrase "Le forgeron chauffe le fer puis il le tord." --choisir --appareil cpu --json sorties/cartes-ton-ia.json';
+/** Les dix jetons qu'elle juge les plus probables après le départ de l'atelier du chapitre 1.1, suivi de « le ». */
+export const EVALUATION_SUIVANTS_TON_IA =
+  'uv run --extra cpu python -m evaluation_pas_a_pas suivants --modele D:\\forge-ia-donnees\\cache\\ton-ia-1.5 --phrase "Le forgeron frappe le" --appareil cpu --json sorties/ton-ia-suivants.json';

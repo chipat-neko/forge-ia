@@ -9,8 +9,9 @@
 // et leur suite s'affichent comme du code. Ces textes ne sont pas du texte du site : ils portent
 // data-pagefind-ignore, et les parcours ne leur appliquent pas la typographie.
 //
-// Tant que le relevé manque (ton IA, la vraie, jusqu'à la tâche 16 du plan 5), le composant
-// affiche « à mesurer », marqué data-a-mesurer.
+// Si le relevé manque, le composant affiche « à mesurer », marqué data-a-mesurer : c'était le cas de
+// ton IA, la vraie, jusqu'à la tâche 16 du plan 5. Le relevé est versionné depuis, et la garde de
+// parution (e2e/parution.spec.ts) refuse cette valeur dans un chapitre paru.
 //
 //   <EchantillonsEvaluation nom="mini" />
 import { root } from 'astro:config/server';
