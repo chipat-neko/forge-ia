@@ -6,10 +6,12 @@ paquet `forge`, dans `projets/forge`) :
 
 - il **lit le journal** d'un entraînement : les sessions (un entraînement mis en pause puis repris en
   a plusieurs), la courbe de perte réduite en paquets de pas, et un résumé en quelques nombres. Il a
-  relevé celui de la version d'une heure de « ton IA » (le modèle « mini », `mesures/ton-ia-mini.json`) ;
+  relevé celui de la version d'une heure de « ton IA » (le modèle « mini », `mesures/ton-ia-mini.json`)
+  et celui de son entraînement principal (la version `ton-ia-1.5`, `mesures/ton-ia-1.5.json`) ;
 - il fait un **petit essai de pause et de reprise exacte** sur le processeur : un entraînement de
   60 pas, fait d'un trait, puis refait en l'arrêtant à mi-chemin et en le reprenant. Sur le processeur,
-  les deux finissent sur la même perte, au bit près.
+  les deux finissent sur la même perte, au bit près. L'essai a aussi tourné sur la carte graphique de
+  l'auteur (`mesures/essai-rtx-5070-ti.json`).
 
 C'est le projet du chapitre 1.5 de La Forge IA, « Le pré-entraînement sur ton
 GPU ». Ce chapitre n'est pas encore en ligne : il paraîtra après la fin de
@@ -69,6 +71,8 @@ dossier.
 ```bash
 uv run --extra cpu python -m pre_entrainement essai --appareil cpu --enregistrer sorties/essai-processeur.txt --json mesures/essai-processeur.json
 uv run --extra cpu python -m pre_entrainement courbe --journal D:\forge-ia-donnees\entrainements\ton-ia-mini\journal.jsonl --config ..\forge\configs\mini.toml --json mesures/ton-ia-mini.json
+uv run --extra cpu python -m pre_entrainement courbe --journal D:\forge-ia-donnees\entrainements\ton-ia\journal.jsonl --config ..\forge\configs\principal.toml --nom ton-ia-1.5 --json mesures/ton-ia-1.5.json
+uv run --extra gpu python -m pre_entrainement essai --appareil cuda --enregistrer sorties/essai-rtx-5070-ti.txt --json mesures/essai-rtx-5070-ti.json
 ```
 
 - `essai` prépare les données de l'essai (le texte du site, encodé par le tokenizer figé de « ton
@@ -83,9 +87,11 @@ uv run --extra cpu python -m pre_entrainement courbe --journal D:\forge-ia-donne
 - `courbe` lit le journal d'un entraînement de forge (`journal.jsonl`) et le fichier TOML qui l'a
   lancé, et affiche son résumé et ses sessions. Avec `--json FICHIER`, il écrit aussi
   `{"nom", "releve_le", "resume", "sessions", "courbe"}` : c'est ainsi que
-  `mesures/ton-ia-mini.json` a été écrit. Le journal de « mini » est hors du dépôt (sous
-  `FORGE_DONNEES`, `D:\forge-ia-donnees` sur le PC de l'auteur) : sans lui, la commande ne se
-  rejoue pas, mais le fichier relevé est dans le dépôt. Sous Linux ou Mac, la
+  `mesures/ton-ia-mini.json` et `mesures/ton-ia-1.5.json` ont été écrits. `nom` est le dossier de
+  l'entraînement (`ton-ia-mini`), ou ce que donne `--nom` : l'entraînement principal a pour dossier
+  `ton-ia`, et son relevé porte le nom de la version publiée, `ton-ia-1.5`. Les journaux sont hors du
+  dépôt (sous `FORGE_DONNEES`, `D:\forge-ia-donnees` sur le PC de l'auteur) : sans eux, les commandes
+  ne se rejouent pas, mais les fichiers relevés sont dans le dépôt. Sous Linux ou Mac, la
   commande a la même forme, avec des `/` dans les chemins (par exemple
   `--config ../forge/configs/mini.toml`) et le journal sous ton propre
   `FORGE_DONNEES`.
@@ -195,18 +201,22 @@ arrête la construction.
 | Fichier | D'où il vient | Relevé le |
 | --- | --- | --- |
 | `mesures/ton-ia-mini.json` | le journal de la version d'une heure de « ton IA » (le modèle « mini », entraîné le 03/11/2026), lu par `courbe` ; 6 370 pas, 60 min 17 s de calcul, sans pause | 09/11/2026 |
+| `mesures/ton-ia-1.5.json` | le journal de l'entraînement principal de « ton IA » (la version `ton-ia-1.5`, entraînée du 03 au 14/11/2026), lu par `courbe --nom ton-ia-1.5` ; 16 540 pas, 139 h 06 min 32 s de calcul, 13 sessions et 12 pauses | 15/11/2026 |
 | `mesures/essai-processeur.json` | l'essai de pause et de reprise sur le processeur, écrit par `essai --json` | 09/11/2026 |
 | `sorties/essai-processeur.txt` | la sortie du même essai, écrite par `essai --enregistrer` | 09/11/2026 |
+| `mesures/essai-rtx-5070-ti.json` | le même essai sur la carte graphique de l'auteur (NVIDIA GeForce RTX 5070 Ti), avec l'extra `gpu`, écrit par `essai --appareil cuda --json` | 15/11/2026 |
+| `sorties/essai-rtx-5070-ti.txt` | la sortie de l'essai sur la carte, écrite par `essai --enregistrer` | 15/11/2026 |
 
 L'essai a tourné sur le processeur de l'auteur (16 cœurs logiques). Sa durée
 change d'une machine à l'autre ; ses pertes aussi, à la dernière décimale, selon
 le nombre de fils du processeur. L'égalité des deux pertes, elle, ne change pas.
 
-### Ce qui viendra de ton IA
-
-Les relevés de la vraie « ton IA » (`mesures/ton-ia-1.5.json`, et l'essai sur la
-carte graphique) seront versés après la fin de son entraînement, avant la
-parution du chapitre ; jusque-là, rien n'en est inventé ici.
+Sur la carte graphique, l'essai ne promet pas une reprise au bit près : la carte
+n'utilise pas de calculs déterministes, et peut additionner dans un autre ordre
+d'un entraînement à l'autre. `mesures/essai-rtx-5070-ti.json` donne l'écart
+mesuré tel qu'il est (`ecart`), et la commande rend 0 sur la carte quel que soit
+cet écart ; le test `test_essai_sur_la_carte` demande seulement qu'il reste
+petit.
 
 ## Le notebook
 

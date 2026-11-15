@@ -4,11 +4,14 @@
     uv run --extra cpu python -m evaluation_pas_a_pas qcm-exemples --sauvegarde <etape.pt> --appareil cpu --json mesures/qcm-mini.json
     uv run --extra cpu python -m evaluation_pas_a_pas cartes --sauvegarde <etape.pt> --phrase "Le forgeron dit qu'il" --couche 3 --tete 0 --appareil cpu --json cartes.json
     uv run --extra cpu python -m evaluation_pas_a_pas suivants --sauvegarde <etape.pt> --phrase "Il était une fois" --appareil cpu --json suivants.json
+    uv run --extra cpu python -m evaluation_pas_a_pas cartes --modele <dossier de ton-ia-1.5> --phrase "Le forgeron chauffe le fer puis il le tord." --choisir --appareil cpu --json sorties/cartes-ton-ia.json
 
 `resumer` lit le `rapport.json` de `python -m forge evaluer` et en tire le relevé que le site lit. `qcm-exemples` lit
 quelques questions de MMMLU (en flux) et les note avec le modèle de la sauvegarde. `cartes` écrit les poids d'attention
-d'une phrase, pour une couche et une tête\u202f; `suivants` les jetons que le modèle juge les plus probables après une
-phrase. Les trois dernières prennent `--appareil` (`auto`, `cpu` ou `cuda`). Sans carte graphique, `--appareil cuda`
+d'une phrase, pour une couche et une tête (ou, avec `--choisir`, pour la couche et les deux têtes qu'elle choisit)\u202f;
+`suivants` les jetons que le modèle juge les plus probables après une phrase. Les trois dernières prennent le modèle
+d'une sauvegarde (`--sauvegarde`) ou les fichiers publiés de ton IA (`--modele`, le dossier de la version
+`ton-ia-1.5`), et `--appareil` (`auto`, `cpu` ou `cuda`). Sans carte graphique, `--appareil cuda`
 dit quoi faire, sans trace Python, et rend le code 2\u202f; de même sans PyTorch, ou avec une carte que PyTorch voit
 sans savoir calculer dessus.
 """
@@ -24,9 +27,16 @@ try:
     from forge.tokenizer.bpe_octets import TokenizerOctets
 
     from evaluation_pas_a_pas.qcm_exemples import exemples_mmmlu, noter_exemples
-    from evaluation_pas_a_pas.regarder import cartes_attention, jetons_de_la_phrase, suivants, texte_du_jeton
+    from evaluation_pas_a_pas.regarder import (
+        cartes_attention,
+        choisir_couche_et_tetes,
+        jetons_de_la_phrase,
+        suivants,
+        texte_du_jeton,
+    )
     from evaluation_pas_a_pas.resumer import resumer
     from evaluation_pas_a_pas.sauvegarde import charger_sauvegarde
+    from evaluation_pas_a_pas.ton_ia import NOM_DE_LA_VERSION, charger_ton_ia
 except ImportError as erreur:  # PyTorch (ou forge) manque : main() le dit, sans trace
     MANQUE: ImportError | None = erreur
 else:
@@ -102,6 +112,11 @@ def nom_de_la_sauvegarde(sauvegarde: Path) -> str:
     return chemin.parent.parent.name if chemin.parent.name == "sauvegardes" else chemin.stem
 
 
+def nom_du_modele(options: argparse.Namespace) -> str:
+    """Le nom du relevé : « ton-ia-1.5 » avec `--modele` (le nom des poids publiés), celui de la sauvegarde sinon."""
+    return NOM_DE_LA_VERSION if options.modele else nom_de_la_sauvegarde(Path(options.sauvegarde))
+
+
 def commande_resumer(options: argparse.Namespace) -> int:
     try:
         releve = resumer(Path(options.rapport), options.nom)
@@ -125,17 +140,28 @@ def commande_resumer(options: argparse.Namespace) -> int:
 
 
 def preparer(options: argparse.Namespace):
-    """Le modèle de la sauvegarde, sur l'appareil choisi, et le tokenizer ; ou le code de sortie d'une erreur dite en français."""
+    """Le modèle (de la sauvegarde, ou publié), sur l'appareil choisi, et le tokenizer ; ou le code de sortie d'une erreur dite en français."""
     from evaluation_pas_a_pas.appareil import AppareilIndisponible, choisir_appareil
 
+    if options.modele and options.tokenizer:
+        print(
+            f"--tokenizer ne sert qu'avec --sauvegarde{FINE}: le dossier de --modele a son tokenizer, celui de ton IA. "
+            "Retire --tokenizer.",
+            file=sys.stderr,
+        )
+        return 2
     try:
         ou = choisir_appareil(options.appareil)
     except (AppareilIndisponible, ValueError) as erreur:
         print(erreur, file=sys.stderr)
         return 2
     try:
-        modele, config = charger_sauvegarde(Path(options.sauvegarde), ou.type)
-        tokenizer = TokenizerOctets.charger(Path(options.tokenizer) if options.tokenizer else TOKENIZER)
+        if options.modele:
+            modele, tokenizer = charger_ton_ia(Path(options.modele), ou.type)
+            config = modele.config
+        else:
+            modele, config = charger_sauvegarde(Path(options.sauvegarde), ou.type)
+            tokenizer = TokenizerOctets.charger(Path(options.tokenizer) if options.tokenizer else TOKENIZER)
     except (FileNotFoundError, ValueError) as erreur:
         print(erreur, file=sys.stderr)
         return 2
@@ -173,7 +199,7 @@ def commande_qcm_exemples(options: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 2
-        releve = {"nom": nom_de_la_sauvegarde(Path(options.sauvegarde)), "releve_le": aujourd_hui(), "appareil": ou.type}
+        releve = {"nom": nom_du_modele(options), "releve_le": aujourd_hui(), "appareil": ou.type}
         releve.update(noter_exemples(modele, tokenizer, qcms))
         jeu = releve["jeu"]
         print(f"{releve['n']} questions de {jeu['nom']} ({jeu['configuration']}), licence {jeu['licence']}, lues en flux sur {jeu['adresse']}")
@@ -193,40 +219,113 @@ def commande_qcm_exemples(options: argparse.Namespace) -> int:
     return sur_l_appareil(options, travail)
 
 
+def arrondi(regard: dict[str, float]) -> dict[str, float]:
+    """Un regard (voir `regard_des_tetes`), ses nombres arrondis comme les poids du fichier."""
+    return {cle: round(valeur, CHIFFRES_DES_POIDS) for cle, valeur in regard.items()}
+
+
+def releve_des_cartes_choisies(modele, config, ids: list[int]) -> dict:
+    """La couche et les deux têtes choisies par `choisir_couche_et_tetes`, leurs cartes, et les chiffres qui justifient le choix."""
+    import torch
+
+    couche, avant, loin, regards = choisir_couche_et_tetes(modele, torch.tensor(ids))
+    cartes = cartes_attention(modele, torch.tensor(ids), couche)
+    montrees = [
+        {
+            "tete": tete,
+            "role": role,
+            **arrondi(regards[couche][tete]),
+            "poids": [[round(float(x), CHIFFRES_DES_POIDS) for x in ligne] for ligne in cartes[tete]],
+        }
+        for tete, role in ((avant, "jeton-d-avant"), (loin, "loin"))
+    ]
+    par_couche = []
+    for c, regards_c in enumerate(regards):
+        meilleure = max(range(config.tetes), key=lambda t: regards_c[t]["jeton_d_avant"])
+        par_couche.append({"couche": c, "tete": meilleure, "jeton_d_avant": round(regards_c[meilleure]["jeton_d_avant"], CHIFFRES_DES_POIDS)})
+    return {
+        "couche": couche,
+        "couches": config.couches,
+        "tetes": config.tetes,
+        "cartes": montrees,
+        "choix": {
+            "jeton_d_avant_par_couche": par_couche,
+            "regards_de_la_couche": [{"tete": t, **arrondi(r)} for t, r in enumerate(regards[couche])],
+        },
+    }
+
+
 def commande_cartes(options: argparse.Namespace) -> int:
     import torch
 
-    def travail(ou, modele, config, tokenizer) -> int:
-        if not 0 <= options.couche < config.couches:
-            print(
-                f"La couche {options.couche} n'existe pas{FINE}: ce modèle a {config.couches} couches, de 0 à {config.couches - 1}. "
-                "Corrige --couche.",
-                file=sys.stderr,
-            )
-            return 2
-        if not 0 <= options.tete < config.tetes:
-            print(
-                f"La tête {options.tete} n'existe pas{FINE}: ce modèle a {config.tetes} têtes, de 0 à {config.tetes - 1}. Corrige --tete.",
-                file=sys.stderr,
-            )
-            return 2
+    if options.choisir and (options.couche is not None or options.tete is not None):
+        print(
+            f"--choisir choisit lui-même la couche et les têtes{FINE}: retire --couche et --tete, ou retire --choisir.",
+            file=sys.stderr,
+        )
+        return 2
+
+    def travail_choisi(ou, modele, config, tokenizer) -> int:
         ids = jetons_de_la_phrase(tokenizer, options.phrase, config.longueur_contexte)
-        cartes = cartes_attention(modele, torch.tensor(ids), options.couche)
-        poids = [[round(float(x), CHIFFRES_DES_POIDS) for x in ligne] for ligne in cartes[options.tete]]
         jetons = [texte_du_jeton(tokenizer, i) for i in ids]
         releve = {
-            "nom": nom_de_la_sauvegarde(Path(options.sauvegarde)),
+            "nom": nom_du_modele(options),
             "releve_le": aujourd_hui(),
             "appareil": ou.type,
             "phrase": options.phrase,
             "jetons": jetons,
-            "couche": options.couche,
+            **releve_des_cartes_choisies(modele, config, ids),
+        }
+        avant, loin = releve["cartes"]
+        print(
+            f"Cartes d'attention de la couche {releve['couche']} ({len(jetons)} jetons, sur {ou.type}), "
+            f"choisie parmi {config.couches} couches de {config.tetes} têtes"
+        )
+        print(
+            f"  tête {avant['tete']}, celle qui regarde le plus le jeton d'avant{FINE}: "
+            f"{pourcent(avant['jeton_d_avant'])} de son attention"
+        )
+        print(
+            f"  tête {loin['tete']}, celle qui regarde le plus loin{FINE}: "
+            f"{nombre(loin['distance'], 2)} jetons en arrière en moyenne, sans compter <|fin_texte|>"
+        )
+        if options.json:
+            ecrire_json(Path(options.json), releve)
+        return 0
+
+    def travail(ou, modele, config, tokenizer) -> int:
+        couche = 0 if options.couche is None else options.couche
+        tete = 0 if options.tete is None else options.tete
+        if not 0 <= couche < config.couches:
+            print(
+                f"La couche {couche} n'existe pas{FINE}: ce modèle a {config.couches} couches, de 0 à {config.couches - 1}. "
+                "Corrige --couche.",
+                file=sys.stderr,
+            )
+            return 2
+        if not 0 <= tete < config.tetes:
+            print(
+                f"La tête {tete} n'existe pas{FINE}: ce modèle a {config.tetes} têtes, de 0 à {config.tetes - 1}. Corrige --tete.",
+                file=sys.stderr,
+            )
+            return 2
+        ids = jetons_de_la_phrase(tokenizer, options.phrase, config.longueur_contexte)
+        cartes = cartes_attention(modele, torch.tensor(ids), couche)
+        poids = [[round(float(x), CHIFFRES_DES_POIDS) for x in ligne] for ligne in cartes[tete]]
+        jetons = [texte_du_jeton(tokenizer, i) for i in ids]
+        releve = {
+            "nom": nom_du_modele(options),
+            "releve_le": aujourd_hui(),
+            "appareil": ou.type,
+            "phrase": options.phrase,
+            "jetons": jetons,
+            "couche": couche,
             "couches": config.couches,
-            "tete": options.tete,
+            "tete": tete,
             "tetes": config.tetes,
             "poids": poids,
         }
-        print(f"Cartes d'attention de la couche {options.couche}, tête {options.tete} ({len(jetons)} jetons, sur {ou.type})")
+        print(f"Cartes d'attention de la couche {couche}, tête {tete} ({len(jetons)} jetons, sur {ou.type})")
         regardes = sorted(range(len(jetons)), key=lambda j: -poids[-1][j])[:3]
         print(
             f"  le dernier jeton ({jetons[-1]!r}) regarde surtout{FINE}: "
@@ -236,14 +335,14 @@ def commande_cartes(options: argparse.Namespace) -> int:
             ecrire_json(Path(options.json), releve)
         return 0
 
-    return sur_l_appareil(options, travail)
+    return sur_l_appareil(options, travail_choisi if options.choisir else travail)
 
 
 def commande_suivants(options: argparse.Namespace) -> int:
     def travail(ou, modele, config, tokenizer) -> int:
         liste = suivants(modele, tokenizer, options.phrase, options.k)
         releve = {
-            "nom": nom_de_la_sauvegarde(Path(options.sauvegarde)),
+            "nom": nom_du_modele(options),
             "releve_le": aujourd_hui(),
             "appareil": ou.type,
             "phrase": options.phrase,
@@ -260,9 +359,16 @@ def commande_suivants(options: argparse.Namespace) -> int:
 
 
 def ajouter_modele(commande: argparse.ArgumentParser) -> None:
-    """Les options des commandes qui chargent un modèle."""
-    commande.add_argument("--sauvegarde", required=True, metavar="PT", help="une sauvegarde de forge (etape-*.pt ou meilleur.pt)")
-    commande.add_argument("--tokenizer", metavar="JSON", help="le tokenizer du modèle (par défaut, le tokenizer figé de « ton IA »)")
+    """Les options des commandes qui chargent un modèle : une sauvegarde de l'entraînement, ou ton IA publiée (l'une des deux, voir `main`)."""
+    commande.add_argument("--sauvegarde", metavar="PT", help="une sauvegarde de forge (etape-*.pt ou meilleur.pt) ; ou bien --modele")
+    commande.add_argument(
+        "--modele",
+        metavar="DOSSIER",
+        help="le dossier des fichiers publiés de ton IA (version ton-ia-1.5 : config.json, poids, tokenizer) ; ou bien --sauvegarde",
+    )
+    commande.add_argument(
+        "--tokenizer", metavar="JSON", help="avec --sauvegarde, le tokenizer du modèle (par défaut, le tokenizer figé de « ton IA »)"
+    )
     commande.add_argument("--appareil", help="auto (par défaut, sauf si FORGE_APPAREIL est réglée), cpu ou cuda", default=None)
     commande.add_argument("--json", metavar="FICHIER", help="écrit aussi le résultat dans FICHIER (JSON)")
 
@@ -288,8 +394,13 @@ def main(argv: list[str] | None = None) -> int:
     cartes = commandes.add_parser("cartes", help="les poids d'attention d'une phrase, pour une couche et une tête")
     ajouter_modele(cartes)
     cartes.add_argument("--phrase", required=True, help="la phrase à lire")
-    cartes.add_argument("--couche", type=int, default=0, help="la couche, à partir de 0 (0 par défaut)")
-    cartes.add_argument("--tete", type=int, default=0, help="la tête, à partir de 0 (0 par défaut)")
+    cartes.add_argument("--couche", type=int, default=None, help="la couche, à partir de 0 (0 par défaut)")
+    cartes.add_argument("--tete", type=int, default=None, help="la tête, à partir de 0 (0 par défaut)")
+    cartes.add_argument(
+        "--choisir",
+        action="store_true",
+        help="choisit la couche et deux têtes : celle qui regarde le plus le jeton d'avant, et celle qui regarde le plus loin",
+    )
     cartes.set_defaults(fonction=commande_cartes)
     suivant = commandes.add_parser("suivants", help="les jetons que le modèle juge les plus probables après une phrase")
     ajouter_modele(suivant)
@@ -297,6 +408,12 @@ def main(argv: list[str] | None = None) -> int:
     suivant.add_argument("--k", type=int, default=10, help="combien de jetons (10 par défaut)")
     suivant.set_defaults(fonction=commande_suivants)
     options = lecteur.parse_args(argv)
+    if hasattr(options, "modele") and (options.sauvegarde is None) == (options.modele is None):
+        # argparse sort alors avec le code 2, comme pour une option requise qui manque.
+        lecteur.error(
+            f"donne le modèle à charger{FINE}: --sauvegarde (une sauvegarde de forge) ou --modele (le dossier de "
+            "ton IA publiée), l'un des deux."
+        )
     if MANQUE is not None:
         print(
             f"Un module manque ({MANQUE}). Lance le script avec la version de PyTorch de ton poste{FINE}: "

@@ -16,6 +16,7 @@ from evaluation_pas_a_pas.resumer import nom_de_l_entrainement, resumer
 PROJET = pathlib.Path(__file__).resolve().parents[1]
 RACINE = pathlib.Path(__file__).resolve().parents[3]
 MINI_MD = RACINE / "docs" / "mesures" / "ton-ia-mini.md"
+TON_IA_MD = RACINE / "docs" / "mesures" / "ton-ia-1.5.md"
 
 RAPPORT = {
     "version": VERSION_DU_RAPPORT,
@@ -169,6 +170,27 @@ def test_le_releve_de_mini_dit_ce_que_dit_le_document():
     assert releve["qcm"]["hellaswag"]["verdict"] == "au-dessus" and releve["qcm"]["arc"]["verdict"] == "pas-different"
     assert len(releve["echantillons"]) == 10
     # Le relevé est écrit comme les autres mesures du dépôt.
+    octets = chemin.read_bytes()
+    assert b"\r" not in octets and octets.endswith(b"}\n")
+    assert octets.decode("utf-8") == json.dumps(releve, ensure_ascii=False, allow_nan=False, indent=1) + "\n"
+
+
+def test_le_releve_de_ton_ia_dit_ce_que_dit_le_document():
+    chemin = PROJET / "mesures" / "evaluation-1.5.json"
+    if not chemin.exists():
+        pytest.skip("Le relevé de ton IA n'est pas encore écrit (voir le README du projet).")
+    if not TON_IA_MD.exists():
+        pytest.skip("Projet téléchargé seul : docs/mesures/ton-ia-1.5.md n'est pas là pour comparer.")
+    releve = json.loads(chemin.read_text(encoding="utf-8"))
+    document = TON_IA_MD.read_text(encoding="utf-8").replace("\u202f", " ").replace("\u00a0", " ")
+    # Le nom est celui de la version publiée, pas celui du dossier de l'entraînement (« ton-ia »).
+    assert releve["nom"] == "ton-ia-1.5" and releve["pas"] == 16540
+    assert f"**perplexité {virgule(releve['perplexite'], 1)}**" in document  # 11,2
+    assert f"**{virgule(releve['bits_par_octet'], 3)} bit par octet**" in document  # 0,802
+    assert f"HellaSwag **{virgule(100 * releve['qcm']['hellaswag']['exactitude_normalisee'], 1)} %**" in document  # 34,8 %
+    assert f"ARC-Challenge {virgule(100 * releve['qcm']['arc']['exactitude_normalisee'], 1)} %" in document  # 25,1 %
+    assert releve["qcm"]["hellaswag"]["verdict"] == "au-dessus" and releve["qcm"]["arc"]["verdict"] == "pas-different"
+    assert len(releve["echantillons"]) == 10
     octets = chemin.read_bytes()
     assert b"\r" not in octets and octets.endswith(b"}\n")
     assert octets.decode("utf-8") == json.dumps(releve, ensure_ascii=False, allow_nan=False, indent=1) + "\n"

@@ -68,6 +68,51 @@ def cartes_attention(modele: Transformer, ids: Tensor, couche: int) -> Tensor:
 # fin: cartes
 
 
+def regard_des_tetes(cartes: Tensor) -> list[dict[str, float]]:
+    """Ce que regarde chaque tête d'une couche, en trois nombres, à partir de ses cartes `[têtes, n, n]`.
+
+    Le jeton 0 est `<|fin_texte|>` (voir `jetons_de_la_phrase`). Les moyennes se font sur les jetons qui ont
+    un jeton de la phrase juste avant eux, les jetons 2 à n − 1\u202f:
+
+    - `jeton_d_avant`\u202f: la part de l'attention donnée au jeton juste avant (`poids[i][i − 1]`)\u202f;
+    - `distance`\u202f: combien de jetons en arrière la tête regarde, sur les mots de la phrase\u202f: la somme des
+      `poids[i][j] × (i − j)` pour j de 1 à i. L'attention posée sur `<|fin_texte|>` n'y compte pas\u202f:
+      beaucoup de têtes y reposent quand rien ne les intéresse, et elle ferait passer leur regard pour lointain\u202f;
+    - `debut`\u202f: la part de l'attention posée sur `<|fin_texte|>`.
+    """
+    n = cartes.shape[-1]
+    if n < 3:
+        raise ValueError(f"Il faut au moins deux jetons après <|fin_texte|> pour mesurer un regard\u202f: la phrase en a {n - 1}.")
+    cartes = cartes.double()
+    positions = torch.arange(n, dtype=torch.float64)
+    ecarts = (positions[:, None] - positions[None, :]).clamp(min=0)  # i − j, nul en avant (où le poids est nul)
+    i = torch.arange(2, n)
+    avant = cartes[:, i, i - 1].mean(dim=-1)
+    distance = (cartes[:, 2:, 1:] * ecarts[2:, 1:]).sum(dim=-1).mean(dim=-1)
+    debut = cartes[:, 2:, 0].mean(dim=-1)
+    return [
+        {"jeton_d_avant": float(a), "distance": float(d), "debut": float(b)} for a, d, b in zip(avant, distance, debut)
+    ]
+
+
+def choisir_couche_et_tetes(modele: Transformer, ids: Tensor) -> tuple[int, int, int, list[list[dict[str, float]]]]:
+    """La couche et les deux têtes à montrer pour la phrase `ids`, avec le regard de chaque tête de chaque couche.
+
+    La couche est celle de la tête qui regarde le plus le jeton d'avant, dans tout le modèle (le plus grand
+    `jeton_d_avant`). Dans cette couche, la seconde tête est celle qui regarde le plus loin (la plus grande
+    `distance`), parmi les autres. Rend `(couche, tête_jeton_d_avant, tête_loin, regards)`, où `regards[c][t]`
+    est le regard de la tête `t` de la couche `c` (voir `regard_des_tetes`).
+    """
+    config = modele.config
+    regards = [regard_des_tetes(cartes_attention(modele, ids, couche)) for couche in range(config.couches)]
+    couche, avant = max(
+        ((c, t) for c in range(config.couches) for t in range(config.tetes)),
+        key=lambda ct: regards[ct[0]][ct[1]]["jeton_d_avant"],
+    )
+    loin = max((t for t in range(config.tetes) if t != avant), key=lambda t: regards[couche][t]["distance"])
+    return couche, avant, loin, regards
+
+
 def jetons_de_la_phrase(tokenizer, phrase: str, longueur_contexte: int) -> list[int]:
     """`<|fin_texte|>` (le début de document du modèle), puis la phrase en jetons ; les derniers jetons si elle est trop longue."""
     ids = [tokenizer.id_special(JETON_DE_DEBUT), *tokenizer.encoder(phrase)]

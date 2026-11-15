@@ -16,7 +16,7 @@ import sys
 
 import pytest
 import torch
-from modele_factice import CONFIG, petit_modele, sauvegarder
+from modele_factice import CONFIG, arrondi_en_bf16, exporter_comme_la_release, petit_modele, sauvegarder
 from test_resumer import RAPPORT, ecrire
 
 import evaluation_pas_a_pas.__main__ as script
@@ -39,6 +39,14 @@ def sans_variable(monkeypatch):
 @pytest.fixture
 def sauvegarde(tmp_path):
     return sauvegarder(petit_modele(), tmp_path / "entrainements" / "ton-ia-factice" / "sauvegardes" / "etape-0000007.pt")
+
+
+@pytest.fixture
+def modele_publie(tmp_path):
+    """Le petit modèle (poids arrondis en bf16) exporté comme la version publiée, et sa sauvegarde : le même modèle."""
+    modele = arrondi_en_bf16(petit_modele())
+    sauvegarde = sauvegarder(modele, tmp_path / "entrainements" / "ton-ia" / "sauvegardes" / "meilleur.pt")
+    return exporter_comme_la_release(modele, tmp_path / "publie" / "ton-ia-1.5"), sauvegarde
 
 
 @pytest.fixture
@@ -161,6 +169,90 @@ def test_sauvegarde_introuvable_le_dit(tmp_path, capsys):
     assert "Sauvegarde introuvable" in lu.err and "Traceback" not in lu.err and lu.out == ""
 
 
+# --- --modele : les fichiers publiés de ton IA -----------------------------------------------------
+
+
+def test_suivants_du_modele_publie_valent_ceux_de_sa_sauvegarde(modele_publie, tmp_path):
+    dossier, sauvegarde = modele_publie
+    publie, sauve = tmp_path / "publie.json", tmp_path / "sauve.json"
+    assert main(["suivants", "--modele", str(dossier), "--phrase", PHRASE, "--k", "5", "--appareil", "cpu", "--json", str(publie)]) == 0
+    assert main(["suivants", "--sauvegarde", str(sauvegarde), "--phrase", PHRASE, "--k", "5", "--appareil", "cpu", "--json", str(sauve)]) == 0
+    lu, attendu = ecrit_comme_les_autres(publie), ecrit_comme_les_autres(sauve)
+    assert lu["nom"] == "ton-ia-1.5" and attendu["nom"] == "ton-ia"
+    assert lu["suivants"] == attendu["suivants"]  # les mêmes poids : les mêmes jetons, les mêmes probabilités
+
+
+def test_qcm_exemples_du_modele_publie(modele_publie, sans_reseau, tmp_path):
+    dossier, _ = modele_publie
+    sortie = tmp_path / "qcm-1.5.json"
+    assert main(["qcm-exemples", "--modele", str(dossier), "--appareil", "cpu", "--n", "2", "--json", str(sortie)]) == 0
+    donnees = ecrit_comme_les_autres(sortie)
+    assert donnees["nom"] == "ton-ia-1.5" and donnees["appareil"] == "cpu" and donnees["n"] == 2
+
+
+def test_cartes_choisies_du_modele_publie(modele_publie, tmp_path, capsys):
+    from evaluation_pas_a_pas.regarder import cartes_attention, choisir_couche_et_tetes, jetons_de_la_phrase
+    from evaluation_pas_a_pas.ton_ia import charger_ton_ia
+
+    dossier, _ = modele_publie
+    sortie = tmp_path / "cartes-ton-ia.json"
+    assert main(["cartes", "--modele", str(dossier), "--phrase", PHRASE, "--choisir", "--appareil", "cpu", "--json", str(sortie)]) == 0
+    donnees = ecrit_comme_les_autres(sortie)
+    assert list(donnees) == ["nom", "releve_le", "appareil", "phrase", "jetons", "couche", "couches", "tetes", "cartes", "choix"]
+    assert donnees["nom"] == "ton-ia-1.5" and (donnees["couches"], donnees["tetes"]) == (2, 4)
+    modele, tok = charger_ton_ia(dossier)
+    ids = torch.tensor(jetons_de_la_phrase(tok, PHRASE, CONFIG.longueur_contexte))
+    couche, avant, loin, regards = choisir_couche_et_tetes(modele, ids)
+    assert donnees["couche"] == couche
+    assert [(c["tete"], c["role"]) for c in donnees["cartes"]] == [(avant, "jeton-d-avant"), (loin, "loin")]
+    cartes = cartes_attention(modele, ids, couche)
+    n = len(donnees["jetons"])
+    for carte in donnees["cartes"]:
+        assert list(carte) == ["tete", "role", "jeton_d_avant", "distance", "debut", "poids"]
+        assert (torch.tensor(carte["poids"]) - cartes[carte["tete"]]).abs().max().item() <= 1e-6 and len(carte["poids"]) == n
+        assert carte["jeton_d_avant"] == round(regards[couche][carte["tete"]]["jeton_d_avant"], 6)
+    # Le choix se justifie par les chiffres : la meilleure tête « jeton d'avant » de chaque couche, et le regard de chaque tête de la couche.
+    choix = donnees["choix"]
+    assert list(choix) == ["jeton_d_avant_par_couche", "regards_de_la_couche"]
+    assert [c["couche"] for c in choix["jeton_d_avant_par_couche"]] == [0, 1]
+    assert max(choix["jeton_d_avant_par_couche"], key=lambda c: c["jeton_d_avant"])["couche"] == couche
+    assert [r["tete"] for r in choix["regards_de_la_couche"]] == [0, 1, 2, 3]
+    lu = capsys.readouterr().out
+    assert f"couche {couche}" in lu and "jeton d'avant" in lu and "plus loin" in lu
+
+
+def test_choisir_refuse_couche_et_tete(modele_publie, tmp_path, capsys):
+    dossier, _ = modele_publie
+    sortie = tmp_path / "cartes.json"
+    assert main(["cartes", "--modele", str(dossier), "--phrase", PHRASE, "--choisir", "--couche", "1", "--json", str(sortie)]) == 2
+    lu = capsys.readouterr()
+    assert "--choisir" in lu.err and "Traceback" not in lu.err and lu.out == "" and not sortie.exists()
+
+
+def test_modele_et_sauvegarde_ensemble_ou_ni_l_un_ni_l_autre(modele_publie, capsys):
+    dossier, sauvegarde = modele_publie
+    for options in (["--modele", str(dossier), "--sauvegarde", str(sauvegarde)], []):
+        with pytest.raises(SystemExit) as fin:
+            main(["suivants", *options, "--phrase", PHRASE, "--appareil", "cpu"])
+        assert fin.value.code == 2
+    assert "--sauvegarde" in capsys.readouterr().err
+
+
+def test_modele_introuvable_le_dit(tmp_path, capsys):
+    assert main(["suivants", "--modele", str(tmp_path / "rien"), "--phrase", PHRASE, "--appareil", "cpu"]) == 2
+    lu = capsys.readouterr()
+    assert "n'existe pas" in lu.err and "gh release download ton-ia-1.5" in lu.err and "Traceback" not in lu.err and lu.out == ""
+
+
+def test_modele_refuse_un_autre_tokenizer(modele_publie, tmp_path, capsys):
+    dossier, _ = modele_publie
+    autre = tmp_path / "autre.json"
+    autre.write_text("{}", encoding="utf-8")
+    assert main(["suivants", "--modele", str(dossier), "--tokenizer", str(autre), "--phrase", PHRASE, "--appareil", "cpu"]) == 2
+    lu = capsys.readouterr()
+    assert "--tokenizer" in lu.err and "Traceback" not in lu.err and lu.out == ""
+
+
 # --- La carte graphique ------------------------------------------------------------------------------
 
 
@@ -180,13 +272,15 @@ def test_appareil_inconnu(sauvegarde, capsys):
 
 
 def test_cuda_demandee_sans_carte_dans_un_vrai_processus(sauvegarde, tmp_path):
+    # CUDA_VISIBLE_DEVICES=-1 cache la carte quand il y en a une (avec l'extra gpu), comme dans 0.4 et 0.5.
+    # Une valeur vide ne suffit pas : sous Windows, une variable vide compte comme absente.
     resultat = subprocess.run(
         [sys.executable, "-m", "evaluation_pas_a_pas", "cartes", "--sauvegarde", str(sauvegarde), "--phrase", PHRASE, "--appareil", "cuda", "--json", str(tmp_path / "c.json")],
         capture_output=True,
         encoding="utf-8",
         errors="replace",
         cwd=PROJET,
-        env={**os.environ, "CUDA_VISIBLE_DEVICES": "", "PYTHONIOENCODING": "cp1252"},
+        env={**os.environ, "CUDA_VISIBLE_DEVICES": "-1", "PYTHONIOENCODING": "cp1252"},
         timeout=120,
     )
     assert resultat.returncode == 2

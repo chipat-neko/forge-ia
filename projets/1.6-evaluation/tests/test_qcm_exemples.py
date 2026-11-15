@@ -140,3 +140,22 @@ def test_le_releve_de_mini_a_sa_licence_et_son_adresse():
     octets = chemin.read_bytes()
     assert b"\r" not in octets and octets.endswith(b"}\n")
     assert octets.decode("utf-8") == json.dumps(releve, ensure_ascii=False, allow_nan=False, indent=1) + "\n"
+
+
+def test_le_releve_de_ton_ia_note_les_questions_de_mini():
+    chemin, mini = PROJET / "mesures" / "qcm-1.5.json", PROJET / "mesures" / "qcm-mini.json"
+    if not (chemin.exists() and mini.exists()):
+        pytest.skip("Les relevés des QCM de MMMLU ne sont pas encore écrits (voir le README du projet).")
+    releve = json.loads(chemin.read_text(encoding="utf-8"))
+    de_mini = json.loads(mini.read_text(encoding="utf-8"))
+    assert releve["nom"] == "ton-ia-1.5" and releve["appareil"] == "cpu"
+    assert releve["jeu"]["licence"] == "MIT" and releve["jeu"]["adresse"] == "https://huggingface.co/datasets/openai/MMMLU"
+    # Les six mêmes questions que « mini » (même tirage, graine 0) : seules les réponses du modèle changent.
+    garder = ("contexte", "choix", "bonne")
+    assert [{k: q[k] for k in garder} for q in releve["questions"]] == [{k: q[k] for k in garder} for q in de_mini["questions"]]
+    for q in releve["questions"]:
+        assert q["prefere"] == max(range(4), key=lambda k: q["scores_normalises"][k]) and q["juste"] == (q["prefere"] == q["bonne"])
+    assert releve["justes"] == sum(q["juste"] for q in releve["questions"])
+    octets = chemin.read_bytes()
+    assert b"\r" not in octets and octets.endswith(b"}\n")
+    assert octets.decode("utf-8") == json.dumps(releve, ensure_ascii=False, allow_nan=False, indent=1) + "\n"

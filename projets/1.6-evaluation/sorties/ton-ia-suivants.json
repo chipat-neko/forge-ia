@@ -1,0 +1,48 @@
+{
+ "nom": "ton-ia-1.5",
+ "releve_le": "2026-11-15",
+ "appareil": "cpu",
+ "phrase": "Le forgeron frappe le",
+ "suivants": [
+  {
+   "jeton": " bois",
+   "probabilite": 0.1219044104218483
+  },
+  {
+   "jeton": " sol",
+   "probabilite": 0.11918479204177856
+  },
+  {
+   "jeton": " métal",
+   "probabilite": 0.06050847843289375
+  },
+  {
+   "jeton": " fer",
+   "probabilite": 0.03403143957257271
+  },
+  {
+   "jeton": " mur",
+   "probabilite": 0.023923521861433983
+  },
+  {
+   "jeton": " cœur",
+   "probabilite": 0.014945751056075096
+  },
+  {
+   "jeton": " cuir",
+   "probabilite": 0.010499395430088043
+  },
+  {
+   "jeton": " cuivre",
+   "probabilite": 0.00972178764641285
+  },
+  {
+   "jeton": " premier",
+   "probabilite": 0.008491024374961853
+  },
+  {
+   "jeton": " ciel",
+   "probabilite": 0.00816091988235712
+  }
+ ]
+}

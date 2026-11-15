@@ -11,11 +11,12 @@ pas à pas et à la main, les mesures que fait forge (le paquet `forge`, dans `p
 - il refait **la marge et le verdict** : l'exactitude mesurée dépasse-t-elle le hasard de plus que la
   marge d'erreur ?
 - il **résume le rapport d'évaluation** de la version d'une heure de « ton IA » (le modèle « mini »,
-  `mesures/evaluation-mini.json`) ;
+  `mesures/evaluation-mini.json`) et celui de la version publiée, `ton-ia-1.5`
+  (`mesures/evaluation-1.5.json`) ;
 - il **note quelques questions de MMMLU**, un jeu de questions que le rapport de forge ne mesure pas
-  (`mesures/qcm-mini.json`) ;
+  (`mesures/qcm-mini.json`, `mesures/qcm-1.5.json`) ;
 - il **regarde dans le modèle** : les cartes d'attention d'une phrase, et les jetons que le modèle juge les
-  plus probables pour la suite.
+  plus probables pour la suite (`sorties/cartes-ton-ia.json`, `sorties/ton-ia-suivants.json`).
 
 C'est le projet du chapitre 1.6 de La Forge IA, « Évaluer son modèle ». Ce
 chapitre n'est pas encore en ligne : il paraîtra après la fin de l'entraînement
@@ -48,11 +49,16 @@ forge charge un modèle :
   d'attention refont le calcul de l'attention de forge pour en montrer les
   poids) ;
 - `forge.tokenizer.bpe_octets` : `TokenizerOctets`, qui charge le tokenizer figé
-  de « ton IA ».
+  de « ton IA » ;
+- `forge.exporter` : les noms des fichiers publiés (`NOM_DES_POIDS`,
+  `NOM_DE_LA_CONFIG`, `PLONGEMENT`, `SORTIE`), `empreinte_sha256` et
+  `EMPREINTE_DU_TOKENIZER` (relire la version publiée de « ton IA » comme
+  forge l'a écrite), et, par forge, `safetensors` (lire ses poids).
 
 Ses tests importent aussi `forge.evaluation.perte` (`perplexite` et `bits_par_octet`, la
 référence des mesures refaites à la main), `forge.evaluation.qcm` (`_marge_95` et
-`_marge_hasard`) et `forge.evaluation.rapport.verdict`, et `import forge`.
+`_marge_hasard`) et `forge.evaluation.rapport.verdict`, `forge.exporter.exporter` (écrire un petit modèle au
+format de la version publiée), et `import forge`.
 
 Il ne modifie aucun fichier de forge. Il reprend aussi, par copie, le choix
 de l'appareil du projet 0.3 (voir « Les copies »).
@@ -82,6 +88,17 @@ uv run --extra cpu python -m evaluation_pas_a_pas cartes --sauvegarde <etape.pt>
 uv run --extra cpu python -m evaluation_pas_a_pas suivants --sauvegarde <etape.pt> --phrase "Il était une fois" --appareil cpu --json suivants.json
 ```
 
+Pour la version publiée de « ton IA » (`ton-ia-1.5`), les commandes prennent `--modele` et le dossier de ses
+fichiers, téléchargés une fois (avec l'outil `gh` de GitHub, ou à la main depuis la page des versions du dépôt) :
+
+```bash
+gh release download ton-ia-1.5 --dir D:\forge-ia-donnees\cache\ton-ia-1.5
+uv run --extra cpu python -m evaluation_pas_a_pas resumer --rapport D:\forge-ia-donnees\cache\ton-ia-1.5\rapport.json --nom ton-ia-1.5 --json mesures/evaluation-1.5.json
+uv run --extra cpu python -m evaluation_pas_a_pas qcm-exemples --modele D:\forge-ia-donnees\cache\ton-ia-1.5 --appareil cpu --json mesures/qcm-1.5.json
+uv run --extra cpu python -m evaluation_pas_a_pas cartes --modele D:\forge-ia-donnees\cache\ton-ia-1.5 --phrase "Le forgeron chauffe le fer puis il le tord." --choisir --appareil cpu --json sorties/cartes-ton-ia.json
+uv run --extra cpu python -m evaluation_pas_a_pas suivants --modele D:\forge-ia-donnees\cache\ton-ia-1.5 --phrase "Le forgeron frappe le" --appareil cpu --json sorties/ton-ia-suivants.json
+```
+
 - `resumer` lit le `rapport.json` que `python -m forge evaluer` écrit, et en tire le relevé que le site lit
   (voir « Les mesures et les sorties »). Rien n'est recalculé. Les sauvegardes et les rapports de « mini » sont hors du dépôt
   (sous `FORGE_DONNEES`, `D:\forge-ia-donnees` sur le PC de l'auteur) : sans eux, les commandes ne se rejouent
@@ -97,6 +114,13 @@ uv run --extra cpu python -m evaluation_pas_a_pas suivants --sauvegarde <etape.p
   chemins et les sauvegardes et rapports sous ton propre `FORGE_DONNEES`.
 - `--sauvegarde` est une sauvegarde de forge (`etape-*.pt`, `meilleur.pt`). `--tokenizer` donne un autre
   tokenizer que le tokenizer figé de « ton IA » (`forge/ressources/tokenizer-ton-ia-v1.json`).
+- `--modele` est le dossier des fichiers publiés de « ton IA » (`config.json`, `ton-ia-1.5.safetensors`,
+  `tokenizer-ton-ia-v1.json`), lus par `charger_ton_ia` (voir plus bas) ; il prend la place de `--sauvegarde`,
+  et son tokenizer celle de `--tokenizer`. Le relevé porte alors le nom `ton-ia-1.5`. `resumer` prend le
+  `rapport.json` publié avec les poids, et `--nom ton-ia-1.5` : sans `--nom`, le relevé prendrait le nom du
+  dossier de l'entraînement (`ton-ia`).
+- `cartes --choisir` choisit lui-même la couche et deux têtes à montrer (voir « Les cartes d'attention du
+  site ») ; il ne prend alors ni `--couche` ni `--tete`.
 - Sans `--appareil`, le projet prend la carte si PyTorch la voit, sinon le processeur (ou ce que dit la
   variable `FORGE_APPAREIL`). `--appareil cuda` sans carte dit quoi faire, sans trace Python, et rend le
   code 2 ; de même avec une carte que PyTorch voit sans savoir calculer dessus.
@@ -127,9 +151,10 @@ Les autres fichiers du paquet :
 | Fichier | Région | Ce qu'il fait |
 | --- | --- | --- |
 | `sauvegarde.py` | `sauvegarde` | `charger_sauvegarde(chemin, appareil="cpu")` rend `(modele, config)` : il passe par `forge.entrainement.sauvegarde.charger` et reconstruit le modèle comme l'évaluation de forge |
+| `ton_ia.py` | | `charger_ton_ia(dossier, appareil="cpu")` rend `(modele, tokenizer)` : il lit les fichiers publiés de « ton IA » (`config.json`, les poids en bf16 sans `sortie.weight`, qu'il reprend de `plongement.weight`, et le tokenizer, refusé si son empreinte SHA-256 n'est pas celle du tokenizer figé), et passe les poids en float32 |
 | `resumer.py` | `resumer` | `resumer(rapport_json)` rend le relevé d'un rapport d'évaluation |
 | `qcm_exemples.py` | `noter-exemples` | `exemples_mmmlu(n, graine)` lit des questions de MMMLU ; `noter_exemples(modele, tokenizer, qcms)` les note |
-| `regarder.py` | `cartes`, `suivants` | `cartes_attention(modele, ids, couche)` et `suivants(modele, tokenizer, phrase, k)` |
+| `regarder.py` | `cartes`, `suivants` | `cartes_attention(modele, ids, couche)` et `suivants(modele, tokenizer, phrase, k)` ; hors région, `regard_des_tetes(cartes)` et `choisir_couche_et_tetes(modele, ids)`, pour `cartes --choisir` |
 | `attendus.py` | | écrit `tests/attendus.json`, la grille des marges et des verdicts que le site vérifie |
 
 ## Ce que montre le chapitre
@@ -139,18 +164,22 @@ tirées des repères `# region: <nom>` et `# fin: <nom>` : `perte`, `perplexite`
 `bits`, `qcm` et `marge`. Les autres régions (`sauvegarde`, `resumer`,
 `noter-exemples`, `cartes`, `suivants`, `appareil` et `test-cartes`) ne sont pas
 montrées en code : le chapitre en montre les résultats, par les relevés
-ci-dessous.
+ci-dessous. `ton_ia.py` n'a pas de région.
 
 ## Les mesures et les sorties
 
 Chaque fichier porte sa date (champ `releve_le`). Le site les lit à la
 construction (`site/src/lib/partie-1/evaluation.ts`) et les vérifie : un champ
-qui manque arrête la construction. Ce projet n'a pas de dossier `sorties/`.
+qui manque arrête la construction.
 
 | Fichier | D'où il vient | Date du champ `releve_le` |
 | --- | --- | --- |
 | `mesures/evaluation-mini.json` | le rapport d'évaluation de la version d'une heure de « ton IA » (le modèle « mini », pas 6 370), écrit par `resumer` | 03/11/2026, la date du rapport de forge ; le fichier est entré dans le dépôt le 10/11/2026 |
 | `mesures/qcm-mini.json` | six questions de MMMLU en français, notées par « mini » sur le processeur, écrit par `qcm-exemples` | 10/11/2026 |
+| `mesures/evaluation-1.5.json` | le rapport d'évaluation de la version publiée de « ton IA » (`ton-ia-1.5`, pas 16 540, le `rapport.json` publié avec ses poids), écrit par `resumer --nom ton-ia-1.5` | 14/11/2026, la date du rapport de forge ; le fichier est entré dans le dépôt le 15/11/2026 |
+| `mesures/qcm-1.5.json` | les six mêmes questions de MMMLU, notées par `ton-ia-1.5` sur le processeur, écrit par `qcm-exemples --modele` | 15/11/2026 |
+| `sorties/cartes-ton-ia.json` | les cartes d'attention de `ton-ia-1.5` pour la phrase « Le forgeron chauffe le fer puis il le tord. », sur le processeur : la couche et les deux têtes choisies par `cartes --choisir`, et les chiffres du choix | 15/11/2026 |
+| `sorties/ton-ia-suivants.json` | les dix jetons que `ton-ia-1.5` juge les plus probables après « Le forgeron frappe le », sur le processeur, écrit par `suivants --modele` | 15/11/2026 |
 
 Les chiffres de `mesures/evaluation-mini.json` sont ceux de
 `docs/mesures/ton-ia-mini.md` : perplexité 30,8, 1,133 bit par octet, HellaSwag
@@ -169,16 +198,16 @@ reçoit son `verdict`.
 `juste`. Les lignes de MMMLU dont deux réponses sont identiques ou vides sont
 ignorées au tirage.
 
+Les chiffres de `mesures/evaluation-1.5.json` sont ceux de
+`docs/mesures/ton-ia-1.5.md` : perplexité 11,2, 0,802 bit par octet, HellaSwag
+34,8 % d'exactitude normalisée (au-dessus du hasard), ARC 25,1 % d'exactitude
+normalisée (pas différent du hasard). `mesures/qcm-1.5.json` note les six
+questions de `mesures/qcm-mini.json`, tirées de la même façon (graine 0).
+
 Les sauvegardes et les rapports de « mini » ne sont pas dans le dépôt : les
-relevés ont été faits sur le PC de l'auteur.
-
-### Ce qui viendra de ton IA
-
-Les cartes d'attention de la vraie « ton IA », ses mesures, et l'option
-`--modele` des commandes `qcm-exemples`, `cartes` et `suivants` (qui prendra le
-dossier des poids publiés de « ton IA ») viendront après la fin de son
-entraînement, avant la parution du chapitre ; jusque-là, rien n'en est inventé
-ici.
+relevés ont été faits sur le PC de l'auteur. Les fichiers de `ton-ia-1.5`
+(poids, configuration, tokenizer, rapport) sont publiés sur la page des
+versions du dépôt : <https://github.com/chipat-neko/forge-ia/releases/tag/ton-ia-1.5>.
 
 ### MMMLU
 
@@ -229,6 +258,29 @@ le composant d'animation du chapitre 1.4, à cause de RoPE et de la profondeur).
 le test `test_cartes_redonnent_la_sortie_de_l_attention` vérifie qu'en les multipliant par les valeurs v puis par
 `proj_sortie`, on retrouve la sortie de l'attention de forge, en float64, à 10⁻¹² près.
 
+Avec `--choisir` (c'est ainsi que `sorties/cartes-ton-ia.json` a été écrit), la commande choisit la couche et
+deux de ses têtes, et le fichier a `{nom, releve_le, appareil, phrase, jetons, couche, couches, tetes, cartes,
+choix}` :
+
+- le regard d'une tête se mesure par trois nombres (`regard_des_tetes`), en moyenne sur les jetons qui ont un
+  jeton de la phrase juste avant eux (du deuxième jeton de la phrase au dernier) : `jeton_d_avant`, la part
+  de l'attention donnée au jeton juste avant ; `distance`, combien de jetons en arrière la tête regarde, sur
+  les mots de la phrase (la somme des `poids[i][j] × (i − j)` pour j ≥ 1) ; `debut`, la part posée sur
+  `<|fin_texte|>`. Le jeton de
+  début ne compte pas dans la distance : beaucoup de têtes y reposent quand rien ne les intéresse, et il
+  ferait passer leur regard pour lointain ;
+- `couche` est celle de la tête qui regarde le plus le jeton d'avant, dans tout le modèle ;
+- `cartes` a deux entrées, `{tete, role, jeton_d_avant, distance, debut, poids}` : la tête `jeton-d-avant`
+  (le plus grand `jeton_d_avant` de la couche), puis la tête `loin` (la plus grande `distance` des autres
+  têtes de la couche) ; `poids` est leur tableau `n × n`, comme plus haut ;
+- `choix` justifie ce choix par les chiffres : `jeton_d_avant_par_couche` donne, pour chaque couche, sa
+  tête qui regarde le plus le jeton d'avant et sa part ; `regards_de_la_couche`, le regard de chaque tête de
+  la couche choisie.
+
+Les nombres sont arrondis à 6 décimales. Pour la phrase de `sorties/cartes-ton-ia.json`, découpée par le
+tokenizer de « ton IA », c'est la couche 12 : sa tête 10 regarde le jeton d'avant, et sa tête 4 regarde le
+plus loin.
+
 `suivants --json` écrit `{nom, releve_le, appareil, phrase, suivants}`, où `suivants` est la liste ordonnée
 des `{jeton, probabilite}`.
 
@@ -257,8 +309,14 @@ régions du paquet, les relevés enregistrés, la grille `tests/attendus.json` e
 
 `tests/attendus.json` se régénère avec `uv run --extra cpu python -m evaluation_pas_a_pas.attendus`.
 
-Le test marqué `gpu` (`test_cartes_sur_la_carte_egales_a_celles_du_processeur_a_1e_5`) refait les cartes sur la
-carte graphique ; sans CUDA, il est sauté. Tous les autres tournent sur le processeur.
+`tests/test_ton_ia.py` exporte le petit modèle des tests avec `forge.exporter.exporter`, la fonction qui a écrit
+les fichiers publiés, puis vérifie que `charger_ton_ia` redonne ses logits au bit près, et qu'il refuse un
+fichier manquant, abîmé, ou un tokenizer modifié. D'autres tests relisent les relevés de `ton-ia-1.5`
+(`mesures/`, `sorties/`) et refont le choix des têtes sur les chiffres du fichier.
+
+Les tests marqués `gpu` (`test_cartes_sur_la_carte_egales_a_celles_du_processeur_a_1e_5`, et
+`test_charger_ton_ia_sur_la_carte`) refont les cartes et le chargement sur la carte graphique ; sans CUDA, ils
+sont sautés. Tous les autres tournent sur le processeur.
 
 ## Le notebook
 

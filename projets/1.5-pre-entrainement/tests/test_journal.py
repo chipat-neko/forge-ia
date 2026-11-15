@@ -219,3 +219,31 @@ def test_validation_refaite_garde_la_derniere():
     lignes = lignes_de_pas(2) + [{"pas": 2, "perte": 5.0, "perte_val": 4.0}]
     lignes[2]["perte_val"] = 9.0
     assert courbe(lignes)["validations"] == [[2, 4.0]]
+
+
+# --- Le relevé de ton IA -----------------------------------------------------------------------------
+
+
+def test_le_releve_de_ton_ia_dit_ce_que_dit_le_document():
+    projet = pathlib.Path(__file__).resolve().parents[1]
+    chemin = projet / "mesures" / "ton-ia-1.5.json"
+    document = projet.parents[1] / "docs" / "mesures" / "ton-ia-1.5.md"
+    if not chemin.exists():
+        pytest.skip("Le relevé de ton IA n'est pas encore écrit (voir le README du projet).")
+    if not document.exists():
+        pytest.skip("Projet téléchargé seul : docs/mesures/ton-ia-1.5.md n'est pas là pour comparer.")
+    releve = json.loads(chemin.read_text(encoding="utf-8"))
+    texte = document.read_text(encoding="utf-8").replace("\u202f", " ").replace("\u00a0", " ")
+    r = releve["resume"]
+    assert releve["nom"] == "ton-ia-1.5"
+    assert r["pas_faits"] == r["pas_total"] == 16540 and r["parametres"] == 433_573_120 and r["jetons_vus"] == 8_671_723_520
+    # 139 h 06 min 32 s de calcul, en 13 sessions et 12 pauses, comme le document.
+    heures, reste = divmod(round(r["secondes_de_calcul"]), 3600)
+    assert f"**{heures} h {reste // 60:02d} min {reste % 60:02d} s**" in texte
+    assert f"**{len(releve['sessions'])} sessions et {r['pauses']} pauses**" in texte
+    assert [s["fin"] for s in releve["sessions"]] == ["pause"] * 12 + ["fin"]
+    assert round(r["debit_moyen"]) == 17316 and "17 316 jetons par seconde" in texte
+    assert f"finit à **{r['validation_finale']:.3f}**".replace(".", ",") in texte  # 2,467
+    octets = chemin.read_bytes()
+    assert b"\r" not in octets and octets.endswith(b"}\n")
+    assert octets.decode("utf-8") == json.dumps(releve, ensure_ascii=False, allow_nan=False, indent=1) + "\n"

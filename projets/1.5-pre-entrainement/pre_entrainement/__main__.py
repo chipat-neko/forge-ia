@@ -1,13 +1,14 @@
 """`python -m pre_entrainement` : relever les courbes d'un journal d'entraînement, et faire l'essai de pause et de reprise.
 
     uv run --extra cpu python -m pre_entrainement courbe --journal <journal.jsonl> --config <mini.toml> --json mesures/ton-ia-mini.json
+    uv run --extra cpu python -m pre_entrainement courbe --journal <journal.jsonl> --config <principal.toml> --nom ton-ia-1.5 --json mesures/ton-ia-1.5.json
     uv run --extra cpu python -m pre_entrainement essai --appareil cpu --enregistrer sorties/essai-processeur.txt --json mesures/essai-processeur.json
     uv run --extra gpu python -m pre_entrainement essai --appareil cuda
 
 `courbe` lit le journal d'un entraînement de forge et la configuration qui l'a lancé, affiche un
-résumé, et écrit avec `--json` le résumé, les sessions et la courbe. `essai` entraîne un petit modèle de
-deux façons (d'un trait, puis avec une pause et une reprise à mi-chemin) et dit si les deux pertes finales
-sont les mêmes. Sans carte graphique, `--appareil cuda` dit quoi faire, sans trace Python, et rend le code
+résumé, et écrit avec `--json` le résumé, les sessions et la courbe (sous le nom `--nom`, ou celui du
+dossier de l'entraînement). `essai` entraîne un petit modèle de deux façons (d'un trait, puis avec une
+pause et une reprise à mi-chemin) et dit si les deux pertes finales sont les mêmes. Sans carte graphique, `--appareil cuda` dit quoi faire, sans trace Python, et rend le code
 2 ; de même sans PyTorch, ou avec une carte que PyTorch voit sans savoir calculer dessus.
 """
 
@@ -138,7 +139,7 @@ def commande_courbe(options: argparse.Namespace) -> int:
         print(erreur, file=sys.stderr)
         return 2
     lignes = lire(journal)
-    nom = Path(config.sortie).name
+    nom = options.nom or Path(config.sortie).name
     r = resume(lignes, config)
     probleme = defaut_du_resume(r)
     if probleme:
@@ -226,6 +227,7 @@ def main(argv: list[str] | None = None) -> int:
     courbe = commandes.add_parser("courbe", help="le résumé, les sessions et la courbe d'un journal")
     courbe.add_argument("--journal", required=True, metavar="JOURNAL", help="le journal.jsonl de l'entraînement")
     courbe.add_argument("--config", required=True, metavar="CONFIG", help="le fichier TOML qui a lancé l'entraînement")
+    courbe.add_argument("--nom", metavar="NOM", help="le nom du relevé (par défaut, le dossier de l'entraînement : ton-ia-mini)")
     courbe.add_argument("--json", metavar="FICHIER", help="écrit aussi le résumé, les sessions et la courbe dans FICHIER (JSON)")
     courbe.set_defaults(fonction=commande_courbe)
     essai = commandes.add_parser("essai", help="un petit entraînement, mis en pause puis repris")

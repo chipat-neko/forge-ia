@@ -1,0 +1,104 @@
+{
+ "nom": "ton-ia-1.5",
+ "releve_le": "2026-11-14",
+ "pas": 16540,
+ "perte_val": 2.4186856746673584,
+ "perplexite": 11.231088306178787,
+ "bits_par_octet": 0.8019327809540503,
+ "qcm": {
+  "hellaswag": {
+   "exactitude": 0.2971728421503534,
+   "exactitude_normalisee": 0.34782608695652173,
+   "hasard": 0.25,
+   "n": 9338,
+   "marge_95": 0.00926953530355918,
+   "marge_95_normalisee": 0.009660329138195967,
+   "marge_hasard": 0.008782734869282344,
+   "total_du_test": 9338,
+   "verdict": "au-dessus"
+  },
+  "arc": {
+   "exactitude": 0.20615911035072712,
+   "exactitude_normalisee": 0.25149700598802394,
+   "hasard": 0.2501568291987454,
+   "n": 1169,
+   "marge_95": 0.023190857857736703,
+   "marge_95_normalisee": 0.024872073723407308,
+   "marge_hasard": 0.024825917545327553,
+   "total_du_test": 1169,
+   "verdict": "pas-different"
+  }
+ },
+ "echantillons": [
+  {
+   "invite": "Il était une fois",
+   "suite": ", un homme qui a reçu une lettre d’amour pour une fille. Il a reçu une lettre d’amour mais elle a oublié de la porter. Il a donc dû la prendre et tout faire pour l’oublier… Mais elle ne l’a pas oublié et elle a oublié de lui dire qu’elle était tombée",
+   "graine": 0,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "La capitale de la France est",
+   "suite": " Paris. Pour les touristes, elle est la destination idéale. Paris est une ville cosmopolite. Capitale de la France, la ville est un lieu incontournable pour tout voyageur parisien.\nBudapest : un voyage à Budapest\nBudapest est une ville de Hongrie. Sa",
+   "graine": 1,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "Pour faire un bon gâteau au chocolat, il faut",
+   "suite": " de la pâte à choux, des raisins secs, des pépites de chocolat, des raisins secs et du sucre en poudre. Cette liste va évidemment vous donner toutes les informations indispensables, mais vous pouvez aussi en donner un peu à tout le monde.\nMéthode de préparation\nIl vous faut",
+   "graine": 2,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "Le soleil se couchait sur la mer et",
+   "suite": " le ciel se couchait sur les nuages …. A vrai dire, en plus de cela, je n’ai pas eu le temps de faire tout ce que j’ai fait … car avec ma canne a pêche, je n’ai pas trop le temps d’aller faire une grosse balade. J’ai juste le",
+   "graine": 3,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "Aujourd'hui, le gouvernement a annoncé",
+   "suite": " la suppression de 300 emplois en cinq ans. Avec, sans surprise, des conséquences sur l'emploi qui seront connues peu après. Il ne faudrait pas que cela se reproduise. L'ensemble des réformes engagées depuis le début de l'année et dont nous avons parlé hier a pour objectif de faire baisser la",
+   "graine": 4,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "Dans un petit village de Bretagne,",
+   "suite": " des amis se rencontrent au milieu des années 80. Trois amis d’enfance et de jeunesse, issus de l’immigration, qui vont devenir parents. Trois amis qui vont changer le cours de l’Histoire et de leur vie. Leurs destins vont basculer dans un conflit qui va marquer la vie des trois amis",
+   "graine": 5,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "La photosynthèse est le processus par lequel",
+   "suite": " une molécule chimique se transforme en une autre en lui-même et se transforme en une partie. La photosynthèse est considérée comme l’énergie libérée lors de la photosynthèse. Cela sous-entend que la lumière dans la nature est un produit de la photosynthèse. La source de lumière dans",
+   "graine": 6,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "Bonjour, je voudrais savoir comment",
+   "suite": " je peux obtenir une remise de 15% sur ma facture EDF. Mon ancien compteur était au mur. J'ai également un compteur Linky. J'ai plusieurs personnes qui ont eu ce soucis et aucun d'eux n'a eu ce problème. Je suis sur le point de procéder à l'ouverture de ce",
+   "graine": 7,
+   "n_jetons": 60,
+   "s_arrete": false
+  },
+  {
+   "invite": "def factorielle(n):\n",
+   "suite": "    return sum(set(range(n)) - set(range(n)))\n\n\ndef factors(n):\n    return [n*i for i in range(1, n)]\n\n# def factorielle(n, k):\n#     return (n*k)",
+   "graine": 8,
+   "n_jetons": 50,
+   "s_arrete": true
+  },
+  {
+   "invite": "def moyenne(valeurs):\n    \"\"\"Renvoie la moyenne",
+   "suite": " des votes, de façon à ce que l'électeur vote pour l'une des différentes valeurs de cette moyenne.\nLes estimations ont été faites pour des valeurs comprises entre 0 et 100, et ne dépassent pas 0,01%. Si l'électeur a voté pour l'une des valeurs et que",
+   "graine": 9,
+   "n_jetons": 60,
+   "s_arrete": false
+  }
+ ]
+}

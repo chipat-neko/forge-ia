@@ -41,3 +41,20 @@ def sauvegarder(modele: Transformer, chemin: Path, pas: int = 7) -> Path:
         chemin,
     )
     return chemin
+
+
+def arrondi_en_bf16(modele: Transformer) -> Transformer:
+    """Le même modèle, ses poids arrondis en bf16 (et gardés en float32) : ceux qu'une version publiée rend exactement."""
+    with torch.no_grad():
+        for parametre in modele.parameters():
+            parametre.copy_(parametre.to(torch.bfloat16).float())
+    return modele
+
+
+def exporter_comme_la_release(modele: Transformer, dossier: Path) -> Path:
+    """Les fichiers de `modele`, écrits par `forge.exporter.exporter` comme ceux de la version `ton-ia-1.5` ; rend `dossier`."""
+    from forge.exporter import exporter
+
+    sauvegarde = sauvegarder(modele, dossier.parent / f"{dossier.name}-sauvegarde" / "meilleur.pt")
+    exporter(sauvegarde, dossier)
+    return dossier

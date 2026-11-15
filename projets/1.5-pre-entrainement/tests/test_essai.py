@@ -114,3 +114,16 @@ def test_regions_de_essai():
     fermees = [m.group(1) for ligne in lignes if (m := re.match(r"\s*# fin: (\S+)", ligne))]
     assert ouvertes == ["essai-donnees", "essai-reprise"]
     assert fermees == ouvertes
+
+
+def test_le_releve_de_l_essai_sur_la_carte():
+    projet = pathlib.Path(__file__).resolve().parents[1]
+    chemin, texte = projet / "mesures" / "essai-rtx-5070-ti.json", projet / "sorties" / "essai-rtx-5070-ti.txt"
+    if not chemin.exists():
+        pytest.skip("L'essai sur la carte n'est pas encore relevé (voir le README du projet).")
+    releve = json.loads(chemin.read_text(encoding="utf-8"))
+    assert releve["appareil"] == "cuda" and releve["pas_total"] == 60 and releve["pas_de_la_pause"] == 30
+    assert releve["ecart"] == abs(releve["perte_un_trait"] - releve["perte_reprise"]) and releve["ecart"] < 0.1
+    lignes = texte.read_text(encoding="utf-8").splitlines()
+    assert lignes[0] == f"# relevé le {releve['releve_le']}"
+    assert lignes[1].startswith("Pause et reprise exacte, sur la carte graphique, NVIDIA GeForce RTX 5070 Ti")

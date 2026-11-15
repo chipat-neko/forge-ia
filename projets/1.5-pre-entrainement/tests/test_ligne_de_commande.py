@@ -84,6 +84,14 @@ def test_courbe_ecrit_le_json(config, tmp_path, capsys):
     assert "10 pas sur 10" in capsys.readouterr().out.replace("\u202f", " ")  # un résumé à l'écran
 
 
+def test_courbe_prend_le_nom_donne(config, tmp_path, capsys):
+    # Le dossier de l'entraînement principal est « ton-ia » : son relevé porte le nom de la version publiée.
+    sortie = tmp_path / "ton-ia-1.5.json"
+    assert main(["courbe", "--journal", str(FACTICE), "--config", str(config), "--nom", "ton-ia-1.5", "--json", str(sortie)]) == 0
+    assert json.loads(sortie.read_text(encoding="utf-8"))["nom"] == "ton-ia-1.5"
+    assert capsys.readouterr().out.startswith("Journal de ton-ia-1.5")
+
+
 def test_courbe_sans_journal_le_dit(config, tmp_path, capsys):
     assert main(["courbe", "--journal", str(tmp_path / "rien.jsonl"), "--config", str(config)]) == 2
     assert "n’existe pas" in capsys.readouterr().err
@@ -142,6 +150,8 @@ def test_appareil_inconnu(capsys):
 
 
 def test_cuda_demandee_sans_carte_dans_un_vrai_processus(tmp_path):
+    # CUDA_VISIBLE_DEVICES=-1 cache la carte quand il y en a une (avec l'extra gpu), comme dans 0.4 et 0.5.
+    # Une valeur vide ne suffit pas : sous Windows, une variable vide compte comme absente.
     sortie = tmp_path / "carte.txt"
     resultat = subprocess.run(
         [sys.executable, "-m", "pre_entrainement", "essai", "--appareil", "cuda", "--enregistrer", str(sortie)],
@@ -149,7 +159,7 @@ def test_cuda_demandee_sans_carte_dans_un_vrai_processus(tmp_path):
         encoding="utf-8",
         errors="replace",
         cwd=PROJET,
-        env={**os.environ, "CUDA_VISIBLE_DEVICES": "", "PYTHONIOENCODING": "cp1252"},
+        env={**os.environ, "CUDA_VISIBLE_DEVICES": "-1", "PYTHONIOENCODING": "cp1252"},
         timeout=120,
     )
     assert resultat.returncode == 2
