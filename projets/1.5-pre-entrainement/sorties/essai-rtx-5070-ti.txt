@@ -5,5 +5,6 @@ Pause et reprise exacte, sur la carte graphique, NVIDIA GeForce RTX 5070 Ti
   d’un trait : perte 7,633545 au pas 60
   arrêté au pas 30 (comme Ctrl+C), puis repris : perte 7,633545 au pas 60
   écart des deux pertes : 0
-  60,8 s pour les trois entraînements
+  11,3 s pour les trois entraînements
+  avant le chronomètre, 6,7 s pour échauffer la carte (2 pas)
 la reprise est exacte : oui

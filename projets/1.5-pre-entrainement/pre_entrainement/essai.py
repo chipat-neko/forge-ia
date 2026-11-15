@@ -9,6 +9,10 @@ vecteurs de 64 nombres) et ses données aussi : le texte du site, encodé par le
 Arrêter l'essai à mi-chemin (`arreter_apres`) fait comme Ctrl+C : forge finit le pas en cours et
 sauvegarde tout (le modèle, l'optimiseur, la position dans les données et l'état du hasard). La
 seule différence est la ligne `pause` du journal, que Ctrl+C écrit en plus.
+
+Sur la carte graphique, un entraînement de 2 pas passe d'abord, hors chronomètre (`echauffer_la_carte`) :
+la première utilisation de la carte dans un processus coûte des dizaines de secondes, qui ne sont pas du
+calcul.
 """
 
 import contextlib
@@ -78,6 +82,24 @@ def preparer_essai(racine: Path, texte: str) -> Path:
 # fin: essai-donnees
 
 
+def echauffer_la_carte(base: ConfigEntrainement, racine: Path) -> float:
+    """Sur la carte, un entraînement de 2 pas, avant le chronomètre de l'essai ; rend ses secondes.
+
+    Au premier calcul d'un processus, la carte se prépare : PyTorch ouvre son contexte et charge le
+    code de chaque opération. Cela peut prendre des dizaines de secondes, une fois : compté dans l'essai,
+    ce temps ferait croire la carte lente. Ces 2 pas passent par les mêmes opérations que l'essai (le
+    même modèle, les passages avant et arrière, AdamW, la validation), dans leur propre dossier, puis on
+    attend que la carte ait tout fini.
+    """
+    import torch  # déjà chargé par forge : la carte vient d'être choisie
+
+    debut = time.perf_counter()
+    with contextlib.redirect_stdout(io.StringIO()):
+        entrainer(replace(base, jetons_total=2 * base.taille_lot_jetons, sortie=str(Path(racine) / "echauffement")))
+    torch.cuda.synchronize()
+    return time.perf_counter() - debut
+
+
 # region: essai-reprise
 def config_essai(appareil: str, racine: Path, pas: int = 60) -> ConfigEntrainement:
     """La configuration de l'essai : un petit modèle, 1 024 jetons par pas, `pas` pas.
@@ -105,15 +127,18 @@ def essai_pause_reprise(appareil: str, racine: Path) -> dict:
 
     Rend `appareil`, `pas_total`, `pas_de_la_pause`, les deux pertes finales (`perte_un_trait`,
     `perte_reprise`), leur `ecart` (0 attendu sur le processeur), `pertes_identiques` (vrai si les
-    pertes de la seconde moitié sont les mêmes une à une), et les `secondes` de tout l'essai.
+    pertes de la seconde moitié sont les mêmes une à une), les `secondes` des trois entraînements, et
+    `secondes_echauffement` : sur la carte, celles de `echauffer_la_carte`, hors chronomètre (0 sur le
+    processeur, qui n'en a pas besoin).
     """
     racine = Path(racine)
     if not (racine / "jetons" / ".complet").exists():  # sinon ils sont prêts : les réécrire échoue si un chargeur les lit encore
         preparer_essai(racine, texte_du_site())
     base = config_essai(appareil, racine)
     milieu = base.pas_total // 2
-    for nom in ("d-un-trait", "en-pause"):  # un essai précédent refuserait de repartir de zéro
+    for nom in ("d-un-trait", "en-pause", "echauffement"):  # un essai précédent refuserait de repartir de zéro
         shutil.rmtree(racine / nom, ignore_errors=True)
+    echauffement = echauffer_la_carte(base, racine) if appareil == "cuda" else 0.0
     debut = time.perf_counter()
     with contextlib.redirect_stdout(io.StringIO()):  # forge raconte sa progression : l'essai la garde pour lui
         d_un_trait = entrainer(replace(base, sortie=str(racine / "d-un-trait")))
@@ -131,5 +156,6 @@ def essai_pause_reprise(appareil: str, racine: Path) -> dict:
         "ecart": abs(avant - apres),
         "pertes_identiques": d_un_trait["pertes"][milieu:] == repris["pertes"],
         "secondes": round(secondes, 2),
+        "secondes_echauffement": round(echauffement, 2),
     }
 # fin: essai-reprise

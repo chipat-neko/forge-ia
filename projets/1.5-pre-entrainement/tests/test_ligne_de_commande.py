@@ -1,6 +1,6 @@
 """`python -m pre_entrainement courbe|essai` : sorties, fichiers et codes de sortie.
 
-Aucun test ici n'ouvre la carte graphique : les cas `cuda` cachent la carte (CUDA_VISIBLE_DEVICES vide,
+Aucun test ici n'ouvre la carte graphique : les cas `cuda` cachent la carte (CUDA_VISIBLE_DEVICES=-1,
 ou `torch.cuda.is_available` simulé) et simulent la panne de l'essai.
 """
 
@@ -49,6 +49,7 @@ RESULTAT = {
     "ecart": 0.0,
     "pertes_identiques": True,
     "secondes": 12.34,
+    "secondes_echauffement": 0.0,
 }
 
 
@@ -132,7 +133,16 @@ def test_essai_sur_la_carte_ne_demande_pas_l_egalite(monkeypatch, capsys):
         script, "essai_pause_reprise", lambda appareil, racine: {**RESULTAT, "appareil": "cuda", "ecart": 2e-3}
     )
     assert main(["essai", "--appareil", "cuda"]) == 0
-    assert "Carte de test" in capsys.readouterr().out
+    lu = capsys.readouterr().out.replace("\u202f", " ")
+    assert "Carte de test" in lu
+    # L'échauffement de la carte est dit à part, hors des secondes de l'essai.
+    assert "avant le chronomètre, 0,0 s pour échauffer la carte (2 pas)" in lu
+
+
+def test_essai_sur_le_processeur_ne_parle_pas_d_echauffement(monkeypatch, capsys):
+    monkeypatch.setattr(script, "essai_pause_reprise", lambda appareil, racine: dict(RESULTAT))
+    assert main(["essai", "--appareil", "cpu"]) == 0
+    assert "échauffer" not in capsys.readouterr().out
 
 
 def test_cuda_absente_message_francais(monkeypatch, capsys):

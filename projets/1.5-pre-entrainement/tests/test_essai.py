@@ -7,6 +7,7 @@ Tout tourne sur le processeur, sauf le test marqué `gpu` (sauté sans carte gra
 import json
 import pathlib
 import re
+import time
 
 import numpy as np
 import pytest
@@ -98,6 +99,54 @@ def test_le_resultat_de_l_essai_et_son_silence(tmp_path, capsys):
     assert capsys.readouterr().out == ""
 
 
+def entrainements_simules(monkeypatch, appels: list) -> None:
+    """Remplace l'entraînement de forge par un faux, instantané, qui note le dossier de chaque entraînement."""
+
+    def faux_entrainer(config, reprendre=False, arreter_apres=None):
+        appels.append(pathlib.Path(config.sortie).name)
+        pas = arreter_apres or config.pas_total
+        return {"pertes": [7.5] * (pas - (config.pas_total // 2 if reprendre else 0))}
+
+    monkeypatch.setattr(essai, "entrainer", faux_entrainer)
+
+
+@pytest.mark.parametrize("appareil, echauffee", [("cuda", True), ("cpu", False)])
+def test_l_echauffement_de_la_carte_passe_avant_le_chronometre(monkeypatch, tmp_path, appareil, echauffee):
+    # Sans carte : les entraînements sont simulés. Sur la carte (et seulement sur elle), l'échauffement
+    # passe d'abord, et sa durée (ici 0,3 s) n'entre pas dans les secondes de l'essai.
+    appels = []
+    entrainements_simules(monkeypatch, appels)
+
+    def faux_echauffement(base, racine):
+        appels.append("échauffement")
+        time.sleep(0.3)
+        return 0.3
+
+    monkeypatch.setattr(essai, "echauffer_la_carte", faux_echauffement)
+    r = essai_pause_reprise(appareil, tmp_path)
+    attendus = ["d-un-trait", "en-pause", "en-pause"]
+    assert appels == (["échauffement", *attendus] if echauffee else attendus)
+    assert r["secondes_echauffement"] == (0.3 if echauffee else 0.0)
+    assert r["secondes"] < 0.25 and r["ecart"] == 0.0
+
+
+def test_echauffer_la_carte_fait_deux_pas_dans_son_dossier(monkeypatch, tmp_path):
+    import torch
+
+    appels, configs, attentes = [], [], []
+    entrainements_simules(monkeypatch, appels)
+    vrai_faux = essai.entrainer
+    monkeypatch.setattr(essai, "entrainer", lambda config, **options: (configs.append(config), vrai_faux(config, **options))[1])
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda *a: attentes.append("synchronisée"))
+    base = config_essai("cuda", tmp_path)
+    secondes = essai.echauffer_la_carte(base, tmp_path)
+    assert appels == ["echauffement"] and attentes == ["synchronisée"] and secondes >= 0
+    (config,) = configs
+    # Le même modèle, le même appareil, les mêmes lots : seuls le nombre de pas et le dossier changent.
+    assert config.pas_total == 2 and config.appareil == "cuda" and config.modele == base.modele
+    assert config.taille_lot_jetons == base.taille_lot_jetons and pathlib.Path(config.sortie) == tmp_path / "echauffement"
+
+
 @pytest.mark.gpu
 def test_essai_sur_la_carte(tmp_path):
     # Sur la carte, deux entraînements identiques peuvent différer un peu (la carte additionne dans un
@@ -124,6 +173,7 @@ def test_le_releve_de_l_essai_sur_la_carte():
     releve = json.loads(chemin.read_text(encoding="utf-8"))
     assert releve["appareil"] == "cuda" and releve["pas_total"] == 60 and releve["pas_de_la_pause"] == 30
     assert releve["ecart"] == abs(releve["perte_un_trait"] - releve["perte_reprise"]) and releve["ecart"] < 0.1
+    assert releve["secondes_echauffement"] > 0  # l'échauffement de la carte, hors des secondes de l'essai
     lignes = texte.read_text(encoding="utf-8").splitlines()
     assert lignes[0] == f"# relevé le {releve['releve_le']}"
     assert lignes[1].startswith("Pause et reprise exacte, sur la carte graphique, NVIDIA GeForce RTX 5070 Ti")

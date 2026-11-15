@@ -267,6 +267,14 @@ def commande_cartes(options: argparse.Namespace) -> int:
 
     def travail_choisi(ou, modele, config, tokenizer) -> int:
         ids = jetons_de_la_phrase(tokenizer, options.phrase, config.longueur_contexte)
+        if len(ids) < 3:  # <|fin_texte|> et au moins deux jetons : voir regard_des_tetes
+            print(
+                f"La phrase «{FINE}{options.phrase}{FINE}» fait {len(ids) - 1} jeton{'s' if len(ids) - 1 > 1 else ''}{FINE}: "
+                "--choisir mesure le regard des têtes sur les jetons qui ont un jeton de la phrase juste avant eux"
+                f"{FINE}: il faut au moins deux jetons. Donne une phrase plus longue.",
+                file=sys.stderr,
+            )
+            return 2
         jetons = [texte_du_jeton(tokenizer, i) for i in ids]
         releve = {
             "nom": nom_du_modele(options),

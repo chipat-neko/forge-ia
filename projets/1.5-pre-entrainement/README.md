@@ -78,7 +78,10 @@ uv run --extra gpu python -m pre_entrainement essai --appareil cuda --enregistre
 - `essai` prépare les données de l'essai (le texte du site, encodé par le tokenizer figé de « ton
   IA », dans un dossier temporaire), puis entraîne un petit modèle (2 couches, des vecteurs de 64
   nombres, 60 pas de 1 024 jetons) trois fois en tout : d'un trait, arrêté au pas 30, puis repris
-  jusqu'au pas 60. Il affiche les deux pertes finales, leur écart, et « la reprise est exacte : oui »
+  jusqu'au pas 60. Sur la carte, un entraînement de 2 pas passe d'abord, hors chronomètre, pour
+  l'échauffer (`echauffer_la_carte`) : la première utilisation de la carte dans un processus coûte
+  des secondes qui ne sont pas du calcul ; la sortie et le JSON (`secondes_echauffement`) les disent
+  à part. Il affiche les deux pertes finales, leur écart, et « la reprise est exacte : oui »
   si cet écart est nul. Sur le processeur, un écart non nul fait rendre le code de sortie 1. Avec
   `--enregistrer FICHIER`, il écrit aussi sa sortie dans FICHIER (UTF-8), précédée de la date du
   relevé ; avec `--json FICHIER`, son résultat. Sans `--appareil`, il prend la carte si PyTorch la
@@ -139,6 +142,7 @@ Tout est dans `pre_entrainement/essai.py` :
 | `essai-donnees` | `preparer_essai(racine, texte)` | écrit `racine/jetons` au format de `forge encoder` : `train/fragment-00000.bin` et `val/fragment-00000.bin` (`uint16` petit-boutiste), `index.json` et `.complet` |
 | `essai-reprise` | `config_essai(appareil, racine, pas)` | la configuration : dim 64, 2 couches, 4 têtes, contexte 64 ; lot de 1 024 jetons, micro-lot 16, taux max 0,001, échauffement 6, validation tous les 20 pas, sans compilation |
 | `essai-reprise` | `essai_pause_reprise(appareil, racine)` | les trois entraînements, et leurs deux pertes finales, leur écart, les secondes et l'appareil |
+| (hors région) | `echauffer_la_carte(base, racine)` | sur la carte seulement, avant le chronomètre : un entraînement de 2 pas du même modèle, dans `racine/echauffement`, puis l'attente de la carte ; rend ses secondes |
 
 `preparer_essai` est un raccourci de la chaîne de données du chapitre 1.2 : un seul texte, encodé par
 le tokenizer figé, suivi de `<|fin_texte|>`, dont les 90 premiers % des jetons vont à l'entraînement
@@ -216,7 +220,8 @@ n'utilise pas de calculs déterministes, et peut additionner dans un autre ordre
 d'un entraînement à l'autre. `mesures/essai-rtx-5070-ti.json` donne l'écart
 mesuré tel qu'il est (`ecart`), et la commande rend 0 sur la carte quel que soit
 cet écart ; le test `test_essai_sur_la_carte` demande seulement qu'il reste
-petit.
+petit. Ses `secondes` comptent les trois entraînements seulement, après
+l'échauffement de la carte (`secondes_echauffement`, à part).
 
 ## Le notebook
 

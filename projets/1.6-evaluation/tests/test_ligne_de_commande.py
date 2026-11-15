@@ -1,6 +1,6 @@
 """`python -m evaluation_pas_a_pas resumer|qcm-exemples|cartes|suivants` : sorties, fichiers et codes de sortie.
 
-Aucun test ici n'ouvre la carte graphique : les cas `cuda` cachent la carte (CUDA_VISIBLE_DEVICES vide, ou
+Aucun test ici n'ouvre la carte graphique : les cas `cuda` cachent la carte (CUDA_VISIBLE_DEVICES=-1, ou
 `torch.cuda.is_available` simulé, avec un modèle déjà sur le processeur) et simulent les pannes. Aucun ne
 touche le réseau : les questions de MMMLU sont données à la main.
 """
@@ -227,6 +227,17 @@ def test_choisir_refuse_couche_et_tete(modele_publie, tmp_path, capsys):
     assert main(["cartes", "--modele", str(dossier), "--phrase", PHRASE, "--choisir", "--couche", "1", "--json", str(sortie)]) == 2
     lu = capsys.readouterr()
     assert "--choisir" in lu.err and "Traceback" not in lu.err and lu.out == "" and not sortie.exists()
+
+
+@pytest.mark.parametrize("phrase", ["Le", ""])
+def test_choisir_une_phrase_trop_courte_le_dit(modele_publie, tmp_path, capsys, phrase):
+    # Le regard d'une tête se mesure sur les jetons qui ont un jeton de la phrase juste avant eux : il en faut deux.
+    dossier, _ = modele_publie
+    sortie = tmp_path / "cartes.json"
+    assert main(["cartes", "--modele", str(dossier), "--phrase", phrase, "--choisir", "--appareil", "cpu", "--json", str(sortie)]) == 2
+    lu = capsys.readouterr()
+    assert "au moins deux jetons" in lu.err and "plus longue" in lu.err
+    assert "Traceback" not in lu.err and lu.out == "" and not sortie.exists()
 
 
 def test_modele_et_sauvegarde_ensemble_ou_ni_l_un_ni_l_autre(modele_publie, capsys):

@@ -165,6 +165,12 @@ def lignes_d_essai(r: dict, config, materiel: str) -> list[str]:
 
     modele = config.modele
     exacte = r["ecart"] == 0
+    # Sur la carte, l'échauffement (2 pas, avant le chronomètre) est dit à part : ce n'est pas du calcul de l'essai.
+    echauffement = (
+        [f"  avant le chronomètre, {nombre(r['secondes_echauffement'], 1)} s pour échauffer la carte (2 pas)"]
+        if r["appareil"] == "cuda"
+        else []
+    )
     return [
         f"Pause et reprise exacte, sur {materiel}",
         f"  modèle{FINE}: dim {modele.dim}, {modele.couches} couches, {modele.tetes} têtes, contexte {modele.longueur_contexte} "
@@ -175,6 +181,7 @@ def lignes_d_essai(r: dict, config, materiel: str) -> list[str]:
         f"  arrêté au pas {r['pas_de_la_pause']} (comme Ctrl+C), puis repris{FINE}: perte {nombre(r['perte_reprise'], 6)} au pas {r['pas_total']}",
         f"  écart des deux pertes{FINE}: {ecart_en_francais(r['ecart'])}",
         f"  {nombre(r['secondes'], 1)} s pour les trois entraînements",
+        *echauffement,
         f"la reprise est exacte{FINE}: {'oui' if exacte else 'non'}",
     ]
 
