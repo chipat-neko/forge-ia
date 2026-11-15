@@ -131,7 +131,12 @@ def test_la_documentation_des_sources():
     validation = re.search(r"\*\*Validation.*?(?=\n- \*\*|\n\n)", doc, re.S).group(0)
     assert "encodage" in validation and "ne met rien de côté" in validation
     assert "et l'encodage les lisent" not in doc  # l'encodage n'existe pas encore : il ne lit pas déjà
-    assert "seul le fragment en cours" in doc  # une reprise relit le fragment en cours
+    # Une reprise relit le flux depuis le début du jeu pour sauter les documents déjà comptés : elle
+    # coûte du temps et du réseau (18 min pour 15,6 millions de documents, entrainement-2026-11.md).
+    readme = (Path(__file__).parents[1] / "README.md").read_text(encoding="utf-8")
+    for texte in (doc, readme):
+        assert "seul le fragment en cours" not in texte
+        assert "relu depuis le début du jeu" in texte and "18 minutes" in texte
 
 
 def test_aucun_caractere_de_controle_dans_les_fichiers_ecrits_a_la_main():
@@ -771,7 +776,8 @@ def test_sous_commande_donnees_erreurs_en_francais(tmp_path, monkeypatch, capsys
     monkeypatch.setattr(telechargement, "telecharger", interrompu)
     assert main(["donnees", "--octets", "1M", "--dossier", "essai"]) == 130
     interrompu = capsys.readouterr().err
-    assert "Relance la même commande : seul le fragment en cours sera relu." in interrompu
+    assert "Relance la même commande : les fragments déjà écrits sont gardés." in interrompu
+    assert "relu depuis le début du jeu" in interrompu and "seul le fragment en cours" not in interrompu
     assert "Rien n'est perdu" not in interrompu
 
     # Sans --octets ou --dossier, argparse refuse (code 2).

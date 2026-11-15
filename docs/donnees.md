@@ -88,9 +88,12 @@ Le téléchargement et l'apprentissage du tokenizer les lisent là ; l'encodag
   `{"texte": …}` par document. Chaque fichier est écrit sous un nom `.tmp`, puis renommé d'un
   coup. L'état (`etat.json`) n'est mis à jour qu'après le fragment qu'il compte.
 - **Reprise :** après une coupure (réseau, courant, disque plein), on relance la même commande.
-  Les documents déjà comptés sont sautés et rien n'est écrit deux fois ; seul le fragment en cours
-  (jusqu'à 100 Mo) est relu. Le marqueur `.complet` n'est posé qu'à la fin ; sans lui, une source
-  n'est jamais tenue pour terminée.
+  Les fragments déjà écrits sont gardés, et rien n'est écrit deux fois. Mais le flux est
+  relu depuis le début du jeu : les documents déjà comptés sont relus, puis sautés. Cette
+  relecture coûte du temps et du réseau, d'autant plus que la coupure est tardive : il a fallu
+  18 minutes pour sauter 15,6 millions de documents de `code_python`, lors de la reprise mesurée
+  dans `docs/mesures/entrainement-2026-11.md`. Le marqueur `.complet` n'est posé
+  qu'à la fin ; sans lui, une source n'est jamais tenue pour terminée.
 - **Place :** avant chaque fragment, on vérifie qu'il reste de la place pour lui et 2 Go de
   marge. Sinon, la commande s'arrête avec un message qui dit combien de Go libérer.
 - **Où :** `FORGE_DONNEES/textes/<dossier>/<source>/` (par défaut `D:\forge-ia-donnees` sur

@@ -7,14 +7,15 @@ d'optimisation de l'entraînement et rend un débit positif avec tous les fils d
 micro-lot suit bien « puissances de 2, puis affinage ».
 """
 
+import importlib.util
 import json
-import os
 import re
 
 import psutil
 import pytest
 import torch
 
+from forge import mesure
 from forge.__main__ import construire_parseur, main
 from forge.mesure import (
     JETONS_PAR_PARAMETRE,
@@ -30,6 +31,7 @@ from forge.mesure import (
     tableaux_markdown,
 )
 from forge.modele import PRESETS, ConfigModele, nombre_parametres
+from forge.processeur import fils_disponibles
 
 MODELE_MINUSCULE = ConfigModele(taille_vocabulaire=128, dim=32, couches=2, tetes=2, longueur_contexte=16)
 GO = 1024**3
@@ -39,7 +41,7 @@ def test_mesurer_cpu_utilise_tous_les_fils():
     nombre_de_fils_avant = torch.get_num_threads()
     resultat = mesurer(MODELE_MINUSCULE, "cpu", micro_lot=2, pas=3)
     assert resultat["jetons_par_seconde"] > 0
-    assert resultat["fils_utilises"] == os.cpu_count()
+    assert resultat["fils_utilises"] == fils_disponibles()
     assert resultat["pas_mesures"] == 3
     # La charge de chaque cœur logique pendant la mesure, en pourcentage.
     assert len(resultat["charge_par_coeur"]) == psutil.cpu_count(logical=True)
@@ -49,6 +51,12 @@ def test_mesurer_cpu_utilise_tous_les_fils():
     assert resultat["memoire_max_go"] is None
     # La mesure ne laisse pas son réglage de fils derrière elle.
     assert torch.get_num_threads() == nombre_de_fils_avant
+
+
+def test_mesurer_cpu_suit_les_fils_disponibles(monkeypatch):
+    """Les fils que ce processus peut utiliser (affinité comprise), pas tous ceux de la machine."""
+    monkeypatch.setattr("forge.mesure.fils_disponibles", lambda: 3)
+    assert mesurer(MODELE_MINUSCULE, "cpu", micro_lot=1, pas=1)["fils_utilises"] == 3
 
 
 def test_mesurer_cpu_fils_choisis():
@@ -183,8 +191,32 @@ def test_la_commande_mesurer_sur_cpu_ecrit_un_tableau(tmp_path, capsys, monkeypa
     assert " %" not in ecran  # espace fine insécable, jamais une espace ordinaire, avant le %
     assert sortie.is_file()
     brut = json.loads(sortie.read_text(encoding="utf-8"))
-    assert brut["presets"]["minuscule"]["cpu"]["fils_utilises"] == os.cpu_count()
+    assert brut["presets"]["minuscule"]["cpu"]["fils_utilises"] == fils_disponibles()
     assert brut["presets"]["minuscule"]["gpu"] is None
+    # Ce qui est vrai sur cette machine, pas « triton absent sous Windows » écrit en dur.
+    assert brut["machine"]["triton"] == (importlib.util.find_spec("triton") is not None)
+    assert "sous Windows" not in brut["machine"]["compilation"]
+
+
+def _find_spec_sauf_triton(triton_present: bool):
+    vrai = importlib.util.find_spec
+
+    def find_spec(nom, *a, **k):
+        if nom == "triton":
+            return object() if triton_present else None
+        return vrai(nom, *a, **k)
+
+    return find_spec
+
+
+def test_la_compilation_dit_ce_qui_est_vrai_sur_la_machine(monkeypatch):
+    monkeypatch.setattr(importlib.util, "find_spec", _find_spec_sauf_triton(False))
+    sans = mesure.decrire_la_compilation()
+    assert sans["triton"] is False and "triton n'est pas installé" in sans["compilation"]
+    monkeypatch.setattr(importlib.util, "find_spec", _find_spec_sauf_triton(True))
+    avec = mesure.decrire_la_compilation()
+    assert avec["triton"] is True and "triton est installé" in avec["compilation"]
+    assert 'compiler = "auto"' in avec["compilation"]
 
 
 def test_lire_etat_gpu_et_gpu_occupe():
@@ -240,6 +272,13 @@ def test_tableaux_en_francais_avec_la_typographie():
     assert "milliards" in texte
     assert not re.search(r" [%:;!?]", texte)  # jamais d'espace ordinaire devant ces signes
     assert not re.search(r"\d,\d{3}\b", texte)  # pas de virgule de milliers à l'anglaise
+    assert "triton" not in texte  # sans triton, rien à signaler : la mesure est celle de l'entraînement
+    # Avec triton (sous Linux, par exemple), l'entraînement compilera le modèle : le tableau le signale.
+    avec_triton = tableaux_markdown(
+        {"machine": {"disque_libre_go": 44.4, "coeurs_logiques": 16, "triton": True}, "presets": {"tres_grand": ligne}}
+    )
+    assert "triton est installé" in avec_triton and "torch.compile" in avec_triton
+    assert not re.search(r" [%:;!?]", avec_triton)
 
 
 @pytest.mark.gpu

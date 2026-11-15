@@ -34,6 +34,7 @@ from forge.evaluation.echantillons import TEMPERATURE, TOP_K, echantillons
 from forge.evaluation.perte import bits_par_octet, lire_octets_par_jeton, perplexite, perte_validation
 from forge.evaluation.qcm import TOTAL_DES_QUESTIONS, charger_frenchbench, evaluer_qcm
 from forge.modele import ConfigModele, Transformer, nombre_parametres
+from forge.processeur import fils_disponibles
 from forge.tokenizer.bpe_octets import TokenizerOctets
 
 VERSION_DU_RAPPORT = 1
@@ -182,7 +183,7 @@ def evaluer(
     octets_par_jeton = lire_octets_par_jeton(dossier_jetons)
 
     if appareil_choisi.type == "cpu":
-        torch.set_num_threads(os.cpu_count() or 1)  # tous les fils du processeur
+        torch.set_num_threads(fils_disponibles())  # tous les fils que ce processus peut utiliser
     modele = Transformer(config)
     try:
         modele.load_state_dict(etat["modele"])

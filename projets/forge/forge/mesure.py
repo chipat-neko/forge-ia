@@ -10,18 +10,21 @@ gradients, pas d'AdamW), avec les mêmes calculs en `bfloat16` sur la carte grap
 optimiseur. Seules les données diffèrent : des jetons tirés au hasard, de la forme exacte de
 ceux du chargeur (`micro_lot` lignes de `longueur_contexte` jetons). La vitesse d'un pas ne
 dépend pas des valeurs des jetons, seulement de leur nombre ; on n'a donc pas besoin de
-corpus pour mesurer. Tout se passe en mode immédiat : `torch.compile` n'est pas utilisé
-(il manque `triton` sous Windows), comme dans l'entraînement réel de ce PC.
+corpus pour mesurer. Tout se passe en mode immédiat : `torch.compile` n'est pas utilisé,
+comme dans l'entraînement réel de ce PC, où `triton` manque (il est rarement installé sous
+Windows). Là où `triton` est installé (sous Linux, le plus souvent), l'entraînement compilera
+le modèle et ira plus vite que la mesure : elle le dit (`decrire_la_compilation`).
 
-Une mesure sur le processeur utilise **tous les fils** (`os.cpu_count()`, soit 16 sur le
-Ryzen 7 9800X3D : 8 cœurs, 2 fils chacun), et le prouve : la charge de chaque cœur logique
-pendant la mesure est relevée avec `psutil`, ainsi que le nombre de cœurs que le processus
-occupe en moyenne.
+Une mesure sur le processeur utilise **tous les fils** que ce processus peut utiliser
+(`forge.processeur.fils_disponibles`, soit 16 sur le Ryzen 7 9800X3D : 8 cœurs, 2 fils
+chacun), et le prouve : la charge de chaque cœur logique pendant la mesure est relevée avec
+`psutil`, ainsi que le nombre de cœurs que le processus occupe en moyenne.
 
 Les « Go » de ce module valent 1024³ octets (comme l'Explorateur de Windows).
 """
 
 import gc
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -33,6 +36,7 @@ import torch
 
 from forge.entrainement.boucle import ConfigEntrainement, _creer_optimiseur, _pas_d_optimisation
 from forge.modele import PRESETS, ConfigModele, Transformer, nombre_parametres
+from forge.processeur import fils_disponibles
 
 _OCTETS_PAR_GO = 1024**3
 
@@ -204,7 +208,8 @@ def mesurer(
     - `micro_lot` : lignes de `longueur_contexte` jetons traitées d'un coup ;
     - `pas` : nombre de pas chronométrés (après `echauffement` pas non comptés, 2 par défaut :
       le premier pas alloue la mémoire et prépare les noyaux de calcul, il est plus lent) ;
-    - `fils` : sur le processeur, nombre de fils de calcul (tous, `os.cpu_count()`, par défaut).
+    - `fils` : sur le processeur, nombre de fils de calcul (par défaut, tous ceux que ce processus
+      peut utiliser : `forge.processeur.fils_disponibles`).
       Sans effet sur la carte graphique ;
     - `accumulation` : micro-lots par pas d'optimisation (1 par défaut) ;
     - `secondes_max` : si la mesure dure déjà plus que ça, on s'arrête avant `pas` (au moins
@@ -239,7 +244,7 @@ def mesurer(
     peripherique = torch.device(appareil)
     fils_avant = torch.get_num_threads()
     if appareil == "cpu":
-        torch.set_num_threads(fils or os.cpu_count() or 1)  # tous les fils du processeur
+        torch.set_num_threads(fils or fils_disponibles())  # tous les fils que ce processus peut utiliser
     try:
         return _mesurer(config, peripherique, micro_lot, pas, accumulation, echauffement, secondes_max)
     finally:
@@ -450,6 +455,28 @@ def gpu_occupe(etat: dict | None) -> str | None:
 
 
 
+def decrire_la_compilation() -> dict:
+    """Ce qui est vrai sur cette machine pour `torch.compile` : `{"triton": bool, "compilation": texte}`.
+
+    La mesure se fait toujours en mode immédiat, sans compilation. Sans `triton` (le cas habituel
+    sous Windows), l'entraînement aussi, avec `compiler = "auto"` : la mesure prédit sa durée.
+    Avec `triton` (le cas habituel sous Linux), l'entraînement compilera le modèle, et ira sans
+    doute plus vite que la mesure.
+    """
+    if importlib.util.find_spec("triton") is None:
+        return {
+            "triton": False,
+            "compilation": "non : mode immédiat (triton n'est pas installé sur cette machine : "
+            "l'entraînement sur la carte graphique ne compilera pas non plus)",
+        }
+    return {
+        "triton": True,
+        "compilation": 'non : mode immédiat, alors que triton est installé : avec compiler = "auto", '
+        "l'entraînement sur la carte graphique compilera le modèle (torch.compile) et ira sans doute "
+        "plus vite que cette mesure",
+    }
+
+
 def charge_au_repos(duree: float = 2.0) -> float:
     """Charge moyenne de tous les cœurs logiques pendant `duree` secondes, avant la mesure (en %)."""
     return psutil.cpu_percent(interval=duree)
@@ -488,7 +515,7 @@ def mesurer_presets(
         "coeurs_physiques": psutil.cpu_count(logical=False),
         "ram_go": round(psutil.virtual_memory().total / _OCTETS_PAR_GO, 1),
         "torch": torch.__version__,
-        "compilation": "non : mode immédiat (triton absent sous Windows)",
+        **decrire_la_compilation(),
         "charge_au_repos_pct": charge_au_repos(),
         "disque_libre_go": round(shutil.disk_usage(_dossier_des_donnees()).free / _OCTETS_PAR_GO, 1),
     }
@@ -547,7 +574,7 @@ def _mesurer_les_tailles(
                 ligne["gpu_balayage"] = balayage
                 ligne["gpu_max"] = balayage[micro_lot]
                 ligne["gpu"] = max(balayage.values(), key=lambda r: r["jetons_par_seconde"])
-        journal(f"{nom} : processeur, {os.cpu_count()} fils, micro_lot {cpu_micro_lot}, au plus {cpu_secondes:.0f} s…")
+        journal(f"{nom} : processeur, {fils_disponibles()} fils, micro_lot {cpu_micro_lot}, au plus {cpu_secondes:.0f} s…")
         # Un seul pas d'échauffement sur le processeur : rien à compiler ni à allouer au-delà du
         # premier passage, et un pas d'un grand modèle y dure des dizaines de secondes.
         ligne["cpu"] = mesurer(config, "cpu", cpu_micro_lot, pas, secondes_max=cpu_secondes, echauffement=1)
@@ -681,4 +708,12 @@ def tableaux_markdown(resultats: dict) -> str:
             f"| {_go(place['pic_go'])} | {_tient_sur_le_disque(place['pic_go'], libre)} "
             f"| {_go(place['pic_sequentiel_go'])} | {_tient_sur_le_disque(place['pic_sequentiel_go'], libre)} |"
         )
-    return "\n\n".join("\n".join(tableau) for tableau in (carte, processeur, duree, disque)) + "\n"
+    texte = "\n\n".join("\n".join(tableau) for tableau in (carte, processeur, duree, disque)) + "\n"
+    if resultats["machine"].get("triton"):
+        texte += (
+            f"\nAttention{_FINE}: ces mesures sont faites sans compilation, alors que triton est installé sur "
+            f'cette machine. Avec compiler = "auto", l\'entraînement sur la carte graphique compilera le '
+            f"modèle (torch.compile){_FINE}: il ira sans doute plus vite, et durera moins longtemps que ces "
+            "tableaux ne le disent.\n"
+        )
+    return texte

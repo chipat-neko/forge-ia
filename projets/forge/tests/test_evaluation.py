@@ -216,6 +216,19 @@ def test_rapport(tmp_path, sauvegarde_minuscule, donnees_test, tok_fichier_test)
     assert "Perplexité" in (tmp_path / "rapport.md").read_text(encoding="utf-8")
 
 
+def test_rapport_sur_le_processeur_suit_les_fils_disponibles(
+    tmp_path, sauvegarde_minuscule, donnees_test, tok_fichier_test, monkeypatch
+):
+    """Les fils que ce processus peut utiliser (affinité comprise), pas tous ceux de la machine."""
+    monkeypatch.setattr("forge.evaluation.rapport.fils_disponibles", lambda: 2)
+    avant = torch.get_num_threads()
+    try:
+        evaluer(sauvegarde_minuscule, donnees_test, tok_fichier_test, tmp_path, n_qcm=0, appareil="cpu")
+        assert torch.get_num_threads() == 2
+    finally:
+        torch.set_num_threads(avant)
+
+
 # --------------------------------------------------------------------------------------
 # Perte, perplexité, bits par octet
 # --------------------------------------------------------------------------------------

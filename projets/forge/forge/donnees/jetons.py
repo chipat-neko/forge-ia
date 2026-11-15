@@ -28,7 +28,6 @@ import gzip
 import hashlib
 import json
 import multiprocessing
-import os
 import signal
 import sys
 import time
@@ -45,6 +44,7 @@ from forge.chemins import verifier_place
 from forge.donnees.melange import est_validation
 from forge.donnees.nettoyage import empreinte_du_texte_nettoye
 from forge.donnees.telechargement import MARGE_PLACE, _ecrire_atomique, en_mo
+from forge.processeur import fils_disponibles
 from forge.tokenizer.apprentissage import DonneesManquantes
 from forge.tokenizer.bpe_octets import TokenizerOctets
 
@@ -63,6 +63,13 @@ _NOMBRES_DU_MARQUEUR = (
     "jetons_sans_fin",
     "octets",
 )
+
+
+class FragmentInaccessible(OSError):
+    """Un fragment de texte n'a pas pu être lu, sans être abîmé pour autant (disque, droits…).
+
+    Le message dit quoi faire : relancer la même commande, sans rien effacer.
+    """
 
 
 @dataclass(frozen=True)
@@ -193,12 +200,30 @@ def _encoder_les_textes(tokenizer: TokenizerOctets, fin: int, fragment: Path) ->
                 cible.extend(jetons)
                 cible.append(fin)
                 chiffres[nombre] += 1
-    except (OSError, EOFError, zlib.error, ValueError, KeyError, TypeError) as erreur:
+    # Le fragment est abîmé (gzip coupé ou corrompu, ligne qui n'est pas du JSON, ou sans « texte ») :
+    # il faut le retélécharger. `gzip.BadGzipFile` est une `OSError` : elle passe avant les autres.
+    except (
+        gzip.BadGzipFile,
+        EOFError,
+        zlib.error,
+        ValueError,  # dont json.JSONDecodeError, et UnicodeDecodeError (octets qui ne sont pas de l'UTF-8)
+        KeyError,
+        TypeError,
+    ) as erreur:
         source = fragment.parent
         raise ValueError(
             f"Le fragment {fragment} est illisible ({type(erreur).__name__} : {erreur}). "
             f"Supprime le dossier {source}, puis relance le téléchargement avec : "
             f"python -m forge donnees --octets <taille> --dossier {source.parent.name}"
+        ) from erreur
+    # Toute autre erreur d'entrée-sortie ne dit rien du fragment : disque débranché ou endormi,
+    # droit d'accès, antivirus… Effacer la source perdrait des heures de téléchargement pour rien.
+    except OSError as erreur:
+        raise FragmentInaccessible(
+            f"Impossible de lire le fragment {fragment} ({type(erreur).__name__} : {erreur}). Le "
+            "fichier n'est sans doute pas abîmé : vérifie que le disque est bien branché et que le "
+            "fichier n'est pas ouvert ailleurs, puis relance la même commande : les fragments déjà "
+            "encodés sont gardés."
         ) from erreur
     chiffres["jetons_train"] = len(train)
     chiffres["jetons_val"] = len(val)
@@ -395,8 +420,9 @@ def encoder_corpus(
 
     `dossiers` : les dossiers de sources (chacun avec ses `fragment-*.jsonl.gz` et son
     `.complet`). `processus` : combien de processus travaillent en même temps, un fragment
-    chacun (`os.cpu_count()` par défaut ; 1 encode sans processus à part). `journal`, s'il
-    est donné, reçoit une ligne par fragment.
+    chacun (par défaut, autant que de fils que ce processus peut utiliser, affinité comprise :
+    `fils_disponibles` ; 1 encode sans processus à part). `journal`, s'il est donné, reçoit une
+    ligne par fragment.
 
     Le résumé : `jetons_train` et `jetons_val` (les `<|fin_texte|>` compris, comme dans les
     fichiers) et `octets_par_jeton` (octets UTF-8 des textes divisés par leurs jetons, sans
@@ -409,7 +435,7 @@ def encoder_corpus(
     sortie = Path(sortie)
     ecrire = journal if journal is not None else (lambda _message: None)
     if processus is None:
-        processus = os.cpu_count() or 1
+        processus = fils_disponibles()
     if processus < 1:
         raise ValueError(f"Le nombre de processus doit être au moins 1, pas {processus}.")
     travaux = _lister_les_travaux(dossiers)

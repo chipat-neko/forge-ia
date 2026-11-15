@@ -220,7 +220,9 @@ def test_le_nombre_de_processus_par_defaut_est_celui_des_coeurs(corpus, tokenize
         vus.append(processus)
         return reel(travaux, tokenizer, empreinte_tokenizer, sortie, 1, rendre_compte)
 
-    monkeypatch.setattr(os, "cpu_count", lambda: 16)
+    # Les fils que ce processus peut utiliser (l'affinité comprise), pas tous ceux de la machine.
+    monkeypatch.setattr(module_jetons, "fils_disponibles", lambda: 16)
+    monkeypatch.setattr(os, "cpu_count", lambda: 64)
     monkeypatch.setattr(module_jetons, "_encoder_tous_les_fragments", espion)
     encoder_corpus(corpus.dossiers, tokenizer_de_test, tmp_path)
     assert vus == [16]
@@ -469,6 +471,39 @@ def test_un_fragment_illisible_arrete_tout_proprement(corpus, tokenizer_de_test,
     assert "fragment-00001.jsonl.gz" in str(erreur.value) and "relance le téléchargement" in str(erreur.value)
     assert not list(sortie.rglob("*.tmp"))
     assert not (sortie / ".complet").exists() and not (sortie / "index.json").exists()
+
+
+def test_une_erreur_de_lecture_passagere_ne_fait_rien_effacer(corpus, tokenizer_de_test, tmp_path, monkeypatch):
+    """Un disque USB débranché, un droit d'accès : le fragment n'est pas abîmé, on ne l'efface pas."""
+    dossiers = dossiers_copies(corpus, tmp_path)
+    sortie = tmp_path / "jetons"
+    vrai_open = module_jetons.gzip.open
+
+    def open_refuse(chemin, *a, **k):
+        if Path(chemin).name == "fragment-00001.jsonl.gz":
+            raise PermissionError(13, "Accès refusé", str(chemin))
+        return vrai_open(chemin, *a, **k)
+
+    monkeypatch.setattr(module_jetons.gzip, "open", open_refuse)
+    with pytest.raises(OSError) as erreur:
+        encoder_corpus(dossiers, tokenizer_de_test, sortie, processus=1)
+    message = str(erreur.value)
+    assert "fragment-00001.jsonl.gz" in message and "PermissionError" in message
+    assert "Supprime" not in message and "relance le téléchargement" not in message
+    assert "relance la même commande : les fragments déjà encodés sont gardés" in message
+    assert not (sortie / ".complet").exists()
+
+
+def test_sous_commande_encoder_erreur_de_lecture_passagere(donnees_de_la_session, monkeypatch, capsys):
+    def open_refuse(chemin, *a, **k):
+        raise PermissionError(13, "Accès refusé", str(chemin))
+
+    monkeypatch.setattr(module_jetons.gzip, "open", open_refuse)
+    arguments = ["encoder", "--donnees", "essai", "--tokenizer", str(donnees_de_la_session.tokenizer), "--processus", "1"]
+    assert main(arguments) == 1
+    erreur = capsys.readouterr().err
+    assert erreur.startswith("Erreur : ") and "les fragments déjà encodés sont gardés" in erreur
+    assert "Supprime" not in erreur and erreur.lower().count("relance la même commande") == 1
 
 
 # --- Lecture -----------------------------------------------------------------------------

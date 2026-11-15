@@ -75,6 +75,12 @@ def parts_en_octets(texte: str) -> dict[str, int]:
     return {nom: lues[nom] for nom in MELANGE_PAR_DEFAUT}
 
 
+def _premiere_ligne(erreur: BaseException) -> str:
+    """« RuntimeError : CUDA error: … » : le type et la première ligne d'une erreur imprévue, sans trace."""
+    lignes = str(erreur).strip().splitlines()
+    return f"{type(erreur).__name__} : {lignes[0] if lignes else 'sans message'}"
+
+
 def _nouvelle_commande(sous_parseurs, nom: str, aide: str) -> argparse.ArgumentParser:
     """Ajoute une sous-commande, avec son aide en français."""
     commande = sous_parseurs.add_parser(
@@ -127,8 +133,9 @@ def _commande_donnees(choix: argparse.Namespace) -> int:
             return 1
         except KeyboardInterrupt:
             print(
-                f"Interrompu pendant « {nom} ». "
-                "Relance la même commande : seul le fragment en cours sera relu.",
+                f"Interrompu pendant « {nom} ». Relance la même commande : les fragments déjà écrits sont "
+                "gardés. Le flux sera relu depuis le début du jeu pour sauter les documents déjà comptés, "
+                "ce qui prend du temps et du réseau (18 minutes pour 15,6 millions de documents).",
                 file=sys.stderr,
             )
             return 130
@@ -191,6 +198,21 @@ def _commande_tokenizer(choix: argparse.Namespace) -> int:
         )
     except (DonneesManquantes, ValueError) as erreur:
         print(f"Erreur : {erreur}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print(
+            f"Apprentissage interrompu : {choix.sortie} n'est écrit qu'à la fin, d'un coup, il n'a pas été "
+            "touché. Relance la même commande : l'apprentissage repart du début.",
+            file=sys.stderr,
+        )
+        return 130
+    except Exception as erreur:  # disque plein ou débranché, mémoire…
+        print(
+            f"Erreur pendant l'apprentissage du tokenizer ({_premiere_ligne(erreur)}).\n"
+            f"{choix.sortie} n'est jamais écrit à moitié. Vérifie la place sur le disque et le chemin de "
+            "--sortie, puis relance la même commande : l'apprentissage repart du début.",
+            file=sys.stderr,
+        )
         return 1
     print(
         f"Tokenizer « {tokenizer.nom} » enregistré dans {choix.sortie} : "
@@ -293,6 +315,7 @@ def _commande_encoder(choix: argparse.Namespace) -> int:
     # Imports ici : les autres commandes n'ont pas besoin de l'encodage.
     from forge.chemins import PlaceInsuffisante, racine_donnees
     from forge.donnees import jetons
+    from forge.donnees.jetons import FragmentInaccessible
     from forge.donnees.melange import MELANGE_PAR_DEFAUT
     from forge.donnees.telechargement import dossier_des_textes
     from forge.tokenizer.apprentissage import DonneesManquantes, verifier_dossier
@@ -309,7 +332,7 @@ def _commande_encoder(choix: argparse.Namespace) -> int:
         resume = jetons.encoder_corpus(
             [racine / source for source in MELANGE_PAR_DEFAUT], tokenizer, sortie, choix.processus, journal
         )
-    except (DonneesManquantes, PlaceInsuffisante, FileNotFoundError, ValueError) as erreur:
+    except (DonneesManquantes, PlaceInsuffisante, FragmentInaccessible, FileNotFoundError, ValueError) as erreur:
         print(f"Erreur : {erreur}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
@@ -393,6 +416,20 @@ def _commande_entrainer(choix: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 130
+    except Exception as erreur:  # CUDA après une mise en veille, carte trop ancienne, disque…
+        if "no kernel image" in str(erreur):
+            conseil = (
+                "PyTorch n'a pas de code pour cette carte graphique, trop ancienne pour ses roues CUDA 13.2 "
+                "(il faut une carte Turing, RTX 20xx, ou plus récente : voir le README). Mets "
+                f'appareil = "cpu" dans {choix.config}, puis, pour reprendre : '
+            )
+        else:
+            conseil = (
+                "La dernière sauvegarde complète reste bonne. Si la carte graphique est en cause (après une "
+                "mise en veille, par exemple) et que l'erreur revient, redémarre le PC. Puis, pour reprendre : "
+            )
+        print(f"Erreur imprévue pendant l'entraînement ({_premiere_ligne(erreur)}).\n{conseil}{reprise}", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -673,6 +710,14 @@ def _commande_exporter(choix: argparse.Namespace) -> int:
     except KeyboardInterrupt:
         print("Export interrompu : aucun fichier n'est à moitié écrit. Relance la même commande.", file=sys.stderr)
         return 130
+    except Exception as erreur:  # le disque qui se remplit pendant l'écriture des poids, par exemple
+        print(
+            f"Erreur pendant l'export ({_premiere_ligne(erreur)}).\n"
+            f"Aucun fichier n'est à moitié écrit. Vérifie la place sur le disque de {choix.sortie} (libère-en "
+            "s'il est plein), puis relance la même commande.",
+            file=sys.stderr,
+        )
+        return 1
     print(f"Fichiers écrits dans {choix.sortie} :")
     for chemin in ecrits:
         octets = chemin.stat().st_size
@@ -778,8 +823,46 @@ def construire_parseur() -> argparse.ArgumentParser:
     return parseur
 
 
+# Des signes que les commandes écrivent et que cp1252 (Windows) n'a pas : « ≈ » et l'espace fine.
+_SIGNES_NON_ASCII = "\u2248\u202f"
+
+
+def _proteger_les_sorties() -> None:
+    """Qu'aucun signe écrit à l'écran ne fasse planter une commande dont la sortie est redirigée.
+
+    Sous Windows, sans `PYTHONUTF8=1`, Python écrit une sortie redirigée (`> journal.txt`,
+    `| Tee-Object`, `Start-Process` avec redirection) en cp1252, qui n'a ni « ≈ » ni l'espace
+    fine : le premier `print` qui en contient lève `UnicodeEncodeError`, et la commande s'arrête
+    (un entraînement, dès le pas 1). Une sortie qui ne sait pas écrire ces signes est donc
+    reconfigurée :
+
+    - redirigée vers un fichier ou un tube, elle passe en UTF-8, comme avec `PYTHONUTF8=1` ;
+    - branchée sur une console, elle garde l'encodage que la console affiche, et un signe
+      absent devient « ? » au lieu de tout arrêter.
+
+    Une sortie qui sait déjà tout écrire (UTF-8, la console de Windows) n'est pas touchée.
+    """
+    for flux in (sys.stdout, sys.stderr):
+        reconfigurer = getattr(flux, "reconfigure", None)
+        if reconfigurer is None:
+            continue  # sortie remplacée par un objet sans `reconfigure` : on n'y touche pas
+        try:
+            _SIGNES_NON_ASCII.encode(flux.encoding or "ascii")
+            continue
+        except (UnicodeEncodeError, LookupError):
+            pass
+        try:
+            if flux.isatty():
+                reconfigurer(errors="replace")
+            else:
+                reconfigurer(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            pass  # sortie déjà fermée, ou déjà lue : on la laisse telle quelle
+
+
 def main(arguments: list[str] | None = None) -> int:
     """Lance la commande demandée ; renvoie le code de sortie du programme."""
+    _proteger_les_sorties()
     parseur = construire_parseur()
     choix = parseur.parse_args(arguments)
     fonction = getattr(choix, "fonction", None)

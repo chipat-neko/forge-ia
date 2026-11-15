@@ -235,6 +235,24 @@ def test_sous_commande_exporter_erreurs_en_francais(tmp_path, capsys):
     assert code == 1 and erreur.startswith("Erreur : ") and "absent.pt" in erreur
 
 
+def test_sous_commande_exporter_erreur_inattendue(tmp_path, monkeypatch, capsys):
+    """L'erreur de `save_file` quand le disque se remplit, par exemple : pas de trace, la marche à suivre."""
+
+    class SafetensorError(Exception):
+        pass
+
+    def export_qui_echoue(*a, **k):
+        raise SafetensorError("Error while serializing: No space left on device (os error 28)\ndétail")
+
+    monkeypatch.setattr("forge.exporter.exporter", export_qui_echoue)
+    code = main(["exporter", "--sauvegarde", str(tmp_path / "meilleur.pt"), "--sortie", str(tmp_path / "s")])
+    erreur = capsys.readouterr().err
+    assert code == 1
+    assert "SafetensorError : Error while serializing: No space left on device (os error 28)" in erreur
+    assert "détail" not in erreur
+    assert "aucun fichier n'est à moitié écrit" in erreur.lower() and "relance la même commande" in erreur.lower()
+
+
 def test_aide_de_exporter(capsys):
     with pytest.raises(SystemExit) as fin:
         main(["exporter", "--help"])

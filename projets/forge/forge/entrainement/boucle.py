@@ -28,12 +28,12 @@ suivant est exactement celui qui aurait suivi sans la pause. Après un plantage 
 coupure de courant, la reprise part de la dernière sauvegarde complète.
 """
 
+import contextlib
 import dataclasses
 import gc
 import importlib.util
 import json
 import logging
-import os
 import random
 import signal
 import sys
@@ -54,6 +54,7 @@ from forge.entrainement.sauvegarde import charger_derniere, est_disque_plein, no
 from forge.evaluation.perte import autocast as _autocast  # bf16 sur la carte graphique, 32 bits sur le processeur
 from forge.evaluation.perte import perte_sur_morceaux as _perte_validation  # la mesure est celle de `evaluer`
 from forge.modele import PRESETS, ConfigModele, Transformer, nombre_parametres
+from forge.processeur import fils_disponibles
 from forge.tokenizer.apprentissage import DonneesManquantes
 
 VERSION_DE_LA_SAUVEGARDE = 1
@@ -371,6 +372,11 @@ class _Pause:
     Le premier appui lève seulement un drapeau, que la boucle regarde à la fin de chaque pas.
     Un second appui arrête tout de suite (`KeyboardInterrupt`) : le pas en cours est perdu,
     mais la dernière sauvegarde complète reste bonne.
+
+    SIGTERM, là où il existe, fait de même : c'est ce qu'envoient l'arrêt du système (Linux),
+    `docker stop` ou `timeout`. Ils laissent en général le temps (90 s pour systemd, 10 s pour
+    `docker stop`, réglable) de finir le pas et de sauvegarder, au lieu de perdre jusqu'à
+    `sauvegarde_minutes` de calcul.
     """
 
     def __init__(self) -> None:
@@ -381,19 +387,25 @@ class _Pause:
         if self.demandee:
             raise KeyboardInterrupt
         self.demandee = True
-        try:
-            print(
-                "\nPause demandée : je finis le pas en cours, je sauvegarde, puis je m'arrête "
-                "(Ctrl+C une seconde fois : arrêt immédiat, sans sauvegarder ce pas).",
-                flush=True,
+        if numero == getattr(signal, "SIGTERM", None):
+            message = (
+                "\nArrêt demandé par le système (SIGTERM) : je finis le pas en cours, je sauvegarde, "
+                "puis je m'arrête."
             )
+        else:
+            message = (
+                "\nPause demandée : je finis le pas en cours, je sauvegarde, puis je m'arrête "
+                "(Ctrl+C une seconde fois : arrêt immédiat, sans sauvegarder ce pas)."
+            )
+        try:
+            print(message, flush=True)
         except (OSError, RuntimeError):
             pass  # l'écran était déjà occupé : le message de pause suivra quand même
 
     def __enter__(self) -> "_Pause":
         # On ne peut poser un gestionnaire de signal que depuis le fil principal.
         if threading.current_thread() is threading.main_thread():
-            for nom in ("SIGINT", "SIGBREAK"):
+            for nom in ("SIGINT", "SIGBREAK", "SIGTERM"):
                 numero = getattr(signal, nom, None)
                 if numero is not None:
                     self._anciens[numero] = signal.signal(numero, self._signal_recu)
@@ -402,6 +414,48 @@ class _Pause:
     def __exit__(self, *erreur) -> None:
         for numero, ancien in self._anciens.items():
             signal.signal(numero, ancien)
+
+
+# Les drapeaux de `SetThreadExecutionState` (Windows) : « jusqu'au prochain appel » et « le système
+# doit rester éveillé ».
+ES_CONTINUOUS = 0x80000000
+ES_SYSTEM_REQUIRED = 0x00000001
+
+
+def _etat_d_execution_windows():
+    """La fonction `SetThreadExecutionState` de Windows ; `None` ailleurs, ou si on ne la trouve pas."""
+    if sys.platform != "win32":
+        return None
+    try:
+        import ctypes
+
+        fonction = ctypes.WinDLL("kernel32").SetThreadExecutionState
+    except (ImportError, OSError, AttributeError):
+        return None
+    fonction.argtypes = [ctypes.c_uint32]
+    fonction.restype = ctypes.c_uint32
+    return fonction
+
+
+@contextlib.contextmanager
+def _sans_mise_en_veille():
+    """Pendant le bloc, Windows ne se met pas en veille de lui-même (l'écran, lui, peut s'éteindre).
+
+    Un entraînement dure des jours : une mise en veille automatique le suspendrait au même pas
+    toute la nuit, et CUDA échoue parfois au réveil. `ES_SYSTEM_REQUIRED` l'empêche tant que le
+    bloc dure ; à la sortie (fin, pause, erreur), `ES_CONTINUOUS` seul rend la main aux réglages
+    d'alimentation. Une veille demandée (bouton, capot fermé) reste possible. Ailleurs que sous
+    Windows, rien n'est fait.
+    """
+    fixer_etat = _etat_d_execution_windows()
+    if fixer_etat is None:
+        yield
+        return
+    fixer_etat(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)
+    try:
+        yield
+    finally:
+        fixer_etat(ES_CONTINUOUS)
 
 
 # --- Le modèle et l'optimiseur ----------------------------------------------------------
@@ -596,16 +650,43 @@ def _signaler_manque_de_memoire(config: ConfigEntrainement, appareil: torch.devi
             libre = f"{_nombre(octets_libres / 1024**3, 1)} Go sur {_nombre(octets_total / 1024**3, 1)} Go"
         except RuntimeError:
             pass
-    print(
-        f"La carte graphique manque de mémoire pour micro_lot = {config.micro_lot}.\n"
-        f"Mémoire libre sur la carte graphique : {libre} (Windows et les programmes ouverts "
-        "en prennent une partie).\n"
-        f"Réduis micro_lot dans {config.fichier or '<fichier>'}, ferme les jeux ou logiciels 3D "
-        "ouverts, puis relance avec --reprendre.",
-        file=sys.stderr,
-        flush=True,
-    )
+    fichier = config.fichier or "<fichier>"
+    memoire = f"Mémoire libre sur la carte graphique : {libre} (Windows et les programmes ouverts en prennent une partie)."
+    if config.micro_lot > 1:
+        message = (
+            f"La carte graphique manque de mémoire pour micro_lot = {config.micro_lot}.\n{memoire}\n"
+            f"Réduis micro_lot dans {fichier}, ferme les jeux ou logiciels 3D ouverts, puis relance avec "
+            "--reprendre."
+        )
+    else:
+        message = _manque_de_memoire_avec_un_micro_lot_de_1(config, memoire)
+    print(message, file=sys.stderr, flush=True)
     raise SystemExit(2)
+
+
+def _manque_de_memoire_avec_un_micro_lot_de_1(config: ConfigEntrainement, memoire: str) -> str:
+    """Le message quand `micro_lot` vaut déjà 1 : on ne peut plus le réduire, il faut une autre marche à suivre."""
+    fichier = config.fichier or "<fichier>"
+    parametres = nombre_parametres(config.modele)
+    taille = f"preset « {config.preset} »" if isinstance(config.preset, str) else "table [preset]"
+    millions = _nombre(parametres / 1e6, 1)
+    plus_petits = [nom for nom, modele in PRESETS.items() if nombre_parametres(modele) < parametres]
+    lignes = [
+        f"La carte graphique manque de mémoire, même avec micro_lot = 1 : ce modèle ({taille}, "
+        f"{millions} millions de paramètres) ne tient pas sur cette carte.",
+        memoire,
+        "Que faire :",
+        "- ferme les programmes qui prennent la carte (jeux, logiciels 3D, vidéos, un autre entraînement), "
+        f"puis relance : {_commande_de_reprise(config)} ;",
+    ]
+    if plus_petits:
+        lignes.append(
+            "- ou choisis un preset plus petit, dans une nouvelle sortie (une sauvegarde ne reprend que le "
+            f"même modèle) : python -m forge mesurer --presets {','.join(plus_petits)} dit lesquels tiennent "
+            "sur cette carte ;"
+        )
+    lignes.append(f'- ou mets appareil = "cpu" dans {fichier} (bien plus lent), puis relance avec --reprendre.')
+    return "\n".join(lignes)
 
 
 def _etat_du_modele(config: ConfigEntrainement, modele: nn.Module, pas: int) -> dict:
@@ -679,7 +760,7 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
 
     # 2. Le modèle, l'optimiseur et les données, tirés de la graine…
     if appareil.type == "cpu":
-        torch.set_num_threads(os.cpu_count() or 1)  # tous les fils du processeur
+        torch.set_num_threads(fils_disponibles())  # tous les fils que ce processus peut utiliser
     _semer(config.graine)
     modele = Transformer(config.modele).to(appareil)
     optimiseur = _creer_optimiseur(modele, config, appareil)
@@ -756,7 +837,7 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
         debut_session = time.perf_counter()
         derniere_ecriture = debut_session
         dernier_affichage = None
-        with _Pause() as pause:
+        with _Pause() as pause, _sans_mise_en_veille():
             while pas < fin:
                 debut_pas = time.perf_counter()
                 pas += 1

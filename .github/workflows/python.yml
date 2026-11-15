@@ -46,6 +46,8 @@ jobs:
           nombre=0
           for dossier in projets/*/; do
             [ -f "${dossier}pyproject.toml" ] || continue
+            # forge a son propre job (plus bas) : ses tests prennent l'essentiel du temps.
+            [ "$dossier" = "projets/forge/" ] && continue
             nombre=$((nombre + 1))
             echo "::group::${dossier}"
             # --locked : échoue si uv.lock ne correspond plus à pyproject.toml.
@@ -67,6 +69,29 @@ jobs:
             exit 1
           fi
           exit "$echec"
+
+  # forge (le moteur de ton IA) dans son propre job, avec son propre délai : ses tests prenaient
+  # 3 min 16 s des 11 min 30 s du job Windows ci-dessus (relevé le 15/11/2026), et ils vont grandir.
+  # --durations=15 liste les 15 tests les plus lents, pour voir venir un dépassement.
+  forge:
+    name: Tests de forge (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.3.3
+      # --locked : échoue si uv.lock ne correspond plus à pyproject.toml. Les roues CPU de
+      # PyTorch : les machines de l'intégration continue n'ont pas de carte NVIDIA.
+      - name: Tests de forge
+        shell: bash
+        working-directory: projets/forge
+        run: uv run --locked --extra cpu pytest -q --durations=15
 
   # Chaque notebook, exécuté dans un environnement qui reproduit l'image de Colab sans
   # carte graphique (relue le 05/11/2026, https://github.com/googlecolab/backend-info) :

@@ -8,11 +8,14 @@ chaque époque : les tests de reprise traversent un changement d'époque.
 """
 
 import errno
+import io
 import json
 import math
 import os
 import shutil
 import signal
+import subprocess
+import sys
 from collections import Counter
 from dataclasses import replace
 from pathlib import Path
@@ -138,6 +141,37 @@ def test_memoire_gpu_message(tmp_path, monkeypatch, capsys):
     erreur = capsys.readouterr().err
     assert "Réduis micro_lot" in erreur
     assert "ferme les jeux ou logiciels 3D ouverts, puis relance avec --reprendre." in erreur
+
+
+def test_memoire_gpu_message_quand_micro_lot_vaut_deja_1(capsys):
+    """La configuration principale a déjà micro_lot = 1 : « réduis micro_lot » serait une impasse."""
+    config = lire_config(RACINE_DU_PROJET / "configs" / "principal.toml")
+    with pytest.raises(SystemExit) as sortie:
+        boucle._signaler_manque_de_memoire(config, torch.device("cpu"))
+    assert sortie.value.code == 2
+    erreur = capsys.readouterr().err
+    assert "Réduis micro_lot" not in erreur
+    assert "même avec micro_lot = 1" in erreur and "ne tient pas sur cette carte" in erreur
+    assert "Mémoire libre sur la carte graphique : inconnue" in erreur
+    # Trois vraies marches à suivre : libérer la carte, une taille plus petite, ou le processeur.
+    assert "ferme les programmes qui prennent la carte" in erreur
+    assert f"python -m forge entrainer --config {config.fichier} --reprendre" in erreur
+    assert "nouvelle sortie" in erreur and "python -m forge mesurer --presets mini,petit,moyen,grand" in erreur
+    assert 'appareil = "cpu"' in erreur
+
+
+def test_memoire_gpu_message_micro_lot_1_pendant_l_entrainement(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(
+        "forge.entrainement.boucle._pas_d_optimisation",
+        lambda *a, **k: (_ for _ in ()).throw(torch.cuda.OutOfMemoryError("CUDA out of memory")),
+    )
+    with pytest.raises(SystemExit) as sortie:
+        entrainer(config_test(tmp_path, micro_lot=1), arreter_apres=1)
+    assert sortie.value.code == 2
+    erreur = capsys.readouterr().err
+    assert "ne tient pas sur cette carte" in erreur and "Réduis micro_lot" not in erreur
+    # Le modèle des tests est plus petit que tous les presets : pas de preset plus petit à proposer.
+    assert "--presets" not in erreur and 'appareil = "cpu"' in erreur
 
 
 def test_planning():
@@ -490,6 +524,41 @@ def test_pause_par_ctrl_c(tmp_path, monkeypatch, capsys):
     assert reference[3:8] == suite  # au bit près sur le processeur
 
 
+def test_sigterm_met_en_pause_comme_ctrl_c(tmp_path, monkeypatch, capsys):
+    """Un arrêt du système, `docker stop` ou `timeout` envoient SIGTERM : on sauvegarde, comme pour Ctrl+C."""
+    avant = signal.getsignal(signal.SIGTERM)
+    vrai_pas = boucle._pas_d_optimisation
+    faits = []
+
+    def pas_puis_sigterm(*a, **k):
+        perte = vrai_pas(*a, **k)
+        faits.append(perte)
+        if len(faits) == 2:
+            # Le gestionnaire posé pour SIGTERM, appelé comme le système le ferait.
+            gestionnaire = signal.getsignal(signal.SIGTERM)
+            assert callable(gestionnaire) and gestionnaire is not avant, "SIGTERM n'est pas une pause"
+            gestionnaire(signal.SIGTERM, None)
+        return perte
+
+    monkeypatch.setattr(boucle, "_pas_d_optimisation", pas_puis_sigterm)
+    r = entrainer(config_test(tmp_path), arreter_apres=8)
+    assert r["en_pause"] and r["pas"] == 2
+    assert charger_derniere(tmp_path / "sauvegardes")["pas"] == 2
+    assert signal.getsignal(signal.SIGTERM) is avant  # rendu à la fin
+    assert "SIGTERM" in capsys.readouterr().out
+
+
+def test_l_entrainement_sur_le_processeur_suit_les_fils_disponibles(tmp_path, monkeypatch):
+    """Les fils que ce processus peut utiliser (affinité comprise), pas tous ceux de la machine."""
+    monkeypatch.setattr(boucle, "fils_disponibles", lambda: 2)
+    avant = torch.get_num_threads()
+    try:
+        entrainer(config_test(tmp_path), arreter_apres=1)
+        assert torch.get_num_threads() == 2
+    finally:
+        torch.set_num_threads(avant)
+
+
 def test_reprise_coupe_le_journal(tmp_path):
     entrainer(config_test(tmp_path), arreter_apres=10)
     with open(tmp_path / "journal.jsonl", "a", encoding="utf-8") as journal:
@@ -658,6 +727,25 @@ def test_config_mini_toml():
     assert config.fichier.endswith("mini.toml")
 
 
+def test_le_readme_suit_les_commandes_et_mini_toml():
+    """Chaque commande a son exemple dans le README, et celui d'`evaluer` vise les vrais chemins de mini.toml.
+
+    `docs/mesures/ton-ia-mini.md` dit que ses commandes « sont celles du README ».
+    """
+    import argparse
+
+    from forge.__main__ import construire_parseur
+
+    readme = (RACINE_DU_PROJET / "README.md").read_text(encoding="utf-8")
+    sous_commandes = next(a for a in construire_parseur()._actions if isinstance(a, argparse._SubParsersAction))
+    for commande in sous_commandes.choices:
+        assert f"python -m forge {commande} " in readme, commande
+    mini = lire_config(RACINE_DU_PROJET / "configs" / "mini.toml")
+    attendu = f'entrainements\\{mini.sortie}\\sauvegardes\\meilleur.pt" --donnees {mini.donnees}\n'
+    assert attendu in readme
+    assert "au fil des tâches du plan" not in readme
+
+
 def test_config_principal_toml():
     # Le choix de l'utilisateur après la mesure de la tâche 10 : la carte, la taille « tres_grand »,
     # 20 jetons par paramètre.
@@ -679,7 +767,8 @@ def test_config_cle_inconnue(tmp_path):
         lire_config(fichier)
 
 
-def test_commande_entrainer(tmp_path, capsys):
+def ecrire_config_toml(tmp_path: Path) -> Path:
+    """Le TOML d'un entraînement minuscule sur le processeur : 6 pas de 64 jetons, sortie dans `tmp_path/sortie`."""
     ecrire_corpus(tmp_path / "jetons")
     fichier = tmp_path / "essai.toml"
     fichier.write_text(
@@ -706,9 +795,153 @@ def test_commande_entrainer(tmp_path, capsys):
         + "\n",
         encoding="utf-8",
     )
+    return fichier
+
+
+def test_commande_entrainer(tmp_path, capsys):
+    fichier = ecrire_config_toml(tmp_path)
     assert main(["entrainer", "--config", str(fichier)]) == 0
     assert charger_derniere(tmp_path / "sortie" / "sauvegardes")["pas"] == 6
     # Relancer sans --reprendre ne détruit pas l'entraînement fait : message et code 1.
     assert main(["entrainer", "--config", str(fichier)]) == 1
     assert "--reprendre" in capsys.readouterr().err
     assert main(["entrainer", "--config", str(fichier), "--reprendre"]) == 0
+
+
+def test_commande_entrainer_erreur_inattendue(tmp_path, monkeypatch, capsys):
+    """Une erreur de CUDA après une mise en veille, par exemple : pas de trace, mais la commande de reprise."""
+
+    def erreur_de_cuda(*a, **k):
+        raise RuntimeError(
+            "CUDA error: unspecified launch failure\nCUDA kernel errors might be asynchronously reported."
+        )
+
+    monkeypatch.setattr("forge.entrainement.entrainer", erreur_de_cuda)
+    fichier = ecrire_config_toml(tmp_path)
+    assert main(["entrainer", "--config", str(fichier)]) == 1
+    erreur = capsys.readouterr().err
+    assert "RuntimeError : CUDA error: unspecified launch failure" in erreur
+    assert "asynchronously" not in erreur  # la première ligne seulement
+    assert f"python -m forge entrainer --config {fichier} --reprendre" in erreur
+    assert "dernière sauvegarde complète" in erreur
+
+
+def test_commande_entrainer_carte_trop_ancienne(tmp_path, monkeypatch, capsys):
+    """« no kernel image » : la carte est plus ancienne que ce que les roues CUDA 13.2 savent faire tourner."""
+
+    def carte_trop_ancienne(*a, **k):
+        raise RuntimeError("CUDA error: no kernel image is available for execution on the device")
+
+    monkeypatch.setattr("forge.entrainement.entrainer", carte_trop_ancienne)
+    fichier = ecrire_config_toml(tmp_path)
+    assert main(["entrainer", "--config", str(fichier)]) == 1
+    erreur = capsys.readouterr().err
+    assert "trop ancienne" in erreur and 'appareil = "cpu"' in erreur and "--reprendre" in erreur
+
+
+# --------------------------------------------------------------------------------------
+# Une sortie redirigée sans UTF-8 (sous Windows, sans PYTHONUTF8)
+# --------------------------------------------------------------------------------------
+
+
+def test_entrainement_avec_la_sortie_redirigee_sans_utf8(tmp_path):
+    """`python -m forge entrainer … > sortie.txt`, sans PYTHONUTF8 : sous Windows, la sortie est en cp1252.
+
+    La ligne de suivi de chaque pas contient « reste ≈ » (U+2248), absent de cp1252 : le premier
+    `print` levait `UnicodeEncodeError`, et l'entraînement s'arrêtait au pas 1, sans sauvegarde.
+    """
+    fichier = ecrire_config_toml(tmp_path)
+    environnement = {cle: valeur for cle, valeur in os.environ.items() if cle not in ("PYTHONUTF8", "PYTHONIOENCODING")}
+    environnement["FORGE_DONNEES"] = str(tmp_path / "donnees")  # rien n'est écrit dans les vraies données
+    if sys.platform != "win32":
+        # Ailleurs, une sortie redirigée est déjà en UTF-8 : on lui impose cp1252, l'encodage qu'elle
+        # a sous Windows, pour que le test garde son sens partout.
+        environnement["PYTHONIOENCODING"] = "cp1252"
+    sortie = tmp_path / "sortie.txt"
+    with open(sortie, "wb") as fichier_de_sortie:
+        resultat = subprocess.run(
+            [sys.executable, "-m", "forge", "entrainer", "--config", str(fichier)],
+            cwd=RACINE_DU_PROJET,
+            stdout=fichier_de_sortie,
+            stderr=subprocess.STDOUT,
+            env=environnement,
+            timeout=300,
+        )
+    texte = sortie.read_bytes().decode("utf-8", errors="replace")
+    assert resultat.returncode == 0, texte
+    assert "reste ≈" in texte and "Entraînement terminé au pas 6." in texte
+    assert charger_derniere(tmp_path / "sortie" / "sauvegardes")["pas"] == 6
+
+
+class FluxDeTest(io.TextIOWrapper):
+    """Une sortie standard dans un encodage choisi, branchée sur une console ou sur un fichier."""
+
+    def __init__(self, encodage: str, console: bool) -> None:
+        super().__init__(io.BytesIO(), encoding=encodage, newline="\n")
+        self._console = console
+
+    def isatty(self) -> bool:
+        return self._console
+
+
+def test_les_sorties_ecrivent_tous_les_signes(monkeypatch):
+    from forge.__main__ import _proteger_les_sorties
+
+    fichier, console = FluxDeTest("cp1252", console=False), FluxDeTest("cp1252", console=True)
+    monkeypatch.setattr(sys, "stdout", fichier)
+    monkeypatch.setattr(sys, "stderr", console)
+    _proteger_les_sorties()
+    print("reste ≈ 2 s · 1\u202f234", flush=True)
+    print("reste ≈ 2 s · é", file=sys.stderr, flush=True)
+    # Un fichier passe en UTF-8, comme avec PYTHONUTF8=1 : il garde tous les signes.
+    assert fichier.buffer.getvalue().decode("utf-8") == "reste ≈ 2 s · 1\u202f234\n"
+    # Une console garde son encodage (celui qu'elle affiche) ; un signe absent devient « ? ».
+    assert console.buffer.getvalue().decode("cp1252") == "reste ? 2 s · é\n"
+    # Une sortie qui sait déjà tout écrire n'est pas touchée.
+    deja_bonne = FluxDeTest("utf-8", console=False)
+    monkeypatch.setattr(sys, "stdout", deja_bonne)
+    _proteger_les_sorties()
+    assert deja_bonne.encoding == "utf-8" and deja_bonne.errors == "strict"
+
+
+# --------------------------------------------------------------------------------------
+# Pas de mise en veille pendant l'entraînement (Windows)
+# --------------------------------------------------------------------------------------
+
+ES_CONTINUOUS, ES_SYSTEM_REQUIRED = 0x80000000, 0x00000001
+
+
+def test_sans_mise_en_veille_demande_puis_rend_la_veille(monkeypatch):
+    appels = []
+    monkeypatch.setattr(boucle, "_etat_d_execution_windows", lambda: appels.append)
+    with boucle._sans_mise_en_veille():
+        assert appels == [ES_CONTINUOUS | ES_SYSTEM_REQUIRED]
+    assert appels == [ES_CONTINUOUS | ES_SYSTEM_REQUIRED, ES_CONTINUOUS]
+    # Même sur erreur, la veille est rendue.
+    appels.clear()
+    with pytest.raises(RuntimeError), boucle._sans_mise_en_veille():
+        raise RuntimeError("plantage")
+    assert appels == [ES_CONTINUOUS | ES_SYSTEM_REQUIRED, ES_CONTINUOUS]
+
+
+def test_sans_mise_en_veille_ne_fait_rien_hors_de_windows(monkeypatch):
+    monkeypatch.setattr(boucle.sys, "platform", "linux")
+    assert boucle._etat_d_execution_windows() is None
+    with boucle._sans_mise_en_veille():  # sans fonction du système : rien à appeler
+        pass
+
+
+def test_l_entrainement_empeche_la_veille_jusqu_a_la_pause(tmp_path, monkeypatch):
+    appels = []
+    monkeypatch.setattr(boucle, "_etat_d_execution_windows", lambda: appels.append)
+    vrai_pas = boucle._pas_d_optimisation
+
+    def pas_puis_ctrl_c(*a, **k):
+        assert appels == [ES_CONTINUOUS | ES_SYSTEM_REQUIRED]  # pendant la boucle : pas de veille
+        perte = vrai_pas(*a, **k)
+        signal.raise_signal(signal.SIGINT)
+        return perte
+
+    monkeypatch.setattr(boucle, "_pas_d_optimisation", pas_puis_ctrl_c)
+    assert entrainer(config_test(tmp_path), arreter_apres=5)["en_pause"]
+    assert appels == [ES_CONTINUOUS | ES_SYSTEM_REQUIRED, ES_CONTINUOUS]  # la pause rend la veille

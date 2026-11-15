@@ -3,8 +3,11 @@
 Le moteur de « ton IA » : un petit modèle de langage qui lit et écrit le
 français et le code, entraîné sur la carte graphique du PC (RTX 5070 Ti). Ce
 projet (paquet Python `forge`) rassemble tout ce qu'il faut : le téléchargement
-des données, le tokenizer, l'encodage, la mesure de vitesse, l'entraînement et
-l'évaluation. Les commandes arrivent au fil des tâches du plan.
+des données, le tokenizer, l'encodage, la mesure de vitesse, l'entraînement,
+le suivi, l'évaluation et l'export des fichiers à publier. Les commandes, dans
+l'ordre de la chaîne : `donnees`, `tokenizer`, `compression`, `encoder`,
+`mesurer`, `entrainer`, `suivi`, `evaluer` et `exporter` (`python -m forge
+<commande> --help` les détaille).
 
 ## Installer et lancer
 
@@ -26,6 +29,22 @@ d'extra resynchronise l'environnement).
 cd projets/forge
 uv run --extra gpu python -m forge --help
 ```
+
+Les commandes de ce README sont écrites pour PowerShell, sous Windows. Sous Linux, voir
+« Sous Linux » plus bas : seules quelques-unes diffèrent.
+
+### Cartes graphiques prises en charge
+
+- **Une carte NVIDIA Turing (sm_75 : RTX 20xx, GTX 16xx) ou plus récente.** Les roues CUDA 13.2
+  de PyTorch (`cu132`) ne contiennent du code que pour sm_75, sm_80, sm_86, sm_90, sm_100 et sm_120
+  (`torch.cuda.get_arch_list()`) : CUDA 13 ne compile plus pour les cartes plus anciennes (Maxwell,
+  Pascal, Volta, comme les GTX 10xx). Avec une de celles-ci, l'entraînement s'arrête sur « no kernel
+  image » : mets `appareil = "cpu"` dans le TOML.
+- **Le bf16 n'est natif qu'à partir d'Ampere (sm_80 et au-delà : RTX 30xx, 40xx, 50xx…).** L'entraînement
+  calcule en bf16 sur la carte. Sur une carte Turing, le matériel ne le fait pas : lance d'abord
+  `forge mesurer`, qui dit la vitesse réelle avant un entraînement de plusieurs heures.
+
+Ce PC a une RTX 5070 Ti (Blackwell, sm_120).
 
 ## Où vont les données
 
@@ -54,9 +73,12 @@ uv run --extra gpu python -m forge donnees --octets 300M --dossier echantillon
 ```
 
 Une coupure (réseau, courant, disque plein) ne laisse ni trou ni doublon : on relance la même
-commande, qui reprend au dernier fragment écrit (seul le fragment en cours, jusqu'à 100 Mo, est
-relu). Une source n'est terminée que lorsque son fichier `.complet` existe. Le mélange par défaut est défini une seule fois, dans
-`forge.donnees.melange.MELANGE_PAR_DEFAUT`.
+commande, qui garde les fragments déjà écrits et reprend après le dernier. Mais pour y arriver, le
+flux est relu depuis le début du jeu, et les documents déjà comptés sont sautés : la reprise coûte
+du temps et du réseau, d'autant plus que la coupure est tardive (il a fallu 18 minutes pour sauter
+15,6 millions de documents de code, voir `docs/mesures/entrainement-2026-11.md`). Une source n'est
+terminée que lorsque son fichier `.complet` existe. Le mélange par défaut est défini une seule fois,
+dans `forge.donnees.melange.MELANGE_PAR_DEFAUT`.
 
 ## Le tokenizer de ton IA
 
@@ -129,15 +151,41 @@ vont dans `FORGE_DONNEES/entrainements/<sortie>/`. On garde les deux dernières 
 écrite d'un coup, donc une coupure de courant n'en laisse jamais une à moitié.
 
 - **Pause :** Ctrl+C. Le pas en cours se termine, tout est sauvegardé, puis la commande de
-  reprise s'affiche.
+  reprise s'affiche. Sous Linux, le signal SIGTERM (arrêt du système, `docker stop`, `timeout`,
+  `kill`) fait de même.
 - **Reprise** (après une pause, un plantage ou une coupure) : la même commande avec
   `--reprendre`. Le pas suivant est exactement celui qui aurait suivi sans la pause.
 - **Mémoire de la carte graphique insuffisante :** réduire `micro_lot` dans le TOML (les
-  jetons de chaque pas restent les mêmes), puis relancer avec `--reprendre`.
+  jetons de chaque pas restent les mêmes), puis relancer avec `--reprendre`. Si `micro_lot` vaut
+  déjà 1 (c'est le cas de `configs/principal.toml`), cette taille de modèle ne tient pas sur la
+  carte. Le message donne la mémoire libre ; trois marches à suivre :
+  - fermer les programmes qui prennent la carte (jeux, logiciels 3D, vidéos, un autre
+    entraînement), puis relancer avec `--reprendre` ;
+  - ou choisir un preset plus petit, dans une nouvelle `sortie` (une sauvegarde ne reprend que le
+    même modèle) : `python -m forge mesurer --presets mini,petit,moyen,grand` dit lesquels
+    tiennent sur la carte ;
+  - ou mettre `appareil = "cpu"` dans le TOML (bien plus lent), puis relancer avec `--reprendre`.
+- **Veille :** sous Windows, l'entraînement empêche la mise en veille automatique du PC tant qu'il
+  tourne (l'écran peut s'éteindre), et la rend à la pause ou à la fin. Une veille demandée
+  (bouton, capot fermé) le suspend quand même ; sous Linux, voir « Sous Linux ».
+- **Erreur imprévue** (CUDA au réveil d'une veille, par exemple) : le message donne le type de
+  l'erreur et la commande de reprise ; la dernière sauvegarde complète reste bonne.
 
 La version courte (« mini », 23 millions de paramètres, une heure sur la carte graphique, `configs/mini.toml`)
 a été entraînée et évaluée le 3 novembre 2026 : durées, courbe, évaluation et échantillons sont dans
-`docs/mesures/ton-ia-mini.md`.
+`docs/mesures/ton-ia-mini.md`. L'entraînement principal (`configs/principal.toml`, 433,6 millions de
+paramètres, 139 h de carte) est raconté dans `docs/mesures/ton-ia-1.5.md`.
+
+## Suivre un entraînement
+
+`suivi` lit le journal d'un entraînement et dit où il en est : état (en cours, en pause, fini,
+arrêté sans pause), pas, perte récente et de validation, débit, temps restant estimé et dernière
+sauvegarde. Il ne fait que lire et n'importe pas PyTorch : on peut le lancer aussi souvent qu'on
+veut, dans une autre console, pendant l'entraînement.
+
+```powershell
+uv run --extra gpu python -m forge suivi --config configs/principal.toml
+```
 
 ## Mesurer la vitesse avant d'entraîner
 
@@ -158,11 +206,11 @@ Les chiffres du 3 novembre 2026 sont dans `docs/mesures/entrainement-2026-11.md`
 ## Évaluer ton IA
 
 Après un entraînement, `evaluer` mesure une sauvegarde et écrit un rapport en français
-(les chemins ci-dessous sont des exemples) :
+(ici, la meilleure sauvegarde de la version courte, celle de `configs/mini.toml`) :
 
 ```powershell
 uv run --extra gpu python -m forge evaluer `
-    --sauvegarde D:\forge-ia-donnees\entrainements\mini\sauvegardes\meilleur.pt --donnees echantillon
+    --sauvegarde "$env:FORGE_DONNEES\entrainements\ton-ia-mini\sauvegardes\meilleur.pt" --donnees court
 ```
 
 Le rapport (`rapport.md` pour la lecture, `rapport.json` pour les programmes) va dans
@@ -188,6 +236,95 @@ Le tokenizer est celui du dépôt (`--tokenizer` pour un autre) : il doit êtr
 encodé les données, sinon la commande refuse de mesurer. Les calculs se font sur la carte graphique si PyTorch la
 voit (en bf16), sinon sur le processeur (`--appareil cpu` pour le forcer).
 
+## Exporter ton IA, et recharger une version publiée
+
+Une sauvegarde de l'entraînement sert à reprendre l'entraînement (poids en 32 bits, optimiseur,
+état du hasard). Pour publier le modèle, `exporter` en tire trois fichiers :
+
+```powershell
+uv run --extra gpu python -m forge exporter `
+    --sauvegarde "$env:FORGE_DONNEES\entrainements\ton-ia\sauvegardes\meilleur.pt" `
+    --sortie "$env:FORGE_DONNEES\publication"
+```
+
+- `ton-ia-1.5.safetensors` (`--poids` pour un autre nom) : les poids en bf16. Le format
+  safetensors ne contient que des nombres : l'ouvrir ne peut rien exécuter. La sortie du modèle
+  réutilise la matrice du plongement (poids « liés ») : seul `plongement.weight` est écrit ;
+- `config.json` : les dimensions du modèle (`ConfigModele(**config)` le reconstruit) ;
+- `tokenizer-ton-ia-v1.json` : la copie exacte du tokenizer figé, vérifiée par son empreinte SHA-256.
+
+Chaque fichier est écrit d'un coup ; la commande affiche la taille et l'empreinte SHA-256 de
+chacun. La version publiée de ton IA est la Release `ton-ia-1.5` du dépôt : ces trois fichiers,
+plus `rapport.json` et sa fiche (`docs/mesures/ton-ia-1.5-LISEZMOI.md`). Pour la recharger,
+depuis `projets/forge` :
+
+```powershell
+gh release download ton-ia-1.5 --repo chipat-neko/forge-ia --dir ton-ia-1.5
+uv run --extra cpu python ton_script.py   # avec une carte NVIDIA : --extra gpu
+```
+
+où `ton_script.py` fait ce que dit la fiche :
+
+```python
+import json
+from pathlib import Path
+
+from safetensors.torch import load_file
+
+from forge.modele import ConfigModele, Transformer, generer
+from forge.tokenizer import TokenizerOctets
+
+dossier = Path("ton-ia-1.5")
+config = ConfigModele(**json.loads((dossier / "config.json").read_text(encoding="utf-8")))
+poids = load_file(dossier / "ton-ia-1.5.safetensors")
+poids.setdefault("sortie.weight", poids["plongement.weight"])  # les poids liés
+modele = Transformer(config)
+modele.load_state_dict(poids)
+tokenizer = TokenizerOctets.charger(dossier / "tokenizer-ton-ia-v1.json")
+
+# Faire écrire ton IA : elle prolonge le début donné.
+fin = tokenizer.id_special("<|fin_texte|>")  # pour ton IA, ce jeton marque aussi le début d'un texte
+debut = [fin, *tokenizer.encoder("Il était une fois")]
+suite = generer(modele, debut, 40, temperature=0.8, top_k=50, graine=0, arret=fin)
+print("Il était une fois" + tokenizer.decoder([jeton for jeton in suite if jeton != fin]))
+```
+
+Pour vérifier un fichier téléchargé, compare son empreinte à celle de la fiche :
+`Get-FileHash ton-ia-1.5.safetensors`.
+
+## Sous Linux
+
+Tout marche de même ; seules ces commandes diffèrent. Les données et les caches se règlent par
+des variables d'environnement (au lieu de `outils/env-forge.ps1`), les chemins prennent des
+`/`, et les commandes coupées sur deux lignes sous PowerShell tiennent ici sur une seule :
+
+```bash
+# Depuis projets/forge, une fois par session (à la place de « . .\outils\env-forge.ps1 ») :
+export FORGE_DONNEES="$HOME/forge-ia-donnees"
+export UV_CACHE_DIR="$FORGE_DONNEES/cache/uv" HF_HOME="$FORGE_DONNEES/cache/huggingface"
+
+uv run --extra gpu python -m forge tokenizer --donnees echantillon-tokenizer --taille 32768 --nom ton-ia-v1 --octets-max 300M --sortie "$FORGE_DONNEES/essai-tokenizer.json"
+uv run --extra gpu python -m forge donnees --parts web_fr=400M,wikipedia_fr=350M,code_python=300M --dossier validation-tokenizer
+uv run --extra gpu python -m forge encoder --donnees echantillon --tokenizer forge/ressources/tokenizer-ton-ia-v1.json
+uv run --extra gpu python -m forge evaluer --sauvegarde "$FORGE_DONNEES/entrainements/ton-ia-mini/sauvegardes/meilleur.pt" --donnees court
+uv run --extra gpu python -m forge exporter --sauvegarde "$FORGE_DONNEES/entrainements/ton-ia/sauvegardes/meilleur.pt" --sortie "$FORGE_DONNEES/publication"
+
+# La forge n'empêche la veille que sous Windows : ici, systemd-inhibit le fait pour elle.
+systemd-inhibit --what=idle:sleep uv run --extra gpu python -m forge entrainer --config configs/principal.toml
+
+# L'empreinte d'un fichier (au lieu de Get-FileHash) :
+sha256sum ton-ia-1.5.safetensors
+```
+
+Deux différences de comportement :
+
+- **La compilation.** Sous Linux, l'extra `gpu` installe aussi `triton` (voir `uv.lock`) : avec
+  `compiler = "auto"`, l'entraînement sur la carte compile le modèle (`torch.compile`) et va plus
+  vite que sous Windows, où il tourne en mode immédiat. `forge mesurer`, qui mesure sans
+  compilation, le signale sous ses tableaux.
+- **L'arrêt.** SIGTERM (arrêt du système, `docker stop`, `timeout`, `kill`) met l'entraînement en
+  pause, avec sauvegarde, comme Ctrl+C.
+
 ## Tester
 
 ```powershell
@@ -196,6 +333,7 @@ uv run --extra gpu pytest -q   # tous les tests, dont celui de la carte graphiqu
 uv run --extra cpu pytest -q   # le test de la carte graphique est sauté
 ```
 
-Les tests marqués `gpu` sont sautés tout seuls quand CUDA est absente. En
-intégration continue, `.github/workflows/python.yml` lance
-`uv run --locked --extra cpu pytest -q` pour ce projet.
+Les tests marqués `gpu` sont sautés tout seuls quand CUDA est absente. En intégration continue,
+`.github/workflows/python.yml` teste ce projet dans un job à part (« Tests de forge », sous Linux
+et sous Windows) : `uv run --locked --extra cpu pytest -q --durations=15`, qui liste aussi les
+15 tests les plus lents.

@@ -469,6 +469,31 @@ def test_sous_commande_tokenizer(tmp_path, monkeypatch, capsys):
     assert "python -m forge donnees" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize(
+    ("erreur", "code", "attendu"),
+    [
+        (KeyboardInterrupt(), 130, "Apprentissage interrompu"),
+        (OSError(28, "No space left on device"), 1, "OSError : [Errno 28] No space left on device"),
+        (RuntimeError("imprévu\ndeuxième ligne"), 1, "RuntimeError : imprévu"),
+    ],
+)
+def test_sous_commande_tokenizer_erreurs_inattendues(tmp_path, monkeypatch, capsys, erreur, code, attendu):
+    """Ctrl+C, disque plein ou erreur imprévue : un message en français et la marche à suivre, sans trace."""
+
+    def apprentissage_qui_echoue(*a, **k):
+        raise erreur
+
+    monkeypatch.setattr("forge.tokenizer.apprentissage.apprendre_depuis_dossier", apprentissage_qui_echoue)
+    try:
+        resultat = main(["tokenizer", "--donnees", "essai", "--sortie", str(tmp_path / "tok.json")])
+    except BaseException as brute:  # Ctrl+C non attrapé arrêterait sinon toute la session de tests
+        pytest.fail(f"{type(brute).__name__} sort en trace brute, sans marche à suivre")
+    message = capsys.readouterr().err
+    assert resultat == code
+    assert attendu in message and "deuxième ligne" not in message
+    assert "relance la même commande" in message.lower()
+
+
 # --- Mesure de la compression ---------------------------------------------------
 
 
