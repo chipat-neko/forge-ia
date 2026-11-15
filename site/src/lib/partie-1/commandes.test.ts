@@ -219,6 +219,17 @@ describe('commandes du chapitre 1.5, le projet', () => {
     const projet = 'projets/1.5-pre-entrainement/';
     expect(`${projet}${/--enregistrer (\S+)/.exec(commandes.PRE_ENTRAINEMENT_ESSAI)![1]}`).toBe(MESURES_PARTIE_1.sortieEssaiProcesseur);
     expect(`${projet}${/--json (\S+)/.exec(commandes.PRE_ENTRAINEMENT_ESSAI)![1]}`).toBe(MESURES_PARTIE_1.essaiProcesseur);
+    // Sur la carte graphique de l'auteur : les mêmes options, l'extra gpu et l'appareil cuda.
+    expect(`${projet}${/--enregistrer (\S+)/.exec(commandes.PRE_ENTRAINEMENT_ESSAI_CARTE)![1]}`).toBe(MESURES_PARTIE_1.sortieEssaiCarte);
+    expect(`${projet}${/--json (\S+)/.exec(commandes.PRE_ENTRAINEMENT_ESSAI_CARTE)![1]}`).toBe(MESURES_PARTIE_1.essaiCarte);
+  });
+
+  it('l’essai sur la carte : la même commande, avec l’extra gpu et --appareil cuda', () => {
+    expect(commandes.PRE_ENTRAINEMENT_ESSAI_CARTE).toBe(
+      'uv run --extra gpu python -m pre_entrainement essai --appareil cuda --enregistrer sorties/essai-rtx-5070-ti.txt --json mesures/essai-rtx-5070-ti.json',
+    );
+    expect(PYPROJECT).toContain('gpu = ["torch==');
+    for (const option of ['--appareil', '--enregistrer', '--json']) expect(commandes.PRE_ENTRAINEMENT_ESSAI_CARTE).toContain(`${option} `);
   });
 
   it('la courbe écrit le relevé que lit le chapitre (FICHIERS_ENTRAINEMENT)', () => {
@@ -233,6 +244,7 @@ describe('commandes du chapitre 1.5, le projet', () => {
   it('ce sont les commandes du README du projet', () => {
     expect(README).toContain(`${commandes.ALLER_AU_PROJET_1_5}\n`);
     expect(README).toContain(`${commandes.PRE_ENTRAINEMENT_ESSAI}\n`);
+    expect(README).toContain(`${commandes.PRE_ENTRAINEMENT_ESSAI_CARTE}\n`);
     expect(README).toContain(`${commandes.PRE_ENTRAINEMENT_COURBE}\n`);
     expect(README).toContain(`${commandes.PRE_ENTRAINEMENT_TESTS}\n`);
   });

@@ -9,8 +9,9 @@
 // mini-modèle (ses prénoms sont en ?raw), ni par defi-1-5.ts. Le pari du taux et le défi se
 // vérifient sur ce que la page affiche ; leurs nombres viennent du moteur, vérifié par Vitest.
 //
-// Tant que l'entraînement principal de ton IA n'est pas relevé (ton-ia-1.5.json, tâche 16),
-// l'étape 8 est « à mesurer ».
+// L'entraînement principal de ton IA est relevé (ton-ia-1.5.json, tâche 15 du plan 5) : l'étape 8
+// le montre, après le pari « duree », et plus rien n'est « à mesurer ». L'étape 6 montre aussi
+// l'essai de pause et de reprise sur la carte graphique de l'auteur (essai-rtx-5070-ti).
 import { readFileSync } from 'node:fs';
 import { test, expect, type Page } from '@playwright/test';
 import type { Choix } from '../src/lib/choix';
@@ -23,12 +24,15 @@ import { lireEntrainement } from '../src/lib/partie-1/journal';
 import { MESURES_PARTIE_1 } from '../src/lib/partie-1/mesures';
 import {
   choixDebitCourte,
+  choixDureeReelle,
   choixPerteDepartTonIA,
   choixReprise,
+  dureeDeCalcul,
   ECART_DU_DEFI,
   lignesDeLaCourbe,
   lignesDesSessions,
   lireEssaiDeReprise,
+  QUESTION_DUREE,
 } from '../src/lib/partie-1/paris-1-5';
 import { LLAMA_31_405B, SOURCES_LABO_1_5 } from '../src/lib/partie-1/sources-1-5';
 import { PRESETS_MINI, TAUX_PROPOSES } from '../src/lib/mini-modele/reglages';
@@ -57,6 +61,7 @@ const TON_IA_15 = lireEntrainement('ton-ia-1.5');
 const INVITE_DE_L_OUVERTURE = 'La capitale de la France est';
 const ECRIT_PAR_MINI = lireEchantillon('ton-ia-mini', INVITE_DE_L_OUVERTURE);
 const ESSAI = lireEssaiDeReprise();
+const ESSAI_CARTE = lireEssaiDeReprise('..', 'carte');
 const COMPLET = PRESETS_MINI.complet;
 
 // Ce qui n'est pas du texte du chapitre mais des données brutes : les prénoms inventés par la démo.
@@ -100,7 +105,11 @@ test('chapitre 1.5 complet', async ({ page }, info) => {
   const { total } = trouverChapitre('1.5');
   await expect(page.locator('header')).toContainText(`Partie 1, chapitre 1.5 sur ${total}`);
   if (info.project.name === 'mobile') expect(page.viewportSize()?.width).toBe(390);
-  await expect(page.locator('.pari[data-pari]')).toHaveCount(4);
+  await expect(page.locator('.pari[data-pari]')).toHaveCount(5);
+  // Le programme (« 10 étapes, 5 paris ») compte les étapes et les paris de la page.
+  const etapes = await page.locator('.etape h2').count();
+  expect(etapes).toBe(10);
+  expect(await page.locator('.programme').textContent()).toContain(`${etapes} étapes, 5 paris`);
   await page.locator('[data-pari="depart"] [data-juste]').click();
   await page.locator('[data-pari="taux"] [data-juste]').click();
   await expect(page.locator('[data-verrou="atelier"]')).not.toHaveAttribute('inert', '');
@@ -113,7 +122,12 @@ test('chapitre 1.5 complet', async ({ page }, info) => {
   await expect(page.locator('#recap [data-acquis="atelier"]')).toHaveAttribute('data-gagne', 'oui');
   await page.locator('[data-pari="reprise"] [data-juste]').click();
   await page.locator('[data-pari="courte"] [data-juste]').click();
-  await expect(page.locator('#recap [data-total]')).toContainText('5 sur 5');
+  await expect(page.locator('#recap [data-acquis="principal"]')).toHaveAttribute('data-gagne', 'non');
+  await page.locator('[data-pari="duree"] [data-juste]').click();
+  await expect(page.locator('#recap [data-acquis="principal"]')).toHaveAttribute('data-gagne', 'oui');
+  await expect(page.locator('#recap [data-total]')).toContainText('6 sur 6');
+  // Plus rien « à mesurer » : ton IA, la vraie, est relevée.
+  await expect(page.locator('[data-a-mesurer]')).toHaveCount(0);
   // Le pied suit les fichiers : 1.4 a paru, 1.6 est « à venir » tant qu'il n'a pas paru.
   await verifierVoisin(page, 'precedent', '1-4.mdx', '/forge-ia/partie-1/1-4/');
   await verifierVoisin(page, 'suivant', '1-6.mdx', '/forge-ia/partie-1/1-6/');
@@ -173,30 +187,91 @@ test('la courbe de la version d’une heure se dessine, et ses tableaux disent l
   await expect(sessions.locator('tfoot')).toContainText(`${nombre(MINI.resume.pas_faits)} pas`);
 });
 
-test('ton IA, la vraie : « à mesurer » tant que son entraînement n’est pas relevé', async ({ page }) => {
+test('ton IA, la vraie : sa courbe, ses sessions et son résumé, lus dans son relevé, après le pari « duree »', async ({ page }) => {
+  expect(TON_IA_15, 'le relevé mesures/ton-ia-1.5.json du projet 1.5 manque').not.toBeNull();
+  const t = TON_IA_15!;
   await page.goto(PAGE);
   const etape8 = page.locator('#etape-8');
-  if (TON_IA_15 === null) {
-    expect(await etape8.locator('[data-a-mesurer]').count()).toBeGreaterThanOrEqual(1);
-    await expect(etape8.locator('[data-courbe-absente="ton-ia-1.5"]')).toBeVisible();
-    await expect(etape8.locator('[data-sessions-absentes="ton-ia-1.5"]')).toBeVisible();
-    await expect(etape8.locator('[data-courbe="ton-ia-1.5"]')).toHaveCount(0);
-    await expect(etape8.locator('p[data-a-mesurer]')).toHaveCount(3);
-  } else {
-    await expect(etape8.locator('[data-a-mesurer]')).toHaveCount(0);
-    await expect(etape8.locator('[data-courbe="ton-ia-1.5"]')).toBeVisible();
+  await expect(etape8.locator('[data-a-mesurer]')).toHaveCount(0);
+  // La courbe : une ligne d'arrêt par pause, et ses tableaux disent la même chose que le relevé.
+  const figure = etape8.locator('[data-courbe="ton-ia-1.5"]');
+  await expect(figure).toBeVisible();
+  await expect(figure.locator('[data-test="courbe-svg"] line.arret')).toHaveCount(t.resume.pauses);
+  expect(await figure.locator('[data-test="courbe-svg"] line.arret').evaluateAll((l) => l.map((x) => Number(x.getAttribute('data-arret'))))).toStrictEqual(
+    t.sessions.slice(0, -1).map((s) => s.dernier_pas),
+  );
+  const trace = (await figure.locator('[data-test="courbe-entrainement"]').getAttribute('d')) ?? '';
+  expect(trace.split('L')).toHaveLength(t.courbe.pertes.length);
+  await expect(figure.locator('[data-test="courbe-tableau"] tbody tr')).toHaveCount(lignesDeLaCourbe(t.courbe).length);
+  const sessions = etape8.locator('[data-sessions="ton-ia-1.5"] [data-test="sessions"]');
+  const attendues = lignesDesSessions(t.sessions);
+  await expect(sessions.locator('tbody tr')).toHaveCount(attendues.length);
+  for (const [i, l] of attendues.entries()) {
+    expect(await sessions.locator('tbody tr').nth(i).locator('th, td').allTextContents()).toStrictEqual([nombre(l.numero), l.debut, l.fin, l.pas, l.duree]);
   }
-  // L'échantillon de l'ouverture vient du relevé du rapport d'évaluation de mini (projet 1.6, evaluation.ts) : « à mesurer » seulement s'il manque.
+  // Le résumé en nombres, après les tableaux.
+  const resume = etape8.locator('[data-test="resume-ton-ia"]');
+  await expect(resume).toContainText(`${nombre(t.resume.pas_faits)} pas`);
+  await expect(resume).toContainText(dureeDeCalcul(t.resume.secondes_de_calcul));
+  await expect(resume).toContainText(formaterPerte(t.resume.validation_finale));
+  // Le pari « duree » vient avant la courbe, les sessions et le résumé, qui donnent sa réponse.
+  const avant = await page.evaluate(() => {
+    const pari = document.querySelector('[data-pari="duree"]')!;
+    return ['[data-courbe="ton-ia-1.5"]', '[data-sessions="ton-ia-1.5"]', '[data-test="resume-ton-ia"]'].map(
+      (s) => (pari.compareDocumentPosition(document.querySelector(s)!) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+    );
+  });
+  expect(avant).toStrictEqual([true, true, true]);
+  // Rien avant le pari, dans l'étape, ne donne sa durée.
+  const texteAvant = await page.evaluate(() => {
+    const pari = document.querySelector('[data-pari="duree"]')!;
+    const morceaux: string[] = [];
+    const marcheur = document.createTreeWalker(document.querySelector('#etape-8')!, NodeFilter.SHOW_TEXT);
+    for (let n = marcheur.nextNode(); n; n = marcheur.nextNode()) {
+      if (pari.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_PRECEDING) morceaux.push(n.textContent ?? '');
+    }
+    return morceaux.join(' ');
+  });
+  expect(texteAvant).toContain('Quand le PC servait à autre chose');
+  expect(texteAvant).not.toMatch(/\d[\s\u202F]*(h|min|jours?|heures?)\b/);
+  // L'échantillon de l'ouverture vient du relevé du rapport d'évaluation de mini (projet 1.6, evaluation.ts).
+  expect(ECRIT_PAR_MINI).not.toBeNull();
   const echantillon = page.locator('#etape-1 [data-echantillon="dernier"]');
-  if (ECRIT_PAR_MINI === null) {
-    await expect(echantillon.and(page.locator('[data-a-mesurer]'))).toBeVisible();
-  } else {
-    await expect(echantillon).toBeVisible();
-    await expect(echantillon).not.toHaveAttribute('data-a-mesurer', /.*/);
-    await expect(echantillon.locator('[data-test="echantillon-dernier"]')).toHaveText(INVITE_DE_L_OUVERTURE + ECRIT_PAR_MINI.suite);
-  }
-  // Le texte de l'étape 8 ne donne aucun nombre de l'entraînement principal, seulement sa configuration.
-  await expect(etape8).toContainText('Quand le PC servait à autre chose');
+  await expect(echantillon).not.toHaveAttribute('data-a-mesurer', /.*/);
+  await expect(echantillon.locator('[data-test="echantillon-dernier"]')).toHaveText(INVITE_DE_L_OUVERTURE + ECRIT_PAR_MINI!.suite);
+});
+
+test('le pari « duree » : sa question, ses tranches et son explication viennent du relevé de ton IA', async ({ page }) => {
+  const t = TON_IA_15!;
+  await page.goto(PAGE);
+  const pari = page.locator('[data-pari="duree"]');
+  await expect(pari.locator('.q')).toContainText(typographier(QUESTION_DUREE));
+  const choix = choixDureeReelle(t);
+  expect(await pari.locator('button[data-choix]').allTextContents()).toEqual(choix.map(affiche));
+  expect(await pari.locator('[data-juste]').textContent()).toBe(affiche(choix.find((c) => c.juste)!));
+  await expect(pari).toContainText(dureeDeCalcul(t.resume.secondes_de_calcul));
+  await expect(pari).toContainText(`${nombre(t.sessions.length)} sessions`);
+  await expect(pari).toContainText(`${nombre(t.resume.debit_moyen)} jetons par seconde`);
+});
+
+test('l’essai sur la carte graphique de l’auteur : sa sortie telle quelle, et ce qu’elle ne promet pas', async ({ page }) => {
+  await page.goto(PAGE);
+  const etape6 = page.locator('#etape-6');
+  const sortie = lireSortie(readFileSync(`../${MESURES_PARTIE_1.sortieEssaiCarte}`, 'utf8'), MESURES_PARTIE_1.sortieEssaiCarte);
+  expect(sortie).not.toBeNull();
+  const bloc = etape6.locator(`[data-sortie="${MESURES_PARTIE_1.sortieEssaiCarte}"]`);
+  expect(await bloc.locator('[data-contenu]').textContent()).toBe(sortie!.contenu);
+  expect(await bloc.locator('.commande').textContent()).toBe(commandes.PRE_ENTRAINEMENT_ESSAI_CARTE);
+  // Les secondes des deux essais, et leur rapport, lus dans les deux relevés.
+  expect(ESSAI_CARTE.appareil).toBe('cuda');
+  const texte = (await etape6.textContent()) ?? '';
+  expect(texte).toContain(`${nombre(ESSAI_CARTE.secondes, 1)}${FINE}s`);
+  expect(texte).toContain(`${nombre(ESSAI.secondes, 1)}${FINE}s`);
+  expect(texte).toContain(`${nombre(ESSAI.secondes / ESSAI_CARTE.secondes, 1)} fois`);
+  expect(texte).toContain(`${nombre(ESSAI_CARTE.secondes_echauffement!, 1)}${FINE}s`);
+  // L'écart nul de ce jour-là n'est pas une promesse : la carte n'a pas de calculs déterministes.
+  expect(ESSAI_CARTE.ecart).toBe(0);
+  await expect(etape6).toContainText('déterministes');
 });
 
 test('les commandes affichées sont celles de commandes.ts, et les chemins de l’auteur sont signalés', async ({ page }) => {
@@ -233,6 +308,7 @@ test('les choix des paris viennent des relevés du projet', async ({ page }) => 
     ['depart', choixPerteDepartTonIA(MINI)],
     ['reprise', choixReprise(ESSAI)],
     ['courte', choixDebitCourte(MINI)],
+    ['duree', choixDureeReelle(TON_IA_15!)],
   ];
   for (const [id, choix] of paris) {
     expect(await page.locator(`[data-pari="${id}"] button[data-choix]`).allTextContents(), id).toEqual(choix.map(affiche));
@@ -347,13 +423,15 @@ test('sans JavaScript, tout se lit : les explications, la perte du premier pas, 
   const ctx = await browser.newContext({ javaScriptEnabled: false, baseURL });
   const page = await ctx.newPage();
   await page.goto(PAGE);
-  for (const id of ['depart', 'taux', 'reprise', 'courte']) {
+  for (const id of ['depart', 'taux', 'reprise', 'courte', 'duree']) {
     await expect(page.locator(`[data-pari="${id}"] .verdict`)).toBeVisible();
   }
   await expect(page.locator('[data-verrou="depart"]')).not.toHaveAttribute('inert', '');
   await expect(page.locator('[data-test="perte-premier-pas"]')).toBeVisible();
   await expect(page.locator('[data-courbe="ton-ia-mini"] [data-test="courbe-svg"]')).toBeVisible();
   await expect(page.locator('[data-sessions="ton-ia-mini"]')).toBeVisible();
+  await expect(page.locator('[data-courbe="ton-ia-1.5"] [data-test="courbe-svg"]')).toBeVisible();
+  await expect(page.locator('[data-sessions="ton-ia-1.5"]')).toBeVisible();
   await verifierSansDebordement(page);
   await ctx.close();
 });

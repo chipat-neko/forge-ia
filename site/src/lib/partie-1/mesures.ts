@@ -23,6 +23,10 @@ export const MESURES_PARTIE_1 = Object.freeze({
   sortieEssaiProcesseur: 'projets/1.5-pre-entrainement/sorties/essai-processeur.txt',
   /** 1.5 : le résultat de l'essai de pause et de reprise sur le processeur : les deux pertes finales, leur écart, les secondes. */
   essaiProcesseur: 'projets/1.5-pre-entrainement/mesures/essai-processeur.json',
+  /** 1.5 : ce que la commande `essai --appareil cuda` affiche sur la carte graphique de l'auteur (la première ligne est « # relevé le AAAA-MM-JJ »). */
+  sortieEssaiCarte: 'projets/1.5-pre-entrainement/sorties/essai-rtx-5070-ti.txt',
+  /** 1.5 : le même essai sur la carte graphique de l'auteur, avec en plus les secondes de l'échauffement, hors chronomètre. */
+  essaiCarte: 'projets/1.5-pre-entrainement/mesures/essai-rtx-5070-ti.json',
 } as const);
 
 export type NomMesuresPartie1 = keyof typeof MESURES_PARTIE_1;

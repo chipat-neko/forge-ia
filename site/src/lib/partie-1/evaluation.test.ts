@@ -10,17 +10,24 @@ import {
   CLES_DES_VERSIONS,
   FICHIERS_EVALUATION,
   FICHIERS_QCM,
+  FICHIERS_SORTIES_TON_IA,
+  JETON_DE_DEBUT,
+  lireCartes,
   lireEchantillon,
   lireEvaluation,
   lireQcm,
+  lireSuivants,
   marge95,
   margeHasard,
   QUI_EST_EVALUE,
   verdictQcm,
+  verifierCartes,
   verifierEvaluation,
   verifierQcm,
+  verifierSuivants,
+  VERSION_PUBLIEE,
 } from './evaluation';
-import type { Evaluation, QcmExemples } from './evaluation';
+import type { Evaluation, FichierCartes, FichierSuivants, QcmExemples } from './evaluation';
 
 // Vitest est lancé depuis site/ : le dépôt est un dossier plus haut.
 const RACINE = '..';
@@ -244,5 +251,202 @@ describe('verifierQcm', () => {
     expect(verifie((q) => { q.questions[1].prefere = 9; })).toThrow(/questions\[1\]/);
     expect(verifie((q) => { q.questions[0].juste = !q.questions[0].juste; })).toThrow(/questions\[0\]/);
     expect(verifie((q) => { q.justes += 1; })).toThrow(/justes vaut/);
+  });
+});
+
+// Ton IA, la vraie (ton-ia-1.5) : ses relevés, écrits par la tâche 15 du plan 5, disent ce que dit
+// docs/mesures/ton-ia-1.5.md ; ses cartes d'attention et ses jetons suivants (les sorties que lisent les
+// chapitres 1.4 et 1.1) se lisent et se vérifient.
+describe('les relevés de ton IA, la vraie', () => {
+  it('lisent l’évaluation, qui dit ce que dit le document', () => {
+    const e = lireEvaluation('ton-ia-1.5', RACINE)!;
+    expect(e).not.toBeNull();
+    const document = readFileSync('../docs/mesures/ton-ia-1.5.md', 'utf8').replace(/[\u202F\u00a0]/g, ' ');
+    const virgule = (x: number, decimales: number): string => x.toFixed(decimales).replace('.', ',');
+    expect(e.nom).toBe('ton-ia-1.5');
+    expect(e.pas).toBe(16540);
+    expect(document).toContain(`**perplexité ${virgule(e.perplexite, 1)}**`);
+    expect(document).toContain(`**${virgule(e.bits_par_octet, 3)} bit par octet**`);
+    expect(document).toContain(`HellaSwag **${virgule(100 * e.qcm.hellaswag.exactitude_normalisee, 1)} %**`);
+    expect(document).toContain(`ARC-Challenge ${virgule(100 * e.qcm.arc.exactitude_normalisee, 1)} %`);
+    expect(e.qcm.hellaswag.verdict).toBe('au-dessus');
+    expect(e.qcm.arc.verdict).toBe('pas-different');
+    expect(e.echantillons).toHaveLength(10);
+  });
+
+  it('lisent les QCM de MMMLU : les six mêmes questions que la version d’une heure', () => {
+    const q15 = lireQcm('ton-ia-1.5', RACINE)!;
+    const mini = lireQcm('ton-ia-mini', RACINE)!;
+    expect(q15.appareil).toBe('cpu');
+    expect(q15.questions.map((q) => [q.contexte, q.choix, q.bonne])).toStrictEqual(mini.questions.map((q) => [q.contexte, q.choix, q.bonne]));
+  });
+});
+
+describe('lireCartes : les cartes d’attention de ton IA (sorties/cartes-ton-ia.json)', () => {
+  const CARTES = lireCartes(RACINE);
+
+  it('la version publiée de ton IA : son nom, celui des fichiers, et sa page sur GitHub', () => {
+    expect(VERSION_PUBLIEE).toStrictEqual({ nom: 'ton-ia-1.5', adresse: 'https://github.com/chipat-neko/forge-ia/releases/tag/ton-ia-1.5' });
+    expect(CARTES.nom).toBe(VERSION_PUBLIEE.nom);
+    expect(lireSuivants(RACINE).nom).toBe(VERSION_PUBLIEE.nom);
+  });
+
+  it('gardent leur chemin, et commencent par le jeton de début de document', () => {
+    expect(FICHIERS_SORTIES_TON_IA.cartes).toBe('projets/1.6-evaluation/sorties/cartes-ton-ia.json');
+    expect(JETON_DE_DEBUT).toBe('<|fin_texte|>');
+    expect(CARTES.jetons[0]).toBe(JETON_DE_DEBUT);
+  });
+
+  it('sont celles de ton-ia-1.5, sur le processeur, comme le dit le README du projet 1.6', () => {
+    expect(CARTES.nom).toBe('ton-ia-1.5');
+    expect(CARTES.appareil).toBe('cpu');
+    expect(CARTES.phrase).toBe('Le forgeron chauffe le fer puis il le tord.');
+    // « c'est la couche 12 : sa tête 10 regarde le jeton d'avant, et sa tête 4 regarde le plus loin ».
+    expect([CARTES.couche, CARTES.couches, CARTES.tetes]).toStrictEqual([12, 20, 20]);
+    expect(CARTES.cartes.map((c) => [c.tete, c.role])).toStrictEqual([
+      [10, 'jeton-d-avant'],
+      [4, 'loin'],
+    ]);
+  });
+
+  it('chaque carte : un tableau n × n, rien vers la suite, des lignes qui font 1', () => {
+    const n = CARTES.jetons.length;
+    for (const c of CARTES.cartes) {
+      expect(c.poids).toHaveLength(n);
+      c.poids.forEach((ligne, i) => {
+        expect(ligne).toHaveLength(n);
+        for (let j = i + 1; j < n; j++) expect(ligne[j], `${c.tete} : ${i}, ${j}`).toBe(0);
+        let total = 0;
+        for (const p of ligne) total += p;
+        expect(Math.abs(total - 1), `${c.tete} : ligne ${i}`).toBeLessThan(1e-4);
+      });
+    }
+  });
+
+  it('le regard de chaque carte est celui de sa tête dans les chiffres du choix', () => {
+    for (const c of CARTES.cartes) {
+      const r = CARTES.choix.regards_de_la_couche[c.tete];
+      expect([c.jeton_d_avant, c.distance, c.debut]).toStrictEqual([r.jeton_d_avant, r.distance, r.debut]);
+    }
+  });
+
+  it('un fichier absent est une erreur qui dit quelle commande le refait', () => {
+    const racine = mkdtempSync(join(tmpdir(), 'cartes-'));
+    try {
+      mkdirSync(join(racine, 'projets/1.6-evaluation/sorties'), { recursive: true });
+      expect(() => lireCartes(racine)).toThrow(/cartes-ton-ia\.json.*manque.*evaluation_pas_a_pas cartes/);
+      writeFileSync(join(racine, FICHIERS_SORTIES_TON_IA.cartes), '{ pas du json', 'utf8');
+      expect(() => lireCartes(racine)).toThrow(/cartes-ton-ia\.json.*JSON illisible/);
+    } finally {
+      rmSync(racine, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('verifierCartes', () => {
+  const lu = (): FichierCartes => JSON.parse(readFileSync('../' + FICHIERS_SORTIES_TON_IA.cartes, 'utf8')) as FichierCartes;
+  const verifie = (modifie: (c: FichierCartes) => void): (() => unknown) => {
+    const c = lu();
+    modifie(c);
+    return () => verifierCartes(c, 'cartes-essai.json');
+  };
+
+  it('accepte le fichier de ton IA', () => {
+    expect(() => verifierCartes(lu(), 'cartes-ton-ia.json')).not.toThrow();
+  });
+
+  it('refuse ce qui n’est pas un fichier de cartes, en disant quoi faire', () => {
+    expect(() => verifierCartes([], 'cartes-essai.json')).toThrow(/cartes-essai\.json.*pas un objet JSON.*evaluation_pas_a_pas cartes/);
+    expect(verifie((c) => { c.nom = ''; })).toThrow(/nom est vide/);
+    expect(verifie((c) => { c.releve_le = 'hier'; })).toThrow(/releve_le doit être une date/);
+    expect(verifie((c) => { c.phrase = ''; })).toThrow(/phrase est vide/);
+  });
+
+  it('n’accepte que des cartes du processeur', () => {
+    expect(verifie((c) => { c.appareil = 'cuda'; })).toThrow(/appareil.*cpu/);
+  });
+
+  it('refuse des jetons sans le début de document, ou trop peu', () => {
+    expect(verifie((c) => { c.jetons[0] = 'Le'; })).toThrow(/<\|fin_texte\|>/);
+    expect(verifie((c) => { c.jetons = [JETON_DE_DEBUT, 'Le']; })).toThrow(/jetons/);
+  });
+
+  it('refuse une couche ou une tête hors du modèle', () => {
+    expect(verifie((c) => { c.couche = c.couches; })).toThrow(/couche doit être un entier/);
+    expect(verifie((c) => { c.cartes[1].tete = c.tetes; })).toThrow(/cartes\[1\]\.tete/);
+    expect(verifie((c) => { c.cartes[1].tete = c.cartes[0].tete; })).toThrow(/deux cartes/);
+    expect(verifie((c) => { (c.cartes[0] as { role: string }).role = 'au-hasard'; })).toThrow(/cartes\[0\]\.role/);
+  });
+
+  it('refuse des poids qui regardent la suite, hors de 0 à 1, ou des lignes qui ne font pas 1', () => {
+    expect(verifie((c) => { c.cartes[0].poids[3][5] = 0.1; c.cartes[0].poids[3][3] -= 0.1; })).toThrow(/cartes\[0\]\.poids\[3\]/);
+    expect(verifie((c) => { c.cartes[1].poids[4][0] += 0.01; })).toThrow(/cartes\[1\]\.poids\[4\].*1/);
+    expect(verifie((c) => { c.cartes[1].poids[2] = c.cartes[1].poids[2].slice(1); })).toThrow(/cartes\[1\]\.poids\[2\]/);
+    expect(verifie((c) => { c.cartes[0].poids.pop(); })).toThrow(/cartes\[0\]\.poids/);
+  });
+
+  it('refuse un regard qui n’est pas celui des chiffres du choix', () => {
+    expect(verifie((c) => { c.cartes[0].distance = 3; })).toThrow(/cartes\[0\].*regards_de_la_couche/);
+    expect(verifie((c) => { c.choix.regards_de_la_couche.pop(); })).toThrow(/regards_de_la_couche/);
+    expect(verifie((c) => { c.choix.jeton_d_avant_par_couche.pop(); })).toThrow(/jeton_d_avant_par_couche/);
+  });
+
+  it('refuse un choix qui n’est plus celui de la règle : la couche, la tête du jeton d’avant, la tête qui regarde le plus loin', () => {
+    // Une autre couche regarderait plus le jeton d'avant que la couche choisie.
+    expect(verifie((c) => { c.choix.jeton_d_avant_par_couche[0].jeton_d_avant = 0.99; })).toThrow(/couche/);
+    // Une autre tête de la couche regarderait plus loin que la tête « loin ».
+    expect(verifie((c) => { c.choix.regards_de_la_couche[0].distance = 5; })).toThrow(/loin/);
+    // La tête « jeton-d-avant » ne serait plus la meilleure de sa couche.
+    expect(verifie((c) => { c.choix.regards_de_la_couche[0].jeton_d_avant = 0.95; })).toThrow(/jeton-d-avant/);
+  });
+});
+
+describe('lireSuivants : les jetons que ton IA juge les plus probables (sorties/ton-ia-suivants.json)', () => {
+  it('gardent leur chemin, et sont ceux de ton-ia-1.5, sur le processeur', () => {
+    expect(FICHIERS_SORTIES_TON_IA.suivants).toBe('projets/1.6-evaluation/sorties/ton-ia-suivants.json');
+    const s = lireSuivants(RACINE);
+    expect(s.nom).toBe('ton-ia-1.5');
+    expect(s.appareil).toBe('cpu');
+    expect(s.phrase).toBe('Le forgeron frappe le');
+    expect(s.suivants).toHaveLength(10);
+    expect(s.suivants[0].jeton).toBe(' bois');
+  });
+
+  it('un fichier absent est une erreur qui dit quelle commande le refait', () => {
+    const racine = mkdtempSync(join(tmpdir(), 'suivants-'));
+    try {
+      mkdirSync(join(racine, 'projets/1.6-evaluation/sorties'), { recursive: true });
+      expect(() => lireSuivants(racine)).toThrow(/ton-ia-suivants\.json.*manque.*evaluation_pas_a_pas suivants/);
+    } finally {
+      rmSync(racine, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('verifierSuivants', () => {
+  const lu = (): FichierSuivants => JSON.parse(readFileSync('../' + FICHIERS_SORTIES_TON_IA.suivants, 'utf8')) as FichierSuivants;
+  const verifie = (modifie: (s: FichierSuivants) => void): (() => unknown) => {
+    const s = lu();
+    modifie(s);
+    return () => verifierSuivants(s, 'suivants-essai.json');
+  };
+
+  it('accepte le fichier de ton IA', () => {
+    expect(() => verifierSuivants(lu(), 'ton-ia-suivants.json')).not.toThrow();
+  });
+
+  it('refuse ce qui n’est pas un fichier de suivants, en disant quoi faire', () => {
+    expect(() => verifierSuivants('rien', 'suivants-essai.json')).toThrow(/suivants-essai\.json.*pas un objet JSON.*evaluation_pas_a_pas suivants/);
+    expect(verifie((s) => { s.phrase = ''; })).toThrow(/phrase est vide/);
+    expect(verifie((s) => { s.appareil = ''; })).toThrow(/appareil est vide/);
+    expect(verifie((s) => { s.suivants = []; })).toThrow(/suivants est vide/);
+  });
+
+  it('refuse des probabilités hors de 0 à 1, dans le désordre, ou qui font plus que 1', () => {
+    expect(verifie((s) => { s.suivants[3].probabilite = 0; })).toThrow(/suivants\[3\]/);
+    expect(verifie((s) => { s.suivants[3].probabilite = 0.5; })).toThrow(/ordre/);
+    expect(verifie((s) => { for (const x of s.suivants) x.probabilite = 0.2; })).toThrow(/plus que 1/);
+    expect(verifie((s) => { s.suivants[2].jeton = s.suivants[1].jeton; })).toThrow(/deux fois/);
+    expect(verifie((s) => { s.suivants[0].jeton = ''; })).toThrow(/suivants\[0\]/);
   });
 });

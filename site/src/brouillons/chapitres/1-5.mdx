@@ -3,7 +3,7 @@ partie: 1
 numero: "1.5"
 titre: "Le pré-entraînement sur ton GPU"
 chapeau: "Ton IA naît ici : elle lit ses textes, pas après pas, et apprend à prédire le jeton suivant. Un petit modèle apprend la même recette sous tes yeux, tu mets un entraînement en pause, puis tu le reprends, et tu suis la version d'une heure de ton IA jusqu'à son dernier pas."
-programme: "10 étapes, 4 paris, environ 35 minutes."
+programme: "10 étapes, 5 paris, environ 35 minutes."
 acquis:
   - cle: depart
     texte: "Au premier pas, ton IA donne à peu près la même chance à chaque jeton : sa perte est celle du hasard, ln V."
@@ -20,6 +20,9 @@ acquis:
   - cle: courte
     texte: "Sur une carte graphique, la version d'une heure de ton IA lit des centaines de milliers de jetons chaque seconde."
     ou: "à l'étape 7"
+  - cle: principal
+    texte: "Ton IA, la vraie, a demandé des jours de calcul, en sessions coupées par des pauses."
+    ou: "à l'étape 8"
 ---
 
 import { root } from 'astro:config/server';
@@ -31,7 +34,7 @@ import BlocCommande from '../../components/gabarit/BlocCommande.astro';
 import RecupererProjet from '../../components/gabarit/RecupererProjet.astro';
 import SortieCommande from '../../components/gabarit/SortieCommande.astro';
 import { materiel } from '../../lib/calculateur/donnees';
-import { dixPuissance, formaterPuissanceDeDix, formaterQuantite } from '../../lib/calculateur/formats';
+import { dixPuissance, formaterDate, formaterPuissanceDeDix, formaterQuantite } from '../../lib/calculateur/formats';
 import { OPERATIONS_PAR_PARAMETRE_ET_JETON, operationsEntrainement } from '../../lib/calculateur/formules';
 import { CLES_FORGE, dureeHeures, JETONS_PAR_PARAMETRE, MATERIEL_DES_MESURES, MESURES_TON_IA, NOMS_TAILLES, PRESETS_FORGE } from '../../lib/calculateur/ton-ia';
 import { chapitresParus } from '../../lib/chapitres-parus';
@@ -47,6 +50,7 @@ import {
   PAUSE,
   PRE_ENTRAINEMENT_COURBE,
   PRE_ENTRAINEMENT_ESSAI,
+  PRE_ENTRAINEMENT_ESSAI_CARTE,
   PRE_ENTRAINEMENT_TESTS,
   REPRENDRE,
 } from '../../lib/partie-1/commandes';
@@ -55,19 +59,24 @@ import { lireEntrainement } from '../../lib/partie-1/journal';
 import { MESURES_PARTIE_1 } from '../../lib/partie-1/mesures';
 import {
   choixDebitCourte,
+  choixDureeReelle,
   choixPerteDepartTonIA,
   choixReprise,
   dureeDeCalcul,
   ECART_DU_DEFI,
   faitsDuPariDebit,
   faitsDuPariDepart,
+  faitsDuPariDuree,
   lireEssaiDeReprise,
   lirePertesRecentes,
   lireReglages,
   pasTotalDesReglages,
+  QUESTION_DUREE,
   TEXTES_REPRISE,
   TRANCHES_DEPART,
+  TRANCHES_DUREE,
 } from '../../lib/partie-1/paris-1-5';
+import { CORPUS_PRINCIPAL } from '../../lib/partie-1/projet-1-2';
 import { LLAMA_31_405B, SOURCES_LABO_1_5 } from '../../lib/partie-1/sources-1-5';
 import { typographier } from '../../lib/typo';
 
@@ -103,7 +112,12 @@ export const MINI = (() => {
   return m;
 })();
 
-export const TON_IA_15 = lireEntrainement('ton-ia-1.5', RACINE); // null jusqu'à son relevé (tâche 16) : « à mesurer ».
+export const TON_IA_15 = (() => {
+  // Ton IA, la vraie : le relevé de son entraînement principal, versionné par le projet 1.5 (tâche 15 du plan 5).
+  const t = lireEntrainement('ton-ia-1.5', RACINE);
+  exiger(t !== null, 'le relevé de l’entraînement principal (mesures/ton-ia-1.5.json) manque');
+  return t;
+})();
 
 export const DEPART = (() => {
   // Le pari « depart » : la perte du premier pas de mini, face au hasard ln V.
@@ -227,6 +241,29 @@ export const ESSAI = (() => {
   };
 })();
 
+export const CARTE = (() => {
+  // L'étape 6 : le même essai sur la carte graphique de l'auteur (mesures/essai-rtx-5070-ti.json), publié tel quel.
+  const c = lireEssaiDeReprise(RACINE, 'carte');
+  const p = lireEssaiDeReprise(RACINE);
+  exiger(c.appareil === 'cuda', 'l’essai de la carte n’a plus tourné sur la carte graphique');
+  exiger(c.pas_total === p.pas_total && c.pas_de_la_pause === p.pas_de_la_pause, 'l’essai de la carte n’est plus le même essai que celui du processeur');
+  // « Ce jour-là, l'écart des deux pertes est nul. »
+  exiger(c.ecart === 0 && c.pertes_identiques, 'l’essai de la carte n’a plus un écart nul : son texte est à revoir');
+  // « La carte avait d'abord été échauffée, hors du chronomètre. »
+  exiger(c.secondes_echauffement !== undefined && c.secondes_echauffement > 0, 'l’essai de la carte n’a plus d’échauffement à part');
+  // « Environ N fois moins de temps que le processeur. »
+  const fois = p.secondes / c.secondes;
+  exiger(fois > 2, 'la carte ne va plus bien plus vite que le processeur sur l’essai');
+  const secondes = (x) => `${nombre(x, 1)}\u202Fs`;
+  return {
+    carte: secondes(c.secondes),
+    processeur: secondes(p.secondes),
+    leProcesseur: formaterDate(p.releve_le),
+    fois: nombre(fois, 1),
+    echauffement: secondes(c.secondes_echauffement),
+  };
+})();
+
 export const COURTE = (() => {
   // Le pari « courte » et le résumé de la version d'une heure (son journal, relevé par le projet).
   const r = MINI.resume;
@@ -293,10 +330,51 @@ export const PRINCIPAL = (() => {
   };
 })();
 
+export const DUREE = (() => {
+  // Le pari « duree » : le temps de calcul de ton IA, la vraie, pauses non comptées (mesures/ton-ia-1.5.json).
+  const f = faitsDuPariDuree(TON_IA_15);
+  const choix = choixDureeReelle(TON_IA_15);
+  // L'explication commence par la bonne tranche, et l'acquis dit « des jours de calcul ».
+  exiger(choix.find((c) => c.juste)?.texte === TRANCHES_DUREE[1].texte, 'le temps de calcul de ton IA n’est plus entre 1 et 10 jours : l’explication du pari « duree » commence par là');
+  exiger(f.jours >= 2, 'ton IA n’a plus demandé des jours de calcul : l’acquis « principal » est à revoir');
+  // La précision : environ N fois plus de jetons que la version d'une heure, et chacun environ M fois plus de calcul.
+  const foisJetons = TON_IA_15.resume.jetons_vus / MINI.resume.jetons_vus;
+  exiger(foisJetons > 5 && foisJetons < 20, 'ton IA ne lit plus une dizaine de fois plus de jetons que la version d’une heure');
+  // « Une mesure de quelques pas en prédisait … : ton IA en a lu un peu moins. »
+  const mesure = MESURES_TON_IA.tres_grand.carte.jetonsParSeconde;
+  const ecart = 1 - f.debit / mesure;
+  exiger(ecart > 0 && ecart < 0.05, 'le débit de ton IA n’est plus un peu sous celui mesuré avant son lancement');
+  return {
+    question: QUESTION_DUREE,
+    choix,
+    foisJetons: nombre(Math.round(foisJetons)),
+    dureeMini: dureeDeCalcul(MINI.resume.secondes_de_calcul),
+    duree: dureeDeCalcul(f.secondes),
+    jours: nombre(f.jours, 1),
+    debit: nombre(f.debit),
+    mesure: nombre(mesure),
+    prevues: nombre(Math.round(dureeHeures(TON_IA_15.resume.jetons_vus, mesure))),
+    ecart: pourcent(ecart, 1),
+    sessions: nombre(f.sessions),
+    pauses: nombre(f.pauses),
+  };
+})();
+
 export const RESUME_15 = (() => {
-  // Le résumé de l'entraînement principal : null jusqu'à son relevé (tâche 16).
-  if (TON_IA_15 === null) return null;
+  // Le résumé et la courbe de l'entraînement principal, et ce qu'en dit le texte de l'étape 8.
   const r = TON_IA_15.resume;
+  const v = TON_IA_15.courbe.validations;
+  // « Elle part du hasard, un peu au-dessus. »
+  exiger(r.perte_premier_pas > TON_IA_15.courbe.hasard && r.perte_premier_pas - TON_IA_15.courbe.hasard < 0.5, 'la perte du premier pas de ton IA n’est plus un peu au-dessus du hasard');
+  // « Sa perte de validation a baissé à chaque mesure, sans exception. »
+  exiger(v.every(([, x], i) => i === 0 || x < v[i - 1][1]), 'la perte de validation de ton IA ne baisse plus à chaque mesure');
+  // « Au premier dixième de l'entraînement, elle a déjà fait l'essentiel de sa descente. »
+  const dixieme = v.find(([pas]) => pas >= r.pas_total / 10);
+  exiger(dixieme !== undefined && v[0][1] - dixieme[1] > 2 * (dixieme[1] - r.validation_finale), 'au premier dixième, la perte de validation n’a plus fait l’essentiel de sa descente');
+  // « Elle ne relit jamais un texte : son corpus a plus de jetons qu'elle n'en lit. »
+  exiger(CORPUS_PRINCIPAL.dossier === 'principal' && r.jetons_vus < CORPUS_PRINCIPAL.jetons_train, 'ton IA lit maintenant plus de jetons que son corpus n’en a : elle relit des textes');
+  // « L'écart entre les deux pertes reste petit. »
+  exiger(r.validation_finale > r.perte_finale && r.validation_finale - r.perte_finale < 0.1, 'à la fin, l’écart entre la perte de validation et celle d’entraînement n’est plus petit');
   return {
     pas: nombre(r.pas_faits),
     jetons: nombre(r.jetons_vus),
@@ -305,6 +383,7 @@ export const RESUME_15 = (() => {
     premier: formaterPerte(r.perte_premier_pas),
     finale: formaterPerte(r.perte_finale),
     validation: formaterPerte(r.validation_finale),
+    corpus: nombre(CORPUS_PRINCIPAL.jetons_train),
   };
 })();
 
@@ -509,15 +588,20 @@ Et la commande de l'essai, avec ce qu'elle a affiché :
   absent="À mesurer : l'essai de pause et de reprise sur le processeur."
 />
 
+Sur la carte graphique de l'auteur, le même essai a donné ceci :
+
+<SortieCommande
+  fichier={MESURES_PARTIE_1.sortieEssaiCarte}
+  commande={PRE_ENTRAINEMENT_ESSAI_CARTE}
+  legende="Le même essai, sur la carte graphique de l'auteur"
+  absent="À mesurer : l'essai de pause et de reprise sur la carte graphique."
+/>
+
+Les trois entraînements y ont pris {CARTE.carte}, contre {CARTE.processeur} sur le processeur (relevé du {CARTE.leProcesseur}) : environ {CARTE.fois} fois moins. La carte avait d'abord été échauffée, en {CARTE.echauffement}, hors du chronomètre : les premiers calculs d'une carte sont plus lents que les suivants. Ce jour-là, l'écart des deux pertes est nul. Mais rien ne le garantit : la carte n'a pas de calculs déterministes. Certains y additionnent dans un ordre qui varie, et deux entraînements identiques peuvent alors différer un peu. La reprise, elle, repart toujours exactement du point sauvegardé. Le projet ne demande l'écart nul que sur le processeur.
+
 Avec forge, c'est la même chose, en grand. Pendant l'entraînement de la version d'une heure, que l'étape suivante te fait lancer, {PAUSE} : le pas en cours se termine, tout est sauvegardé, puis forge affiche la commande de reprise et s'arrête. Pour reprendre exactement là :
 
 <BlocCommande commandes={[REPRENDRE]} ou="un terminal, dans le dossier projets/forge du dépôt" />
-
-<Fragment slot="note">
-
-Sur la carte graphique, deux entraînements identiques peuvent différer un peu : certains calculs y additionnent dans un ordre qui varie. La reprise, elle, repart exactement du point sauvegardé. Le projet ne demande l'écart nul que sur le processeur.
-
-</Fragment>
 
 </Etape>
 
@@ -565,17 +649,29 @@ Le journal ne donne pas de dates : la courbe et le tableau sont relevés dans `m
 
 La version d'une heure n'était qu'une répétition. Ton IA, la vraie, a la taille « {PRINCIPAL.taille} » : {PRINCIPAL.parametres} paramètres, environ {PRINCIPAL.fois} fois plus. Son entraînement lit {PRINCIPAL.jetons} jetons, {PRINCIPAL.parJeton} par paramètre, en {PRINCIPAL.pas} pas de {PRINCIPAL.lot} jetons. Il tourne sur la même carte, avec la même recette : AdamW, la même décroissance des poids, le même écrêtage, et un planning du taux qui monte jusqu'à {PRINCIPAL.taux}.
 
-Il ne s'est pas fait d'un trait. Quand le PC servait à autre chose, l'entraînement s'est mis en pause, puis il a repris, exactement comme à l'étape 6. Sa courbe et ses sessions le montreront, avec ses arrêts.
+Il ne s'est pas fait d'un trait. Quand le PC servait à autre chose, l'entraînement s'est mis en pause, puis il a repris, exactement comme à l'étape 6. Sa courbe et ses sessions le montrent, avec ses arrêts.
+
+<Pari
+  id="duree"
+  question={DUREE.question}
+  precision={`Elle lit environ ${DUREE.foisJetons} fois plus de jetons que la version d'une heure, qui a pris ${DUREE.dureeMini} de calcul, et chaque jeton lui demande environ ${PRINCIPAL.fois} fois plus de calcul.`}
+  choix={DUREE.choix}
+  acquis="principal"
+>
+
+Entre 1 et 10 jours : {DUREE.duree} de calcul, environ {DUREE.jours} jours, à {DUREE.debit} jetons par seconde en moyenne. Avant le lancement, une mesure de quelques pas en prédisait {DUREE.mesure} par seconde, soit environ {DUREE.prevues} heures : elle est allée {DUREE.ecart} moins vite.
+
+Les pauses n'y sont pas comptées : en {DUREE.sessions} sessions, l'entraînement s'est arrêté {DUREE.pauses} fois, et chaque fois, il est reparti de sa dernière sauvegarde.
+
+</Pari>
 
 <CourbeEntrainement nom="ton-ia-1.5" titre="La courbe de ton IA" />
 
+Comme celle de la version d'une heure, elle part du hasard, un peu au-dessus, et chute très vite : au premier dixième de l'entraînement, l'essentiel de la descente est fait. Ensuite, chaque gain coûte plus cher. Sa perte de validation a baissé à chaque mesure, sans exception, jusqu'au dernier pas. Et elle reste tout près de la perte d'entraînement. Ton IA ne relit jamais un texte : son corpus a plus de jetons, {RESUME_15.corpus}, qu'elle n'en lit en tout, et forge ne le lit qu'une fois. Chaque perte d'entraînement se mesure donc, elle aussi, sur des textes qu'elle n'avait encore jamais lus.
+
 <TableauSessions nom="ton-ia-1.5" titre="Les sessions de ton IA" />
 
-{RESUME_15 === null ? (
-  <p data-a-mesurer>{typographier('Son résumé en nombres, ses pas, ses jetons, sa durée de calcul et ses pertes : à mesurer, quand son entraînement sera fini.')}</p>
-) : (
-  <p>{typographier(`En tout, ${RESUME_15.pas} pas et ${RESUME_15.jetons} jetons, en ${RESUME_15.duree} de calcul, sur ${RESUME_15.sessions} sessions. Sa perte part de ${RESUME_15.premier} au premier pas, et finit à ${RESUME_15.finale}, en moyenne sur ses ${COURTE.recentes} derniers pas ; sa perte de validation, à ${RESUME_15.validation}.`)}</p>
-)}
+<p data-test="resume-ton-ia">{typographier(`En tout, ${RESUME_15.pas} pas et ${RESUME_15.jetons} jetons, en ${RESUME_15.duree} de calcul, sur ${RESUME_15.sessions} sessions. Sa perte part de ${RESUME_15.premier} au premier pas, et finit à ${RESUME_15.finale}, en moyenne sur ses ${COURTE.recentes} derniers pas ; sa perte de validation, à ${RESUME_15.validation}.`)}</p>
 
 </Etape>
 

@@ -3,7 +3,7 @@ partie: 1
 numero: "1.1"
 titre: "Ce qu'est vraiment un modèle de langage"
 chapeau: "Un modèle de langage devine la suite d'un texte, un morceau à la fois. Tu en construis un ici, le plus simple qui soit : il compte les caractères du texte de ce site, puis il écrit en tirant au sort. Tu verras ce qu'il réussit, et où il bute."
-programme: "9 étapes, 4 paris, environ 30 minutes."
+programme: "10 étapes, 4 paris, environ 30 minutes."
 acquis:
   - cle: distribution
     texte: "Un modèle de langage donne une probabilité à chaque suite possible."
@@ -22,20 +22,23 @@ acquis:
     ou: "à l'étape 7"
 ---
 
+import { root } from 'astro:config/server';
 import AtelierModeleDeLangage from '../../components/chapitres/1-1/AtelierModeleDeLangage.svelte';
 import OuvertureSuite from '../../components/chapitres/1-1/OuvertureSuite.astro';
+import SuivantsTonIA from '../../components/chapitres/1-1/SuivantsTonIA.astro';
 import TableauPerplexites from '../../components/chapitres/1-1/TableauPerplexites.astro';
 import BlocCommande from '../../components/gabarit/BlocCommande.astro';
 import RecupererProjet from '../../components/gabarit/RecupererProjet.astro';
 import { modelePublic } from '../../lib/calculateur/donnees';
 import { formaterQuantite } from '../../lib/calculateur/formats';
-import { PRESETS_FORGE } from '../../lib/calculateur/ton-ia';
+import { PRESETS_FORGE, VOCABULAIRE_FORGE } from '../../lib/calculateur/ton-ia';
 import { chapitresParus } from '../../lib/chapitres-parus';
 import { exigeur } from '../../lib/exiger';
 import { nombre, pourcent } from '../../lib/nombres';
 import { hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
 import { LANCER_TESTS } from '../../lib/partie-0/commandes';
 import { MODELE_SUITE } from '../../lib/partie-1/commandes';
+import { lireEvaluation, lireSuivants, VERSION_PUBLIEE } from '../../lib/partie-1/evaluation';
 import { compter, compterParOrdre, couper, generer, partJamaisVue, tirage, tourneEnRond } from '../../lib/partie-1/ngrammes';
 import {
   caracteres,
@@ -283,11 +286,48 @@ export const LABO = (() => {
 export const DEPART_DE_LA_COMMANDE = (() => {
   // Le départ de la commande du projet (MODELE_SUITE), entre guillemets à sa fin : « Le forgeron » et une espace.
   const depart = /"([^"]*)"$/.exec(MODELE_SUITE)?.[1];
-  exiger(depart !== undefined && depart.endsWith(' '), 'le départ de MODELE_SUITE ne finit plus par une espace : l’étape 9 est à revoir');
+  exiger(depart !== undefined && depart.endsWith(' '), 'le départ de MODELE_SUITE ne finit plus par une espace : l’étape 10 est à revoir');
   return depart.trimEnd();
 })();
 
 export const PARUS = await chapitresParus();
+
+export const RACINE = new URL('../', root); // Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+
+export const TON_IA = (() => {
+  // L'étape 9 : les jetons que ton IA, la vraie, juge les plus probables après le début de l'atelier,
+  // relevés par le projet 1.6 (sorties/ton-ia-suivants.json), et sa perplexité (mesures/evaluation-1.5.json).
+  const s = lireSuivants(RACINE);
+  exiger(s.nom === VERSION_PUBLIEE.nom, 'les jetons suivants ne sont plus ceux de la version publiée de ton IA');
+  exiger(s.phrase === `${CONTEXTE_INITIAL} le`, 'la phrase donnée à ton IA n’est plus le début de l’atelier, suivi de « le »');
+  // « Chacun de ses choix est un mot entier, avec l'espace qui le précède. »
+  exiger(s.suivants.every((x) => /^ \p{L}+$/u.test(x.jeton)), 'un des jetons suivants n’est plus un mot entier, précédé de son espace');
+  // « bois, sol et métal » en tête, puis « le fer … n'arrive qu'en quatrième ».
+  const mots = s.suivants.map((x) => x.jeton.trim());
+  exiger(mots.slice(0, 3).join(' ') === 'bois sol métal', 'les trois premiers choix de ton IA ne sont plus bois, sol et métal');
+  exiger(mots.indexOf('fer') === 3, '« fer » n’est plus le quatrième choix de ton IA');
+  // « Elle hésite » : son premier choix a moins d'une chance sur cinq, et les dix ensemble moins de la moitié.
+  let total = 0;
+  for (const x of s.suivants) total += x.probabilite;
+  exiger(s.suivants[0].probabilite < 0.2, 'le premier choix de ton IA a maintenant une chance sur cinq ou plus : « elle hésite » est à revoir');
+  exiger(total < 0.5, 'les jetons du tableau ont maintenant plus de la moitié des chances, ensemble');
+  const e = lireEvaluation('ton-ia-1.5', RACINE);
+  exiger(e !== null, 'le relevé de l’évaluation de ton IA (mesures/evaluation-1.5.json du projet 1.6) manque');
+  return {
+    suivants: s,
+    phrase: s.phrase,
+    debut: CONTEXTE_INITIAL,
+    n: nombre(s.suivants.length),
+    premier: pourcent(s.suivants[0].probabilite),
+    total: pourcent(total),
+    autres: nombre(VOCABULAIRE_FORGE - s.suivants.length),
+    perplexite: nombre(e.perplexite, 1),
+    hesitation: nombre(Math.round(e.perplexite)),
+    release: VERSION_PUBLIEE.adresse,
+    l15: PARUS.has('1.5') ? hrefChapitre('1.5') : null,
+    l16: PARUS.has('1.6') ? hrefChapitre('1.6') : null,
+  };
+})();
 
 export const SUITE = (() => {
   // L'« À suivre » : le chapitre 1.2. Tant qu'il n'a pas paru, la phrase le dit, et renvoie au premier
@@ -528,7 +568,19 @@ GPT-3, d'OpenAI, s'est entraîné sur des passages de {LABO.gpt3.contexte} jeton
 
 </Etape>
 
-<Etape numero={9} titre="Le code et le projet">
+<Etape numero={9} titre="Ton IA prédit la suite">
+
+Ton IA existe déjà : l'auteur l'a entraînée sur sa carte graphique, avec la recette du {TON_IA.l15 ? <a href={TON_IA.l15}>chapitre 1.5</a> : 'chapitre 1.5'}, et l'a <a href={TON_IA.release}>publiée sur GitHub</a>. Donne-lui le départ de l'atelier, « {TON_IA.debut} », suivi de « le ». Voici les {TON_IA.n} jetons qu'elle juge les plus probables pour la suite :
+
+<SuivantsTonIA suivants={TON_IA.suivants} />
+
+Ce ne sont plus des caractères : chacun de ses choix est un mot entier, avec l'espace qui le précède. Là où le modèle de l'atelier continue souvent en « frappelle », ton IA propose des mots qui vont après « frappe le » : bois, sol, métal. Le fer, que frappe un forgeron, n'arrive qu'en quatrième.
+
+Elle hésite pourtant : son premier choix n'a que {TON_IA.premier} des chances, et ses {TON_IA.n} premiers, ensemble, {TON_IA.total}. Le reste se partage entre les {TON_IA.autres} autres jetons de son vocabulaire. Sur des textes qu'elle n'a jamais lus, sa perplexité est de {TON_IA.perplexite} : elle hésite en moyenne autant que si elle tirait au sort entre {TON_IA.hesitation} jetons. Le {TON_IA.l16 ? <a href={TON_IA.l16}>chapitre 1.6</a> : 'chapitre 1.6'} la mesure.
+
+</Etape>
+
+<Etape numero={10} titre="Le code et le projet">
 
 Les tests du projet vérifient chaque fonction. Celui-ci vérifie le lissage, sur un tout petit texte : devant un contexte jamais vu, chaque caractère doit avoir la même chance.
 

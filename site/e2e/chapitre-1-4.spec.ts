@@ -9,13 +9,15 @@
 // donc pas par paris-attention.ts, qui lit l'exemple de l'attention en .json :
 // les paris « regard » et « masque » se vérifient sur les poids du Python, comme
 // dans e2e/attention.spec.ts. Le code montré est relu dans les fichiers du
-// projet et de forge, tels qu'ils sont aujourd'hui.
+// projet et de forge, tels qu'ils sont aujourd'hui. Les vraies cartes de ton IA
+// viennent de projets/1.6-evaluation/sorties/cartes-ton-ia.json, lu par evaluation.ts.
 import { readFileSync } from 'node:fs';
 import { test, expect, type Page } from '@playwright/test';
 import type { Choix } from '../src/lib/choix';
 import { largeurCachee, nombreParametres, PRESETS_FORGE } from '../src/lib/calculateur/ton-ia';
 import { depuisHex } from '../src/lib/mini-modele/calcul';
 import { nombre } from '../src/lib/nombres';
+import { lireCartes } from '../src/lib/partie-1/evaluation';
 import { trouverChapitre } from '../src/lib/parcours';
 import { MESURES_PARTIE_1 } from '../src/lib/partie-1/mesures';
 import { nombresDeTetes } from '../src/lib/partie-1/parametres';
@@ -67,10 +69,12 @@ const JETONS = ATTENTION.jetons;
 const IL = 6;
 const DE_QUI_ON_PARLE = 1;
 const FORGERON = 1;
+// Les cartes d'attention de ton IA, la vraie, relevées sur le processeur depuis ses poids publiés.
+const CARTES = lireCartes();
 
 // Ce qui n'est pas du texte du chapitre mais des données brutes : les mots de la phrase de
 // l'animation de l'attention (le moteur du plan 3, inchangé), et le texte du schéma (SVG).
-const BRUT = '[data-attention], [data-test="schema"] svg';
+const BRUT = '[data-attention], [data-test="schema"] svg, [data-cartes-ton-ia] [data-jeton]';
 
 /**
  * Attend que les trois îlots de la page (l'animation de l'attention, la figure de RoPE et
@@ -110,7 +114,7 @@ async function regler(page: Page, testId: string, crans: number): Promise<void> 
   for (let i = 0; i < crans; i++) await page.keyboard.press('ArrowRight');
 }
 
-/** Ouvre la page et fait le pari de l'étape 8, qui ouvre l'atelier. */
+/** Ouvre la page et fait le pari de l'étape 9, qui ouvre l'atelier. */
 async function ouvrirAtelier(page: Page): Promise<void> {
   await page.goto(PAGE);
   await attendreHydratation(page);
@@ -164,6 +168,12 @@ test('chapitre 1.4 complet', async ({ page }, info) => {
   await expect(page.locator('header')).toContainText(`Partie 1, chapitre 1.4 sur ${total}`);
   if (info.project.name === 'mobile') expect(page.viewportSize()?.width).toBe(390);
   await expect(page.locator('.pari[data-pari]')).toHaveCount(5);
+  // Le programme (« 12 étapes, 5 paris ») compte les étapes et les paris de la page.
+  const etapes = await page.locator('.etape h2').count();
+  expect(etapes).toBe(12);
+  expect(await page.locator('.programme').textContent()).toContain(`${etapes} étapes, 5 paris`);
+  // Plus rien « à mesurer » : les cartes de ton IA sont relevées.
+  await expect(page.locator('[data-a-mesurer]')).toHaveCount(0);
   await page.locator('[data-pari="regard"] [data-juste]').click();
   await page.locator('[data-pari="masque"] [data-juste]').click();
   await page.locator('[data-pari="rope"] [data-juste]').click();
@@ -429,5 +439,71 @@ test('avant les paris, la figure et l’atelier sont verrouillés ; sans JavaScr
     await expect(sansJs.locator(`[data-pari="${id}"] .verdict`)).toBeVisible();
   }
   await expect(sansJs.locator('[data-test="schema"]')).toBeVisible();
+  // Les cartes de ton IA : la première tête du fichier, en entier.
+  await expect(sansJs.locator('[data-cartes-ton-ia] table')).toHaveAttribute('data-tete', String(CARTES.cartes[0].tete));
+  await expect(sansJs.locator('[data-cartes-ton-ia] table tbody tr')).toHaveCount(CARTES.jetons.length);
   await ctx.close();
+});
+
+/** Ce que la carte affichée montre : la tête, puis, ligne par ligne, le poids de chaque case (null si masquée). */
+async function carteAffichee(page: Page): Promise<{ tete: string | null; cases: (number | null)[][] }> {
+  const table = page.locator('[data-cartes-ton-ia] table');
+  return {
+    tete: await table.getAttribute('data-tete'),
+    cases: await table.locator('tbody tr').evaluateAll((lignes) =>
+      lignes.map((l) => Array.from(l.querySelectorAll('td'), (td) => (td.hasAttribute('data-masque') ? null : Number(td.getAttribute('data-poids'))))),
+    ),
+  };
+}
+
+test('les vraies cartes de ton IA : les têtes du fichier, chacune dans un vrai tableau, sans rien recalculer', async ({ page }) => {
+  await page.goto(PAGE);
+  await attendreHydratation(page);
+  const etape = page.locator('#etape-5');
+  await expect(etape.locator('h2')).toContainText('Les vraies cartes de ton IA');
+  const cartes = etape.locator('[data-cartes-ton-ia]');
+  const n = CARTES.jetons.length;
+  // Les jetons, tels que ton IA les a lus, en tête des colonnes et des lignes.
+  expect(await cartes.locator('table thead th[data-jeton]').evaluateAll((t) => t.map((x) => x.getAttribute('data-jeton')))).toStrictEqual(CARTES.jetons);
+  expect(await cartes.locator('table tbody th[data-jeton]').evaluateAll((t) => t.map((x) => x.getAttribute('data-jeton')))).toStrictEqual(CARTES.jetons);
+  const boutons = cartes.locator('[data-test="cartes-tete"]');
+  await expect(boutons).toHaveCount(CARTES.cartes.length);
+  for (const [k, c] of [...CARTES.cartes.entries()].reverse()) {
+    await boutons.nth(k).click();
+    await expect(boutons.nth(k)).toHaveAttribute('aria-pressed', 'true');
+    for (let autre = 0; autre < CARTES.cartes.length; autre++) {
+      if (autre !== k) await expect(boutons.nth(autre)).toHaveAttribute('aria-pressed', 'false');
+    }
+    // La carte : les poids du fichier, tels quels ; rien vers la suite (le masque).
+    const attendu = c.poids.map((ligne, i) => ligne.map((p, j) => (j > i ? null : p)));
+    expect(await carteAffichee(page), `tête ${c.tete}`).toStrictEqual({ tete: String(c.tete), cases: attendu });
+    // Chaque case montre son poids en pour cent, arrondi : la ligne la plus regardée de « il », par exemple.
+    const il = CARTES.jetons.indexOf(' il');
+    const textes = await cartes.locator('table tbody tr').nth(il).locator('td:not([data-masque])').allTextContents();
+    expect(textes).toStrictEqual(c.poids[il].slice(0, il + 1).map((p) => nombre(100 * p)));
+    await expect(cartes.locator('table tbody tr').nth(il).locator('td[data-masque]')).toHaveCount(n - 1 - il);
+    // Ce que dit le fichier du regard de la tête, sans rien recalculer : sa part au jeton d'avant.
+    await expect(cartes.locator('[data-test="cartes-resume"]')).toContainText(`${nombre(100 * c.jeton_d_avant)}${FINE}%`);
+    await expect(cartes.locator('[data-test="cartes-titre"]')).toContainText(`tête ${nombre(c.tete + 1)}`);
+  }
+  // Le bloc : celui du fichier, compté à partir de 1 pour le lecteur.
+  await expect(cartes.locator('[data-test="cartes-titre"]')).toContainText(`bloc ${nombre(CARTES.couche + 1)} sur ${nombre(CARTES.couches)}`);
+  // La légende dit d'où viennent les nombres.
+  const legende = (await cartes.locator('[data-test="cartes-legende"]').textContent()) ?? '';
+  expect(legende.replace(/\s+/g, ' ')).toContain('calculés sur le processeur par cartes_attention, depuis les poids publiés de ton-ia-1.5');
+  await expect(cartes.locator('[data-test="cartes-legende"] code', { hasText: 'cartes_attention' })).toHaveCount(1);
+  await expect(etape.locator('a[href="https://github.com/chipat-neko/forge-ia/releases/tag/ton-ia-1.5"]')).toHaveCount(1);
+  // Les teintes : du lavande pâle à l'indigo, d'autant plus indigo que le poids est grand ; le texte passe
+  // en papier sur les cases sombres.
+  const fonds = await cartes.locator('table tbody td:not([data-masque])').evaluateAll((tds) =>
+    tds.map((td) => [Number(td.getAttribute('data-poids')), Number(/--fond:\s*([\d.]+)%/.exec(td.getAttribute('style') ?? '')?.[1]), td.classList.contains('claire')] as const),
+  );
+  const ranges = [...fonds].sort((a, b) => a[0] - b[0]);
+  for (let i = 1; i < ranges.length; i++) expect(ranges[i][1], `${ranges[i][0]}`).toBeGreaterThanOrEqual(ranges[i - 1][1]);
+  expect(ranges[0][1]).toBe(0);
+  expect(ranges.at(-1)![1]).toBe(100);
+  for (const [p, , claire] of fonds) expect(claire, String(p)).toBe(p > 0.5);
+  expect(await cartes.locator('table tbody td').first().evaluate((td) => getComputedStyle(td).backgroundImage)).toBe('none');
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
 });

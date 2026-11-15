@@ -54,13 +54,17 @@ export const TRANSFORMER_TESTS = 'uv run --extra cpu pytest -q';
 // projets/1.5-pre-entrainement/pre_entrainement/__main__.py ; ces commandes sont celles
 // du README du projet, et elles écrivent les fichiers de MESURES_PARTIE_1 : commandes.test.ts
 // le vérifie. Le projet utilise PyTorch : ses commandes prennent la version pour le processeur
-// (--extra cpu), qui suffit à tout ce qu'il calcule, y compris l'essai.
+// (--extra cpu), qui suffit à tout ce qu'il calcule, y compris l'essai. Seul le même essai sur la
+// carte graphique de l'auteur prend la version pour la carte (--extra gpu).
 
 /** Entrer dans le projet du chapitre 1.5, depuis le dossier où le dépôt a été cloné. */
 export const ALLER_AU_PROJET_1_5 = 'cd forge-ia/projets/1.5-pre-entrainement';
 /** L'essai de pause et de reprise exacte sur le processeur : la commande qui a écrit la sortie montrée par le chapitre. */
 export const PRE_ENTRAINEMENT_ESSAI =
   'uv run --extra cpu python -m pre_entrainement essai --appareil cpu --enregistrer sorties/essai-processeur.txt --json mesures/essai-processeur.json';
+/** Le même essai sur la carte graphique (NVIDIA) : la commande qui a écrit la sortie de la carte de l'auteur. */
+export const PRE_ENTRAINEMENT_ESSAI_CARTE =
+  'uv run --extra gpu python -m pre_entrainement essai --appareil cuda --enregistrer sorties/essai-rtx-5070-ti.txt --json mesures/essai-rtx-5070-ti.json';
 /** Les courbes et les sessions du journal de la version d'une heure : la commande qui a écrit mesures/ton-ia-mini.json. */
 export const PRE_ENTRAINEMENT_COURBE =
   'uv run --extra cpu python -m pre_entrainement courbe --journal D:\\forge-ia-donnees\\entrainements\\ton-ia-mini\\journal.jsonl --config ..\\forge\\configs\\mini.toml --json mesures/ton-ia-mini.json';

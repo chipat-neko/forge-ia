@@ -7,11 +7,15 @@
 // texte du projet et aux perplexités du Python, lus sur le disque : un
 // parcours, chargé par Node sans Vite, n'importe ni ?raw, ni .json, ni astro:*
 // (P8). Il ne passe donc pas par texte-1-1.ts.
+//
+// L'étape « Ton IA prédit la suite » lit les jetons suivants de ton IA, la vraie
+// (projets/1.6-evaluation/sorties/ton-ia-suivants.json), par evaluation.ts.
 import { readFileSync } from 'node:fs';
 import { test, expect, type Page } from '@playwright/test';
 import type { Choix } from '../src/lib/choix';
-import { nombre } from '../src/lib/nombres';
+import { nombre, pourcent } from '../src/lib/nombres';
 import { trouverChapitre } from '../src/lib/parcours';
+import { lireSuivants } from '../src/lib/partie-1/evaluation';
 import { alphabet, compterParOrdre, couper, generer, tirage } from '../src/lib/partie-1/ngrammes';
 import {
   BARRES_MONTREES,
@@ -61,12 +65,16 @@ const PERPLEXITES = ATTENDUS.ordres.map((o) => ({
   validation: o.perplexite_validation,
 }));
 const LETTRES = alphabet(TEXTE);
+// Les dix jetons que ton IA, la vraie, juge les plus probables après le début de l'atelier.
+const SUIVANTS = lireSuivants();
+/** L'adresse de la version publiée de ton IA, sur GitHub. */
+const RELEASE = 'https://github.com/chipat-neko/forge-ia/releases/tag/ton-ia-1.5';
 const COMPTES = compterParOrdre(couper(TEXTE)[0], N_MAX);
 
 // Ce qui n'est pas du texte du chapitre mais des données brutes : le champ de
 // l'atelier, la suite écrite par le modèle (le texte du site garde ses
 // apostrophes droites) et les caractères des barres et de l'ouverture.
-const BRUT = 'input, [data-test="ml-suite"], [data-caractere]';
+const BRUT = 'input, [data-test="ml-suite"], [data-caractere], [data-suivants-ton-ia] [data-jeton]';
 
 /** Le texte exact d'un élément (textContent : toHaveText ramènerait U+202F à une espace ordinaire). */
 async function texteExact(page: Page, selecteur: string): Promise<string> {
@@ -135,6 +143,12 @@ test('chapitre 1.1 complet', async ({ page }, info) => {
   await expect(page.locator('header')).toContainText(`Partie 1, chapitre 1.1 sur ${total}`);
   if (info.project.name === 'mobile') expect(page.viewportSize()?.width).toBe(390);
   await expect(page.locator('.pari[data-pari]')).toHaveCount(4);
+  // Le programme (« 10 étapes, 4 paris ») compte les étapes et les paris de la page.
+  const etapes = await page.locator('.etape h2').count();
+  expect(etapes).toBe(10);
+  expect(await page.locator('.programme').textContent()).toContain(`${etapes} étapes, 4 paris`);
+  // Plus rien « à mesurer » : les jetons suivants de ton IA sont relevés.
+  await expect(page.locator('[data-a-mesurer]')).toHaveCount(0);
   await page.locator('[data-pari="suivant"] [data-juste]').click();
   await page.locator('[data-pari="temperature"] [data-juste]').click();
   await expect(page.locator('[data-verrou="atelier"]')).not.toHaveAttribute('inert', '');
@@ -310,7 +324,7 @@ test('atelier : distribution et suite égales au jumeau pour n = 0 à 6', async 
     await page.locator(`[data-test="ml-t-${t}"]`).click();
     await verifierAtelier(page, CONTEXTE_INITIAL, N_INITIAL, t, GRAINE_INITIALE);
   }
-  // La commande du projet et l'atelier écrivent le même texte, à la graine du départ (étape 9).
+  // La commande du projet et l'atelier écrivent le même texte, à la graine du départ (étape 10).
   await page.locator(`[data-test="ml-t-${TEMPERATURE_INITIALE}"]`).click();
   await page.locator('[data-test="ml-contexte"]').fill('Le forgeron ');
   await verifierAtelier(page, 'Le forgeron ', N_INITIAL, TEMPERATURE_INITIALE, GRAINE_INITIALE);
@@ -354,5 +368,40 @@ test('avant le pari, l’atelier est verrouillé ; sans JavaScript, tout se lit'
   }
   await expect(sansJs.locator('[data-test="ouverture"]')).toBeVisible();
   await expect(sansJs.locator('[data-test="perplexites"]')).toBeVisible();
+  await expect(sansJs.locator('[data-suivants-ton-ia] tbody tr')).toHaveCount(SUIVANTS.suivants.length);
   await ctx.close();
+});
+
+test('ton IA prédit la suite : ses dix jetons, lus dans le fichier du projet 1.6, tels quels', async ({ page }) => {
+  await page.goto(PAGE);
+  const etape = page.locator('#etape-9');
+  await expect(etape.locator('h2')).toContainText('Ton IA prédit la suite');
+  // La phrase donnée à ton IA : le début de l'atelier, suivi de « le ».
+  expect(SUIVANTS.phrase).toBe(`${CONTEXTE_INITIAL} le`);
+  expect(await etape.textContent()).toContain(typographier(`« ${SUIVANTS.phrase} »`));
+  const tableau = etape.locator('[data-suivants-ton-ia]');
+  const lignes = tableau.locator('tbody tr');
+  await expect(lignes).toHaveCount(SUIVANTS.suivants.length);
+  for (const [i, s] of SUIVANTS.suivants.entries()) {
+    const ligne = lignes.nth(i);
+    // Le jeton tel quel (son espace de tête écrite « ␣ »), et sa chance, avec une décimale.
+    await expect(ligne.locator('[data-jeton]')).toHaveAttribute('data-jeton', s.jeton);
+    expect(await ligne.locator('[data-jeton]').textContent(), s.jeton).toBe(s.jeton.replace(/ /g, '␣'));
+    expect(await ligne.locator('[data-test="suivant-chance"]').textContent(), s.jeton).toBe(pourcent(s.probabilite, 1));
+    // La barre : la chance du jeton, rapportée à celle du premier.
+    const style = (await ligne.locator('.barre').getAttribute('style')) ?? '';
+    expect(Number(/--largeur:\s*([\d.]+)%/.exec(style)?.[1]), s.jeton).toBe(Number(((100 * s.probabilite) / SUIVANTS.suivants[0].probabilite).toFixed(1)));
+  }
+  // Le total des dix, dans le pied du tableau.
+  let total = 0;
+  for (const s of SUIVANTS.suivants) total += s.probabilite;
+  expect(await tableau.locator('tfoot').textContent()).toContain(pourcent(total, 1));
+  // D'où viennent les nombres : le processeur, le jour du relevé, et la version publiée de ton IA.
+  await expect(tableau.locator('figcaption')).toContainText('sur le processeur');
+  await expect(tableau.locator('figcaption')).toContainText('15 novembre 2026');
+  await expect(etape.locator(`a[href="${RELEASE}"]`)).toHaveCount(1);
+  // Les jetons ne sont pas du texte du chapitre : la recherche les ignore.
+  await expect(tableau.locator('[data-jeton][data-pagefind-ignore]')).toHaveCount(SUIVANTS.suivants.length);
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
 });

@@ -6,8 +6,9 @@
 // montré, relu dans les fichiers du projet tels qu'ils sont aujourd'hui. Un parcours, chargé par Node
 // sans Vite, n'importe ni ?raw, ni .json, ni astro:* (P8).
 //
-// Tant que ton IA, la vraie, n'est pas évaluée (evaluation-1.5.json, tâche 15 du plan 5), l'étape 8
-// est « à mesurer ».
+// Ton IA, la vraie, est évaluée (evaluation-1.5.json et qcm-1.5.json, tâche 15 du plan 5) : l'étape 8
+// montre son rapport, ses dix textes tels quels, et l'atelier refait sur ses notes des six mêmes
+// questions. Plus rien n'est « à mesurer ».
 import { readFileSync } from 'node:fs';
 import { test, expect, type Page } from '@playwright/test';
 import type { Choix } from '../src/lib/choix';
@@ -36,7 +37,7 @@ import { FRENCHBENCH, LLAMA_3_BANCS, LLAMA_31_405B_BASE, SOURCES_LABO_1_6, SOURC
 import { extraireRegion } from '../src/lib/regions';
 import { typographier } from '../src/lib/typo';
 import {
-  attendreHydratation,
+  attendreHydratation as attendreLesIlots,
   plusLongueLigne,
   texteHorsCode,
   verifierAxe,
@@ -53,11 +54,13 @@ const FINE = '\u202F';
 const MINI = lireEvaluation('ton-ia-mini')!;
 const QCM = lireQcm('ton-ia-mini')!;
 const TON_IA_15 = lireEvaluation('ton-ia-1.5');
+const QCM_15 = lireQcm('ton-ia-1.5');
 const PAS_A_PAS = 'projets/1.6-evaluation/evaluation_pas_a_pas/pas_a_pas.py';
 
 // Ce qui n'est pas du texte du chapitre mais des données brutes : les questions de MMMLU telles que ton
 // IA les a lues, leurs réponses, et les textes qu'elle a écrits.
-const BRUT = '[data-atelier-qcm] [data-pagefind-ignore], [data-echantillons] [data-pagefind-ignore]';
+// Les scores des ateliers aussi : un « ? » tient la place d'un score pas encore dévoilé.
+const BRUT = '[data-atelier-qcm] [data-pagefind-ignore], [data-atelier-qcm] [data-test="qcm-score"], [data-echantillons] [data-pagefind-ignore]';
 
 /** Les commandes que les blocs « À taper » du chapitre montrent, dans l'ordre de la page. */
 const COMMANDES_DES_BLOCS = [
@@ -66,6 +69,16 @@ const COMMANDES_DES_BLOCS = [
   [commandes.EVALUATION_TESTS],
   [commandes.EVALUATION_RESUMER, commandes.EVALUATION_QCM],
 ];
+
+/**
+ * Attend que les deux ateliers de la page (celui de la version d'une heure, étape 4, et celui de ton IA,
+ * la vraie, étape 8) soient hydratés, avec l'aide commune, mais jusqu'à 20 s au lieu de 5, comme le
+ * chapitre 1.4 pour ses trois îlots : juste après la construction, la première visite d'une page lit
+ * des fichiers neufs, et deux îlots dépassaient parfois les 5 s (relevé du 15 novembre 2026).
+ */
+async function attendreHydratation(page: Page): Promise<void> {
+  await attendreLesIlots(page, 20_000);
+}
 
 /** Le texte d'un choix tel qu'un bouton l'affiche : le code tel quel, le reste typographié. */
 function affiche(choix: Choix): string {
@@ -86,7 +99,7 @@ async function ouvrirLAtelier(page: Page): Promise<void> {
   await attendreHydratation(page);
   await page.locator('[data-pari="bits"] [data-juste]').click();
   await expect(page.locator('[data-verrou="atelier"]')).not.toHaveAttribute('inert', '');
-  await expect(page.locator('[data-atelier-qcm]')).toHaveAttribute('data-pret', 'oui');
+  await expect(page.locator('[data-atelier-qcm="ton-ia-mini"]')).toHaveAttribute('data-pret', 'oui');
 }
 
 test('chapitre 1.6 complet', async ({ page }, info) => {
@@ -99,6 +112,8 @@ test('chapitre 1.6 complet', async ({ page }, info) => {
   await expect(page.locator('header')).toContainText(`Partie 1, chapitre 1.6 sur ${total}`);
   if (info.project.name === 'mobile') expect(page.viewportSize()?.width).toBe(390);
   await expect(page.locator('.pari[data-pari]')).toHaveCount(4);
+  // Plus rien « à mesurer » : ton IA, la vraie, est évaluée.
+  await expect(page.locator('[data-a-mesurer]')).toHaveCount(0);
   // Le programme (« 10 étapes, 4 paris ») compte les étapes et les paris de la page.
   const etapes = await page.locator('.etape h2').count();
   const nParis = await page.locator('.pari[data-pari]').count();
@@ -108,7 +123,7 @@ test('chapitre 1.6 complet', async ({ page }, info) => {
   await page.locator('[data-pari="bits"] [data-juste]').click();
   await expect(page.locator('[data-verrou="atelier"]')).not.toHaveAttribute('inert', '');
   // L'acquis de l'atelier se gagne au compte final, une fois les six questions pariées.
-  const atelier = page.locator('[data-atelier-qcm]');
+  const atelier = page.locator('[data-atelier-qcm="ton-ia-mini"]');
   await expect(page.locator('#recap [data-acquis="qcm"]')).toHaveAttribute('data-gagne', 'non');
   for (let i = 0; i < QCM.n; i++) {
     await expect(atelier).toHaveAttribute('data-question', String(i));
@@ -142,7 +157,7 @@ test('l’atelier : le pari avant les barres, les barres floues tant qu’on n�
   // Six questions, chacune vérifiée avant et après le pari.
   test.setTimeout(90_000);
   await ouvrirLAtelier(page);
-  const atelier = page.locator('[data-atelier-qcm]');
+  const atelier = page.locator('[data-atelier-qcm="ton-ia-mini"]');
   const vues: number[] = [];
   for (const [i, q] of QCM.questions.entries()) {
     await expect(atelier.locator('[data-test="qcm-position"]')).toHaveText(`Question ${i + 1} sur ${QCM.n}`);
@@ -223,23 +238,80 @@ test('la réponse du défi : ce que disent les scores, et le compte face à la m
   expect(analyseDuDefi(QCM).verdict).toBe('pas-different');
   await expect(reponse).toContainText(`${nombre(compteDuQcm(QCM).justes)} justes sur ${nombre(QCM.n)}`);
   // L'énoncé du défi est dans l'atelier.
-  await expect(page.locator('[data-atelier-qcm] .defi')).toContainText('Trouve une question où ton IA préfère la bonne réponse');
+  await expect(page.locator('[data-atelier-qcm="ton-ia-mini"] .defi')).toContainText('Trouve une question où ton IA préfère la bonne réponse');
 });
 
-test('ton IA, la vraie : « à mesurer » tant qu’elle n’est pas évaluée', async ({ page }) => {
+test('ton IA, la vraie : son rapport et ses dix textes, tels quels', async ({ page }) => {
+  expect(TON_IA_15, 'le relevé mesures/evaluation-1.5.json du projet 1.6 manque').not.toBeNull();
+  const e = TON_IA_15!;
   await page.goto(PAGE);
   const etape8 = page.locator('#etape-8');
-  if (TON_IA_15 === null) {
-    expect(await etape8.locator('[data-a-mesurer]').count()).toBeGreaterThanOrEqual(1);
-    await expect(etape8.locator('[data-evaluation-absente="ton-ia-1.5"]')).toBeVisible();
-    await expect(etape8.locator('[data-echantillons-absents="ton-ia-1.5"]')).toBeVisible();
-    await expect(etape8.locator('[data-evaluation="ton-ia-1.5"]')).toHaveCount(0);
-  } else {
-    await expect(etape8.locator('[data-a-mesurer]')).toHaveCount(0);
-    await expect(etape8.locator('[data-evaluation="ton-ia-1.5"]')).toBeVisible();
+  await expect(page.locator('main [data-a-mesurer]')).toHaveCount(0);
+  // Le tableau : les nombres du relevé.
+  const tableau = etape8.locator('[data-evaluation="ton-ia-1.5"]');
+  await expect(tableau).toBeVisible();
+  expect(await tableau.locator('[data-test="evaluation-mesures"] tbody tr td').allTextContents()).toStrictEqual([
+    nombre(e.perte_val, 3),
+    nombre(e.perplexite, 1),
+    nombre(e.bits_par_octet, 3),
+  ]);
+  for (const t of ['hellaswag', 'arc'] as const) {
+    const m = e.qcm[t];
+    const ligne = tableau.locator(`tr[data-test-qcm="${t}"]`);
+    await expect(ligne).toHaveAttribute('data-verdict', m.verdict);
+    await expect(ligne.locator('td').nth(0)).toContainText(pourcent(m.exactitude_normalisee, 1));
+    await expect(ligne.locator('td').nth(1)).toContainText(pourcent(m.hasard, 1));
+    await expect(ligne.locator('td').nth(2)).toHaveText(verdictEnPhrase(m.verdict));
   }
-  // Ailleurs, la version d'une heure est mesurée : rien « à mesurer » hors de l'étape 8.
-  await expect(page.locator('main [data-a-mesurer]:not(#etape-8 *)')).toHaveCount(0);
+  // Ses dix textes, tous, dans l'ordre du rapport, sans retouche.
+  const textes = etape8.locator('[data-echantillons="ton-ia-1.5"] [data-echantillon]');
+  await expect(textes).toHaveCount(e.echantillons.length);
+  for (const [i, x] of e.echantillons.entries()) {
+    expect(await textes.nth(i).textContent()).toBe(x.invite + x.suite);
+    await expect(textes.nth(i).locator('.debut')).toHaveText(x.invite);
+  }
+  // Ce que ces textes disent de ses limites : elle ne répond pas à une question, et son code ne marche pas.
+  await expect(etape8).toContainText('ne répond pas');
+  await expect(etape8).toContainText('toujours 0');
+  // L'évaluation de ton IA est plus haut que celle de la version d'une heure, sur les deux mesures du texte.
+  expect(e.perplexite).toBeLessThan(MINI.perplexite);
+  expect(e.qcm.hellaswag.exactitude_normalisee).toBeGreaterThan(MINI.qcm.hellaswag.exactitude_normalisee);
+});
+
+test('ton IA, la vraie : l’atelier refait sur ses notes des six mêmes questions', async ({ page }) => {
+  // Six questions, chacune pariée puis dévoilée.
+  test.setTimeout(90_000);
+  expect(QCM_15, 'le relevé mesures/qcm-1.5.json du projet 1.6 manque').not.toBeNull();
+  const q15 = QCM_15!;
+  // Les mêmes questions que l'atelier de la version d'une heure : contexte, réponses, bonne réponse.
+  expect(q15.questions.map((q) => [q.contexte, q.choix, q.bonne])).toStrictEqual(QCM.questions.map((q) => [q.contexte, q.choix, q.bonne]));
+  await page.goto(PAGE);
+  await attendreHydratation(page);
+  const atelier = page.locator('#etape-8 [data-atelier-qcm="ton-ia-1.5"]');
+  await expect(atelier).toHaveAttribute('data-pret', 'oui');
+  // Pas de défi ici : il est à l'étape 4.
+  await expect(atelier.locator('[data-defi]')).toHaveCount(0);
+  for (const [i, q] of q15.questions.entries()) {
+    await expect(atelier.locator('[data-test="qcm-position"]')).toHaveText(`Question ${i + 1} sur ${q15.n}`);
+    await expect(atelier.locator('[data-test="qcm-contexte"]')).toHaveText(q.contexte);
+    await expect(atelier.locator('[data-test="qcm-barres"]').first()).toHaveClass(/floues/);
+    await atelier.locator('[data-test="qcm-choix"]').first().click();
+    // Ses scores, sa préférence et la bonne réponse : ceux de qcm-1.5.json.
+    const lignes = atelier.locator('tr[data-reponse]');
+    for (let j = 0; j < q.choix.length; j++) {
+      await expect(lignes.nth(j).locator('[data-test="qcm-score"]')).toHaveText(nombre(q.scores_normalises[j], 2));
+    }
+    await expect(lignes.nth(q.prefere).locator('[data-test="qcm-prefere"]')).toHaveText('préférée par ton IA');
+    await expect(lignes.nth(q.bonne).locator('[data-test="qcm-bonne"]')).toHaveText('bonne réponse');
+    if (i < q15.n - 1) await atelier.locator('[data-test="qcm-suivante"]').click();
+  }
+  await expect(atelier.locator('[data-test="qcm-compte"]')).toHaveText(texteDuCompte(compteDuQcm(q15)));
+  // L'atelier de l'étape 4 n'a pas bougé : toujours à sa première question.
+  await expect(page.locator('[data-atelier-qcm="ton-ia-mini"]')).toHaveAttribute('data-question', '0');
+  // Son acquis ne se gagne qu'à l'étape 4.
+  await expect(page.locator('#recap [data-acquis="qcm"]')).toHaveAttribute('data-gagne', 'non');
+  await verifierAxe(page);
+  await verifierSansDebordement(page);
 });
 
 test('l’ouverture et le tableau de la version d’une heure disent ce que dit son rapport', async ({ page }) => {
@@ -363,6 +435,9 @@ test('l’encadré du labo : les chiffres de sources-1-6, et leurs sources', asy
   await expect(labo).toContainText(`${nombre(l.arc.valeur, 1)}${FINE}%`);
   await expect(labo).toContainText(`${nombre(l.mmluExemples.valeur)} exemples`);
   await expect(labo).toContainText(`${nombre(l.arcExemples.valeur)}`);
+  // Face à Llama 3.1, ton IA, la vraie : ses justes de l'atelier, et ARC-Challenge.
+  await expect(labo).toContainText(`${nombre(QCM_15!.justes)} sur ${nombre(QCM_15!.n)}`);
+  await expect(labo).toContainText(pourcent(TON_IA_15!.qcm.arc.exactitude_normalisee, 1));
   await expect(labo).toContainText(`${nombre(LLAMA_3_BANCS.categories.valeur.length)} familles`);
   for (const c of LLAMA_3_BANCS.categories.valeur) await expect(labo).toContainText(c.francais);
   for (const s of SOURCES_LABO_1_6) await expect(labo.locator(`a[href="${s.url}"]`)).toHaveCount(1);
@@ -407,7 +482,7 @@ test('sans JavaScript, tout se lit : les explications, la première question dé
   for (const id of ['hasard', 'bits', 'marge', 'limites']) {
     await expect(page.locator(`[data-pari="${id}"] .verdict`)).toBeVisible();
   }
-  const atelier = page.locator('[data-atelier-qcm]');
+  const atelier = page.locator('[data-atelier-qcm="ton-ia-mini"]');
   const q = QCM.questions[0];
   await expect(atelier.locator('[data-test="qcm-contexte"]')).toHaveText(q.contexte);
   // L'état caché est celui par défaut ; @media (scripting: none) le dévoile.
@@ -420,6 +495,9 @@ test('sans JavaScript, tout se lit : les explications, la première question dé
   await expect(atelier.locator('.consigne .si-js')).toBeHidden();
   await expect(page.locator('[data-evaluation="ton-ia-mini"]')).toBeVisible();
   await expect(page.locator('[data-echantillons="ton-ia-mini"]')).toBeVisible();
+  await expect(page.locator('[data-evaluation="ton-ia-1.5"]')).toBeVisible();
+  await expect(page.locator('[data-echantillons="ton-ia-1.5"]')).toBeVisible();
+  await expect(page.locator('[data-atelier-qcm="ton-ia-1.5"] [data-test="qcm-contexte"]')).toHaveText(QCM_15!.questions[0].contexte);
   await verifierSansDebordement(page);
   await ctx.close();
 });

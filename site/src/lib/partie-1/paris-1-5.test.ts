@@ -15,6 +15,7 @@ import {
   analyserReglages,
   arretsDeLaCourbe,
   choixDebitCourte,
+  choixDureeReelle,
   choixPerteDepartTonIA,
   choixReprise,
   dureeDeCalcul,
@@ -22,6 +23,10 @@ import {
   ECART_DU_DEFI,
   faitsDuPariDebit,
   faitsDuPariDepart,
+  faitsDuPariDuree,
+  QUESTION_DUREE,
+  trancheDeLaDuree,
+  TRANCHES_DUREE,
   lignesDeLaCourbe,
   lignesDesSessions,
   lireEssaiDeReprise,
@@ -386,5 +391,95 @@ describe('lireEssaiDeReprise, sur un dépôt factice', () => {
     writeFileSync(join(racine, MESURES_PARTIE_1.essaiProcesseur), JSON.stringify(ESSAI), 'utf8');
     expect(lireEssaiDeReprise(racine)).toStrictEqual(ESSAI);
     expect(nombre(ESSAI.pas_total)).toBe('60');
+  });
+});
+
+// Ton IA, la vraie : le relevé de son entraînement principal (mesures/ton-ia-1.5.json, tâche 15 du plan 5).
+const TON_IA = lireEntrainement('ton-ia-1.5') as Entrainement;
+/** Une copie modifiable du relevé de ton IA. */
+const copieTonIA = (): Entrainement => structuredClone(TON_IA);
+
+describe('le pari « duree » : le temps de calcul de ton IA, pauses non comptées', () => {
+  it('la question, telle que la fiche la donne', () => {
+    expect(QUESTION_DUREE).toBe('Combien de temps de calcul a pris ton IA, pauses non comptées ?');
+  });
+
+  it('la bonne tranche est celle des secondes de calcul du relevé : entre 1 et 10 jours', () => {
+    expect(TON_IA).not.toBeNull();
+    const choix = choixDureeReelle(TON_IA);
+    expect(choix.map((c) => c.texte)).toStrictEqual(TRANCHES_DUREE.map((t) => t.texte));
+    expect(juste(choix)).toBe(TRANCHES_DUREE[trancheDeLaDuree(TON_IA.resume.secondes_de_calcul)].texte);
+    expect(juste(choix)).toBe('Entre 1 et 10 jours');
+  });
+
+  it('les tranches, en secondes, se suivent sans trou : moins d’un jour, de 1 à 10 jours, plus de 10 jours', () => {
+    expect(TRANCHES_DUREE.map((t) => t.texte)).toStrictEqual(['Moins d’un jour', 'Entre 1 et 10 jours', 'Plus de 10 jours']);
+    expect([0, 86_399, 86_400, 863_999, 864_000, 1e7].map(trancheDeLaDuree)).toStrictEqual([0, 0, 1, 1, 2, 2]);
+  });
+
+  it('ses faits : les secondes, les jours, les sessions et les pauses du relevé, comme docs/mesures/ton-ia-1.5.md', () => {
+    const f = faitsDuPariDuree(TON_IA);
+    expect(f.secondes).toBe(TON_IA.resume.secondes_de_calcul);
+    expect(f.jours).toBe(TON_IA.resume.secondes_de_calcul / 86_400);
+    expect(f.sessions).toBe(13);
+    expect(f.pauses).toBe(12);
+    expect(f.debit).toBe(TON_IA.resume.debit_moyen);
+    // « 139 h 06 min 32 s » et « 13 sessions et 12 pauses » (docs/mesures/ton-ia-1.5.md).
+    expect(dureeDeCalcul(f.secondes)).toBe(`139${FINE}h 6${FINE}min`);
+  });
+
+  it('garde : des secondes qui ne sont plus la somme des sessions arrêtent la construction', () => {
+    const t = copieTonIA();
+    t.resume.secondes_de_calcul += 3600;
+    expect(() => faitsDuPariDuree(t)).toThrow(/Exemple devenu faux/);
+  });
+
+  it('garde : des pauses qui ne sont plus les sessions moins une, ou une fin qui n’est pas la dernière, arrêtent la construction', () => {
+    const t = copieTonIA();
+    t.resume.pauses = 11;
+    expect(() => faitsDuPariDuree(t)).toThrow(/Exemple devenu faux/);
+    const u = copieTonIA();
+    u.sessions[3].fin = 'coupée';
+    expect(() => faitsDuPariDuree(u)).toThrow(/Exemple devenu faux/);
+    const v = copieTonIA();
+    v.sessions[v.sessions.length - 1].fin = 'pause';
+    expect(() => faitsDuPariDuree(v)).toThrow(/Exemple devenu faux/);
+  });
+
+  it('garde : un entraînement qui n’est pas allé jusqu’au bout arrête la construction', () => {
+    const t = copieTonIA();
+    t.resume.pas_faits -= 1;
+    expect(() => faitsDuPariDuree(t)).toThrow(/Exemple devenu faux/);
+  });
+});
+
+describe('l’essai de pause et de reprise sur la carte graphique de l’auteur', () => {
+  const CARTE = JSON.parse(readFileSync(`../${MESURES_PARTIE_1.essaiCarte}`, 'utf8')) as EssaiDeReprise;
+
+  it('lireEssaiDeReprise(racine, "carte") lit le relevé de la carte, tel quel, avec son échauffement', () => {
+    const e = lireEssaiDeReprise('..', 'carte');
+    expect(e).toStrictEqual(CARTE);
+    expect(e.appareil).toBe('cuda');
+    expect(e.secondes_echauffement).toBeGreaterThan(0);
+    // Par défaut, c'est l'essai du processeur.
+    expect(lireEssaiDeReprise('..', 'processeur')).toStrictEqual(ESSAI);
+  });
+
+  it('les chemins des relevés de la carte, à côté de ceux du processeur', () => {
+    expect(MESURES_PARTIE_1.essaiCarte).toBe('projets/1.5-pre-entrainement/mesures/essai-rtx-5070-ti.json');
+    expect(MESURES_PARTIE_1.sortieEssaiCarte).toBe('projets/1.5-pre-entrainement/sorties/essai-rtx-5070-ti.txt');
+  });
+
+  it('verifierEssai refuse un échauffement qui n’est pas un nombre positif ou nul', () => {
+    expect(verifierEssai(CARTE, 'essai-carte.json')).toBe(CARTE);
+    expect(() => verifierEssai({ ...CARTE, secondes_echauffement: -1 }, 'essai-carte.json')).toThrow(/secondes_echauffement/);
+    expect(() => verifierEssai({ ...CARTE, secondes_echauffement: 'vite' }, 'essai-carte.json')).toThrow(/secondes_echauffement/);
+  });
+
+  it('un relevé de la carte absent dit quelle commande le refait, sur la carte', () => {
+    const racine = mkdtempSync(join(tmpdir(), 'forge-essai-carte-'));
+    TEMPORAIRES.push(racine);
+    mkdirSync(join(racine, 'projets/1.5-pre-entrainement/mesures'), { recursive: true });
+    expect(() => lireEssaiDeReprise(racine, 'carte')).toThrow(/essai-rtx-5070-ti\.json.*--appareil cuda/);
   });
 });

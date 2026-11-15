@@ -5,8 +5,10 @@
 //
 // Leurs bonnes réponses sont calculées sur des mesures : la perte du premier pas et le débit de la
 // version d'une heure (mesures/ton-ia-mini.json, lu par journal.ts), l'écart de l'essai de reprise
-// (mesures/essai-processeur.json). Si une mesure change et qu'une phrase du chapitre devient
-// fausse, la construction s'arrête (« Exemple devenu faux : … »).
+// (mesures/essai-processeur.json), le temps de calcul de ton IA, la vraie (mesures/ton-ia-1.5.json).
+// Le même essai sur la carte de l'auteur (mesures/essai-rtx-5070-ti.json) se lit aussi ici. Si une
+// mesure change et qu'une phrase du chapitre devient fausse, la construction s'arrête (« Exemple
+// devenu faux : … »).
 //
 // Ce module lit des fichiers avec node:fs (l'essai, les configurations), mais n'importe ni ?raw,
 // ni .json, ni astro:*, ni le moteur du mini-modèle (qui lit ses prénoms en ?raw) : un parcours
@@ -95,7 +97,10 @@ export function choixPerteDepartTonIA(mini: Entrainement): Choix[] {
 
 // ---------- Étape 6 : l'essai de pause et de reprise, et le pari « reprise » ----------
 
-/** Le relevé de l'essai de pause et de reprise (mesures/essai-processeur.json du projet 1.5). */
+/**
+ * Le relevé de l'essai de pause et de reprise du projet 1.5 : mesures/essai-processeur.json, ou
+ * mesures/essai-rtx-5070-ti.json pour la carte graphique de l'auteur.
+ */
 export interface EssaiDeReprise {
   releve_le: string;
   appareil: string;
@@ -105,19 +110,40 @@ export interface EssaiDeReprise {
   perte_reprise: number;
   ecart: number;
   pertes_identiques: boolean;
+  /** Les trois entraînements seulement : sur la carte, l'échauffement n'y est pas. */
   secondes: number;
+  /** Sur la carte seulement : les secondes de l'échauffement (deux pas), avant le chronomètre. */
+  secondes_echauffement?: number;
 }
 
-const REFAIRE_ESSAI =
-  'Relance l’essai avec « python -m pre_entrainement essai --appareil cpu --enregistrer sorties/essai-processeur.txt ' +
-  '--json mesures/essai-processeur.json » (voir le README de projets/1.5-pre-entrainement), ou corrige le fichier.';
+/** Où l'essai a tourné : le processeur (le relevé du chapitre), ou la carte graphique de l'auteur. */
+export type AppareilDeLEssai = 'processeur' | 'carte';
+
+/** Le relevé et la commande qui le refait, pour chaque appareil. */
+const ESSAIS: Readonly<Record<AppareilDeLEssai, { fichier: string; refaire: string }>> = Object.freeze({
+  processeur: {
+    fichier: MESURES_PARTIE_1.essaiProcesseur,
+    refaire:
+      'Relance l’essai avec « python -m pre_entrainement essai --appareil cpu --enregistrer sorties/essai-processeur.txt ' +
+      '--json mesures/essai-processeur.json » (voir le README de projets/1.5-pre-entrainement), ou corrige le fichier.',
+  },
+  carte: {
+    fichier: MESURES_PARTIE_1.essaiCarte,
+    refaire:
+      'Relance l’essai sur la carte avec « python -m pre_entrainement essai --appareil cuda --enregistrer ' +
+      'sorties/essai-rtx-5070-ti.txt --json mesures/essai-rtx-5070-ti.json » (voir le README de ' +
+      'projets/1.5-pre-entrainement), ou corrige le fichier.',
+  },
+});
+
+const REFAIRE_ESSAI = ESSAIS.processeur.refaire;
 
 /**
  * Vérifie qu'une valeur lue a le format du relevé de l'essai, et la rend telle quelle. Un écart
  * lève une erreur qui nomme le fichier et le champ, et dit comment refaire le relevé.
  */
-export function verifierEssai(valeur: unknown, fichier: string): EssaiDeReprise {
-  const faute = (quoi: string): Error => new Error(`${fichier}${FINE}: ${quoi}. ${REFAIRE_ESSAI}`);
+export function verifierEssai(valeur: unknown, fichier: string, refaire: string = REFAIRE_ESSAI): EssaiDeReprise {
+  const faute = (quoi: string): Error => new Error(`${fichier}${FINE}: ${quoi}. ${refaire}`);
   if (typeof valeur !== 'object' || valeur === null || Array.isArray(valeur)) throw faute('ce n’est pas un objet JSON');
   const v = valeur as Record<string, unknown>;
   if (typeof v.releve_le !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v.releve_le)) throw faute('releve_le doit être une date AAAA-MM-JJ');
@@ -133,26 +159,33 @@ export function verifierEssai(valeur: unknown, fichier: string): EssaiDeReprise 
     throw faute('ecart n’est pas l’écart des deux pertes finales');
   }
   if (typeof v.pertes_identiques !== 'boolean') throw faute('pertes_identiques doit valoir true ou false');
+  if (
+    v.secondes_echauffement !== undefined &&
+    (typeof v.secondes_echauffement !== 'number' || !Number.isFinite(v.secondes_echauffement) || v.secondes_echauffement < 0)
+  ) {
+    throw faute('secondes_echauffement doit être un nombre positif ou nul');
+  }
   return valeur as EssaiDeReprise;
 }
 
 /**
- * Le relevé de l'essai sur le processeur, lu dans le dépôt dont on donne la racine (par défaut le
- * dossier au-dessus de site/, comme lireEntrainement). Il est versionné depuis le projet 1.5 : un
- * fichier absent est une erreur, pas une mesure « à faire ».
+ * Le relevé de l'essai sur le processeur, ou sur la carte graphique de l'auteur (`appareil`), lu
+ * dans le dépôt dont on donne la racine (par défaut le dossier au-dessus de site/, comme
+ * lireEntrainement). Il est versionné depuis le projet 1.5 : un fichier absent est une erreur, pas
+ * une mesure « à faire ».
  */
-export function lireEssaiDeReprise(racineDepot: string | URL = '..'): EssaiDeReprise {
-  const fichier = MESURES_PARTIE_1.essaiProcesseur;
+export function lireEssaiDeReprise(racineDepot: string | URL = '..', appareil: AppareilDeLEssai = 'processeur'): EssaiDeReprise {
+  const { fichier, refaire } = ESSAIS[appareil];
   const chemin = join(enChemin(racineDepot), fichier);
-  if (!existsSync(chemin)) throw new Error(`${fichier}${FINE}: le fichier manque. ${REFAIRE_ESSAI}`);
+  if (!existsSync(chemin)) throw new Error(`${fichier}${FINE}: le fichier manque. ${refaire}`);
   let valeur: unknown;
   try {
     valeur = JSON.parse(readFileSync(chemin, 'utf8'));
   } catch (erreur) {
     const raison = erreur instanceof Error ? erreur.message : String(erreur);
-    throw new Error(`${fichier}${FINE}: JSON illisible (${raison}). ${REFAIRE_ESSAI}`);
+    throw new Error(`${fichier}${FINE}: JSON illisible (${raison}). ${refaire}`);
   }
-  return verifierEssai(valeur, fichier);
+  return verifierEssai(valeur, fichier, refaire);
 }
 
 /** Les trois choix du pari « reprise », qui complètent « Après une pause, la perte du pas repris… ». */
@@ -211,6 +244,73 @@ export function choixDebitCourte(mini: Entrainement): Choix[] {
   const { debit } = faitsDuPariDebit(mini);
   const juste = trancheDuDebit(debit);
   return TRANCHES_DEBIT.map((t, i) => ({ texte: t.texte, juste: i === juste }));
+}
+
+// ---------- Étape 8 : le pari « duree », sur le temps de calcul de ton IA, la vraie ----------
+
+/** Un jour, en secondes. */
+const JOUR = 86_400;
+
+/** La question du pari « duree » (Pari.astro la typographie). */
+export const QUESTION_DUREE = 'Combien de temps de calcul a pris ton IA, pauses non comptées ?';
+
+/** Les trois tranches du pari « duree », en secondes de calcul. */
+export const TRANCHES_DUREE: readonly Tranche[] = Object.freeze([
+  Object.freeze({ texte: 'Moins d’un jour', jusqua: JOUR }),
+  Object.freeze({ texte: 'Entre 1 et 10 jours', jusqua: 10 * JOUR }),
+  Object.freeze({ texte: 'Plus de 10 jours', jusqua: Infinity }),
+]);
+
+/** La tranche d'une durée de calcul, en secondes : 0 sous un jour, 1 jusqu'à dix jours, 2 au-delà. */
+export function trancheDeLaDuree(secondes: number): number {
+  return rangDeTranche(TRANCHES_DUREE, secondes);
+}
+
+/** Ce que l'explication du pari « duree » dit du relevé de ton IA. */
+export interface FaitsDuPariDuree {
+  /** Le temps de calcul, sans les pauses. */
+  secondes: number;
+  jours: number;
+  sessions: number;
+  pauses: number;
+  /** Jetons lus par seconde de calcul, en moyenne. */
+  debit: number;
+}
+
+/**
+ * Les faits de l'explication du pari « duree » : le temps de calcul de ton IA, en secondes et en
+ * jours, ses sessions et ses pauses, et son débit moyen. Gardes : l'entraînement est allé jusqu'au
+ * bout ; les secondes sont la somme de celles des sessions, le calcul seul, sans les pauses ; chaque
+ * session finit en pause, sauf la dernière, qui finit l'entraînement ; et il y a une pause de moins
+ * que de sessions. Sinon l'explication (« en N sessions, coupées par N − 1 pauses ») serait fausse.
+ */
+export function faitsDuPariDuree(tonIA: Entrainement): FaitsDuPariDuree {
+  const r = tonIA.resume;
+  exiger(r.pas_faits === r.pas_total, `ton IA n’a fait que ${nombre(r.pas_faits)} pas sur ${nombre(r.pas_total)} : son entraînement n’est pas allé au bout`);
+  let somme = 0;
+  for (const s of tonIA.sessions) somme += s.secondes;
+  exiger(Math.abs(somme - r.secondes_de_calcul) <= 1e-6 * r.secondes_de_calcul, 'les secondes de calcul de ton IA ne sont plus la somme de celles de ses sessions');
+  const n = tonIA.sessions.length;
+  exiger(
+    n >= 2 && tonIA.sessions.every((s, i) => s.fin === (i === n - 1 ? 'fin' : 'pause')),
+    'les sessions de ton IA ne finissent plus toutes en pause, sauf la dernière, qui finit l’entraînement',
+  );
+  exiger(r.pauses === n - 1, `le relevé compte ${nombre(r.pauses)} pauses pour ${nombre(n)} sessions`);
+  exiger(
+    Math.abs(r.debit_moyen - r.jetons_vus / r.secondes_de_calcul) < 1e-6 * r.debit_moyen,
+    'le débit moyen de ton IA n’est plus les jetons lus divisés par les secondes de calcul',
+  );
+  return { secondes: r.secondes_de_calcul, jours: r.secondes_de_calcul / JOUR, sessions: n, pauses: r.pauses, debit: r.debit_moyen };
+}
+
+/**
+ * Le pari « Combien de temps de calcul a pris ton IA, pauses non comptées ? », en trois tranches.
+ * La bonne est celle du temps de calcul de son relevé (resume.secondes_de_calcul).
+ */
+export function choixDureeReelle(tonIA: Entrainement): Choix[] {
+  const { secondes } = faitsDuPariDuree(tonIA);
+  const juste = trancheDeLaDuree(secondes);
+  return TRANCHES_DUREE.map((t, i) => ({ texte: t.texte, juste: i === juste }));
 }
 
 // ---------- Étapes 3, 5 et 8 : les réglages des entraînements de forge ----------

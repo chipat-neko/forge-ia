@@ -5,10 +5,11 @@
 </script>
 
 <script lang="ts">
-  // L'atelier des QCM du chapitre 1.6 : les questions de MMMLU que la version
-  // d'une heure de ton IA a notées (mesures/qcm-mini.json du projet 1.6), une à
-  // la fois. Le lecteur lit la question telle qu'elle l'a lue, puis parie sur
-  // la réponse qu'elle préfère. Alors seulement, les barres se dévoilent : le
+  // L'atelier des QCM du chapitre 1.6 : les questions de MMMLU qu'une version
+  // de ton IA a notées (mesures/qcm-mini.json du projet 1.6 pour la version
+  // d'une heure, qcm-1.5.json pour ton IA, la vraie), une à la fois. Le
+  // lecteur lit la question telle qu'elle l'a lue, puis parie sur la réponse
+  // qu'elle préfère. Alors seulement, les barres se dévoilent : le
   // score par octet de chaque réponse (sa log-vraisemblance divisée par ses
   // octets), la préférence de ton IA, et la bonne réponse, en menthe si ton IA
   // l'a trouvée, en corail sinon. « Question suivante » ; à la fin, le compte :
@@ -21,6 +22,11 @@
   // À placer dans le MDX avec client:load, dans un <Verrou> :
   //   <AtelierQcm client:load qcm={QCM} acquis="qcm" />
   // L'acquis est gagné au compte final, quand les questions ont toutes leur pari.
+  //
+  // La page peut en avoir un second, pour une autre version de ton IA sur les mêmes questions, sans
+  // acquis ni défi (le défi est celui du premier) :
+  //   <AtelierQcm client:load qcm={QCM_15} defi={false} />
+  // data-atelier-qcm porte le nom du relevé (« ton-ia-mini », « ton-ia-1.5 ») : les deux se distinguent.
   //
   // Le HTML d'Astro contient la première question dévoilée (scores, préférence,
   // bonne réponse), mais l'état caché est celui par défaut : les styles ne la
@@ -39,9 +45,14 @@
     qcm: QcmExemples;
     /** Clé de l'acquis gagné au compte final. */
     acquis?: string;
+    /** Le défi, sous les questions ; true par défaut. */
+    defi?: boolean;
   }
 
-  const { qcm, acquis }: Props = $props();
+  const { qcm, acquis, defi: avecDefi = true }: Props = $props();
+  // L'identifiant de la consigne, propre à cet atelier : la page peut en avoir deux.
+  const uid = $props.id();
+  const idConsigne = `${uid}-consigne`;
   const FINE = '\u202F';
   const LETTRES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
@@ -125,11 +136,11 @@
   });
 </script>
 
-<div class="atelier-qcm" data-atelier-qcm data-question={indice} data-pret={monte ? 'oui' : 'non'}>
+<div class="atelier-qcm" data-atelier-qcm={QCM.nom} data-question={indice} data-pret={monte ? 'oui' : 'non'}>
   <p class="position" data-test="qcm-position">Question {nombre(indice + 1)} sur {nombre(N)}</p>
   <div class="lu" tabindex="-1" bind:this={zoneQuestion} data-test="qcm-contexte" data-pagefind-ignore>{question.contexte}</div>
 
-  <p class="consigne" id="qcm-consigne">
+  <p class="consigne" id={idConsigne}>
     {#if revele}
       Les réponses, et leur score par octet pour ton IA{FINE}:
     {:else}
@@ -141,7 +152,7 @@
   <!-- Sur un téléphone, les lignes passent en blocs (display: block) : WebKit retire alors leur rôle aux éléments
        du tableau. Les rôles écrits ici le gardent. -->
   <!-- svelte-ignore a11y_no_redundant_roles -->
-  <table class="reponses" role="table" aria-labelledby="qcm-consigne" data-test="qcm-reponses">
+  <table class="reponses" role="table" aria-labelledby={idConsigne} data-test="qcm-reponses">
     <!-- svelte-ignore a11y_no_redundant_roles -->
     <tbody role="rowgroup">
       {#each choix as c, j (`${indice}-${j}`)}
@@ -220,14 +231,16 @@
     >
   {/if}
 
-  <div class="defi" class:reussi={defi.reussi} data-defi>
-    <h3>Défi</h3>
-    <p>
-      Trouve une question où ton IA préfère la bonne réponse. D’après ses scores, aurait-elle pu tomber juste par hasard{FINE}?
-    </p>
-    <p class="etat" data-test="qcm-defi">{defi.texte}</p>
-    <p class="vh" role="status">{annonceDefi}</p>
-  </div>
+  {#if avecDefi}
+    <div class="defi" class:reussi={defi.reussi} data-defi>
+      <h3>Défi</h3>
+      <p>
+        Trouve une question où ton IA préfère la bonne réponse. D’après ses scores, aurait-elle pu tomber juste par hasard{FINE}?
+      </p>
+      <p class="etat" data-test="qcm-defi">{defi.texte}</p>
+      <p class="vh" role="status">{annonceDefi}</p>
+    </div>
+  {/if}
 </div>
 
 <style>

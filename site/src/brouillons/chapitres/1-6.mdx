@@ -29,13 +29,13 @@ import OuvertureEvaluation from '../../components/chapitres/1-6/OuvertureEvaluat
 import TableauEvaluation from '../../components/chapitres/1-6/TableauEvaluation.astro';
 import BlocCommande from '../../components/gabarit/BlocCommande.astro';
 import RecupererProjet from '../../components/gabarit/RecupererProjet.astro';
-import { VOCABULAIRE_FORGE } from '../../lib/calculateur/ton-ia';
+import { PRESETS_FORGE, VOCABULAIRE_FORGE } from '../../lib/calculateur/ton-ia';
 import { chapitresParus } from '../../lib/chapitres-parus';
 import { exigeur } from '../../lib/exiger';
 import { formaterDate } from '../../lib/calculateur/formats';
 import { formaterPerte, nombre, pourcent } from '../../lib/nombres';
 import { ANNEXES, hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
-import { EVALUATION_QCM, EVALUATION_RESUMER, EVALUATION_TESTS } from '../../lib/partie-1/commandes';
+import { COURT_EVALUER, EVALUATION_QCM, EVALUATION_RESUMER, EVALUATION_TESTS } from '../../lib/partie-1/commandes';
 import { lireEvaluation, lireQcm, margeHasard, verdictQcm, Z_95 } from '../../lib/partie-1/evaluation';
 import {
   analyseDuDefi,
@@ -63,6 +63,7 @@ import {
   SOURCES_LABO_1_6,
   SOURCES_LIMITES_1_6,
 } from '../../lib/partie-1/sources-1-6';
+import { CORPUS_PRINCIPAL } from '../../lib/partie-1/projet-1-2';
 import { typographier } from '../../lib/typo';
 
 export const exiger = exigeur('le texte du chapitre 1.6 (1-6.mdx)');
@@ -230,8 +231,70 @@ export const LIMITES = (() => {
   };
 })();
 
+export const TON_IA = (() => {
+  // L'étape 8 : ton IA, la vraie (ton-ia-1.5), évaluée par forge au dernier pas de son entraînement
+  // (mesures/evaluation-1.5.json), et ses notes des six questions de l'atelier (mesures/qcm-1.5.json).
+  const e = lireEvaluation('ton-ia-1.5', RACINE);
+  exiger(e !== null, 'le relevé de l’évaluation de ton IA (mesures/evaluation-1.5.json du projet 1.6) manque');
+  const q = lireQcm('ton-ia-1.5', RACINE);
+  exiger(q !== null, 'le relevé des QCM de ton IA (mesures/qcm-1.5.json du projet 1.6) manque');
+  // « Elle hésite bien moins que la version d'une heure : sa perplexité et ses bits par octet sont plus bas. »
+  exiger(e.perplexite < MINI.perplexite && e.bits_par_octet < MINI.bits_par_octet, 'la perplexité ou les bits par octet de ton IA ne sont plus sous ceux de la version d’une heure');
+  // « Ses textes de validation ne sont pas ceux de la version d'une heure » : le corpus « principal », pas « court ».
+  exiger(CORPUS_PRINCIPAL.dossier === 'principal' && COURT_EVALUER.includes('--donnees court'), 'les deux versions ne sont plus évaluées sur deux corpus différents');
+  // « Elle lit des morceaux quatre fois plus longs. »
+  const fois = PRESETS_FORGE.tres_grand.contexte / PRESETS_FORGE.mini.contexte;
+  exiger(fois === 4, 'le contexte de ton IA n’est plus quatre fois celui de la version d’une heure');
+  // « Sur HellaSwag, elle est au-dessus du hasard, et bien plus loin que la version d'une heure. »
+  const avance = (x) => x.qcm.hellaswag.exactitude_normalisee - x.qcm.hellaswag.hasard;
+  exiger(e.qcm.hellaswag.verdict === 'au-dessus' && avance(e) > 2 * avance(MINI), 'sur HellaSwag, ton IA n’est plus au-dessus du hasard, bien plus loin que la version d’une heure');
+  // « Sur ARC-Challenge, elle ne fait pas mieux qu'un tirage au sort. »
+  exiger(e.qcm.arc.verdict === 'pas-different', 'sur ARC-Challenge, ton IA se distingue maintenant du hasard');
+
+  // Ses dix textes : chaque phrase de l'étape 8 qui en parle a ici sa preuve, lue dans le texte. Le tableau
+  // suit l'ordre du rapport, et dit, pour chacun, s'il garde son sujet jusqu'au bout (relu le 15/11/2026,
+  // comme docs/mesures/ton-ia-1.5.md : les échantillons 3, 5, 6, 8 et 9).
+  const LECTURE = [
+    ['Il était une fois', false, (t) => t.includes('oublié de la porter') && t.includes('ne l’a pas oublié')],
+    ['La capitale de la France est', false, (t) => t.startsWith(' Paris.') && t.includes('Budapest')],
+    ['Pour faire un bon gâteau au chocolat, il faut', true, (t) => t.includes('pâte à choux') && t.split('raisins secs').length === 3 && t.includes('Méthode de préparation')],
+    ['Le soleil se couchait sur la mer et', false, (t) => t.includes('pêche')],
+    ['Aujourd\'hui, le gouvernement a annoncé', true, (t) => t.includes('suppression de') && t.includes('réformes')],
+    ['Dans un petit village de Bretagne,', true, (t) => t.split('amis').length > 3],
+    ['La photosynthèse est le processus par lequel', false, (t) => t.includes('la lumière dans la nature est un produit de la photosynthèse')],
+    ['Bonjour, je voudrais savoir comment', true, (t) => /^ je /.test(t) && t.includes('compteur')],
+    ['def factorielle(n):\n', true, (t) => /^ {4}return sum\(set\(range\(n\)\) - set\(range\(n\)\)\)\n/.test(t)],
+    ['def moyenne(valeurs):\n    """Renvoie la moyenne', false, (t) => t.includes('électeur')],
+  ];
+  exiger(
+    JSON.stringify(e.echantillons.map((x) => x.invite)) === JSON.stringify(LECTURE.map(([invite]) => invite)),
+    'les débuts des échantillons de ton IA ne sont plus ceux que l’étape 8 a relus',
+  );
+  e.echantillons.forEach((x, i) => exiger(LECTURE[i][2](x.suite), `l’échantillon « ${x.invite} » de ton IA ne dit plus ce que l’étape 8 en dit`));
+  const gardes = LECTURE.filter(([, garde]) => garde).length;
+  exiger(2 * gardes === e.echantillons.length, 'ton IA ne garde plus son sujet dans la moitié de ses textes');
+  // « Ses phrases sont presque toutes correctes » (relu, comme docs/mesures/ton-ia-1.5.md) : chaque texte en français a au moins un point.
+  const francais = e.echantillons.filter((x) => !x.invite.startsWith('def '));
+  exiger(francais.every((x) => x.suite.includes('.')), 'un texte en français de ton IA n’a plus de point');
+  // « Et cette fois, elle s'arrête d'elle-même », pour factorielle seulement ; la version d'une heure, jamais.
+  exiger(e.echantillons.filter((x) => x.s_arrete).map((x) => x.invite).join() === 'def factorielle(n):\n', 'ton IA ne s’arrête plus d’elle-même dans factorielle seulement');
+  exiger(MINI.echantillons.every((x) => !x.s_arrete), 'la version d’une heure s’arrête maintenant d’elle-même');
+
+  // L'atelier refait sur ses notes : les mêmes questions, des préférences qui changent, et six questions qui ne disent rien.
+  exiger(
+    JSON.stringify(q.questions.map((x) => [x.contexte, x.choix, x.bonne])) === JSON.stringify(QCM.questions.map((x) => [x.contexte, x.choix, x.bonne])),
+    'ton IA n’a plus noté les mêmes questions que la version d’une heure',
+  );
+  exiger(q.questions.some((x, i) => x.prefere !== QCM.questions[i].prefere), 'ton IA préfère maintenant les mêmes réponses que la version d’une heure');
+  // « Les six questions de l'atelier » et « dix textes » : écrits en lettres.
+  exiger(q.n === 6 && e.echantillons.length === 10, 'ton IA n’a plus noté six questions, ou n’a plus dix textes : l’étape 8 les compte en lettres');
+  const c = compteDuQcm(q);
+  exiger(verdictQcm(c.justes / c.n, c.hasard / c.n, margeHasard(c.n, 4)) === 'pas-different', 'les justes de ton IA dans l’atelier ne sont plus dans la marge du hasard');
+  return { evaluation: e, qcm: q };
+})();
+
 export const LABO = (() => {
-  // Les bancs de Llama 3 et les scores de Llama 3.1 405B pré-entraîné (sources-1-6.ts), face à ton IA.
+  // Les bancs de Llama 3 et les scores de Llama 3.1 405B pré-entraîné (sources-1-6.ts), face à ton IA, la vraie (étape 8).
   const categories = LLAMA_3_BANCS.categories.valeur;
   const familleDe = (banc) => categories.find((c) => c.bancs.includes(banc))?.francais;
   exiger(familleDe('ARC Challenge') === 'maths et raisonnement', 'ARC Challenge n’est plus dans la famille des maths et du raisonnement');
@@ -252,9 +315,9 @@ export const LABO = (() => {
     mmluExemples: nombre(l.mmluExemples.valeur),
     arcExemples: nombre(l.arcExemples.valeur),
     nAtelier: nombre(c.n),
-    justes: nombre(c.justes),
-    arcMini: pourcent(MINI.qcm.arc.exactitude_normalisee, 1),
-    verdictArc: verdictEnPhrase(MINI.qcm.arc.verdict),
+    justes: nombre(compteDuQcm(TON_IA.qcm).justes),
+    arcTonIA: pourcent(TON_IA.evaluation.qcm.arc.exactitude_normalisee, 1),
+    verdictArc: verdictEnPhrase(TON_IA.evaluation.qcm.arc.verdict),
   };
 })();
 
@@ -468,11 +531,27 @@ Les textes de ton IA viennent du web en français, de Wikipédia et de code Pyth
 
 <Etape numero={8} titre="Ton IA, la vraie">
 
-La version d'une heure n'était qu'une répétition. Ton IA, la vraie, passera les mêmes épreuves au dernier pas de son entraînement : la même perte sur les mêmes textes de validation, les mêmes QCM, les mêmes débuts.
+La version d'une heure n'était qu'une répétition. Ton IA, la vraie, a passé les mêmes épreuves au dernier pas de son entraînement : la même mesure de la perte, sur ses propres textes de validation, les mêmes QCM, les mêmes débuts. Voici son rapport, tel que forge l'a écrit :
 
 <TableauEvaluation nom="1.5" />
 
+Elle hésite bien moins que la version d'une heure : sa perplexité et ses bits par octet sont plus bas. Mais la comparaison n'est qu'indicative. Ses textes de validation ne sont pas ceux de la version d'une heure, et elle lit des morceaux quatre fois plus longs, ce qui l'aide à prédire. Les QCM, eux, sont les mêmes questions, notées de la même façon. Sur HellaSwag, elle est au-dessus du hasard, et bien plus loin que la version d'une heure. Sur ARC-Challenge, ses questions de sciences, elle ne fait pas mieux qu'un tirage au sort.
+
+Voici ses dix textes, tous, tels quels, à partir des mêmes débuts :
+
 <EchantillonsEvaluation nom="1.5" />
+
+Son français est bien plus sûr que celui de la version d'une heure. Ses phrases sont presque toutes correctes, à quelques fautes près, et suivent le ton du début qu'on lui donne : un article de presse, un message de forum, une recette. Elle sait quelques faits fréquents : la capitale de la France est Paris. Dans la moitié de ses textes, elle garde son sujet jusqu'au bout. Dans l'autre moitié, elle se contredit, change de sujet ou écrit des phrases qui n'ont pas de sens : sa capitale part pour Budapest, son soleil couchant passe à une canne à pêche.
+
+Ce qu'elle écrit n'est pas fiable. Sa recette du gâteau au chocolat demande de la pâte à choux, et deux fois des raisins secs ; sa photosynthèse fait de la lumière « un produit de la photosynthèse ». Et elle ne répond pas aux questions : après « Bonjour, je voudrais savoir comment », elle continue la question, comme si c'était elle qui la posait. Elle n'a appris qu'à prolonger un texte.
+
+Son code a la forme du code, pas son sens. Sa `factorielle` est du Python bien indenté, et, cette fois, ton IA s'arrête d'elle-même après quelques lignes, par le jeton de fin de texte. Mais cette fonction renvoie toujours 0 : `set(range(n)) - set(range(n))` est un ensemble vide. Et la docstring de `moyenne` part sur des élections.
+
+Elle a aussi noté les six questions de l'atelier, sur le processeur. Parie de nouveau : ses préférences ne sont pas toujours celles de la version d'une heure.
+
+<AtelierQcm client:load qcm={TON_IA.qcm} defi={false} />
+
+Six questions ne départagent pas deux modèles : pour voir la différence, il faut les milliers de questions de HellaSwag.
 
 </Etape>
 
@@ -484,7 +563,7 @@ Ton IA passe deux QCM. Avant tout réglage, Meta a fait passer à Llama 3 {LABO.
 
 Pour Llama 3, Meta range ses bancs d'essai en {LABO.familles} familles : {LABO.liste}, comme MMLU. ARC-Challenge, que ton IA passe aussi en français, est dans la famille des maths et du raisonnement. Chaque score qui est une moyenne simple y a son intervalle de confiance à 95&#8239;%, calculé comme la précision de la mesure de ton projet : <span class="formule-en-texte">{LABO.z} × √(S (1 − S) / N)</span>. Meta reconnaît que cette formule suppose des scores répartis en cloche, ce qu'ils ne sont pas, mais ses essais disent que l'approximation est bonne.
 
-Sur MMLU, dont l'atelier t'a montré {LABO.nAtelier} questions traduites, Llama 3.1 405B pré-entraîné répond juste à {LABO.mmlu} des questions, en moyenne sur ses matières ; sur ARC-Challenge, à {LABO.arc}. La version d'une heure de ton IA : {LABO.justes} sur {LABO.nAtelier}, et {LABO.arcMini} sur ARC-Challenge, {LABO.verdictArc}. Mais ces chiffres ne se comparent pas. Meta pose ses questions en anglais, et montre {LABO.mmluExemples} exemples résolus avant chaque question de MMLU, {LABO.arcExemples} avant celles d'ARC-Challenge ; ton IA n'en voit aucun, et lit une traduction.
+Sur MMLU, dont l'atelier t'a montré {LABO.nAtelier} questions traduites, Llama 3.1 405B pré-entraîné répond juste à {LABO.mmlu} des questions, en moyenne sur ses matières ; sur ARC-Challenge, à {LABO.arc}. Ton IA, la vraie : {LABO.justes} sur {LABO.nAtelier} dans l'atelier, et {LABO.arcTonIA} sur ARC-Challenge, {LABO.verdictArc}. Mais ces chiffres ne se comparent pas. Meta pose ses questions en anglais, et montre {LABO.mmluExemples} exemples résolus avant chaque question de MMLU, {LABO.arcExemples} avant celles d'ARC-Challenge ; ton IA n'en voit aucun, et lit une traduction.
 
 </EncadreLabo>
 
