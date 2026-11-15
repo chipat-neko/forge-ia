@@ -183,12 +183,13 @@ test('recherche : les titres du parcours, un numéro, et rien de la page d’ess
   await champ.fill('1.3');
   await expect(page.locator('[data-resultat]').first()).toContainText('Le tokenizer');
   // La page d'essai du gabarit (construite pour les tests) n'est jamais cherchée :
-  // « gabarit » n'est que dans son texte à elle.
-  await champ.fill('gabarit');
-  await expect(page.getByRole('heading', { level: 2, name: /Rien sur «\s?gabarit\s?»/ })).toBeVisible();
+  // « coloration » n'est que dans son texte à elle. (« gabarit » ne convient plus
+  // depuis la parution de 1.6, qui parle du « gabarit des questions ».)
+  await champ.fill('coloration');
+  await expect(page.getByRole('heading', { level: 2, name: /Rien sur «\s?coloration\s?»/ })).toBeVisible({ timeout: 15_000 });
   await expect(page.locator('[data-resultat]')).toHaveCount(0);
   await champ.fill('Parier avant de voir');
-  await expect(page.locator('[role="status"]')).toContainText('avant');
+  await expect(page.locator('[role="status"]')).toContainText('avant', { timeout: 15_000 });
   await expect(page.locator('main a[href*="/essais/"]')).toHaveCount(0);
   await verifierAxe(page);
   await verifierSansDebordement(page);
@@ -203,7 +204,9 @@ test('recherche : « jeux » et « mots » trouvent « jeu » et « mot », comm
   await expect(page.locator('[data-resultat]')).not.toHaveCount(0);
   await expect(page.locator('[data-resultat] mark').first()).toHaveText(/^jeu/);
   await page.getByRole('searchbox').fill('mots');
-  await expect(page.locator('[role="status"]')).toContainText('mots');
+  // Le serveur local lit Pagefind sur le disque D: et met parfois plus de 5 s
+  // (mesuré le 15/11/2026) : ce test vérifie les résultats, pas la vitesse.
+  await expect(page.locator('[role="status"]')).toContainText('mots', { timeout: 15_000 });
   await expect(page.locator('[data-resultat] .passages li')).not.toHaveCount(0);
   await expect(page.locator('[data-resultat] mark', { hasText: /^mot$/ }).first()).toBeVisible();
 });

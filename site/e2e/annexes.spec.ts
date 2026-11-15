@@ -161,8 +161,8 @@ test('glossaire : un renvoi vers un chapitre paru est un lien, les autres disent
       }
     }
   }
-  // Aucun lien vers un chapitre qui n'a pas paru (1.5 et 1.6 au moins, aujourd'hui).
-  expect(aVenir.size).toBeGreaterThan(0);
+  // Aucun lien vers un chapitre qui n'a pas paru. Depuis la parution de 1.5 et 1.6,
+  // tous les renvois du glossaire visent des chapitres parus : la liste peut être vide.
   for (const numero of aVenir) await expect(page.locator(`main a[href="${adresseDuChapitre(numero)}"]`)).toHaveCount(0);
   // Les liens des chapitres parus répondent.
   const liens = await page.locator('.renvois a[href^="/forge-ia/partie-"]').evaluateAll((a) => a.map((l) => l.getAttribute('href')));
