@@ -73,10 +73,13 @@ uv run --extra gpu python -m forge donnees --octets 300M --dossier echantillon
 ```
 
 Une coupure (réseau, courant, disque plein) ne laisse ni trou ni doublon : on relance la même
-commande, qui garde les fragments déjà écrits et reprend après le dernier. Mais pour y arriver, le
-flux est relu depuis le début du jeu, et les documents déjà comptés sont sautés : la reprise coûte
-du temps et du réseau, d'autant plus que la coupure est tardive (il a fallu 18 minutes pour sauter
-15,6 millions de documents de code, voir `docs/mesures/entrainement-2026-11.md`). Une source n'est
+commande, qui garde les fragments déjà écrits et reprend après le dernier. La reprise repart du
+fichier et du groupe de lignes où le flux s'était arrêté (`etat_du_flux` dans `etat.json`), sans
+relire ce qui est déjà compté. Un téléchargement commencé avant cette version n'a pas cet état :
+sa première reprise est relue depuis le début du jeu, en sautant les documents déjà comptés, ce
+qui coûte du temps et du réseau (18 minutes pour 15,6 millions de documents de code, voir
+`docs/mesures/entrainement-2026-11.md`). Si le jeu refuse l'état enregistré (autre source, autre
+version de `datasets`), la commande s'arrête avec un message, sans rien écrire. Une source n'est
 terminée que lorsque son fichier `.complet` existe. Le mélange par défaut est défini une seule fois,
 dans `forge.donnees.melange.MELANGE_PAR_DEFAUT`.
 

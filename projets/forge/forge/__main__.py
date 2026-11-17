@@ -134,8 +134,9 @@ def _commande_donnees(choix: argparse.Namespace) -> int:
         except KeyboardInterrupt:
             print(
                 f"Interrompu pendant « {nom} ». Relance la même commande : les fragments déjà écrits sont "
-                "gardés. Le flux sera relu depuis le début du jeu pour sauter les documents déjà comptés, "
-                "ce qui prend du temps et du réseau (18 minutes pour 15,6 millions de documents).",
+                "gardés. La reprise repart du fichier et du groupe de lignes où le flux s'était arrêté. "
+                "Seul un téléchargement commencé avant cette version relit le flux depuis le début du jeu "
+                "(18 minutes pour 15,6 millions de documents).",
                 file=sys.stderr,
             )
             return 130

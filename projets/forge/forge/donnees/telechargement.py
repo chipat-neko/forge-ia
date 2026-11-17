@@ -5,7 +5,9 @@ Une source s'écrit dans un dossier (`FORGE_DONNEES/textes/<dossier>/<source>/`)
 - `fragment-00000.jsonl.gz`, `fragment-00001.jsonl.gz`… : environ 100 Mo de texte chacun,
   une ligne `{"texte": …}` par document nettoyé ;
 - `etat.json` : où le téléchargement en est (`documents_lus`, `octets_ecrits`, et de quoi
-  retrouver les fragments et les empreintes qui comptent) ;
+  retrouver les fragments et les empreintes qui comptent), plus `etat_du_flux`, le
+  `state_dict()` du flux `datasets` pris juste après le dernier document du dernier fragment
+  écrit : la reprise repart de ce fichier et de ce groupe de lignes, sans relire le début ;
 - `empreintes.bin` : les empreintes des textes déjà écrits, pour ne jamais en réécrire un ;
 - `.complet` : posé en dernier, quand le volume demandé est atteint ou la source épuisée.
 
@@ -63,13 +65,69 @@ class _Etat:
     fragments: int = 0  # nombre de fragments écrits : les suivants sont des orphelins
     empreintes: int = 0  # nombre d'empreintes valides dans `empreintes.bin`
     source_epuisee: bool = False  # la source n'avait plus rien à donner
+    # `state_dict()` du flux après le dernier document compté (`None` : état d'avant cette
+    # version, ou jeu qui ne sait pas reprendre ; la reprise relit alors le flux depuis le début).
+    etat_du_flux: dict | None = None
 
 
-def lecteur_hugging_face(source: Source, ignorer: int = 0) -> Iterator[dict]:
+# Ce que `datasets` lève quand l'état qu'on lui rend ne va pas avec le jeu (clé absente, indice
+# hors du jeu…) : jamais une erreur de réseau ou de disque, qui sont des `OSError`.
+_ERREURS_D_ETAT = (KeyError, IndexError, ValueError, TypeError, AttributeError)
+
+
+class LecteurDeFlux:
+    """Les documents d'un jeu `datasets` en flux, et de quoi savoir où l'on en est.
+
+    `etat()` renvoie le `state_dict()` du jeu (la position après le dernier document donné),
+    ou `None` si le jeu ne le permet pas. `refus`, s'il est donné, transforme une erreur
+    d'état de `datasets` à la première lecture en une erreur claire : `load_state_dict` ne
+    vérifie presque rien, c'est la lecture qui échoue si l'état ne va pas avec le jeu.
+    """
+
+    def __init__(self, jeu, refus: Callable[[Exception], Exception] | None = None) -> None:
+        self._jeu = jeu
+        self._refus = refus
+        self._iterateur = None
+
+    def __iter__(self) -> Iterator[dict]:
+        if self._iterateur is None:
+            self._iterateur = self._lire()
+        return self._iterateur
+
+    def _lire(self) -> Iterator[dict]:
+        flux = iter(self._jeu)
+        try:
+            premier = next(flux)
+        except StopIteration:
+            return
+        except _ERREURS_D_ETAT as erreur:
+            if self._refus is None:
+                raise
+            raise self._refus(erreur) from erreur
+        yield premier
+        yield from flux
+
+    def etat(self) -> dict | None:
+        try:
+            return self._jeu.state_dict()
+        except Exception:  # noqa: BLE001 - jeu sans état (pas un IterableDataset, version ancienne)
+            return None
+
+    def close(self) -> None:
+        fermer = getattr(self._iterateur, "close", None)
+        if callable(fermer):
+            fermer()
+
+
+def lecteur_hugging_face(
+    source: Source, etat_du_flux: dict | None = None, ignorer: int = 0
+) -> LecteurDeFlux:
     """Lit une source en flux depuis Hugging Face, sans rien télécharger d'entier.
 
-    `ignorer` documents du début sont sautés (pour la reprise) : le flux est relu depuis
-    le début du jeu, dont l'ordre ne change pas d'une lecture à l'autre.
+    Avec `etat_du_flux` (le `state_dict()` pris à l'arrêt précédent), la lecture repart du
+    fichier et du groupe de lignes où le flux s'était arrêté. Sans lui, `ignorer` documents du
+    début sont sautés (l'ancienne voie) : le flux est relu depuis le début du jeu, dont l'ordre
+    ne change pas d'une lecture à l'autre.
     """
     from datasets import load_dataset  # lourd : importé seulement quand on lit pour de bon
 
@@ -87,9 +145,26 @@ def lecteur_hugging_face(source: Source, ignorer: int = 0) -> Iterator[dict]:
         )
     else:
         jeu = load_dataset(source.depot, split="train", streaming=True)
-    if ignorer:
-        jeu = jeu.skip(ignorer)
-    yield from jeu
+    if etat_du_flux is None:
+        if ignorer:
+            jeu = jeu.skip(ignorer)
+        return LecteurDeFlux(jeu)
+
+    def refus(erreur: Exception) -> RuntimeError:
+        return RuntimeError(
+            f"{source.nom} : le jeu refuse l'état du flux enregistré dans etat.json "
+            f"({type(erreur).__name__} : {erreur}). La source ou la version de `datasets` a "
+            "sans doute changé. Rien n'a été écrit. Pour repartir de zéro, efface etat.json "
+            "et les fragments du dossier. Pour garder les fragments comptés, retire seulement "
+            "la ligne `etat_du_flux` d'etat.json et efface les fragments au-delà du dernier "
+            "compté : le flux sera relu depuis le début, à l'ancienne."
+        )
+
+    try:
+        jeu.load_state_dict(etat_du_flux)
+    except _ERREURS_D_ETAT as erreur:
+        raise refus(erreur) from erreur
+    return LecteurDeFlux(jeu, refus)
 
 
 def _ecrire_atomique(chemin: Path, ecrire: Callable[[BinaryIO], None]) -> None:
@@ -242,12 +317,25 @@ def telecharger(
 
     vues = _charger_empreintes(dossier, etat)
     if lecteur is None:
-        flux = documents = lecteur_hugging_face(source, ignorer=etat.documents_lus)
+        flux = documents = lecteur_hugging_face(
+            source, etat_du_flux=etat.etat_du_flux, ignorer=etat.documents_lus
+        )
     else:
         flux = lecteur(source)
         documents = islice(flux, etat.documents_lus, None)
     if etat.documents_lus:
-        ecrire(f"{source.nom} : reprise après {etat.documents_lus} documents lus.")
+        if lecteur is not None or etat.etat_du_flux is not None:
+            ecrire(f"{source.nom} : reprise après {etat.documents_lus} documents lus.")
+        else:
+            ecrire(
+                f"{source.nom} : reprise après {etat.documents_lus} documents lus, "
+                "ancien état : le flux est relu depuis le début."
+            )
+
+    def etat_du_flux_courant() -> dict | None:
+        """La position du flux, si le lecteur sait la dire."""
+        donner = getattr(flux, "etat", None)
+        return donner() if callable(donner) else None
 
     tampon: list[str] = []
     cles: list[int] = []
@@ -269,6 +357,7 @@ def telecharger(
             fragments=fragments,
             empreintes=etat.empreintes + len(cles),
             source_epuisee=epuisee,
+            etat_du_flux=etat_du_flux_courant(),
         )
         _ecrire_etat(dossier, nouvel_etat)
         if tampon:
@@ -304,12 +393,13 @@ def telecharger(
             if octets_tampon >= octets_fragment:
                 valider(epuisee=False)
                 verifier_avant_lecture()
+        # Le dernier fragment se valide flux ouvert : son état est pris après le dernier document.
+        valider(epuisee=epuisee)
     finally:
         # Ferme le flux de la source (connexions ouvertes) : arrêt voulu ou erreur.
         fermer = getattr(flux, "close", None)
         if callable(fermer):
             fermer()
-    valider(epuisee=epuisee)
     _poser_marqueur(dossier, etat)
     ecrire(
         f"{source.nom} : terminé, {en_mo(etat.octets_ecrits)} Mo de texte, "
