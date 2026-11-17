@@ -530,8 +530,8 @@ Le petit modèle calcule dans ton navigateur, sur le processeur : rien ne passe 
 
 La descente de gradient du {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : 'chapitre 0.2'} recule chaque poids du taux fois sa pente. C'est l'optimiseur le plus simple : la recette qui corrige les poids à chaque pas. Ton IA, elle, utilise AdamW : pour chaque poids, il garde deux moyennes, celle de ses pentes récentes et celle de leurs carrés. Il avance d'après la première, divisée par la racine de la seconde. Un poids dont la pente garde le même signe avance d'à peu près le taux à chaque pas ; un poids dont la pente change sans cesse de signe avance moins. Voici comment forge le crée :
 
-<CodeExplique fichier="projets/forge/forge/entrainement/boucle.py" symbole="_creer_optimiseur">
-  <li data-lignes="1">`_creer_optimiseur` reçoit le modèle, la configuration de l'entraînement et l'appareil.</li>
+<CodeExplique fichier="projets/forge/forge/entrainement/boucle.py" symbole="creer_optimiseur">
+  <li data-lignes="1">`creer_optimiseur` reçoit le modèle, la configuration de l'entraînement et l'appareil.</li>
   <li data-lignes="2-3">Les poids sont rangés en deux familles : les matrices, qui ont au moins deux dimensions (la table du plongement, les projections de l'attention et du MLP), et les vecteurs, les poids des RMSNorm.</li>
   <li data-lignes="4-7">La décroissance des poids, {REGLAGES.decroissance} pour la version d'une heure, ne s'applique qu'aux matrices : à chaque pas, elle tire doucement chacun de leurs poids vers 0.</li>
   <li data-lignes="8-9">AdamW, avec le taux maximal et `betas`, {REGLAGES.beta1} et {REGLAGES.beta2} : la mémoire des deux moyennes. Plus un beta est proche de 1, plus sa moyenne se souvient loin. `fused` : sur la carte, une seule opération met à jour tous les poids.</li>
@@ -539,7 +539,7 @@ La descente de gradient du {LIENS.l02 ? <a href={LIENS.l02}>chapitre 0.2</a> : '
 
 Un lot bizarre peut donner un gradient énorme, et un saut qui défait des heures d'apprentissage. Avant chaque pas d'AdamW, forge l'écrête : si la norme du gradient, la longueur de toutes ses pentes mises bout à bout, dépasse {REGLAGES.ecretage}, toutes les pentes sont réduites dans la même proportion. Voici un pas entier :
 
-<CodeExplique fichier="projets/forge/forge/entrainement/boucle.py" symbole="_pas_d_optimisation">
+<CodeExplique fichier="projets/forge/forge/entrainement/boucle.py" symbole="pas_d_optimisation">
   <li data-lignes="1-9">Un pas reçoit le modèle, l'optimiseur, le chargeur des jetons, le nombre de micro-lots par pas, le taux de ce pas (celui du planning), le seuil de l'écrêtage et l'appareil.</li>
   <li data-lignes="10-11">Le taux du planning est donné à l'optimiseur.</li>
   <li data-lignes="12-13">Les gradients du pas d'avant sont effacés, et la somme des pertes part de 0.</li>

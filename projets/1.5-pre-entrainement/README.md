@@ -187,7 +187,7 @@ Le chapitre 1.5 montre :
 | --- | --- |
 | `tests/test_essai.py` | la région `test-reprise` |
 | `forge/entrainement/planning.py` (dans forge) | `taux` |
-| `forge/entrainement/boucle.py` (dans forge) | `_creer_optimiseur` et `_pas_d_optimisation` |
+| `forge/entrainement/boucle.py` (dans forge) | `creer_optimiseur` et `pas_d_optimisation` |
 
 Les régions de `pre_entrainement/journal.py` (`sessions`, `courbe`) et
 `pre_entrainement/essai.py` (`essai-donnees`, `essai-reprise`), ainsi que

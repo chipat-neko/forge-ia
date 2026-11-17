@@ -15,6 +15,7 @@ réglages décident de ce tirage :
 
 import torch
 
+from forge.modele.modes import en_evaluation
 from forge.modele.transformer import Transformer
 
 
@@ -72,9 +73,7 @@ def generer(
     hasard = torch.Generator(device=peripherique)
     hasard.manual_seed(graine)
 
-    modes = {module: module.training for module in modele.modules()}
-    modele.eval()
-    try:
+    with en_evaluation(modele):
         texte = list(ids)
         nouveaux: list[int] = []
         for _ in range(n_nouveaux):
@@ -95,6 +94,3 @@ def generer(
             if arret is not None and suivant == arret:
                 break
         return nouveaux
-    finally:
-        for module, mode in modes.items():
-            module.training = mode

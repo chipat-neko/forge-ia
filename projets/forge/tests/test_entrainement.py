@@ -336,17 +336,75 @@ def test_donnees_manquantes_vient_de_forge_erreurs_et_reste_importable_d_avant()
     assert officielle is ancienne is DonneesManquantes
 
 
-def test_les_modules_de_forge_n_importent_pas_de_nom_prive_d_un_autre_module():
+def _noms_prives_pris_a_un_autre_module(source: str, paquet: str = "forge.x") -> list[str]:
+    """Les noms en `_` pris à un autre module `forge` : `from forge.x import _y`, `from .x import _y`, `x._y`."""
     import ast
+    import importlib.util
+
+    arbre = ast.parse(source)
+    fautes, modules = [], set()
+    for noeud in ast.walk(arbre):
+        if isinstance(noeud, ast.ImportFrom):
+            if noeud.level:  # import relatif : `from .x import _y`, `from . import x`
+                base = ".".join(paquet.split(".")[: -noeud.level]) or "forge"
+                origine = f"{base}.{noeud.module}" if noeud.module else base
+            else:
+                origine = noeud.module or ""
+            if not origine.startswith("forge"):
+                continue
+            for alias in noeud.names:
+                if alias.name.startswith("_") and not alias.name.startswith("__"):
+                    fautes.append(f"{origine}.{alias.name}")
+                else:
+                    try:
+                        est_un_module = importlib.util.find_spec(f"{origine}.{alias.name}") is not None
+                    except ModuleNotFoundError:  # `origine` n'est pas un paquet : le nom est une fonction, une classe…
+                        est_un_module = False
+                    if est_un_module:  # `from forge.x import boucle`
+                        modules.add(alias.asname or alias.name)
+        elif isinstance(noeud, ast.Import):
+            modules |= {a.asname for a in noeud.names if a.asname and a.name.startswith("forge")}
+    for noeud in ast.walk(arbre):
+        if (
+            isinstance(noeud, ast.Attribute)
+            and isinstance(noeud.value, ast.Name)
+            and noeud.value.id in modules
+            and noeud.attr.startswith("_")
+            and not noeud.attr.startswith("__")
+        ):
+            fautes.append(f"{noeud.value.id}.{noeud.attr}")
+    return fautes
+
+
+def test_le_controle_des_noms_prives_attrape_les_trois_formes():
+    source = """
+from forge.entrainement.boucle import _a
+from .sauvegarde import _b
+from forge.entrainement import boucle
+
+
+def f():
+    return boucle._c
+"""
+    assert _noms_prives_pris_a_un_autre_module(source, "forge.entrainement.exemple") == [
+        "forge.entrainement.boucle._a",
+        "forge.entrainement.sauvegarde._b",
+        "boucle._c",
+    ]
+    assert _noms_prives_pris_a_un_autre_module("import os, sys; os._x") == []
+    assert _noms_prives_pris_a_un_autre_module("from forge import __version__") == []
+
+
+def test_les_modules_de_forge_n_importent_pas_de_nom_prive_d_un_autre_module():
     from pathlib import Path
 
     import forge
 
+    racine = Path(forge.__file__).parent
     fautes = []
-    for fichier in Path(forge.__file__).parent.rglob("*.py"):
-        for noeud in ast.walk(ast.parse(fichier.read_text(encoding="utf-8"))):
-            if isinstance(noeud, ast.ImportFrom) and noeud.module and noeud.module.startswith("forge"):
-                fautes += [f"{fichier.name} : {noeud.module}.{a.name}" for a in noeud.names if a.name.startswith("_")]
+    for fichier in racine.rglob("*.py"):
+        paquet = ".".join(("forge", *fichier.relative_to(racine).with_suffix("").parts))
+        fautes += [f"{fichier.name} : {f}" for f in _noms_prives_pris_a_un_autre_module(fichier.read_text(encoding="utf-8"), paquet)]
     assert not fautes, fautes
 
 

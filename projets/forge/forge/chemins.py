@@ -13,7 +13,7 @@ from forge.fichiers import nombre
 
 # Un « Go » est ici 1024³ octets : c'est la valeur que l'Explorateur de Windows
 # affiche, et celle de `outils/env-forge.ps1`.
-_OCTETS_PAR_GO = 1024**3
+OCTETS_PAR_GO = 1024**3
 
 
 class PlaceInsuffisante(Exception):
@@ -34,13 +34,6 @@ def sous_forge_donnees(nom_ou_chemin: str | Path, sorte: str) -> Path:
     return chemin if chemin.is_absolute() else racine_donnees() / sorte / chemin
 
 
-def dossier(*parties: str) -> Path:
-    """Renvoie `racine_donnees()/parties…`, en le créant s'il n'existe pas."""
-    chemin = racine_donnees().joinpath(*parties)
-    chemin.mkdir(parents=True, exist_ok=True)
-    return chemin
-
-
 def plus_proche_existant(chemin: Path) -> Path:
     """Remonte jusqu'au premier dossier qui existe (le dossier visé peut ne pas être créé)."""
     chemin = chemin.absolute()
@@ -51,7 +44,7 @@ def plus_proche_existant(chemin: Path) -> Path:
 
 def en_go(octets: int, arrondi) -> str:
     """Écrit une taille en Go (1024³ octets) avec une décimale (virgule française)."""
-    return nombre(arrondi(octets / _OCTETS_PAR_GO * 10) / 10, 1)
+    return nombre(arrondi(octets / OCTETS_PAR_GO * 10) / 10, 1)
 
 
 def verifier_place(octets_requis: int, chemin: Path | None = None) -> None:

@@ -23,13 +23,13 @@ le chargeur de jetons n'y sert qu'aux annotations de type.
 
 import json
 import math
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import torch
 from torch import nn
+
+from forge.modele.modes import en_evaluation  # noqa: F401  (aussi importée d'ici par `qcm.py`)
 
 if TYPE_CHECKING:
     from forge.entrainement.chargeur import ChargeurJetons
@@ -42,18 +42,6 @@ def autocast(appareil: torch.device):
     deux fois moins de mémoire ; les poids, eux, restent en 32 bits.
     """
     return torch.autocast(device_type=appareil.type, dtype=torch.bfloat16, enabled=appareil.type == "cuda")
-
-
-@contextmanager
-def en_evaluation(modele: nn.Module) -> Iterator[None]:
-    """Met le modèle en mode évaluation (sans dropout, etc.), puis rend à chaque sous-module le mode qu'il avait."""
-    modes = {module: module.training for module in modele.modules()}
-    modele.eval()
-    try:
-        yield
-    finally:
-        for module, mode in modes.items():
-            module.training = mode
 
 
 @torch.no_grad()

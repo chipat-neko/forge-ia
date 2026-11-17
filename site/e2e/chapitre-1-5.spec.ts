@@ -342,8 +342,8 @@ test('le code affiché est celui des symboles de forge et de la région du proje
   const boucle = 'projets/forge/forge/entrainement/boucle.py';
   const blocs: [string, 'symbole' | 'region', string][] = [
     [planning, 'symbole', 'taux'],
-    [boucle, 'symbole', '_creer_optimiseur'],
-    [boucle, 'symbole', '_pas_d_optimisation'],
+    [boucle, 'symbole', 'creer_optimiseur'],
+    [boucle, 'symbole', 'pas_d_optimisation'],
     ['projets/1.5-pre-entrainement/tests/test_essai.py', 'region', 'test-reprise'],
   ];
   const codes = page.locator('.code-explique');
@@ -355,7 +355,7 @@ test('le code affiché est celui des symboles de forge et de la région du proje
     await expect(codes.nth(i).locator('figcaption a')).toHaveAttribute('href', `https://github.com/chipat-neko/forge-ia/blob/main/${fichier}`);
   }
   // Moins de 30 lignes pour un pas entier : il se montre en entier (fiche, étape 5).
-  expect(extraireSymbole(readFileSync(`../${boucle}`, 'utf8'), '_pas_d_optimisation', boucle).split('\n').length).toBeLessThan(30);
+  expect(extraireSymbole(readFileSync(`../${boucle}`, 'utf8'), 'pas_d_optimisation', boucle).split('\n').length).toBeLessThan(30);
   expect(await codes.nth(2).locator('pre').textContent()).toContain('clip_grad_norm_');
 });
 

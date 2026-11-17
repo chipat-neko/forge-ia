@@ -34,13 +34,13 @@ from collections.abc import Callable
 import psutil
 import torch
 
-from forge.chemins import plus_proche_existant, racine_donnees
+from forge.chemins import OCTETS_PAR_GO, plus_proche_existant, racine_donnees
 from forge.entrainement.boucle import ConfigEntrainement, creer_optimiseur, pas_d_optimisation
 from forge.fichiers import ESPACE_FINE, nombre
 from forge.modele import PRESETS, ConfigModele, Transformer, nombre_parametres
 from forge.processeur import fils_disponibles
 
-_OCTETS_PAR_GO = 1024**3
+_OCTETS_PAR_GO = OCTETS_PAR_GO
 
 # La cible de la forge : 20 jetons vus par paramètre du modèle (le rapport « optimal » de
 # Chinchilla). Un modèle de 100 millions de paramètres voit donc 2 milliards de jetons.

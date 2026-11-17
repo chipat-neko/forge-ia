@@ -28,7 +28,7 @@ import torch
 from forge.chemins import sous_forge_donnees
 from forge.donnees.jetons import empreinte_du_tokenizer
 from forge.entrainement.chargeur import ChargeurJetons
-from forge.entrainement.sauvegarde import CONSEIL_DE_REPRISE, lire_sauvegarde
+from forge.entrainement.sauvegarde import lire_sauvegarde
 from forge.evaluation.echantillons import TEMPERATURE, TOP_K, echantillons
 from forge.evaluation.perte import bits_par_octet, lire_octets_par_jeton, perplexite, perte_validation
 from forge.evaluation.qcm import TOTAL_DES_QUESTIONS, charger_frenchbench, evaluer_qcm
@@ -194,9 +194,8 @@ def evaluer(
     ecrire_texte(
         sortie / "rapport.json",
         json.dumps(_json_valide(rapport), ensure_ascii=False, indent=2, allow_nan=False) + "\n",
-        conseil=CONSEIL_DE_REPRISE,
     )
-    ecrire_texte(sortie / "rapport.md", rapport_markdown(rapport), conseil=CONSEIL_DE_REPRISE)
+    ecrire_texte(sortie / "rapport.md", rapport_markdown(rapport))
     return rapport
 
 

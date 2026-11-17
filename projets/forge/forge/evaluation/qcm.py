@@ -36,7 +36,8 @@ from typing import Literal
 
 import torch
 
-from forge.evaluation.perte import autocast, en_evaluation
+from forge.evaluation.perte import autocast
+from forge.modele.modes import en_evaluation
 
 # Le texte d'un document est suivi de `<|fin_texte|>` dans les données d'entraînement : c'est ce
 # que le modèle a vu avant le début de chaque document. On le met donc en tête de chaque séquence

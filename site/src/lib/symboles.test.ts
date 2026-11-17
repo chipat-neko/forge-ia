@@ -68,10 +68,10 @@ describe('extraireSymbole', () => {
       expect(r.join('\n')).not.toContain('Cosinus et sinus');
     });
 
-    it('_pas_d_optimisation : signature sur plusieurs lignes, corps entier', () => {
+    it('pas_d_optimisation : signature sur plusieurs lignes, corps entier', () => {
       const b = readFileSync('../projets/forge/forge/entrainement/boucle.py', 'utf8');
-      const e = extraireSymbole(b, '_pas_d_optimisation').split('\n');
-      expect(e[0]).toBe('def _pas_d_optimisation(');
+      const e = extraireSymbole(b, 'pas_d_optimisation').split('\n');
+      expect(e[0]).toBe('def pas_d_optimisation(');
       expect(e[1]).toBe('    modele: nn.Module,');
       const finSig = e.findIndex((l) => /^\).*:$/.test(l));
       expect(finSig).toBeGreaterThan(5);

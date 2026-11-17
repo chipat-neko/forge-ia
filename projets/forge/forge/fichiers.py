@@ -115,6 +115,11 @@ def nombre(valeur: float, decimales: int = 1, *, milliers: str | None = None) ->
     return f"{valeur:,.{decimales}f}".replace(",", milliers).replace(".", ",")
 
 
+def scientifique(valeur: float, decimales: int = 1) -> str:
+    """Un nombre en notation scientifique à la française : 3,0e-04."""
+    return f"{valeur:.{decimales}e}".replace(".", ",")
+
+
 def entier(valeur: float, *, milliers: str = " ") -> str:
     """Un entier avec une espace entre les milliers : 52 000."""
     return f"{round(valeur):,}".replace(",", milliers)

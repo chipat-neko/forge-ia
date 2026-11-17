@@ -47,7 +47,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from forge.chemins import PlaceInsuffisante, sous_forge_donnees
+from forge.chemins import OCTETS_PAR_GO, PlaceInsuffisante, sous_forge_donnees
 from forge.erreurs import DonneesManquantes
 from forge.entrainement.chargeur import ChargeurJetons, empreinte_du_tokenizer_des_jetons
 from forge.entrainement.planning import taux
@@ -61,7 +61,7 @@ from forge.entrainement.sauvegarde import (
 )
 from forge.evaluation.perte import autocast as _autocast  # bf16 sur la carte graphique, 32 bits sur le processeur
 from forge.evaluation.perte import perte_sur_morceaux as _perte_validation  # la mesure est celle de `evaluer`
-from forge.fichiers import duree, ecrire_texte, entier, nombre
+from forge.fichiers import duree, ecrire_texte, entier, nombre, scientifique
 from forge.modele import PRESETS, ConfigModele, Transformer, nombre_parametres
 from forge.processeur import fils_disponibles
 
@@ -621,7 +621,7 @@ def _signaler_manque_de_memoire(config: ConfigEntrainement, appareil: torch.devi
         torch.cuda.empty_cache()  # rend à la carte ce que cet entraînement gardait en réserve
         try:
             octets_libres, octets_total = torch.cuda.mem_get_info()
-            libre = f"{nombre(octets_libres / 1024**3, 1)} Go sur {nombre(octets_total / 1024**3, 1)} Go"
+            libre = f"{nombre(octets_libres / OCTETS_PAR_GO, 1)} Go sur {nombre(octets_total / OCTETS_PAR_GO, 1)} Go"
         except RuntimeError:
             pass
     fichier = config.fichier or "<fichier>"
@@ -868,7 +868,7 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
                     val = f" · validation {nombre(ligne['perte_val'], 3)}" if "perte_val" in ligne else ""
                     print(
                         f"pas {pas}/{pas_total} · perte {nombre(perte, 3)}{val} · "
-                        f"taux {f'{taux_du_pas:.1e}'.replace('.', ',')} · "
+                        f"taux {scientifique(taux_du_pas)} · "
                         f"{entier(vitesse)} jetons/s · reste ≈ {duree(restant)}",
                         flush=True,
                     )

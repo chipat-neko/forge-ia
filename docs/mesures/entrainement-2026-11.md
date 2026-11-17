@@ -52,7 +52,7 @@ lancé pour l'occasion.
 
 ## Comment on a mesuré
 
-On chronomètre **la vraie étape d'entraînement de la boucle** (`_pas_d_optimisation` de
+On chronomètre **la vraie étape d'entraînement de la boucle** (`pas_d_optimisation` de
 `forge/entrainement/boucle.py`) : calcul de la perte, `backward`, écrêtage des gradients, pas d'AdamW. Le
 calcul se fait en `bfloat16` sur la carte et en 32 bits sur le processeur, exactement comme à
 l'entraînement. Seules les données diffèrent : des jetons tirés au hasard, de la même forme que ceux du

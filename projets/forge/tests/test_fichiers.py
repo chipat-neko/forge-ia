@@ -7,7 +7,7 @@ import pytest
 
 from forge import fichiers
 from forge.chemins import racine_donnees, sous_forge_donnees
-from forge.fichiers import duree, ecrire_atomique, ecrire_atomique_vers, ecrire_texte, entier, nombre, remplacer
+from forge.fichiers import ESPACE_FINE, duree, scientifique, ecrire_atomique, ecrire_atomique_vers, ecrire_texte, entier, nombre, remplacer
 
 
 def test_ecrire_atomique_ecrit_et_ne_laisse_pas_de_tmp(tmp_path):
@@ -99,9 +99,10 @@ def test_ecrire_texte_garde_les_fins_de_ligne_lf(tmp_path):
 def test_formats_a_la_francaise():
     assert nombre(1234.5678, 2) == "1234,57"
     assert nombre(1234.5, 1, milliers=" ") == "1 234,5"
-    assert nombre(1234567.0, 0, milliers=" ") == "1 234 567"
+    assert nombre(1234567.0, 0, milliers=ESPACE_FINE) == "1" + ESPACE_FINE + "234" + ESPACE_FINE + "567"
+    assert scientifique(0.0003) == "3,0e-04"
     assert entier(52000.4) == "52 000"
-    assert entier(52000, milliers=" ") == "52 000"
+    assert entier(52000, milliers=ESPACE_FINE) == "52" + ESPACE_FINE + "000"
     assert [duree(s) for s in (-3, 12, 250, 3900, 183600)] == ["0 s", "12 s", "4 min 10 s", "1 h 05 min", "2 j 3 h"]
 
 
