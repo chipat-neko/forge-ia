@@ -75,6 +75,10 @@ class _Etat:
 _ERREURS_D_ETAT = (KeyError, IndexError, ValueError, TypeError, AttributeError)
 
 
+class EtatDuFluxRefuse(RuntimeError):
+    """Le jeu refuse l'état du flux d'`etat.json` : relancer la même commande ne change rien."""
+
+
 class LecteurDeFlux:
     """Les documents d'un jeu `datasets` en flux, et de quoi savoir où l'on en est.
 
@@ -101,7 +105,10 @@ class LecteurDeFlux:
         except StopIteration:
             return
         except _ERREURS_D_ETAT as erreur:
-            if self._refus is None:
+            import pyarrow  # déjà chargé par `datasets` : pas de coût en plus
+
+            # Un fichier Parquet abîmé (`ArrowInvalid` est une `ValueError`) n'est pas un état refusé.
+            if self._refus is None or isinstance(erreur, pyarrow.ArrowException):
                 raise
             raise self._refus(erreur) from erreur
         yield premier
@@ -150,14 +157,14 @@ def lecteur_hugging_face(
             jeu = jeu.skip(ignorer)
         return LecteurDeFlux(jeu)
 
-    def refus(erreur: Exception) -> RuntimeError:
-        return RuntimeError(
+    def refus(erreur: Exception) -> EtatDuFluxRefuse:
+        return EtatDuFluxRefuse(
             f"{source.nom} : le jeu refuse l'état du flux enregistré dans etat.json "
             f"({type(erreur).__name__} : {erreur}). La source ou la version de `datasets` a "
-            "sans doute changé. Rien n'a été écrit. Pour repartir de zéro, efface etat.json "
-            "et les fragments du dossier. Pour garder les fragments comptés, retire seulement "
-            "la ligne `etat_du_flux` d'etat.json et efface les fragments au-delà du dernier "
-            "compté : le flux sera relu depuis le début, à l'ancienne."
+            "sans doute changé. Relancer la même commande échouera de nouveau. Pour garder les "
+            "fragments déjà écrits, retire la ligne `etat_du_flux` d'etat.json : le flux sera "
+            "relu depuis le début, à l'ancienne. Pour repartir de zéro, efface le dossier de "
+            "la source."
         )
 
     try:

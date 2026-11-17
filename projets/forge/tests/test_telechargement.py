@@ -72,14 +72,13 @@ class Espion:
         self.lecteur.close()
 
 
-@pytest.fixture
-def flux_parquet(monkeypatch, parquets):
-    """Détourne `load_dataset` vers les fichiers Parquet ; renvoie les espions et les appels."""
+def _installer_flux(monkeypatch, chemins):
+    """Détourne `load_dataset` vers ces fichiers Parquet ; renvoie les espions, les appels, les coupures."""
     from datasets import load_dataset as vrai_load_dataset
 
     monkeypatch.setattr(
         "datasets.load_dataset",
-        lambda *a, **k: vrai_load_dataset("parquet", data_files=parquets, split="train", streaming=True),
+        lambda *a, **k: vrai_load_dataset("parquet", data_files=chemins, split="train", streaming=True),
     )
     espions: list[Espion] = []
     appels: list[dict] = []
@@ -94,6 +93,11 @@ def flux_parquet(monkeypatch, parquets):
 
     monkeypatch.setattr(telechargement, "lecteur_hugging_face", lecteur)
     return espions, appels, coupures
+
+
+@pytest.fixture
+def flux_parquet(monkeypatch, parquets):
+    return _installer_flux(monkeypatch, parquets)
 
 
 def _fragments(dossier: Path) -> dict[str, bytes]:
@@ -149,16 +153,19 @@ def test_la_reprise_survit_a_plusieurs_coupures(tmp_path, flux_parquet):
     reference = _d_une_traite(tmp_path, flux_parquet)
     espions, _appels, coupures = flux_parquet
     dossier = tmp_path / "essai"
+    comptes = [0]
+    relus = 0  # documents lus puis perdus par une coupure : ceux du fragment non terminé
     for coupe in (20, 30, 15):
         coupures.append(coupe)
         with pytest.raises(ConnectionError):
             _telecharger(dossier)
+        comptes.append(_etat(dossier)["documents_lus"])
+        relus += coupe - (comptes[-1] - comptes[-2])
     _telecharger(dossier)
-    lus_en_tout = [t for espion in espions[1:] for t in espion.lus]
     assert _fragments(dossier) == reference
-    # Chaque relance ne relit que ce qui n'était pas compté : jamais le début du flux.
+    # Chaque relance ne relit que ce qui n'était pas compté : le total exact, ni plus ni moins.
+    assert sum(len(espion.lus) for espion in espions[1:]) == TOTAL + relus
     assert all(espion.lus[0] != _texte(0) for espion in espions[2:])
-    assert len(lus_en_tout) < 2 * TOTAL
 
 
 def test_un_ancien_etat_reprend_par_skip(tmp_path, flux_parquet):
@@ -195,11 +202,12 @@ def test_un_etat_du_flux_refuse_n_ecrit_rien_de_faux(tmp_path, flux_parquet):
     (dossier / "etat.json").write_text(json.dumps(etat), encoding="utf-8")
     avant_etat = (dossier / "etat.json").read_bytes()
 
-    with pytest.raises(RuntimeError) as erreur:
+    with pytest.raises(telechargement.EtatDuFluxRefuse) as erreur:
         _telecharger(dossier)
     message = str(erreur.value)
+    assert isinstance(erreur.value, telechargement.EtatDuFluxRefuse)
     assert "refuse" in message and "etat.json" in message
-    assert "etat_du_flux" in message and "fragments" in message and "Rien n'a été écrit" in message
+    assert "etat_du_flux" in message and "échouera de nouveau" in message
     # Rien n'a bougé : mêmes fragments, même etat.json, pas de marqueur.
     assert _fragments(dossier) == avant
     assert (dossier / "etat.json").read_bytes() == avant_etat
@@ -215,3 +223,108 @@ def test_etat_vaut_none_si_le_jeu_ne_sait_pas(monkeypatch):
     lecteur = telechargement.lecteur_hugging_face(SOURCE)
     assert lecteur.etat() is None
     assert list(lecteur) == [{"text": "a"}]
+
+
+# --- Documents écartés et plafond d'octets, sur un vrai flux Parquet ----------------------
+#
+# Motif de 13 documents : 9 gardés, 1 trop court, 1 gardé (le 10e, qui ferme le fragment de
+# 3000 octets), puis 1 trop court et 1 doublon juste après la frontière.
+
+
+def _documents_melanges() -> list[str]:
+    textes: list[str] = []
+    gardes: list[str] = []
+    for position in range(TOTAL):
+        place = position % 13
+        if place in (9, 11):
+            textes.append(f"court {position}")
+        elif place == 12 and gardes:
+            textes.append(gardes[0])  # doublon d'un texte déjà gardé
+        else:
+            texte = _texte(position)
+            textes.append(texte)
+            gardes.append(texte)
+    return textes
+
+
+def _textes_ecrits(dossier: Path) -> list[str]:
+    import gzip
+
+    textes = []
+    for fragment in sorted(dossier.glob("fragment-*.jsonl.gz")):
+        with gzip.open(fragment, "rt", encoding="utf-8") as fichier:
+            textes.extend(json.loads(ligne)["texte"] for ligne in fichier)
+    return textes
+
+
+@pytest.fixture
+def flux_melange(tmp_path, monkeypatch):
+    textes = _documents_melanges()
+    dossier = tmp_path / "melange"
+    dossier.mkdir()
+    chemins = []
+    for f in range(FICHIERS):
+        morceau = textes[f * DOCS_PAR_FICHIER : (f + 1) * DOCS_PAR_FICHIER]
+        chemin = dossier / f"part-{f}.parquet"
+        pq.write_table(pa.table({"text": morceau}), chemin, row_group_size=10)
+        chemins.append(str(chemin))
+    attendus = list(dict.fromkeys(t for t in textes if len(t) >= 200))
+    return textes, attendus, *_installer_flux(monkeypatch, chemins)
+
+
+@pytest.mark.parametrize("coupe", [9, 10, 11, 12, 13, 14, 24, 25, 26, 27])
+def test_coupure_autour_de_la_frontiere_avec_des_documents_ecartes(tmp_path, flux_melange, coupe):
+    textes, attendus, espions, _appels, coupures = flux_melange
+    _telecharger(tmp_path / "reference")
+    reference = _fragments(tmp_path / "reference")
+    assert _textes_ecrits(tmp_path / "reference") == attendus
+    assert len(reference) > 5
+
+    dossier = tmp_path / "essai"
+    coupures.append(coupe)
+    with pytest.raises(ConnectionError):
+        _telecharger(dossier)
+    compte = _etat(dossier)["documents_lus"] if (dossier / "etat.json").exists() else 0
+    _telecharger(dossier)
+    # Aucun document compté n'est relu, et le flux reprend au document suivant, écarté ou non.
+    assert espions[-1].lus == textes[compte:]
+    assert _fragments(dossier) == reference
+    assert _textes_ecrits(dossier) == attendus
+
+
+@pytest.mark.parametrize("plafond", [9500, 15000])
+def test_plafond_au_milieu_d_un_fragment_puis_plafond_releve(tmp_path, flux_melange, plafond):
+    textes, attendus, espions, _appels, _coupures = flux_melange
+    _telecharger(tmp_path / "reference")
+    reference = _fragments(tmp_path / "reference")
+
+    dossier = tmp_path / "plafond"
+    telecharger(SOURCE, plafond, dossier, octets_fragment=OCTETS_FRAGMENT)
+    etat = _etat(dossier)
+    assert (dossier / ".complet").exists() and not etat["source_epuisee"]
+    assert plafond <= etat["octets_ecrits"] < plafond + 400  # le dernier document peut dépasser
+    assert 0 < len(_textes_ecrits(dossier)) < len(attendus)
+    dernier = len(_fragments(dossier)) - 1
+    assert len(_textes_ecrits(dossier)) % 10 != 0  # le plafond tombe bien au milieu d'un fragment
+
+    compte = etat["documents_lus"]
+    _telecharger(dossier)  # plafond relevé : on prolonge le dossier déjà complet
+    assert espions[-1].lus == textes[compte:]  # aucun document compté n'est relu
+    assert _textes_ecrits(dossier) == attendus
+    # Le fragment fermé au plafond reste plus court : ceux d'avant sont identiques à la traite.
+    ecrits = _fragments(dossier)
+    assert all(ecrits[nom] == reference[nom] for nom in list(reference)[:dernier])
+    assert (dossier / ".complet").exists() and _etat(dossier)["source_epuisee"]
+
+
+def test_la_commande_donnees_ne_dit_pas_de_relancer_apres_un_etat_refuse(monkeypatch, capsys):
+    from forge.__main__ import main
+
+    def refuse(*args, **kwargs):
+        raise telechargement.EtatDuFluxRefuse("le jeu refuse l'état ; retire la ligne `etat_du_flux`.")
+
+    monkeypatch.setattr(telechargement, "telecharger", refuse)
+    assert main(["donnees", "--octets", "1M", "--dossier", "essai"]) == 1
+    erreur = capsys.readouterr().err
+    assert "retire la ligne `etat_du_flux`" in erreur
+    assert "relance la même commande" not in erreur and "Traceback" not in erreur

@@ -131,6 +131,10 @@ def _commande_donnees(choix: argparse.Namespace) -> int:
         except PlaceInsuffisante as erreur:
             print(f"Erreur : {erreur}", file=sys.stderr)
             return 1
+        except telechargement.EtatDuFluxRefuse as erreur:
+            # Relancer tel quel échouerait de nouveau : le message dit quoi faire, rien d'autre.
+            print(f"Erreur : {erreur}", file=sys.stderr)
+            return 1
         except KeyboardInterrupt:
             print(
                 f"Interrompu pendant « {nom} ». Relance la même commande : les fragments déjà écrits sont "
