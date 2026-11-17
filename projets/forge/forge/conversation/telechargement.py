@@ -14,6 +14,7 @@ pause (Ctrl+C) valide un fragment plus court, pour ne rien perdre.
 """
 
 import gzip
+import json
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -160,7 +161,7 @@ def telecharger_source(
     atteint = exemples_max is not None and sortie.deja >= exemples_max  # coupure juste avant le marqueur
     epuisee = not atteint
     try:
-        with Pause(en_cours="le fragment en cours", sauvegarde="je valide ce fragment") as pause:
+        with Pause(en_cours="le fragment en cours", sauvegarde="je valide ce fragment", perdu="ce fragment") as pause:
             for ligne in () if atteint else lecteur:
                 lus += 1
                 try:
@@ -218,7 +219,13 @@ def lire_pour_entrainement(source: SourceConversations) -> Iterator[dict]:
     """
     exiger_l_entrainement(source)
     dossier = dossier_de_la_source(source)
-    if not (dossier / ".complet").exists():
+    marqueur = dossier / ".complet"
+    if marqueur.exists() and json.loads(marqueur.read_text(encoding="utf-8")).get("epuisee") is False:
+        raise DonneesManquantes(
+            f"{source.nom} n'est téléchargée qu'en partie (arrêtée par --exemples-max) : elle ne sert pas "
+            f"à l'entraînement. Relance sans limite : {_commande_de_reprise(source, None)}"
+        )
+    if not marqueur.exists():
         raise DonneesManquantes(
             f"{source.nom} n'est pas (ou pas entièrement) téléchargée : {dossier / '.complet'} manque. "
             f"Lance : {_commande_de_reprise(source, None)}"

@@ -50,6 +50,35 @@ class UsageInterdit(ValueError):
     """Une source réservée à l'évaluation qu'on voulait mettre dans un entraînement."""
 
 
+# Les jeux réservés à l'évaluation, par nom et par dépôt (en minuscules) : le refus se fonde sur cette
+# liste, quel que soit le champ `usage` de l'objet reçu. HumanEval-FR viendra à la tâche 20 : son nom et
+# tout dépôt dont le nom contient « humaneval » sont déjà réservés.
+NOMS_RESERVES_A_L_EVALUATION = frozenset(
+    {"ifeval_fr", "mgsm_rev2_fr", "gsm8k_platinum_fr", "humaneval", "humaneval_fr"}
+)
+DEPOTS_RESERVES_A_L_EVALUATION = frozenset(
+    {"kurakurai/ifeval-fr", "lightonai/mgsm-rev2", "cmh/gsm8k-platinum_fr", "openai/openai_humaneval"}
+)
+
+
+def est_reservee_a_l_evaluation(nom: str, depot: str) -> bool:
+    """Vrai si ce nom ou ce dépôt est dans la liste des jeux réservés à l'évaluation."""
+    depot = depot.lower()
+    return (
+        nom.lower() in NOMS_RESERVES_A_L_EVALUATION
+        or depot in DEPOTS_RESERVES_A_L_EVALUATION
+        or "humaneval" in depot
+    )
+
+
+def _refuser_l_entrainement(nom: str) -> UsageInterdit:
+    return UsageInterdit(
+        f"{nom} est réservée à l'évaluation : on ne la met jamais dans un entraînement, sans "
+        "quoi la mesure serait faussée. Utilise-la seulement pour évaluer, ou choisis une source "
+        "d'entraînement (python -m forge conversations --liste)."
+    )
+
+
 @dataclass(frozen=True)
 class SourceConversations:
     """Où lire une source de conversations ou d'évaluation, sa licence, son usage et sa conversion.
@@ -76,8 +105,10 @@ class SourceConversations:
     def __post_init__(self) -> None:
         if self.usage not in ("entrainement", "evaluation"):
             raise ValueError(f"{self.nom} : l'usage est « entrainement » ou « evaluation », pas {self.usage!r}.")
-        if self.sorte == "humaneval" and self.usage != "evaluation":
-            raise ValueError(f"{self.nom} : HumanEval est réservé à l'évaluation, jamais à l'entraînement.")
+        if self.usage != "evaluation" and (
+            self.sorte == "humaneval" or est_reservee_a_l_evaluation(self.nom, self.depot)
+        ):
+            raise _refuser_l_entrainement(self.nom)
 
 
 def source_d_entrainement(nom: str) -> SourceConversations:
@@ -94,12 +125,8 @@ def source_d_entrainement(nom: str) -> SourceConversations:
 
 def exiger_l_entrainement(source: SourceConversations) -> None:
     """Lève `UsageInterdit` si `source` est réservée à l'évaluation."""
-    if source.usage != "entrainement":
-        raise UsageInterdit(
-            f"{source.nom} est réservée à l'évaluation : on ne la met jamais dans un entraînement, sans "
-            "quoi la mesure serait faussée. Utilise-la seulement pour évaluer, ou choisis une source "
-            "d'entraînement (python -m forge conversations --liste)."
-        )
+    if source.usage != "entrainement" or est_reservee_a_l_evaluation(source.nom, source.depot):
+        raise _refuser_l_entrainement(source.nom)
 
 
 # --- Les petits outils des conversions ---------------------------------------------------------------
@@ -127,7 +154,7 @@ def _liste(valeur) -> list:
             try:
                 valeur = lire(valeur)
                 break
-            except (ValueError, SyntaxError):
+            except (ValueError, SyntaxError, MemoryError, RecursionError):
                 continue
     if isinstance(valeur, (list, tuple)):
         return list(valeur)
@@ -154,13 +181,15 @@ def _convertir_luth(domaines: tuple[str, ...], exiger_python: bool) -> Callable[
         if not _texte(ligne.get("generator")).startswith(GENERATEURS_GARDES):
             raise LigneEcartee("generateur")
         messages = ligne.get("messages") or []
-        if any(m.get("role") == "tool" or m.get("tool_calls") for m in messages):
+        if any(isinstance(m, dict) and (m.get("role") == "tool" or m.get("tool_calls")) for m in messages):
             raise LigneEcartee("appel_d_outil")
         origine = _texte(ligne.get("source")).lower()
         if any(motif in origine for motif in SOURCES_AMONT_ECARTEES):
             raise LigneEcartee("source_amont")
         tours = []
         for message in messages:
+            if not isinstance(message, dict):
+                raise LigneEcartee("conversation_invalide")
             role = _ROLES.get(message.get("role"))
             if role is None:
                 raise LigneEcartee("conversation_invalide")

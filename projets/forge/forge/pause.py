@@ -10,7 +10,7 @@ import threading
 
 
 class Pause:
-    """Pendant l'entraînement, Ctrl+C (et Ctrl+Pause sous Windows) demande une pause.
+    """Pendant un travail long (l'entraînement par défaut), Ctrl+C (et Ctrl+Pause sous Windows) demande une pause.
 
     Le premier appui lève seulement un drapeau, que la boucle regarde à la fin de chaque pas.
     Un second appui arrête tout de suite (`KeyboardInterrupt`) : le pas en cours est perdu,
@@ -21,15 +21,18 @@ class Pause:
     `docker stop`, réglable) de finir le pas et de sauvegarder, au lieu de perdre jusqu'à
     `sauvegarde_minutes` de calcul.
 
-    `en_cours` et `sauvegarde` ne changent que les mots du message : les travaux par fragments
+    `en_cours`, `sauvegarde` et `perdu` ne changent que les mots du message : les travaux par fragments
     (téléchargement, traduction…) y disent « le fragment en cours » et « je valide ce fragment ».
     Leurs valeurs par défaut sont celles de l'entraînement.
     """
 
-    def __init__(self, en_cours: str = "le pas en cours", sauvegarde: str = "je sauvegarde") -> None:
+    def __init__(
+        self, en_cours: str = "le pas en cours", sauvegarde: str = "je sauvegarde", perdu: str = "ce pas"
+    ) -> None:
         self.demandee = False
         self._en_cours = en_cours
         self._sauvegarde = sauvegarde
+        self._perdu = perdu
         self._anciens: dict[int, object] = {}
 
     def _signal_recu(self, numero, cadre) -> None:
@@ -44,7 +47,7 @@ class Pause:
         else:
             message = (
                 f"\nPause demandée : je finis {self._en_cours}, {self._sauvegarde}, puis je m'arrête "
-                "(Ctrl+C une seconde fois : arrêt immédiat, sans sauvegarder ce pas)."
+                f"(Ctrl+C une seconde fois : arrêt immédiat, sans sauvegarder {self._perdu})."
             )
         try:
             print(message, flush=True)

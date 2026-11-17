@@ -692,3 +692,135 @@ def test_oasst2_lit_le_fichier_des_arbres_ligne_a_ligne(tmp_path, monkeypatch):
     assert [e["origine"] for e in elements] == ["fr-1"] and len(elements[0]["tours"]) == 4
     complet = json.loads((dossier / ".complet").read_text(encoding="utf-8"))
     assert complet["lus"] == 2 and complet["gardes"] == 1 and complet["ecartes"] == {"langue": 1}
+
+
+# --- Ronde 1 : le garde-fou ne se contourne pas, et la reprise d'OASST2 ------------------------------
+
+
+@pytest.mark.parametrize("nom", EVALUATION)
+def test_une_copie_d_un_jeu_d_evaluation_declaree_pour_l_entrainement_est_refusee(nom):
+    with pytest.raises(UsageInterdit, match=nom):
+        replace(SOURCES_CONVERSATIONS[nom], usage="entrainement")
+    # Même en forçant le champ après coup, ou sous un autre nom : le nom et le dépôt décident.
+    copie = replace(SOURCES_CONVERSATIONS[nom], nom="autre_nom")
+    object.__setattr__(copie, "usage", "entrainement")
+    with pytest.raises(UsageInterdit):
+        tele.lire_pour_entrainement(copie)
+    forcee = replace(SOURCES_CONVERSATIONS[nom])
+    object.__setattr__(forcee, "usage", "entrainement")
+    with pytest.raises(UsageInterdit):
+        tele.lire_pour_entrainement(forcee)
+
+
+def test_humaneval_fr_et_tout_depot_humaneval_sont_reserves():
+    base = SOURCES_CONVERSATIONS["aya_fr"]
+    with pytest.raises(UsageInterdit):
+        replace(base, nom="humaneval_fr")
+    with pytest.raises(UsageInterdit):
+        replace(base, depot="quelquun/HumanEval-FR")
+
+
+def test_une_source_arretee_par_exemples_max_ne_sert_pas_a_l_entrainement(flux):
+    from forge.erreurs import DonneesManquantes
+
+    _telecharger(exemples_max=10)
+    with pytest.raises(DonneesManquantes, match="en partie"):
+        tele.lire_pour_entrainement(SOURCES_CONVERSATIONS["luth2_conversation"])
+
+
+def test_une_ligne_luth_mal_formee_est_ecartee_sans_planter():
+    ligne = _luth()
+    ligne["messages"].append("pas un dictionnaire")
+    assert _raison("luth2_conversation", ligne) == "conversation_invalide"
+
+
+# La reprise d'OASST2 : le fichier des arbres lu ligne à ligne (`from_generator`).
+
+ARBRES = 30
+PAR_FRAGMENT_OASST = 4
+
+
+@pytest.fixture
+def arbres_oasst(tmp_path, monkeypatch):
+    fichier = tmp_path / "arbres.jsonl.gz"
+    with gzip.open(fichier, "wt", encoding="utf-8") as sortie:
+        for i in range(ARBRES):
+            arbre = _arbre_de_six_messages(lang_racine="es" if i % 5 == 0 else "fr")
+            arbre["message_tree_id"] = f"t{i}"
+            sortie.write(json.dumps(arbre, ensure_ascii=False) + "\n")
+    monkeypatch.setattr("huggingface_hub.hf_hub_download", lambda **options: str(fichier))
+    espions: list[Espion] = []
+    appels: list[dict] = []
+    coupures: list[int | None] = []
+    vrai_lecteur = tele.lecteur_conversations
+
+    class EspionArbres(Espion):
+        def __iter__(self):
+            for ligne in self.lecteur:
+                if self.coupe_apres is not None and len(self.lus) == self.coupe_apres:
+                    raise ConnectionError("réseau coupé")
+                self.lus.append(json.loads(ligne["ligne"])["message_tree_id"])
+                yield ligne
+
+    def lecteur(source, etat_du_flux=None, ignorer=0):
+        appels.append({"etat_du_flux": etat_du_flux, "ignorer": ignorer})
+        espion = EspionArbres(vrai_lecteur(source, etat_du_flux, ignorer), coupures.pop(0) if coupures else None)
+        espions.append(espion)
+        return espion
+
+    monkeypatch.setattr(tele, "lecteur_conversations", lecteur)
+    return espions, appels, coupures
+
+
+def _oasst(**options):
+    return tele.telecharger_source(SOURCES_CONVERSATIONS["oasst2_fr"], par_fragment=PAR_FRAGMENT_OASST, **options)
+
+
+def _reference_oasst(tmp_path, monkeypatch):
+    monkeypatch.setenv("FORGE_DONNEES", str(tmp_path / "reference"))
+    dossier = _oasst()
+    monkeypatch.setenv("FORGE_DONNEES", str(tmp_path / "donnees"))
+    return {f.name: f.read_bytes() for f in sorted(dossier.glob("conversations-*.jsonl.gz"))}
+
+
+def _verifier_oasst(dossier, reference):
+    fragments = {f.name: f.read_bytes() for f in sorted(dossier.glob("conversations-*.jsonl.gz"))}
+    assert fragments == reference and len(reference) > 3  # mêmes octets qu'une traite
+    origines = [e["origine"] for e in lire_elements(dossier, "conversations")]
+    assert origines == [f"t{i}" for i in range(ARBRES) if i % 5 != 0]  # ni doublon ni trou
+    assert (dossier / ".complet").exists()
+
+
+def test_la_reprise_d_oasst2_apres_coupures_rend_les_memes_fragments(arbres_oasst, tmp_path, monkeypatch):
+    reference = _reference_oasst(tmp_path, monkeypatch)
+    _espions, appels, coupures = arbres_oasst
+    for coupe in (11, 9):
+        coupures.append(coupe)
+        with pytest.raises(ConnectionError):
+            _oasst()
+    _oasst()
+    assert appels[-1]["etat_du_flux"] is not None and appels[-1]["ignorer"] == 0
+    _verifier_oasst(tmp_path / "donnees" / "conversations" / "oasst2_fr", reference)
+
+
+def test_la_reprise_d_oasst2_apres_un_skip_rend_les_memes_fragments(arbres_oasst, tmp_path, monkeypatch):
+    reference = _reference_oasst(tmp_path, monkeypatch)
+    _espions, appels, coupures = arbres_oasst
+    dossier = tmp_path / "donnees" / "conversations" / "oasst2_fr"
+    coupures.append(14)
+    with pytest.raises(ConnectionError):
+        _oasst()
+    ancien = _etat(dossier)
+    lus = ancien["etat"]["lus"]
+    assert lus > 0
+    del ancien["etat"]["etat_du_flux"]  # un etat.json sans état du flux : reprise par saut
+    ancien["etat"].pop("sautes_a_l_ouverture", None)
+    (dossier / "etat.json").write_text(json.dumps(ancien), encoding="utf-8")
+    coupures.append(8)
+    with pytest.raises(ConnectionError):
+        _oasst()
+    assert appels[-1] == {"etat_du_flux": None, "ignorer": lus}
+    assert _etat(dossier)["etat"]["sautes_a_l_ouverture"] == lus
+    _oasst()  # l'état du flux et le même saut, ensemble
+    assert appels[-1]["etat_du_flux"] is not None and appels[-1]["ignorer"] == lus
+    _verifier_oasst(dossier, reference)
