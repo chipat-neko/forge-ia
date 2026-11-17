@@ -55,7 +55,7 @@ from torch import nn
 from forge.chemins import OCTETS_PAR_GO, PlaceInsuffisante, sous_forge_donnees
 from forge.donnees.jetons import empreinte_du_tokenizer
 from forge.entrainement.chargeur import ChargeurJetons, empreinte_du_tokenizer_des_jetons
-from forge.entrainement.methodes import METHODES, PerteNonFinie
+from forge.entrainement.methodes import METHODES, PerteNonFinie, VersionDeDepart
 from forge.entrainement.planning import taux
 from forge.entrainement.sauvegarde import (
     CONSEIL_DE_REPRISE,
@@ -417,6 +417,17 @@ def _couper_journal(chemin: Path, pas: int) -> None:
     ecrire_texte(chemin, "".join(gardees), conseil=CONSEIL_DE_REPRISE, fins_de_ligne=None)
 
 
+def _ouvrir_le_journal(chemin: Path, pas_sauve: int | None) -> "_Journal":
+    """Ouvre le journal d'un entraînement neuf (`pas_sauve` à `None` : l'ancien, celui d'un essai qui
+    n'a rien sauvegardé, est effacé), ou repris (les lignes d'après la sauvegarde sont coupées)."""
+    if pas_sauve is None:
+        chemin.parent.mkdir(parents=True, exist_ok=True)
+        chemin.unlink(missing_ok=True)
+    else:
+        _couper_journal(chemin, pas_sauve)
+    return _Journal(chemin)
+
+
 class _Pause:
     """Pendant l'entraînement, Ctrl+C (et Ctrl+Pause sous Windows) demande une pause.
 
@@ -747,16 +758,6 @@ def _manque_de_memoire_avec_un_micro_lot_de_1(config: ConfigEntrainement, memoir
     return "\n".join(lignes)
 
 
-@dataclass(frozen=True)
-class VersionDeDepart:
-    """Ce qu'un affinage retient de sa version de départ : son nom, l'empreinte SHA-256 de ses
-    poids et l'empreinte de son tokenizer (le SHA-1 de `forge.donnees.jetons.empreinte_du_tokenizer`)."""
-
-    version: str
-    empreinte_des_poids: str
-    empreinte_du_tokenizer: str
-
-
 def _etat_du_modele(
     config: ConfigEntrainement, modele: nn.Module, pas: int, depart: VersionDeDepart | None = None
 ) -> dict:
@@ -908,8 +909,8 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
     if etat is not None and depart is not None:
         _verifier_le_depart(etat, depart, config)
 
-    # 3. Le modèle, l'optimiseur et les données : poids tirés de la graine, puis, pour un
-    # affinage, remplacés par ceux de la version de départ AVANT de créer l'optimiseur…
+    # 3. Le modèle et l'optimiseur : poids tirés de la graine, puis, pour un affinage, remplacés
+    # par ceux de la version de départ AVANT de créer l'optimiseur.
     if appareil.type == "cpu":
         torch.set_num_threads(fils_disponibles())  # tous les fils que ce processus peut utiliser
     _semer(config.graine)
@@ -918,32 +919,47 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
         modele.load_state_dict(poids_de_depart)
         poids_de_depart = None  # la copie sur le processeur ne sert plus
     optimiseur = creer_optimiseur(modele, config, appareil)
-    chargeur, validation = methode.creer_chargeurs(config)
+
+    # 4. La méthode se prépare, sur les poids de départ, puis crée ses chargeurs (qui ouvrent les
+    # fichiers que `preparer` a pu écrire). Ce qu'elles notent attend l'ouverture du journal.
+    pas = 0 if etat is None else etat["pas"]
+    notes: list[dict] = []
+
+    def noter(ligne: dict) -> None:
+        notes.append({**ligne, "pas": pas})
+
+    try:
+        contexte = methode.preparer(config, modele, appareil, noter, depart=depart, reprise=etat is not None)
+    except BaseException:
+        if notes:  # ce que la méthode a constaté avant d'échouer (le contrôle du GRPO…) reste au journal
+            journal = _ouvrir_le_journal(chemin_journal, None if etat is None else pas)
+            try:
+                for ligne in notes:
+                    journal.ecrire(ligne)
+            finally:
+                journal.fermer()
+        raise
+    chargeur, validation = methode.creer_chargeurs(config, contexte, noter)
     # La validation relit toujours les mêmes données : elle repart chaque fois de là.
     depart_validation = None if validation is None else validation.etat()
 
-    # … ou repris exactement là où la sauvegarde les a laissés (les poids du modèle et le hasard
-    # après `preparer`, plus bas : la méthode se prépare sur les poids de départ).
-    pas, secondes_avant, meilleure = 0, 0.0, None
+    # … puis l'optimiseur et les chargeurs reprennent là où la sauvegarde les a laissés (refusé
+    # avant d'écrire au journal si les données ont changé). Les poids et le hasard, plus bas.
+    secondes_avant, meilleure = 0.0, None
     if etat is not None:
         optimiseur.load_state_dict(etat["optimiseur"])
         chargeur.restaurer(etat["chargeur"])
-        pas, secondes_avant, meilleure = etat["pas"], etat["secondes"], etat["meilleure_perte_val"]
-        _couper_journal(chemin_journal, pas)
-    else:
-        sortie.mkdir(parents=True, exist_ok=True)
-        chemin_journal.unlink(missing_ok=True)  # celui d'un essai qui n'a rien sauvegardé
+        secondes_avant, meilleure = etat["secondes"], etat["meilleure_perte_val"]
 
-    journal = _Journal(chemin_journal)
+    journal = _ouvrir_le_journal(chemin_journal, None if etat is None else pas)
     try:
         debut = f"Reprise au pas {pas} sur {pas_total}." if pas else f"Début de l'entraînement : {pas_total} pas."
         journal.ecrire({"evenement": "reprise" if pas else "debut", "pas": pas, "message": debut})
         for message in changements_permis:
             journal.ecrire({"evenement": "configuration", "pas": pas, "message": message})
             print(message, flush=True)
-        if validation is None:
-            message = f"Pas de perte de validation : les données {config.dossier_donnees} n'ont pas de partie val utilisable."
-            journal.ecrire({"evenement": "validation", "pas": pas, "message": message})
+        for ligne in notes:
+            journal.ecrire(ligne)
         depuis = "" if depart is None else f", depuis la version {depart.version} ({config.dossier_depart})"
         print(
             f"{debut} Modèle de {entier(nombre_parametres(config.modele))} paramètres, "
@@ -955,7 +971,6 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
             "Ctrl+C : pause, avec sauvegarde.",
             flush=True,
         )
-        contexte = methode.preparer(config, modele, appareil, journal)
         if etat is not None:
             modele.load_state_dict(etat["modele"])
             _restaurer_hasard(etat["hasard"])
@@ -984,7 +999,7 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
             journal.ecrire({"evenement": "sauvegarde", "pas": pas, "fichier": chemin.name})
             return chemin
 
-        # 4. La boucle : un pas, une ligne de journal, parfois une validation ou une sauvegarde.
+        # 5. La boucle : un pas, une ligne de journal, parfois une validation ou une sauvegarde.
         pertes: list[float] = []
         derniere_sauvegarde = None
         debut_session = time.perf_counter()
@@ -996,7 +1011,9 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
                 pas += 1
                 taux_du_pas = taux(pas, pas_total, config.taux_max, config.echauffement)
                 try:
-                    resultat = methode.pas(modele_entraine, optimiseur, chargeur, config, taux_du_pas, appareil, contexte)
+                    resultat = methode.pas(
+                        modele_entraine, optimiseur, chargeur, config, taux_du_pas, appareil, contexte, numero=pas
+                    )
                 except PerteNonFinie as erreur:
                     # Les poids sont peut-être déjà abîmés : surtout ne rien sauvegarder.
                     journal.ecrire({"evenement": "perte_non_finie", "pas": pas, "message": str(erreur)})
@@ -1052,7 +1069,7 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
                 if pause.demandee:
                     break
 
-        # 4. Le bilan.
+        # 6. Le bilan.
         if pause.demandee:
             journal.ecrire({"evenement": "pause", "pas": pas})
             print(f"Entraînement mis en pause au pas {pas}. Pour reprendre : {_commande_de_reprise(config)}", flush=True)

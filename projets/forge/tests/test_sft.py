@@ -22,6 +22,8 @@ import pytest
 import torch
 import torch.nn.functional as F
 
+from test_entrainement import config_test, lire_journal
+
 from forge.__main__ import main
 from forge.affinage.empaquetage import Rangee, empaqueter
 from forge.affinage.jeu import IGNORE, LotAffinage, ecrire_jeu
@@ -32,6 +34,7 @@ from forge.entrainement import boucle
 from forge.entrainement.methodes import pas_sft, perte_sft_validation
 from forge.entrainement.sauvegarde import VERSION_DE_LA_SAUVEGARDE, sauvegarder
 from forge.exporter import TokenizerNonVerifie, empreinte_sha256, exporter
+from forge.fichiers import ecrire_atomique
 from forge.modele import ConfigModele, Transformer
 from forge.publication import charger_publication, nom_des_poids
 from forge.tokenizer import TokenizerOctets
@@ -175,7 +178,7 @@ def faire_un_pas(lots: list[LotAffinage], graine: int = 0) -> tuple[dict, Transf
     modele = Transformer(MODELE_SFT)
     config = cfg_pas(len(lots))
     optimiseur = boucle.creer_optimiseur(modele, config, CPU)
-    return pas_sft(modele, optimiseur, FauxChargeur(lots), config, 0.0, CPU, {}), modele
+    return pas_sft(modele, optimiseur, FauxChargeur(lots), config, 0.0, CPU, {}, numero=1), modele
 
 
 def pertes_des_jetons(modele: Transformer, lot: LotAffinage) -> torch.Tensor:
@@ -189,6 +192,11 @@ def gradients(modele: torch.nn.Module) -> dict[str, torch.Tensor]:
     return {nom: p.grad.clone() for nom, p in modele.named_parameters() if p.grad is not None}
 
 
+def remplacer_le_sft(monkeypatch, **fonctions):
+    """Le temps du test, la méthode « sft » du registre a ces fonctions-là à la place des siennes."""
+    monkeypatch.setitem(METHODES, "sft", dataclasses.replace(METHODES["sft"], **fonctions))
+
+
 # --------------------------------------------------------------------------------------
 # Les tests du plan
 # --------------------------------------------------------------------------------------
@@ -199,7 +207,7 @@ def test_sft_reprise_exacte(tmp_path):
     entrainer(cfg_sft(tmp_path / "b"), arreter_apres=6)
     b = entrainer(cfg_sft(tmp_path / "b"), reprendre=True, arreter_apres=12)["pertes"]
     assert len(a) == 12 and len(b) == 6
-    assert a[6:12] == pytest.approx(b, abs=1e-6)
+    assert a[6:12] == b  # au bit près sur le processeur
 
 
 def test_sft_pause_par_ctrl_c(tmp_path, monkeypatch, capsys):
@@ -222,7 +230,7 @@ def test_sft_pause_par_ctrl_c(tmp_path, monkeypatch, capsys):
     assert "python -m forge entrainer --config configs/sft-essai.toml --reprendre" in capsys.readouterr().out
     monkeypatch.setitem(METHODES, "sft", sft)
     suite = entrainer(config, reprendre=True, arreter_apres=8)["pertes"]
-    assert reference[3:8] == pytest.approx(suite, abs=1e-6)
+    assert reference[3:8] == suite  # au bit près sur le processeur
 
 
 def test_perte_au_niveau_du_jeton():
@@ -244,21 +252,30 @@ def test_perte_au_niveau_du_jeton():
 
 
 def test_cible_non_apprise_sans_effet():
-    """Changer un jeton dont la cible vaut -100 (dans un document sans jeton appris) : ni la perte ni les gradients ne bougent."""
+    """Changer un jeton dont la cible vaut -100, dans un document sans jeton appris : ni la perte ni les
+    gradients ne bougent. Que ce document vienne après celui qui apprend (la causalité le cache) ou
+    avant (seul le masque par document le cache)."""
     documents = [0] * 8 + [1] * 8
-    lot = lot_avec([2, 4, 6], graine=3, documents=documents)  # jetons appris dans le document 0 seulement
-    change = copy.deepcopy(lot)
-    change.ids[0, 12] = (lot.ids[0, 12] + 7) % 120  # document 1 : aucune cible apprise
-    a, modele_a = faire_un_pas([lot])
-    b, modele_b = faire_un_pas([change])
-    assert a["perte"] == pytest.approx(b["perte"], rel=1e-6)
-    grads_b = gradients(modele_b)
-    for nom, gradient in gradients(modele_a).items():
-        torch.testing.assert_close(gradient, grads_b[nom], msg=nom)
-    # Le test n'est pas vide : changer un jeton du document 0, qui précède des jetons appris, change la perte.
+    for appris, position in (([2, 4, 6], 12), ([10, 12, 14], 3)):
+        lot = lot_avec(appris, graine=3, documents=documents)
+        change = copy.deepcopy(lot)
+        change.ids[0, position] = (lot.ids[0, position] + 7) % 120
+        a, modele_a = faire_un_pas([lot])
+        b, modele_b = faire_un_pas([change])
+        assert a["perte"] == b["perte"], position
+        grads_b = gradients(modele_b)
+        for nom, gradient in gradients(modele_a).items():
+            assert torch.equal(gradient, grads_b[nom]), (position, nom)
+    # Le test n'est pas vide : sans le masque par document (un seul document), le même changement
+    # avant les jetons appris change la perte ; et dans le document qui apprend aussi.
+    seul = lot_avec([10, 12, 14], graine=3)
+    change = copy.deepcopy(seul)
+    change.ids[0, 3] = (seul.ids[0, 3] + 7) % 120
+    assert faire_un_pas([change])[0]["perte"] != faire_un_pas([seul])[0]["perte"]
+    lot = lot_avec([2, 4, 6], graine=3, documents=documents)
     autre = copy.deepcopy(lot)
     autre.ids[0, 1] = (lot.ids[0, 1] + 7) % 120
-    assert faire_un_pas([autre])[0]["perte"] != pytest.approx(a["perte"], rel=1e-6)
+    assert faire_un_pas([autre])[0]["perte"] != faire_un_pas([lot])[0]["perte"]
 
 
 def test_part_de_la_version_publiee(tmp_path, monkeypatch):
@@ -437,8 +454,6 @@ def test_reprise_refusee_si_la_version_de_depart_change(tmp_path):
 
 def test_reprise_refusee_si_la_methode_change(tmp_path):
     entrainer(cfg_sft(tmp_path / "sft"), arreter_apres=2)
-    from test_entrainement import config_test
-
     pre = config_test(tmp_path / "pre", preset=MODELE_SFT, sortie=str(tmp_path / "sft"))
     with pytest.raises(ValueError, match="methode"):
         entrainer(pre, reprendre=True, arreter_apres=4)
@@ -461,6 +476,144 @@ def test_jeu_d_une_autre_sorte_refuse(tmp_path):
     ecrire_jeu(jeu, rangees[:2], rangees[2:4], "dpo", {}, TOK)
     with pytest.raises(ValueError, match="dpo"):
         entrainer(cfg_sft(tmp_path / "sft", donnees=str(jeu)), arreter_apres=1)
+
+
+# --------------------------------------------------------------------------------------
+# Le contrat du registre : l'ordre des appels et ce que reçoivent `preparer` et `pas`
+# --------------------------------------------------------------------------------------
+
+
+def test_preparer_passe_avant_les_chargeurs(tmp_path, monkeypatch):
+    """Un `reference.bin` que `preparer` écrit, en remplaçant un ancien, est celui que lit le premier lot.
+
+    Les chargeurs n'ouvrent leurs fichiers qu'après `preparer` : sous Windows, un fichier ouvert
+    (projeté en mémoire) ne se remplace pas.
+    """
+    jeu = tmp_path / "jeu-reference"
+    shutil.copytree(ecrire_jeu_sft(tmp_path / "commun" / "jeu"), jeu)
+    rangees = json.loads((jeu / "index.json").read_text(encoding="utf-8"))["rangees"]["train"]
+    np.zeros(rangees, dtype="<f8").tofile(jeu / "train" / "reference.bin")  # une référence périmée
+    sft = METHODES["sft"]
+    contextes, references = [], []
+
+    def preparer(config, modele, appareil, noter, *, depart, reprise):
+        nouvelle = (1000.0 + np.arange(rangees)).astype("<f8")
+        ecrire_atomique(config.dossier_donnees / "train" / "reference.bin", lambda f: f.write(nouvelle.tobytes()))
+        return {"reference": "écrite"}
+
+    def creer_chargeurs(config, contexte, noter):
+        contextes.append(contexte)
+        return sft.creer_chargeurs(config, contexte, noter)
+
+    def pas(modele, optimiseur, chargeur, config, taux_du_pas, appareil, contexte, *, numero):
+        references.append(chargeur.lot().reference)
+        return {"perte": 1.0}
+
+    remplacer_le_sft(monkeypatch, preparer=preparer, creer_chargeurs=creer_chargeurs, pas=pas)
+    entrainer(cfg_sft(tmp_path / "sft", donnees=str(jeu)), arreter_apres=1)
+    assert contextes == [{"reference": "écrite"}]
+    assert references[0] is not None and len(references[0]) == 2 and bool((references[0] >= 1000).all())
+
+
+def test_pas_recoit_son_numero(tmp_path, monkeypatch):
+    """Le numéro du pas suit l'entraînement, reprise comprise (le GRPO en tire sa graine)."""
+    sft = METHODES["sft"]
+    numeros = []
+
+    def pas(*arguments, numero, **reste):
+        numeros.append(numero)
+        return sft.pas(*arguments, numero=numero, **reste)
+
+    remplacer_le_sft(monkeypatch, pas=pas)
+    entrainer(cfg_sft(tmp_path / "sft"), arreter_apres=3)
+    entrainer(cfg_sft(tmp_path / "sft"), reprendre=True, arreter_apres=5)
+    assert numeros == [1, 2, 3, 4, 5]
+
+
+def espionner_preparer(monkeypatch, nom: str = "sft") -> list[dict]:
+    """Ce que reçoit `preparer` de la méthode `nom`, à chaque appel ; elle se prépare ensuite comme d'habitude."""
+    vraie = METHODES[nom]
+    vus = []
+
+    def preparer(config, modele, appareil, noter, *, depart, reprise):
+        vus.append({"depart": depart, "reprise": reprise, "plongement": modele.plongement.weight.detach().clone()})
+        return vraie.preparer(config, modele, appareil, noter, depart=depart, reprise=reprise)
+
+    monkeypatch.setitem(METHODES, nom, dataclasses.replace(vraie, preparer=preparer))
+    return vus
+
+
+def test_preparer_sait_si_c_est_une_reprise(tmp_path, monkeypatch):
+    vus = espionner_preparer(monkeypatch)
+    config = cfg_sft(tmp_path / "sft")
+    entrainer(config, reprendre=True, arreter_apres=2)  # aucune sauvegarde : c'est un départ neuf
+    entrainer(config, reprendre=True, arreter_apres=4)
+    assert [v["reprise"] for v in vus] == [False, True]
+    # Même en reprenant, la méthode se prépare sur les poids de départ, pas sur ceux de la sauvegarde.
+    publies = charger_publication(Path(config.depart)).modele.plongement.weight
+    assert torch.equal(vus[0]["plongement"], publies) and torch.equal(vus[1]["plongement"], publies)
+
+
+def test_preparer_recoit_la_version_de_depart(tmp_path, monkeypatch):
+    vus = espionner_preparer(monkeypatch)
+    config = cfg_sft(tmp_path / "sft")
+    entrainer(config, arreter_apres=1)
+    poids = Path(config.depart) / nom_des_poids(ETIQUETTE)
+    attendue = boucle.VersionDeDepart(
+        version=ETIQUETTE, empreinte_des_poids=empreinte_sha256(poids), empreinte_du_tokenizer=EMPREINTE
+    )
+    assert vus[0]["depart"] == attendue
+    pre = espionner_preparer(monkeypatch, "pre_entrainement")
+    entrainer(config_test(tmp_path / "pre"), arreter_apres=1)
+    assert pre[0]["depart"] is None and pre[0]["reprise"] is False
+
+
+def test_les_notes_de_preparer_vont_au_journal(tmp_path, monkeypatch):
+    def preparer(config, modele, appareil, noter, *, depart, reprise):
+        noter({"evenement": "essai", "message": "préparé"})
+        return {}
+
+    remplacer_le_sft(monkeypatch, preparer=preparer)
+    entrainer(cfg_sft(tmp_path / "sft"), arreter_apres=1)
+    lignes = lire_journal(tmp_path / "sft")
+    assert lignes[0]["evenement"] == "debut" and lignes[1] == {"evenement": "essai", "message": "préparé", "pas": 0}
+
+
+def test_les_notes_d_un_preparer_qui_echoue_vont_au_journal(tmp_path, monkeypatch):
+    """Le contrôle de départ du GRPO note son résultat, puis refuse de lancer : la note reste au journal."""
+
+    class Refus(RuntimeError):
+        pass
+
+    def preparer(config, modele, appareil, noter, *, depart, reprise):
+        noter({"evenement": "controle", "message": "aucune réponse juste"})
+        raise Refus("rien n'est lancé")
+
+    remplacer_le_sft(monkeypatch, preparer=preparer)
+    with pytest.raises(Refus):
+        entrainer(cfg_sft(tmp_path / "sft"), arreter_apres=1)
+    assert lire_journal(tmp_path / "sft") == [{"evenement": "controle", "message": "aucune réponse juste", "pas": 0}]
+    assert not (tmp_path / "sft" / "sauvegardes").exists()
+
+
+def test_une_validation_abimee_arrete_le_sft(tmp_path):
+    """Un fichier de validation coupé n'est pas une absence de validation : l'entraînement refuse de partir."""
+    jeu = tmp_path / "jeu-abime"
+    shutil.copytree(ecrire_jeu_sft(tmp_path / "commun" / "jeu"), jeu)
+    contenu = (jeu / "val" / "ids.bin").read_bytes()
+    (jeu / "val" / "ids.bin").write_bytes(contenu[:-34])
+    with pytest.raises(ValueError, match="forge preparer"):
+        entrainer(cfg_sft(tmp_path / "sft", donnees=str(jeu)), arreter_apres=1)
+
+
+def test_un_jeu_sans_validation(tmp_path):
+    jeu = tmp_path / "jeu-sans-val"
+    train, _ = empaqueter(exemples(48, graine=1), longueur=16, bourrage=BOURRAGE)
+    ecrire_jeu(jeu, train, [], "sft", {}, TOK)
+    r = entrainer(cfg_sft(tmp_path / "sft", donnees=str(jeu)), arreter_apres=5)
+    assert r["pas"] == 5 and r["meilleure_perte_val"] is None
+    (ligne,) = [l for l in lire_journal(tmp_path / "sft") if l.get("evenement") == "validation"]
+    assert "aucune rangée de validation" in ligne["message"] and ligne["pas"] == 0
 
 
 @pytest.mark.gpu

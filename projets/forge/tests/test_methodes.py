@@ -8,26 +8,32 @@ avec le modèle minuscule de `test_entrainement`.
 
 import argparse
 import dataclasses
+import json
 
 import pytest
 import torch
 
-from test_entrainement import RACINE_DU_PROJET, config_test, ecrire_config_toml
+from test_entrainement import RACINE_DU_PROJET, config_test, ecrire_config_toml, lire_journal
 
 from forge.__main__ import construire_parseur, main
 from forge.entrainement import (
     METHODES,
+    ChargeurJetons,
     ConfigEntrainement,
     Methode,
     charger_derniere,
     enregistrer_methode,
     entrainer,
+    taux,
 )
 from forge.entrainement import boucle
 from forge.entrainement.sauvegarde import nom_etape
+from forge.modele import Transformer
 
-# Les pertes des 12 premiers pas de `config_test`, relevées avec le code d'AVANT la tâche 6 (le
-# pré-entraînement ne passait pas encore par le registre). Le pré-entraînement ne doit pas changer.
+# Les pertes des 12 premiers pas de `config_test`, relevées sur le PC de développement avec le code
+# d'AVANT la tâche 6 (le pré-entraînement ne passait pas encore par le registre). Sur ce PC, le code
+# d'après donne exactement les mêmes ; un autre processeur (l'intégration continue) peut arrondir
+# autrement les mêmes calculs : la comparaison exacte se fait donc avec `pertes_a_la_main`.
 PERTES_D_AVANT = [
     4.880496978759766,
     4.832585334777832,
@@ -70,10 +76,35 @@ def test_enregistrer_une_methode(monkeypatch):
         enregistrer_methode(base)
 
 
+def pertes_a_la_main(config: ConfigEntrainement, pas: int) -> list[float]:
+    """Le pré-entraînement d'avant le registre, refait à la main : graine, modèle, AdamW, morceaux
+    de `train/`, puis `pas_d_optimisation` au taux du planning, pas après pas."""
+    cpu = torch.device("cpu")
+    torch.manual_seed(config.graine)
+    modele = Transformer(config.modele)
+    optimiseur = boucle.creer_optimiseur(modele, config, cpu)
+    longueur = config.modele.longueur_contexte
+    chargeur = ChargeurJetons(config.dossier_donnees / "train", longueur, config.micro_lot, config.graine)
+    return [
+        boucle.pas_d_optimisation(
+            modele,
+            optimiseur,
+            chargeur,
+            config.accumulation,
+            taux(numero, config.pas_total, config.taux_max, config.echauffement),
+            config.ecretage,
+            cpu,
+        )
+        for numero in range(1, pas + 1)
+    ]
+
+
 def test_le_pre_entrainement_n_a_pas_bouge(tmp_path):
-    r = entrainer(config_test(tmp_path), arreter_apres=12)
-    assert r["pertes"] == pytest.approx(PERTES_D_AVANT, rel=1e-6, abs=1e-6)
-    assert r["meilleure_perte_val"] == pytest.approx(MEILLEURE_PERTE_VAL_D_AVANT, rel=1e-6, abs=1e-6)
+    config = config_test(tmp_path)
+    r = entrainer(config, arreter_apres=12)
+    assert r["pertes"] == pertes_a_la_main(config, 12)  # au bit près
+    assert r["pertes"] == pytest.approx(PERTES_D_AVANT, rel=1e-4)
+    assert r["meilleure_perte_val"] == pytest.approx(MEILLEURE_PERTE_VAL_D_AVANT, rel=1e-4)
     etat = charger_derniere(tmp_path / "sauvegardes")
     assert etat["methode"] == "pre_entrainement" and etat["config"]["methode"] == "pre_entrainement"
     assert etat["depart_version"] is None and etat["depart_empreinte"] is None
@@ -92,6 +123,18 @@ def test_une_ancienne_sauvegarde_de_pre_entrainement_se_reprend(tmp_path):
     torch.save(etat, chemin)
     b = entrainer(config_test(tmp_path / "b"), reprendre=True, arreter_apres=8)["pertes"]
     assert a[4:8] == b  # au bit près sur le processeur
+
+
+def test_sans_validation_le_journal_dit_pourquoi(tmp_path):
+    """Le chargeur de validation du pré-entraînement échoue : le journal recopie son message, comme avant."""
+    config = config_test(tmp_path)
+    index = json.loads((tmp_path / "jetons" / "index.json").read_text(encoding="utf-8"))
+    index["fichiers"] = {nom: n for nom, n in index["fichiers"].items() if not nom.startswith("val/")}
+    (tmp_path / "jetons" / "index.json").write_text(json.dumps(index), encoding="utf-8")
+    r = entrainer(config, arreter_apres=5)
+    assert r["meilleure_perte_val"] is None
+    (ligne,) = [l for l in lire_journal(tmp_path) if l.get("evenement") == "validation"]
+    assert ligne["pas"] == 0 and ligne["message"].startswith("Pas de perte de validation : Aucun jeton dans ")
 
 
 def test_methode_inconnue(tmp_path):

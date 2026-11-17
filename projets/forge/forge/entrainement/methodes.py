@@ -37,25 +37,51 @@ class PerteNonFinie(ArithmeticError):
 
 
 @dataclass(frozen=True)
+class VersionDeDepart:
+    """Ce qu'un affinage retient de sa version de départ : son nom, l'empreinte SHA-256 de ses
+    poids et l'empreinte de son tokenizer (le SHA-1 de `forge.donnees.jetons.empreinte_du_tokenizer`)."""
+
+    version: str
+    empreinte_des_poids: str
+    empreinte_du_tokenizer: str
+
+
+@dataclass(frozen=True)
 class Methode:
     """Une méthode d'entraînement : ses chargeurs, son pas d'optimisation et sa validation.
 
-    - `nom` : le nom du registre, celui du réglage `methode` ;
-    - `creer_chargeurs(config)` : les chargeurs d'entraînement et de validation ; la validation
-      vaut `None` si les données n'en ont pas d'utilisable ;
-    - `preparer(config, modele, appareil, journal)` : ce dont la méthode a besoin en plus, son
-      « contexte » (un dictionnaire, passé ensuite à `pas` et `valider`). Le modèle a alors les
-      poids de départ (ceux de la version de départ, ou tirés de la graine), même quand
-      l'entraînement reprend : la sauvegarde n'est rechargée qu'après. `journal.ecrire(ligne)`
-      écrit une ligne au journal ;
-    - `pas(modele, optimiseur, chargeur, config, taux_du_pas, appareil, contexte)` : un pas
-      d'optimisation ; rend au moins `{"perte": …}`, et ce qu'il veut écrire en plus au journal.
-      Si la perte ou la norme des gradients n'est plus finie, il lève `PerteNonFinie` AVANT de
-      toucher aux poids ;
-    - `valider(modele, chargeur_val, depart_val, appareil, config, contexte)` : la mesure de
-      validation, qui relit toujours les mêmes données (le chargeur repart de `depart_val`) :
-      `{"perte_val": …}`, ou `{"reussite_val": …}` quand `plus_grand_est_meilleur` ;
-    - `plus_grand_est_meilleur` : `meilleur.pt` garde la plus grande mesure au lieu de la plus petite.
+    C'est le contrat entre la boucle (`forge.entrainement.boucle`) et chaque méthode. La boucle
+    appelle, dans cet ordre :
+
+    1. `preparer(config, modele, appareil, noter, *, depart, reprise) -> dict` : ce dont la
+       méthode a besoin en plus, son « contexte » (une référence précalculée, un générateur de
+       problèmes…). Le modèle a alors les poids de départ : ceux de la version de départ (ou tirés
+       de la graine pour le pré-entraînement), même quand l'entraînement reprend ; les poids de la
+       sauvegarde et l'état du hasard ne sont rechargés qu'après. `depart` est la
+       `VersionDeDepart` (`None` pour le pré-entraînement) ; `reprise` dit si l'entraînement repart
+       d'une sauvegarde (vrai) ou de zéro (faux). `noter(ligne)` met une ligne de côté pour le
+       journal (un dictionnaire, auquel la boucle ajoute `"pas"`) : elle y est écrite juste après
+       la ligne de début, ou, si `preparer` lève une exception, avant que l'exception remonte ;
+    2. `creer_chargeurs(config, contexte, noter) -> (train, val | None)` : les chargeurs
+       d'entraînement et de validation. Ils sont créés APRÈS `preparer` : un fichier que `preparer`
+       écrit ou remplace (le `reference.bin` de la DPO) n'est encore ouvert par personne. Sans
+       validation, `val` vaut `None`, et la méthode dit pourquoi avec `noter`. Une donnée abîmée
+       est une erreur, pas une absence de validation ;
+    3. à chaque pas, `pas(modele, optimiseur, chargeur, config, taux_du_pas, appareil, contexte, *,
+       numero) -> dict` : un pas d'optimisation. `numero` est le numéro du pas (1 au premier),
+       qui continue après une reprise : une méthode qui tire au hasard en dérive sa graine. Il
+       rend au moins `{"perte": …}`, plus ce qu'il veut écrire au journal. Si la perte ou la norme
+       des gradients n'est plus finie, il lève `PerteNonFinie` AVANT de toucher aux poids ;
+    4. de temps en temps, `valider(modele, chargeur_val, depart_val, appareil, config, contexte)
+       -> dict` : la mesure de validation, qui relit toujours les mêmes données (le chargeur repart
+       de `depart_val`) : `{"perte_val": …}`, ou `{"reussite_val": …}` quand
+       `plus_grand_est_meilleur`.
+
+    Le contexte n'est jamais sauvegardé : `preparer` doit le refaire à l'identique, à partir de la
+    configuration, de la version de départ et des poids de départ. Seuls le modèle, l'optimiseur,
+    l'état des chargeurs (`etat()`, `restaurer()`) et le hasard passent d'une session à l'autre.
+
+    `plus_grand_est_meilleur` : `meilleur.pt` garde la plus grande mesure au lieu de la plus petite.
     """
 
     nom: str
@@ -76,7 +102,7 @@ def enregistrer_methode(m: Methode) -> None:
     METHODES[m.nom] = m
 
 
-def sans_contexte(config, modele, appareil, journal) -> dict:
+def sans_contexte(config, modele, appareil, noter, *, depart: VersionDeDepart | None, reprise: bool) -> dict:
     """`preparer` des méthodes qui n'ont besoin de rien de plus."""
     return {}
 
@@ -84,18 +110,20 @@ def sans_contexte(config, modele, appareil, journal) -> dict:
 # --- Le pré-entraînement ------------------------------------------------------------------
 
 
-def _chargeurs_pre_entrainement(config) -> tuple[ChargeurJetons, ChargeurJetons | None]:
-    """Les morceaux de `jetons/<donnees>/train` et `val` ; sans validation lisible, `None`."""
+def _chargeurs_pre_entrainement(config, contexte, noter) -> tuple[ChargeurJetons, ChargeurJetons | None]:
+    """Les morceaux de `jetons/<donnees>/train` et `val` ; sans validation lisible, `None` (le
+    journal dit pourquoi : `val/` absent du corpus, ou trop court pour un seul morceau)."""
     longueur = config.longueur_des_rangees
     chargeur = ChargeurJetons(config.dossier_donnees / "train", longueur, config.micro_lot, config.graine)
     try:
         validation = ChargeurJetons(config.dossier_donnees / "val", longueur, config.micro_lot, config.graine)
-    except (DonneesManquantes, ValueError):
+    except (DonneesManquantes, ValueError) as erreur:
+        noter({"evenement": "validation", "message": f"Pas de perte de validation : {erreur}"})
         validation = None
     return chargeur, validation
 
 
-def _pas_pre_entrainement(modele, optimiseur, chargeur, config, taux_du_pas, appareil, contexte) -> dict:
+def _pas_pre_entrainement(modele, optimiseur, chargeur, config, taux_du_pas, appareil, contexte, *, numero) -> dict:
     # La boucle importe ce module : on prend `pas_d_optimisation` chez elle au moment du pas (c'est
     # là que le chapitre 1.5, `forge mesurer` et les tests le trouvent).
     from forge.entrainement import boucle
@@ -114,8 +142,12 @@ def _valider_pre_entrainement(modele, chargeur_val, depart_val, appareil, config
 # --- L'affinage supervisé (SFT) -----------------------------------------------------------
 
 
-def _chargeurs_sft(config) -> tuple[ChargeurAffinage, ChargeurAffinage | None]:
-    """Les rangées de `affinage/<donnees>`, après avoir vérifié la sorte et la longueur du jeu."""
+def _chargeurs_sft(config, contexte, noter) -> tuple[ChargeurAffinage, ChargeurAffinage | None]:
+    """Les rangées de `affinage/<donnees>`, après avoir vérifié la sorte et la longueur du jeu.
+
+    Un jeu sans rangée de validation n'a pas de validation (le journal le dit) ; un fichier de
+    validation abîmé est une erreur.
+    """
     dossier = config.dossier_donnees
     index = lire_index(dossier)
     if index.get("sorte") != "sft":
@@ -132,11 +164,15 @@ def _chargeurs_sft(config) -> tuple[ChargeurAffinage, ChargeurAffinage | None]:
             f"avec des rangées de {longueur}."
         )
     chargeur = ChargeurAffinage(dossier, "train", config.micro_lot, config.graine)
-    try:
-        validation = ChargeurAffinage(dossier, "val", config.micro_lot, config.graine)
-    except ValueError:  # aucune rangée de validation
-        validation = None
-    return chargeur, validation
+    if int(index["rangees"]["val"]) == 0:
+        noter(
+            {
+                "evenement": "validation",
+                "message": f"Pas de perte de validation : le jeu {dossier} n'a aucune rangée de validation.",
+            }
+        )
+        return chargeur, None
+    return chargeur, ChargeurAffinage(dossier, "val", config.micro_lot, config.graine)
 
 
 def somme_des_pertes(logits: torch.Tensor, cibles: torch.Tensor) -> torch.Tensor:
@@ -161,6 +197,8 @@ def pas_sft(
     taux_du_pas: float,
     appareil: torch.device,
     contexte: dict,
+    *,
+    numero: int,
 ) -> dict:
     """Un pas d'affinage supervisé : `accumulation` micro-lots, puis une mise à jour des poids.
 
@@ -171,6 +209,8 @@ def pas_sft(
     avait tout traité d'un coup ; une moyenne de moyennes par micro-lot donnerait autant de poids
     à une réponse d'un mot qu'à une longue explication. Un micro-lot sans jeton appris (du
     bourrage) ajoute 0, jamais « 0 ÷ 0 ».
+
+    `numero` (le numéro du pas) ne sert pas au SFT, qui ne tire rien au hasard.
 
     Rend `{"perte": …, "jetons_appris": N}`. Un pas sans aucun jeton appris est une `ValueError`
     (`forge preparer` écarte les exemples sans jeton appris : cela ne doit pas arriver). Une perte
