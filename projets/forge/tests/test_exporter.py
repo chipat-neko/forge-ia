@@ -9,6 +9,7 @@ celui de la sortie, il prend celui du plongement).
 
 import hashlib
 import json
+import struct
 from pathlib import Path
 
 import pytest
@@ -26,9 +27,14 @@ from safetensors.torch import load_file
 from forge import exporter as module_exporter
 from forge.__main__ import main
 from forge.entrainement import ConfigEntrainement, sauvegarder
+from forge.donnees.jetons import empreinte_du_tokenizer
 from forge.entrainement.boucle import _etat_du_modele
 from forge.exporter import EMPREINTE_DU_TOKENIZER, NOM_DES_POIDS, exporter
 from forge.modele import ConfigModele, Transformer
+from forge.tokenizer.bpe_octets import TokenizerOctets
+
+# Les sauvegardes de test n'ont pas de jetons à côté : l'avertissement « tokenizer non vérifié » est attendu.
+pytestmark = pytest.mark.filterwarnings("ignore:Le tokenizer de .* n'a pas pu être vérifié")
 
 CONFIG_TEST = ConfigModele(taille_vocabulaire=322, dim=32, couches=2, tetes=2, longueur_contexte=16)
 TOKENIZER_DU_DEPOT = Path(__file__).resolve().parents[1] / "forge" / "ressources" / "tokenizer-ton-ia-v1.json"
@@ -259,3 +265,91 @@ def test_aide_de_exporter(capsys):
     aide = capsys.readouterr().out
     assert fin.value.code == 0
     assert aide.startswith("Utilisation : ") and "--sauvegarde" in aide and "--sortie" in aide and "--poids" in aide
+
+
+# --- Le tokenizer de la sauvegarde ---------------------------------------------------------
+
+# L'empreinte du tokenizer figé, telle que `index.json` des jetons de ton IA la porte (SHA-1).
+EMPREINTE_DE_L_INDEX = "a78aa8b2b8aad3baee05df1ff378beda303618b7"
+# Ce que l'export écrivait avant la vérification du tokenizer, pour la sauvegarde de `etat_de_test`.
+# Les poids : le fichier safetensors n'est pas comparé en bloc, car l'ordre des deux métadonnées
+# de son en-tête change d'un lancement à l'autre (une table de hachage de safetensors, avant
+# comme après ce plan). On compare donc l'en-tête sans l'ordre des métadonnées, puis les octets
+# des nombres, qui eux sont toujours les mêmes.
+SHA256_DES_NOMBRES_AVANT = "f870d4087077"  # début du SHA-256 de la partie nombres du fichier des poids
+SHA256_AVANT = {
+    "config.json": "e6f552cd7d80f8b3282609acc1beea5988e724e358c3eb104a7395d0f238d74f",
+    "tokenizer-ton-ia-v1.json": EMPREINTE_DU_TOKENIZER,
+}
+
+
+def empreinte_figee() -> str:
+    return empreinte_du_tokenizer(TokenizerOctets.charger(TOKENIZER_DU_DEPOT))
+
+
+def ecrire_index(dossier: Path, empreinte: str) -> None:
+    dossier.mkdir(parents=True, exist_ok=True)
+    index = {"version": 1, "tokenizer": {"nom": "ton-ia-v1", "taille_vocabulaire": 32768, "empreinte": empreinte}}
+    (dossier / "index.json").write_text(json.dumps(index), encoding="utf-8")
+
+
+def test_l_empreinte_du_tokenizer_fige_est_celle_de_l_index():
+    assert empreinte_figee() == EMPREINTE_DE_L_INDEX
+
+
+def test_une_sauvegarde_du_meme_tokenizer_est_exportee(tmp_path, recwarn):
+    etat, _ = etat_de_test(tmp_path)
+    etat["empreinte_du_tokenizer"] = EMPREINTE_DE_L_INDEX
+    chemins = exporter(ecrire_sauvegarde(tmp_path, etat), tmp_path / "publication")
+    assert all(chemin.exists() for chemin in chemins)
+    assert not [w for w in recwarn if "tokenizer" in str(w.message)]
+
+
+def test_une_sauvegarde_d_un_autre_tokenizer_est_refusee(tmp_path):
+    etat, _ = etat_de_test(tmp_path)
+    etat["empreinte_du_tokenizer"] = "0" * 40
+    with pytest.raises(ValueError, match="autre tokenizer"):
+        exporter(ecrire_sauvegarde(tmp_path, etat), tmp_path / "publication")
+    assert not (tmp_path / "publication").exists()
+
+
+def test_sans_empreinte_l_export_a_lieu_avec_un_avertissement(tmp_path):
+    etat, _ = etat_de_test(tmp_path)  # pas d'empreinte, et le dossier des jetons n'existe pas
+    with pytest.warns(UserWarning, match="pas pu être vérifié"):
+        chemins = exporter(ecrire_sauvegarde(tmp_path, etat), tmp_path / "publication")
+    assert all(chemin.exists() for chemin in chemins)
+
+
+def test_une_ancienne_sauvegarde_est_verifiee_par_l_index_des_donnees(tmp_path, recwarn):
+    etat, _ = etat_de_test(tmp_path)  # sans empreinte : `config["donnees"]` mène à l'index
+    ecrire_index(tmp_path / "jetons", EMPREINTE_DE_L_INDEX)
+    chemins = exporter(ecrire_sauvegarde(tmp_path, etat), tmp_path / "publication")
+    assert all(chemin.exists() for chemin in chemins)
+    assert not [w for w in recwarn if "tokenizer" in str(w.message)]
+
+
+def test_une_ancienne_sauvegarde_d_un_autre_tokenizer_est_refusee_par_l_index(tmp_path):
+    etat, _ = etat_de_test(tmp_path)
+    ecrire_index(tmp_path / "jetons", "f" * 40)
+    with pytest.raises(ValueError, match="autre tokenizer"):
+        exporter(ecrire_sauvegarde(tmp_path, etat), tmp_path / "publication")
+    assert not (tmp_path / "publication").exists()
+
+
+def test_une_sauvegarde_nouvelle_retient_l_empreinte_du_tokenizer(tmp_path):
+    ecrire_index(tmp_path / "jetons", EMPREINTE_DE_L_INDEX)
+    etat, _ = etat_de_test(tmp_path)
+    assert etat["empreinte_du_tokenizer"] == EMPREINTE_DE_L_INDEX
+
+
+def test_l_export_d_un_petit_modele_reste_identique_a_l_octet_pres(tmp_path):
+    ecrire_index(tmp_path / "jetons", EMPREINTE_DE_L_INDEX)  # la vérification passe : rien ne change
+    etat, _ = etat_de_test(tmp_path)
+    poids, config, tokenizer = exporter(ecrire_sauvegarde(tmp_path, etat), tmp_path / "publication")
+    assert {config.name: sha256(config), tokenizer.name: sha256(tokenizer)} == SHA256_AVANT
+    contenu = poids.read_bytes()
+    taille_de_l_en_tete = struct.unpack("<Q", contenu[:8])[0]
+    en_tete = json.loads(contenu[8 : 8 + taille_de_l_en_tete])
+    assert en_tete.pop("__metadata__") == {"format": "pt", "pas": "7"}
+    assert "sortie.weight" not in en_tete and {d["dtype"] for d in en_tete.values()} == {"BF16"}
+    assert hashlib.sha256(contenu[8 + taille_de_l_en_tete :]).hexdigest().startswith(SHA256_DES_NOMBRES_AVANT)

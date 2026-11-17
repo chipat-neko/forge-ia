@@ -32,6 +32,7 @@ import hashlib
 import json
 import os
 import shutil
+import warnings
 from collections.abc import Callable
 from pathlib import Path
 
@@ -39,8 +40,12 @@ import torch
 from safetensors.torch import save_file
 
 from forge.chemins import verifier_place
+from forge.donnees.jetons import empreinte_du_tokenizer
+from forge.entrainement.boucle import _chemin_sous_la_racine
+from forge.entrainement.chargeur import empreinte_du_tokenizer_des_jetons
 from forge.evaluation.rapport import _lire_sauvegarde
 from forge.modele import ConfigModele, Transformer
+from forge.tokenizer.bpe_octets import TokenizerOctets
 
 NOM_DES_POIDS = "ton-ia-1.5.safetensors"
 NOM_DE_LA_CONFIG = "config.json"
@@ -142,6 +147,36 @@ def _copier_le_tokenizer(temporaire: Path) -> None:
         )
 
 
+def _verifier_le_tokenizer_de_la_sauvegarde(etat: dict, fichier: str) -> None:
+    """Refuse une sauvegarde entraînée avec un autre tokenizer que le tokenizer figé de ton IA.
+
+    L'empreinte vient de la sauvegarde ; une ancienne sauvegarde ne l'a pas, on la lit alors dans
+    l'`index.json` de ses données (`config["donnees"]`). Si on ne la trouve nulle part, l'export a
+    lieu, avec un avertissement qui dit ce qui n'a pas été vérifié.
+    """
+    attendue = empreinte_du_tokenizer(TokenizerOctets.charger(TOKENIZER))
+    trouvee, origine = etat.get("empreinte_du_tokenizer"), "la sauvegarde"
+    if trouvee is None:
+        donnees = (etat.get("config") or {}).get("donnees")
+        if donnees:
+            index = _chemin_sous_la_racine(str(donnees), "jetons") / "index.json"
+            trouvee, origine = empreinte_du_tokenizer_des_jetons(index.parent), str(index)
+    if trouvee is None:
+        warnings.warn(
+            f"Le tokenizer de {fichier} n'a pas pu être vérifié : la sauvegarde ne retient pas son "
+            "empreinte, et l'index.json de ses données est introuvable. Rien ne dit qu'elle a été "
+            "entraînée avec le tokenizer figé de ton IA ; vérifie-le avant de publier.",
+            UserWarning,
+            stacklevel=3,
+        )
+    elif trouvee != attendue:
+        raise ValueError(
+            f"{fichier} a été entraînée avec un autre tokenizer que le tokenizer figé de ton IA : "
+            f"l'empreinte lue dans {origine} est {trouvee}, celle de {TOKENIZER.name} est {attendue}. "
+            "Les jetons ne se liraient pas pareil : l'export est refusé."
+        )
+
+
 def exporter(sauvegarde: Path, dossier: Path, nom_des_poids: str = NOM_DES_POIDS) -> list[Path]:
     """Écrit les poids, la configuration et le tokenizer de `sauvegarde` dans `dossier` ; renvoie leurs chemins.
 
@@ -151,8 +186,9 @@ def exporter(sauvegarde: Path, dossier: Path, nom_des_poids: str = NOM_DES_POIDS
     - `nom_des_poids` : le nom du fichier des poids, qui finit par `.safetensors`.
 
     Tout est vérifié avant d'écrire : le nom des poids, l'empreinte du tokenizer du dépôt (s'il a
-    changé, ce n'est plus celui de ton IA : `ValueError`), la sauvegarde, l'accord entre ses poids
-    et sa configuration, puis la place sur le disque (`PlaceInsuffisante`).
+    changé, ce n'est plus celui de ton IA : `ValueError`), la sauvegarde, son tokenizer (l'empreinte
+    qu'elle retient, ou à défaut celle de l'`index.json` de ses données : un autre tokenizer est
+    refusé, un tokenizer introuvable avertit), l'accord entre ses poids et sa configuration, puis la place sur le disque (`PlaceInsuffisante`).
     """
     _verifier_nom_des_poids(nom_des_poids)
     if empreinte_sha256(TOKENIZER) != EMPREINTE_DU_TOKENIZER:
@@ -162,6 +198,7 @@ def exporter(sauvegarde: Path, dossier: Path, nom_des_poids: str = NOM_DES_POIDS
             "éditeur ?). Remets-le comme dans le dépôt (git checkout -- sur ce fichier), puis relance."
         )
     etat, fichier_lu = _lire_sauvegarde(Path(sauvegarde))
+    _verifier_le_tokenizer_de_la_sauvegarde(etat, fichier_lu)
     config = ConfigModele(**etat["config_modele"])
     poids = poids_a_publier(etat["modele"])
     pas = etat.get("pas")

@@ -71,6 +71,20 @@ def _lister_fragments(dossier: Path) -> tuple[list[Path], list[int]]:
     return [racine / nom for nom in noms], [int(fichiers[nom]) for nom in noms]
 
 
+def empreinte_du_tokenizer_des_jetons(racine: Path) -> str | None:
+    """L'empreinte du tokenizer qui a encodé les jetons de `racine`, d'après son `index.json`.
+
+    Renvoie `None` si l'index est absent, illisible ou sans cette empreinte : l'appelant décide
+    quoi en faire (l'entraînement ne la retient pas, l'export avertit).
+    """
+    try:
+        index = json.loads((racine / "index.json").read_text(encoding="utf-8"))
+        empreinte = index["tokenizer"]["empreinte"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return empreinte if isinstance(empreinte, str) and empreinte else None
+
+
 class ChargeurJetons:
     """Forme des lots de morceaux de `dossier` (`.../train` ou `.../val`), mélangés à chaque époque.
 

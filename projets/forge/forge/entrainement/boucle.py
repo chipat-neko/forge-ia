@@ -48,7 +48,7 @@ import torch
 from torch import nn
 
 from forge.chemins import PlaceInsuffisante, racine_donnees
-from forge.entrainement.chargeur import ChargeurJetons
+from forge.entrainement.chargeur import ChargeurJetons, empreinte_du_tokenizer_des_jetons
 from forge.entrainement.planning import taux
 from forge.entrainement.sauvegarde import charger_derniere, est_disque_plein, nom_etape, remplacer, sauvegarder
 from forge.evaluation.perte import autocast as _autocast  # bf16 sur la carte graphique, 32 bits sur le processeur
@@ -690,14 +690,20 @@ def _manque_de_memoire_avec_un_micro_lot_de_1(config: ConfigEntrainement, memoir
 
 
 def _etat_du_modele(config: ConfigEntrainement, modele: nn.Module, pas: int) -> dict:
-    """Ce qu'il faut pour reconstruire et utiliser le modèle : ses poids et sa configuration."""
-    return {
+    """Ce qu'il faut pour reconstruire et utiliser le modèle : ses poids, sa configuration, et
+    l'empreinte du tokenizer des jetons d'entraînement (celle de leur `index.json`), que l'export
+    compare à celle du tokenizer figé. Sans index lisible, la sauvegarde ne la retient pas."""
+    etat = {
         "version": VERSION_DE_LA_SAUVEGARDE,
         "pas": pas,
         "modele": modele.state_dict(),
         "config": dataclasses.asdict(config),
         "config_modele": dataclasses.asdict(config.modele),
     }
+    empreinte = empreinte_du_tokenizer_des_jetons(config.dossier_donnees)
+    if empreinte is not None:
+        etat["empreinte_du_tokenizer"] = empreinte
+    return etat
 
 
 def entrainer(config: ConfigEntrainement, reprendre: bool = False, arreter_apres: int | None = None) -> dict:

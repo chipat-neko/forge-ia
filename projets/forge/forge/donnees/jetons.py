@@ -141,13 +141,19 @@ def _effacer_restes_tmp(sortie: Path) -> None:
 # --- Un fragment --------------------------------------------------------------------
 
 
-def _empreinte_du_tokenizer(tokenizer: TokenizerOctets) -> str:
-    """SHA-1 de ce qui décide des jetons : la taille du vocabulaire et les fusions."""
+def empreinte_du_tokenizer(tokenizer: TokenizerOctets) -> str:
+    """SHA-1 de ce qui décide des jetons : la taille du vocabulaire et les fusions.
+
+    C'est l'empreinte de `index.json` (champ `tokenizer`), que l'export compare à celle de la sauvegarde.
+    """
     contenu = json.dumps(
         {"taille_vocabulaire": tokenizer.taille_vocabulaire, "fusions": tokenizer.fusions},
         separators=(",", ":"),
     )
     return hashlib.sha1(contenu.encode("utf-8"), usedforsecurity=False).hexdigest()
+
+
+_empreinte_du_tokenizer = empreinte_du_tokenizer  # l'ancien nom, gardé pour le code et les tests existants
 
 
 def _empreinte_du_fichier(chemin: Path) -> str:
