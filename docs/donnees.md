@@ -95,9 +95,14 @@ Le téléchargement et l'apprentissage du tokenizer les lisent là ; l'encodag
   flux depuis le début du jeu, puis saute les documents déjà comptés. Cette relecture coûte du
   temps et du réseau, d'autant plus que la coupure est tardive : il a fallu 18 minutes pour
   sauter 15,6 millions de documents de `code_python`, lors de la reprise mesurée dans
-  `docs/mesures/entrainement-2026-11.md`. Si le jeu refuse l'état enregistré (autre source,
-  autre version de `datasets`), la commande s'arrête sans rien écrire. Le marqueur `.complet`
-  n'est posé qu'à la fin ; sans lui, une source n'est jamais tenue pour terminée.
+  `docs/mesures/entrainement-2026-11.md`. Dès que cette reprise écrit un fragment, l'état du flux
+  est tenu, avec le nombre de documents sautés (`sautes_a_l_ouverture`) : les reprises suivantes
+  ne relisent rien. Si le jeu refuse l'état enregistré (autre source, autre version de
+  `datasets`), la commande s'arrête sans rien écrire. Un fragment déjà compté qui manque n'est
+  jamais refait, car la reprise repart après le dernier document compté : la commande
+  s'arrête et dit quoi faire (remettre le fichier, ou effacer le dossier de la source et la
+  retélécharger). Le marqueur `.complet` n'est posé qu'à la fin ; sans lui, une source
+  n'est jamais tenue pour terminée.
 - **Place :** avant chaque fragment, on vérifie qu'il reste de la place pour lui et 2 Go de
   marge. Sinon, la commande s'arrête avec un message qui dit combien de Go libérer.
 - **Où :** `FORGE_DONNEES/textes/<dossier>/<source>/` (par défaut `D:\forge-ia-donnees` sur
@@ -145,7 +150,8 @@ travaille hors du dépôt, sous `FORGE_DONNEES/jetons/<dossier>/`.
   marqueur correspond encore au fragment de texte et au tokenizer sont sautés, les autres sont
   refaits. `.complet` n'est posé qu'à la fin.
 - **Place :** avant chaque fichier, on vérifie qu'il reste de la place pour lui et 2 Go de marge.
-- **Refus :** une source sans `.complet` n'est jamais encodée, et un dossier de sortie déjà
+- **Refus :** une source sans `.complet` n'est jamais encodée, ni une source dont un fragment
+  compté dans `etat.json` manque (le corpus serait troué sans bruit). Un dossier de sortie déjà
   rempli avec un autre tokenizer n'est jamais réécrit sans que tu le décides (supprime-le, ou
   choisis-en un autre).
 

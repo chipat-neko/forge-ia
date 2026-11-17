@@ -235,6 +235,16 @@ def test_sous_commande_exporter_nom_des_poids(tmp_path, sauvegarde_test):
     assert (tmp_path / "essai.safetensors").is_file()
 
 
+def test_sous_commande_exporter_dit_l_avertissement_en_francais(tmp_path, capsys):
+    etat, _ = etat_de_test(tmp_path)  # sans empreinte, sans index : le tokenizer ne peut pas être vérifié
+    sauvegarde = ecrire_sauvegarde(tmp_path, etat)
+    assert main(["exporter", "--sauvegarde", str(sauvegarde), "--sortie", str(tmp_path / "publication")]) == 0
+    erreur = capsys.readouterr().err
+    assert erreur.startswith("Attention : Le tokenizer de ") and "pas pu être vérifié" in erreur
+    # Ni la forme brute de `warnings` (fichier, ligne, catégorie en anglais), ni la ligne de code.
+    assert "UserWarning" not in erreur and ".py:" not in erreur and "exporter(" not in erreur
+
+
 def test_sous_commande_exporter_erreurs_en_francais(tmp_path, capsys):
     code = main(["exporter", "--sauvegarde", str(tmp_path / "absent.pt"), "--sortie", str(tmp_path / "s")])
     erreur = capsys.readouterr().err
@@ -272,11 +282,11 @@ def test_aide_de_exporter(capsys):
 # L'empreinte du tokenizer figé, telle que `index.json` des jetons de ton IA la porte (SHA-1).
 EMPREINTE_DE_L_INDEX = "a78aa8b2b8aad3baee05df1ff378beda303618b7"
 # Ce que l'export écrivait avant la vérification du tokenizer, pour la sauvegarde de `etat_de_test`.
-# Les poids : le fichier safetensors n'est pas comparé en bloc, car l'ordre des deux métadonnées
-# de son en-tête change d'un lancement à l'autre (une table de hachage de safetensors, avant
-# comme après ce plan). On compare donc l'en-tête sans l'ordre des métadonnées, puis les octets
-# des nombres, qui eux sont toujours les mêmes.
+# Les octets des nombres n'ont jamais changé. L'en-tête, lui, a ses clés triées depuis la tâche 5
+# du plan 6 (avant, l'ordre de ses deux métadonnées changeait d'un lancement à l'autre) : le
+# fichier entier est donc le même à chaque export, et son SHA-256 garde tout ce qu'écrit l'export.
 SHA256_DES_NOMBRES_AVANT = "f870d4087077"  # début du SHA-256 de la partie nombres du fichier des poids
+SHA256_DES_POIDS = "d799c3cb5f7c1ce58439d160928593425811668cc13bd2b27851824cb4b4ea63"  # le fichier entier
 SHA256_AVANT = {
     "config.json": "e6f552cd7d80f8b3282609acc1beea5988e724e358c3eb104a7395d0f238d74f",
     "tokenizer-ton-ia-v1.json": EMPREINTE_DU_TOKENIZER,
@@ -308,9 +318,14 @@ def test_une_sauvegarde_du_meme_tokenizer_est_exportee(tmp_path, recwarn):
 def test_une_sauvegarde_d_un_autre_tokenizer_est_refusee(tmp_path):
     etat, _ = etat_de_test(tmp_path)
     etat["empreinte_du_tokenizer"] = "0" * 40
-    with pytest.raises(ValueError, match="autre tokenizer"):
+    with pytest.raises(ValueError, match="autre tokenizer") as erreur:
         exporter(ecrire_sauvegarde(tmp_path, etat), tmp_path / "publication")
     assert not (tmp_path / "publication").exists()
+    # Le message dit de quelle empreinte il parle : celle des fusions (SHA-1, celle d'index.json), pas
+    # le SHA-256 du fichier que publient le README et le LISEZMOI.
+    message = str(erreur.value)
+    assert "fusions" in message and "SHA-1" in message and "index.json" in message
+    assert EMPREINTE_DE_L_INDEX in message and EMPREINTE_DU_TOKENIZER not in message
 
 
 def test_sans_empreinte_l_export_a_lieu_avec_un_avertissement(tmp_path):
@@ -353,6 +368,7 @@ def test_l_export_d_un_petit_modele_reste_identique_a_l_octet_pres(tmp_path):
     assert en_tete.pop("__metadata__") == {"format": "pt", "pas": "7"}
     assert "sortie.weight" not in en_tete and {d["dtype"] for d in en_tete.values()} == {"BF16"}
     assert hashlib.sha256(contenu[8 + taille_de_l_en_tete :]).hexdigest().startswith(SHA256_DES_NOMBRES_AVANT)
+    assert sha256(poids) == SHA256_DES_POIDS  # en-tête trié compris : le fichier entier, à l'octet près
 
 
 # --------------------------------------------------------------------------------------

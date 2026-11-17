@@ -9,6 +9,7 @@ import argparse
 import os
 import re
 import sys
+import warnings
 from pathlib import Path
 
 # Multiplicateurs des tailles écrites « 300M » : comme l'Explorateur de Windows
@@ -111,6 +112,7 @@ def _commande_donnees(choix: argparse.Namespace) -> int:
     from forge.donnees import telechargement
     from forge.donnees.melange import repartir
     from forge.donnees.sources import SOURCES
+    from forge.erreurs import DonneesManquantes
 
     def journal(message: str) -> None:
         print(message, flush=True)
@@ -131,7 +133,7 @@ def _commande_donnees(choix: argparse.Namespace) -> int:
         except PlaceInsuffisante as erreur:
             print(f"Erreur : {erreur}", file=sys.stderr)
             return 1
-        except telechargement.EtatDuFluxRefuse as erreur:
+        except (telechargement.EtatDuFluxRefuse, DonneesManquantes) as erreur:
             # Relancer tel quel échouerait de nouveau : le message dit quoi faire, rien d'autre.
             print(f"Erreur : {erreur}", file=sys.stderr)
             return 1
@@ -140,7 +142,8 @@ def _commande_donnees(choix: argparse.Namespace) -> int:
                 f"Interrompu pendant « {nom} ». Relance la même commande : les fragments déjà écrits sont "
                 "gardés. La reprise repart du fichier et du groupe de lignes où le flux s'était arrêté. "
                 "Seul un téléchargement commencé avant cette version relit le flux depuis le début du jeu "
-                "(18 minutes pour 15,6 millions de documents).",
+                "(18 minutes pour 15,6 millions de documents), tant qu'il n'a pas écrit de nouveau "
+                "fragment : ensuite, ses reprises ne relisent rien non plus.",
                 file=sys.stderr,
             )
             return 130
@@ -705,14 +708,37 @@ def _ajouter_evaluer(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_evaluer)
 
 
+def _exporter_en_francais(sauvegarde: Path, sortie: Path, poids: str) -> list[Path]:
+    """`exporter`, dont l'avertissement « tokenizer non vérifié » s'écrit « Attention : … », en français.
+
+    Sans cela, `warnings` l'afficherait sous sa forme brute : le fichier, la ligne, `UserWarning`
+    et la ligne de code. Les avertissements des bibliothèques s'affichent comme avant.
+    """
+    from forge.exporter import TokenizerNonVerifie, exporter
+
+    avertissements: list[warnings.WarningMessage] = []
+    try:
+        with warnings.catch_warnings(record=True) as avertissements:
+            warnings.simplefilter("always", TokenizerNonVerifie)
+            return exporter(sauvegarde, sortie, poids)
+    finally:
+        for avertissement in avertissements:
+            if issubclass(avertissement.category, TokenizerNonVerifie):
+                print(f"Attention : {avertissement.message}", file=sys.stderr)
+            else:
+                warnings.showwarning(
+                    avertissement.message, avertissement.category, avertissement.filename, avertissement.lineno
+                )
+
+
 def _commande_exporter(choix: argparse.Namespace) -> int:
     """`forge exporter` : les fichiers à publier (poids en safetensors bf16, configuration, tokenizer)."""
     # Imports ici : PyTorch est long à charger, les autres commandes n'en ont pas besoin.
     from forge.chemins import PlaceInsuffisante
-    from forge.exporter import empreinte_sha256, exporter
+    from forge.exporter import empreinte_sha256
 
     try:
-        ecrits = exporter(Path(choix.sauvegarde), choix.sortie, choix.poids)
+        ecrits = _exporter_en_francais(Path(choix.sauvegarde), choix.sortie, choix.poids)
     except (FileNotFoundError, PermissionError, PlaceInsuffisante, ValueError) as erreur:
         print(f"Erreur : {erreur}", file=sys.stderr)
         return 1

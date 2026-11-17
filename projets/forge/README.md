@@ -78,7 +78,8 @@ fichier et du groupe de lignes où le flux s'était arrêté (`etat_du_flux` dan
 relire ce qui est déjà compté. Un téléchargement commencé avant cette version n'a pas cet état :
 sa première reprise est relue depuis le début du jeu, en sautant les documents déjà comptés, ce
 qui coûte du temps et du réseau (18 minutes pour 15,6 millions de documents de code, voir
-`docs/mesures/entrainement-2026-11.md`). Si le jeu refuse l'état enregistré (autre source, autre
+`docs/mesures/entrainement-2026-11.md`). Dès son premier fragment écrit, l'état du flux est tenu :
+les reprises suivantes ne relisent rien. Si le jeu refuse l'état enregistré (autre source, autre
 version de `datasets`), la commande s'arrête avec un message, sans rien écrire. Une source n'est
 terminée que lorsque son fichier `.complet` existe. Le mélange par défaut est défini une seule fois,
 dans `forge.donnees.melange.MELANGE_PAR_DEFAUT`.
@@ -256,9 +257,17 @@ uv run --extra gpu python -m forge exporter `
 - `config.json` : les dimensions du modèle (`ConfigModele(**config)` le reconstruit) ;
 - `tokenizer-ton-ia-v1.json` : la copie exacte du tokenizer figé, vérifiée par son empreinte SHA-256.
 
+Avant d'écrire quoi que ce soit, l'export vérifie aussi que la sauvegarde vient de ce tokenizer :
+il compare l'empreinte de ses fusions (SHA-1) que retient la sauvegarde, ou à défaut celle de
+l'`index.json` de ses données, à celle du tokenizer figé. Un autre tokenizer est refusé ; si
+l'empreinte est introuvable, l'export a lieu, avec un message « Attention » qui dit ce qui n'a pas
+été vérifié.
+
 Chaque fichier est écrit d'un coup ; la commande affiche la taille et l'empreinte SHA-256 de
 chacun. La version publiée de ton IA est la Release `ton-ia-1.5` du dépôt : ces trois fichiers,
-plus `rapport.json` et sa fiche (`docs/mesures/ton-ia-1.5-LISEZMOI.md`). Pour la recharger,
+plus `rapport.json` (son évaluation d'origine), `rapport-2026-11-17.json` (la même, aux bits
+par octet exacts), sa fiche `LISEZMOI.md` et son document `ton-ia-1.5.md` (dans le dépôt :
+`docs/mesures/ton-ia-1.5-LISEZMOI.md` et `docs/mesures/ton-ia-1.5.md`). Pour la recharger,
 depuis `projets/forge` :
 
 ```powershell

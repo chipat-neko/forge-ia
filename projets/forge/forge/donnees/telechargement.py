@@ -7,7 +7,8 @@ Une source s'écrit dans un dossier (`FORGE_DONNEES/textes/<dossier>/<source>/`)
 - `etat.json` : où le téléchargement en est (`documents_lus`, `octets_ecrits`, et de quoi
   retrouver les fragments et les empreintes qui comptent), plus `etat_du_flux`, le
   `state_dict()` du flux `datasets` pris juste après le dernier document du dernier fragment
-  écrit : la reprise repart de ce fichier et de ce groupe de lignes, sans relire le début ;
+  écrit : la reprise repart de ce fichier et de ce groupe de lignes, sans relire le début
+  (`sautes_a_l_ouverture` dit quel saut refaire avant de recharger cet état) ;
 - `empreintes.bin` : les empreintes des textes déjà écrits, pour ne jamais en réécrire un ;
 - `.complet` : posé en dernier, quand le volume demandé est atteint ou la source épuisée.
 
@@ -32,7 +33,8 @@ from typing import BinaryIO
 from forge.chemins import sous_forge_donnees, verifier_place
 from forge.donnees.nettoyage import empreinte_du_texte_nettoye, nettoyer
 from forge.donnees.sources import Source
-from forge.fichiers import ecrire_atomique, nombre
+from forge.erreurs import DonneesManquantes
+from forge.fichiers import ecrire_atomique, entier, nombre
 
 # Taille visée d'un fragment : environ 100 Mo de texte (un Mo vaut 1024² octets ici).
 TAILLE_FRAGMENT = 100 * 1024**2
@@ -69,6 +71,10 @@ class _Etat:
     # `state_dict()` du flux après le dernier document compté (`None` : état d'avant cette
     # version, ou jeu qui ne sait pas reprendre ; la reprise relit alors le flux depuis le début).
     etat_du_flux: dict | None = None
+    # Documents sautés (`jeu.skip`) à l'ouverture du flux dont `etat_du_flux` est l'état : non nul
+    # après la reprise d'un état d'avant cette version. Cet état ne se recharge que sur un jeu
+    # sauté du même nombre, sans quoi `datasets` le refuse.
+    sautes_a_l_ouverture: int = 0
 
 
 # Ce que `datasets` lève quand l'état qu'on lui rend ne va pas avec le jeu (clé absente, indice
@@ -132,10 +138,14 @@ def lecteur_hugging_face(
 ) -> LecteurDeFlux:
     """Lit une source en flux depuis Hugging Face, sans rien télécharger d'entier.
 
+    `ignorer` documents du début sont sautés (`jeu.skip`) : le flux est relu depuis le début du
+    jeu, dont l'ordre ne change pas d'une lecture à l'autre (l'ancienne voie de reprise).
+
     Avec `etat_du_flux` (le `state_dict()` pris à l'arrêt précédent), la lecture repart du
-    fichier et du groupe de lignes où le flux s'était arrêté. Sans lui, `ignorer` documents du
-    début sont sautés (l'ancienne voie) : le flux est relu depuis le début du jeu, dont l'ordre
-    ne change pas d'une lecture à l'autre.
+    fichier et du groupe de lignes où le flux s'était arrêté, sans rien relire. `ignorer` doit
+    alors valoir ce qu'il valait à l'ouverture où cet état a été pris : l'état d'un jeu sauté
+    garde la trace du saut, et ne se recharge que sur un jeu sauté de même (le saut, déjà fait
+    d'après l'état, ne relit rien).
     """
     from datasets import load_dataset  # lourd : importé seulement quand on lit pour de bon
 
@@ -153,9 +163,9 @@ def lecteur_hugging_face(
         )
     else:
         jeu = load_dataset(source.depot, split="train", streaming=True)
+    if ignorer:
+        jeu = jeu.skip(ignorer)
     if etat_du_flux is None:
-        if ignorer:
-            jeu = jeu.skip(ignorer)
         return LecteurDeFlux(jeu)
 
     def refus(erreur: Exception) -> EtatDuFluxRefuse:
@@ -175,6 +185,10 @@ def lecteur_hugging_face(
     return LecteurDeFlux(jeu, refus)
 
 
+def _nom_du_fragment(numero: int) -> str:
+    return f"fragment-{numero:05d}.jsonl.gz"
+
+
 def _ecrire_fragment(dossier: Path, numero: int, textes: list[str]) -> None:
     """Écrit le fragment `numero` : une ligne `{"texte": …}` par texte, compressée en gzip."""
     def ecrire(fichier: BinaryIO) -> None:
@@ -184,7 +198,7 @@ def _ecrire_fragment(dossier: Path, numero: int, textes: list[str]) -> None:
                 ligne = json.dumps({"texte": texte}, ensure_ascii=False) + "\n"
                 compresse.write(ligne.encode("utf-8"))
 
-    ecrire_atomique(dossier / f"fragment-{numero:05d}.jsonl.gz", ecrire)
+    ecrire_atomique(dossier / _nom_du_fragment(numero), ecrire)
 
 
 def _ecrire_etat(dossier: Path, etat: _Etat) -> None:
@@ -205,6 +219,66 @@ def _lire_etat(dossier: Path) -> _Etat | None:
             f"Le fichier {chemin} est illisible ({erreur}). Supprime le dossier {dossier} "
             "pour recommencer cette source de zéro, puis relance la même commande."
         ) from erreur
+
+
+def reparer_un_fragment_manquant(dossier: Path) -> str:
+    """Que faire quand un fragment déjà compté de la source `dossier` manque, et ce que ça coûte.
+
+    `telecharger` ne refait jamais un fragment compté : sa reprise repart après le dernier
+    document compté, et le flux ne sait pas revenir en arrière. Hors de la corbeille, la seule
+    réparation honnête est donc de retélécharger toute la source.
+    """
+    try:
+        etat = _lire_etat(dossier)
+    except RuntimeError:
+        etat = None  # etat.json illisible : la réparation est la même, seul le coût manque
+    cout = ""
+    if etat is not None:
+        mo = nombre(etat.octets_ecrits / 1024**2, 1, milliers=" ")
+        cout = f" ({entier(etat.documents_lus)} documents, {mo} Mo de texte)"
+    nom = dossier.parent.name
+    return (
+        "python -m forge donnees ne refait jamais un fragment déjà compté : sa reprise repart après le "
+        "dernier document compté. Si le fichier est dans la corbeille ou en quarantaine (antivirus), "
+        "remets-le à sa place, puis relance la même commande. Sinon, la seule réparation est de "
+        f"retélécharger cette source : efface le dossier {dossier}, relance python -m forge donnees "
+        f"--octets <taille> --dossier {nom}, qui relit toute la source{cout}, puis python -m forge "
+        f"encoder --donnees {nom} --tokenizer <chemin>."
+    )
+
+
+def verifier_les_fragments_comptes(dossier: Path) -> None:
+    """Lève `DonneesManquantes` si un fragment que compte `etat.json` n'est plus sur le disque.
+
+    Sans `etat.json`, rien n'est compté, donc rien à vérifier.
+    """
+    try:
+        etat = _lire_etat(dossier)
+    except RuntimeError as erreur:
+        nom = dossier.parent.name
+        raise DonneesManquantes(
+            f"Le fichier {dossier / 'etat.json'} est illisible ({erreur.__cause__}) : impossible de "
+            f"vérifier que les fragments qu'il compte sont tous là. Efface le dossier {dossier}, relance "
+            f"python -m forge donnees --octets <taille> --dossier {nom}, puis python -m forge encoder "
+            f"--donnees {nom} --tokenizer <chemin>."
+        ) from erreur
+    if etat is not None:
+        _verifier_les_fragments(dossier, etat)
+
+
+def _verifier_les_fragments(dossier: Path, etat: _Etat) -> None:
+    manquants = [nom for nom in map(_nom_du_fragment, range(etat.fragments)) if not (dossier / nom).is_file()]
+    if not manquants:
+        return
+    if len(manquants) == 1:
+        sujet = f"Le fragment {manquants[0]} manque"
+    else:
+        liste = ", ".join(manquants[:5]) + (", …" if len(manquants) > 5 else "")
+        sujet = f"{len(manquants)} fragments manquent ({liste})"
+    raise DonneesManquantes(
+        f"{sujet} dans {dossier}, alors qu'etat.json compte {etat.fragments} fragments écrits. "
+        + reparer_un_fragment_manquant(dossier)
+    )
 
 
 def _cle(texte_nettoye: str) -> int:
@@ -286,13 +360,16 @@ def telecharger(
     Après une coupure, on relance la même commande : les documents déjà comptés dans
     `etat.json` sont sautés, les empreintes déjà vues ne sont pas réécrites, et
     `PlaceInsuffisante` ou toute autre erreur laisse le dossier utilisable tel quel.
-    Relancer avec un `octets_max` plus grand prolonge un dossier déjà complet.
+    Relancer avec un `octets_max` plus grand prolonge un dossier déjà complet. Un fragment
+    compté qui manque lève `DonneesManquantes` avant toute lecture : il ne serait jamais refait.
     """
     dossier = Path(dossier)
     dossier.mkdir(parents=True, exist_ok=True)
     ecrire = journal if journal is not None else (lambda _message: None)
     marqueur = dossier / ".complet"
     etat = _lire_etat(dossier)
+    if etat is not None:
+        _verifier_les_fragments(dossier, etat)  # un trou ne se comble jamais : ni « complet », ni reprise
 
     if marqueur.exists():
         if etat is None or etat.source_epuisee or etat.octets_ecrits >= octets_max:
@@ -308,10 +385,12 @@ def telecharger(
 
     vues = _charger_empreintes(dossier, etat)
     if lecteur is None:
-        flux = documents = lecteur_hugging_face(
-            source, etat_du_flux=etat.etat_du_flux, ignorer=etat.documents_lus
-        )
+        # Sans état du flux, on saute les documents comptés ; avec, on refait le même saut qu'à
+        # l'ouverture où il a été pris (zéro, sauf après la reprise d'un ancien état).
+        sautes = etat.documents_lus if etat.etat_du_flux is None else etat.sautes_a_l_ouverture
+        flux = documents = lecteur_hugging_face(source, etat_du_flux=etat.etat_du_flux, ignorer=sautes)
     else:
+        sautes = 0
         flux = lecteur(source)
         documents = islice(flux, etat.documents_lus, None)
     if etat.documents_lus:
@@ -342,13 +421,15 @@ def telecharger(
             _ecrire_fragment(dossier, etat.fragments, tampon)
             _ajouter_empreintes(dossier, etat.empreintes, cles)
             fragments += 1
+        etat_du_flux = etat_du_flux_courant()
         nouvel_etat = _Etat(
             documents_lus=etat.documents_lus + lus,
             octets_ecrits=etat.octets_ecrits + octets_tampon,
             fragments=fragments,
             empreintes=etat.empreintes + len(cles),
             source_epuisee=epuisee,
-            etat_du_flux=etat_du_flux_courant(),
+            etat_du_flux=etat_du_flux,
+            sautes_a_l_ouverture=sautes if etat_du_flux is not None else 0,
         )
         _ecrire_etat(dossier, nouvel_etat)
         if tampon:

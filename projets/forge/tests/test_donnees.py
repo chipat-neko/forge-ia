@@ -556,6 +556,52 @@ def test_restes_tmp_effaces_a_la_relance(tmp_path):
     assert not list(tmp_path.glob("*.tmp")) and len(lire_tous_les_textes(tmp_path)) == 5
 
 
+def lecteur_interdit(_source):
+    raise AssertionError("le lecteur ne doit pas être ouvert")
+
+
+def contenu(dossier: Path) -> dict[str, bytes]:
+    return {fichier.name: fichier.read_bytes() for fichier in sorted(dossier.iterdir())}
+
+
+def test_un_fragment_compte_qui_manque_n_est_pas_dit_complet(tmp_path):
+    """`forge donnees` ne refait jamais un fragment déjà compté : il le dit, avec la réparation et son coût."""
+    from forge.erreurs import DonneesManquantes
+    from forge.fichiers import entier
+
+    telecharger(SOURCE_FACTICE, 10**9, tmp_path, faux_lecteur(DOCS), octets_fragment=3000)
+    etat = lire_etat(tmp_path)
+    assert (tmp_path / ".complet").exists() and etat["fragments"] >= 3
+    (tmp_path / "fragment-00001.jsonl.gz").unlink()
+    avant = contenu(tmp_path)
+    messages: list[str] = []
+    for octets_max in (10**9, 10**10):  # le même volume, puis un volume plus grand
+        with pytest.raises(DonneesManquantes) as erreur:
+            telecharger(SOURCE_FACTICE, octets_max, tmp_path, lecteur_interdit, journal=messages.append)
+        message = str(erreur.value)
+        assert "fragment-00001.jsonl.gz" in message and str(tmp_path) in message
+        assert "ne refait jamais un fragment déjà compté" in message
+        # D'abord remettre le fichier ; sinon, la seule réparation : effacer la source et la retélécharger.
+        assert message.index("corbeille") < message.index(f"efface le dossier {tmp_path}")
+        assert message.index("python -m forge donnees") < message.index("python -m forge encoder")
+        assert f"{entier(etat['documents_lus'])} documents" in message and "Mo de texte" in message
+    assert not any("déjà complet" in m for m in messages)
+    assert contenu(tmp_path) == avant  # rien n'a bougé, le marqueur non plus
+
+
+def test_un_fragment_compte_qui_manque_arrete_aussi_une_reprise(tmp_path):
+    from forge.erreurs import DonneesManquantes
+
+    with pytest.raises(ConnectionError):
+        telecharger(SOURCE_FACTICE, 10**9, tmp_path, lecteur_qui_coupe_a(DOCS, 35), octets_fragment=3000)
+    assert lire_etat(tmp_path)["fragments"] >= 2 and not (tmp_path / ".complet").exists()
+    (tmp_path / "fragment-00000.jsonl.gz").unlink()
+    avant = contenu(tmp_path)
+    with pytest.raises(DonneesManquantes, match="fragment-00000.jsonl.gz"):
+        telecharger(SOURCE_FACTICE, 10**9, tmp_path, lecteur_interdit, octets_fragment=3000)
+    assert contenu(tmp_path) == avant  # aucun fragment n'est écrit après le trou
+
+
 def test_etat_incoherent_message_clair(tmp_path):
     telecharger(SOURCE_FACTICE, 3000, tmp_path, faux_lecteur(DOCS), octets_fragment=1500)
     (tmp_path / ".complet").unlink()
@@ -771,6 +817,18 @@ def test_sous_commande_donnees_erreurs_en_francais(tmp_path, monkeypatch, capsys
     erreur = capsys.readouterr().err
     assert "relance la même commande" in erreur and "Traceback" not in erreur
     assert "dernier fragment écrit" in erreur
+
+    def fragment_manquant(*args, **kwargs):
+        from forge.erreurs import DonneesManquantes
+
+        raise DonneesManquantes("Le fragment fragment-00001.jsonl.gz manque : efface le dossier de la source.")
+
+    # Relancer tel quel ne réparerait rien : le message dit quoi faire, sans « relance la même commande ».
+    monkeypatch.setattr(telechargement, "telecharger", fragment_manquant)
+    assert main(["donnees", "--octets", "1M", "--dossier", "essai"]) == 1
+    erreur = capsys.readouterr().err
+    assert erreur.startswith("Erreur : Le fragment fragment-00001.jsonl.gz manque")
+    assert "dernier fragment écrit" not in erreur and "Traceback" not in erreur
 
     def interrompu(*args, **kwargs):
         raise KeyboardInterrupt

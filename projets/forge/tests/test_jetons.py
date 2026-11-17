@@ -98,12 +98,23 @@ def corpus(tmp_path_factory):
     for source in sorted(FRAGMENTS_DE_TEST):
         dossier = racine / source
         debut = 0
+        octets = 0
         for numero, nombre in enumerate(FRAGMENTS_DE_TEST[source]):
             documents = faux_documents(source, debut, nombre)
             ecrire_fragment(dossier, numero, documents)
             fragments.append(documents)
             debut += nombre
-        (dossier / ".complet").write_text("{}", encoding="utf-8")
+            octets += sum(len(texte.encode("utf-8")) for texte in documents)
+        # L'état que le téléchargement aurait laissé : il compte les fragments écrits.
+        etat = {
+            "documents_lus": debut,
+            "octets_ecrits": octets,
+            "fragments": len(FRAGMENTS_DE_TEST[source]),
+            "empreintes": debut,
+            "source_epuisee": True,
+        }
+        (dossier / "etat.json").write_text(json.dumps(etat), encoding="utf-8")
+        (dossier / ".complet").write_text(json.dumps(etat), encoding="utf-8")
         dossiers.append(dossier)
     # Les documents sont déjà propres : leur empreinte ne change pas avec le nettoyage.
     assert all(empreinte(t) == empreinte_du_texte_nettoye(t) for documents in fragments for t in documents)
@@ -494,9 +505,36 @@ def test_une_erreur_de_lecture_passagere_ne_fait_rien_effacer(corpus, tokenizer_
     assert not (sortie / ".complet").exists()
 
 
+def test_un_fragment_compte_absent_est_refuse_avant_tout_encodage(corpus, tokenizer_de_test, tmp_path):
+    """Sans lui, le corpus serait encodé troué, et les numéros des fragments suivants décalés."""
+    from forge.fichiers import entier
+
+    dossiers = dossiers_copies(corpus, tmp_path)
+    web_fr = dossiers[1]
+    (web_fr / "fragment-00001.jsonl.gz").unlink()
+    sortie = tmp_path / "jetons"
+    with pytest.raises(DonneesManquantes) as erreur:
+        encoder_corpus(dossiers, tokenizer_de_test, sortie, processus=1)
+    message = str(erreur.value)
+    assert "fragment-00001.jsonl.gz" in message and str(web_fr) in message and "etat.json" in message
+    assert "ne refait jamais un fragment déjà compté" in message
+    assert message.index("corbeille") < message.index(f"efface le dossier {web_fr}")
+    assert message.index("python -m forge donnees") < message.index("python -m forge encoder")
+    assert f"{entier(sum(FRAGMENTS_DE_TEST['web_fr']))} documents" in message
+    assert not sortie.exists()  # rien n'est écrit
+
+    # Un etat.json illisible ne dit plus ce qui est compté : on ne devine pas.
+    (web_fr / "etat.json").write_text("{", encoding="utf-8")
+    with pytest.raises(DonneesManquantes, match="illisible") as erreur:
+        encoder_corpus(dossiers, tokenizer_de_test, sortie, processus=1)
+    assert "python -m forge donnees" in str(erreur.value) and not sortie.exists()
+
+
 @pytest.mark.parametrize("endroit", ["ouverture", "empreinte"])
-def test_un_fragment_manquant_dit_de_relancer_donnees_puis_encoder(corpus, tokenizer_de_test, tmp_path, monkeypatch, endroit):
-    """Un fragment disparu (supprimé, jamais téléchargé) : `forge donnees` le refait, puis `forge encoder`."""
+def test_un_fragment_disparu_pendant_l_encodage_dit_la_seule_reparation(
+    corpus, tokenizer_de_test, tmp_path, monkeypatch, endroit
+):
+    """Un fragment listé, puis disparu (antivirus, effacement) : `forge donnees` ne le refait pas."""
     dossiers = dossiers_copies(corpus, tmp_path)
     sortie = tmp_path / "jetons"
     nom = "fragment-00001.jsonl.gz"
@@ -517,9 +555,13 @@ def test_un_fragment_manquant_dit_de_relancer_donnees_puis_encoder(corpus, token
     with pytest.raises(FileNotFoundError) as erreur:
         encoder_corpus(dossiers, tokenizer_de_test, sortie, processus=1)
     message = str(erreur.value)
-    assert nom in message and "forge donnees" in message and "forge encoder" in message
-    assert message.index("forge donnees") < message.index("forge encoder")
-    assert "Supprime" not in message and not (sortie / ".complet").exists()
+    assert nom in message and "a disparu pendant l'encodage" in message
+    assert "ne refait jamais un fragment déjà compté" in message and "il refait" not in message
+    # D'abord remettre le fichier ; sinon, effacer la source, la retélécharger, puis encoder.
+    assert message.index("corbeille") < message.index("efface le dossier")
+    assert message.index("python -m forge donnees") < message.index("python -m forge encoder")
+    assert "documents" in message and "Mo de texte" in message  # le coût du retéléchargement
+    assert not (sortie / ".complet").exists()
 
 
 def test_sous_commande_encoder_fragment_manquant(donnees_de_la_session, capsys, monkeypatch):
@@ -541,6 +583,17 @@ def test_sous_commande_encoder_fragment_manquant(donnees_de_la_session, capsys, 
     erreur = capsys.readouterr().err
     assert erreur.startswith("Erreur : ") and premier.name in erreur
     assert "forge donnees" in erreur and "forge encoder" in erreur and "Traceback" not in erreur
+
+
+def test_sous_commande_encoder_refuse_un_fragment_compte_absent(donnees_de_la_session, capsys):
+    donnees = donnees_de_la_session
+    (donnees.textes / "wikipedia_fr" / "fragment-00000.jsonl.gz").unlink()
+    arguments = ["encoder", "--donnees", "essai", "--tokenizer", str(donnees.tokenizer), "--processus", "1"]
+    assert main(arguments) == 1
+    erreur = capsys.readouterr().err
+    assert erreur.startswith("Erreur : ") and "fragment-00000.jsonl.gz" in erreur and "wikipedia_fr" in erreur
+    assert "--dossier essai" in erreur and "--donnees essai" in erreur and "Traceback" not in erreur
+    assert not (donnees.racine / "jetons").exists()  # rien n'est écrit
 
 
 def test_sous_commande_encoder_erreur_de_lecture_passagere(donnees_de_la_session, monkeypatch, capsys):

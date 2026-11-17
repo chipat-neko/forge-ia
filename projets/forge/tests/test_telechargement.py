@@ -139,8 +139,8 @@ def test_la_reprise_repart_au_fragment_pres(tmp_path, flux_parquet):
     messages: list[str] = []
     _telecharger(dossier, messages)
     relance = espions[-1]
-    # Aucun document déjà compté n'est relu : le flux repart juste après le dernier compté.
-    assert appels[-1]["etat_du_flux"] is not None and appels[-1]["ignorer"] == compte
+    # Aucun document déjà compté n'est relu : le flux repart juste après le dernier compté, sans saut.
+    assert appels[-1]["etat_du_flux"] is not None and appels[-1]["ignorer"] == 0
     assert relance.lus[0] == _texte(compte)
     assert len(relance.lus) == TOTAL - compte
     assert not any("ancien état" in m for m in messages)
@@ -188,6 +188,52 @@ def test_un_ancien_etat_reprend_par_skip(tmp_path, flux_parquet):
     assert espions[-1].lus[0] == _texte(etat["documents_lus"])
     assert _fragments(dossier) == reference
     assert _etat(dossier)["etat_du_flux"] is not None  # l'état du flux est de nouveau tenu
+
+
+# Les clés d'un etat.json écrit avant le plan 6 : ni `etat_du_flux`, ni rien de ce qui l'accompagne.
+_CLES_D_UN_ANCIEN_ETAT = ("documents_lus", "octets_ecrits", "fragments", "empreintes", "source_epuisee")
+
+
+def test_un_ancien_etat_survit_a_plusieurs_reprises(tmp_path, flux_parquet):
+    """Un téléchargement d'avant le plan 6 : une reprise par `skip`, puis d'autres par l'état du flux."""
+    reference = _d_une_traite(tmp_path, flux_parquet)
+    espions, appels, coupures = flux_parquet
+    dossier = tmp_path / "ancien"
+    coupures.append(25)
+    with pytest.raises(ConnectionError):
+        _telecharger(dossier)
+    ancien = {cle: valeur for cle, valeur in _etat(dossier).items() if cle in _CLES_D_UN_ANCIEN_ETAT}
+    (dossier / "etat.json").write_text(json.dumps(ancien), encoding="utf-8")
+    comptes = [ancien["documents_lus"]]
+    assert comptes[0] > 0
+
+    # Première reprise : l'ancienne voie (relecture et saut), coupée à son tour.
+    messages: list[str] = []
+    coupures.append(30)
+    with pytest.raises(ConnectionError):
+        _telecharger(dossier, messages)
+    assert appels[-1] == {"etat_du_flux": None, "ignorer": comptes[0]}
+    assert any("ancien état" in m for m in messages)
+    comptes.append(_etat(dossier)["documents_lus"])
+    assert comptes[1] > comptes[0] and _etat(dossier)["etat_du_flux"] is not None
+
+    # Deuxième et troisième reprises : par l'état du flux, sans relire le début ni refuser l'état.
+    for coupe in (30, None):
+        messages = []
+        coupures.append(coupe)
+        if coupe is None:
+            _telecharger(dossier, messages)
+        else:
+            with pytest.raises(ConnectionError):
+                _telecharger(dossier, messages)
+        assert appels[-1]["etat_du_flux"] is not None
+        assert not any("ancien état" in m for m in messages)
+        assert espions[-1].lus[0] == _texte(comptes[-1])
+        comptes.append(_etat(dossier)["documents_lus"])
+    assert comptes[-1] == TOTAL
+    # Les fragments sont identiques, octet pour octet, à ceux d'un téléchargement d'une traite.
+    assert _fragments(dossier) == reference
+    assert (dossier / ".complet").exists()
 
 
 def test_un_etat_du_flux_refuse_n_ecrit_rien_de_faux(tmp_path, flux_parquet):

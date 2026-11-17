@@ -49,8 +49,15 @@ from forge.tokenizer.bpe_octets import TokenizerOctets
 NOM_DES_POIDS = "ton-ia-1.5.safetensors"
 NOM_DE_LA_CONFIG = "config.json"
 TOKENIZER = Path(__file__).parent / "ressources" / "tokenizer-ton-ia-v1.json"
-# L'empreinte SHA-256 du tokenizer figé de ton IA, tel qu'il est dans le dépôt depuis la vague 1.
+# L'empreinte SHA-256 du fichier du tokenizer figé de ton IA, tel qu'il est dans le dépôt depuis la
+# vague 1 (celle que publient le README et le LISEZMOI). À ne pas confondre avec
+# `empreinte_du_tokenizer()`, le SHA-1 de ses fusions, que portent `index.json` et les sauvegardes.
 EMPREINTE_DU_TOKENIZER = "3001e7ab40630739c4dec807c7a92c0d4fb469cc0fc4afa368704395391f21ba"
+
+
+class TokenizerNonVerifie(UserWarning):
+    """L'export a lieu, mais rien ne dit que la sauvegarde vient du tokenizer figé de ton IA."""
+
 
 # `torch.compile` range le modèle d'origine sous `_orig_mod` : ses poids prennent ce préfixe.
 PREFIXE_DE_LA_COMPILATION = "_orig_mod."
@@ -180,9 +187,11 @@ def _copier_le_tokenizer(temporaire: Path) -> None:
 def _verifier_le_tokenizer_de_la_sauvegarde(etat: dict, fichier: str) -> None:
     """Refuse une sauvegarde entraînée avec un autre tokenizer que le tokenizer figé de ton IA.
 
-    L'empreinte vient de la sauvegarde ; une ancienne sauvegarde ne l'a pas, on la lit alors dans
-    l'`index.json` de ses données (`config["donnees"]`). Si on ne la trouve nulle part, l'export a
-    lieu, avec un avertissement qui dit ce qui n'a pas été vérifié.
+    L'empreinte comparée est celle des fusions (le SHA-1 d'`empreinte_du_tokenizer`, celle
+    d'`index.json`), pas le SHA-256 du fichier (`EMPREINTE_DU_TOKENIZER`). Elle vient de la
+    sauvegarde ; une ancienne sauvegarde ne l'a pas, on la lit alors dans l'`index.json` de ses
+    données (`config["donnees"]`). Si on ne la trouve nulle part, l'export a lieu, avec un
+    avertissement (`TokenizerNonVerifie`) qui dit ce qui n'a pas été vérifié.
     """
     attendue = empreinte_du_tokenizer(TokenizerOctets.charger(TOKENIZER))
     trouvee, origine = etat.get("empreinte_du_tokenizer"), "la sauvegarde"
@@ -196,14 +205,15 @@ def _verifier_le_tokenizer_de_la_sauvegarde(etat: dict, fichier: str) -> None:
             f"Le tokenizer de {fichier} n'a pas pu être vérifié : la sauvegarde ne retient pas son "
             "empreinte, et l'index.json de ses données est introuvable. Rien ne dit qu'elle a été "
             "entraînée avec le tokenizer figé de ton IA ; vérifie-le avant de publier.",
-            UserWarning,
+            TokenizerNonVerifie,
             stacklevel=3,
         )
     elif trouvee != attendue:
         raise ValueError(
             f"{fichier} a été entraînée avec un autre tokenizer que le tokenizer figé de ton IA : "
-            f"l'empreinte lue dans {origine} est {trouvee}, celle de {TOKENIZER.name} est {attendue}. "
-            "Les jetons ne se liraient pas pareil : l'export est refusé."
+            f"l'empreinte de ses fusions (SHA-1, celle d'index.json) lue dans {origine} est {trouvee}, "
+            f"celle de {TOKENIZER.name} est {attendue}. Les jetons ne se liraient pas pareil : l'export "
+            "est refusé."
         )
 
 

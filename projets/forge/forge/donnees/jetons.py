@@ -43,7 +43,12 @@ import numpy as np
 from forge.chemins import verifier_place
 from forge.donnees.melange import est_validation
 from forge.donnees.nettoyage import empreinte_du_texte_nettoye
-from forge.donnees.telechargement import MARGE_PLACE, en_mo
+from forge.donnees.telechargement import (
+    MARGE_PLACE,
+    en_mo,
+    reparer_un_fragment_manquant,
+    verifier_les_fragments_comptes,
+)
 from forge.erreurs import DonneesManquantes
 from forge.fichiers import ecrire_atomique, nombre
 from forge.processeur import fils_disponibles
@@ -187,12 +192,9 @@ def _marqueur_a_jour(fait: dict, identite: dict, sortie: Path, nom: str) -> bool
 
 
 def _fragment_manquant(fragment: Path) -> FileNotFoundError:
-    """L'erreur d'un fragment de textes introuvable : `forge donnees` le refait, puis `forge encoder`."""
-    source = fragment.parent
+    """L'erreur d'un fragment listé, puis disparu : `forge donnees` ne le refait pas, le message le dit."""
     return FileNotFoundError(
-        f"Le fragment {fragment} est introuvable. Relance d'abord : python -m forge donnees --octets "
-        f"<taille> --dossier {source.parent.name} (il refait le fragment manquant), puis : "
-        "python -m forge encoder --donnees <nom> --tokenizer <chemin>"
+        f"Le fragment {fragment} a disparu pendant l'encodage. " + reparer_un_fragment_manquant(fragment.parent)
     )
 
 
@@ -344,6 +346,9 @@ def _lister_les_travaux(dossiers: Sequence[Path]) -> list[_Travail]:
                 f"dans {source}. Relance : {relancer} (avec la même taille) ; il reprendra là où il "
                 "s'est arrêté."
             )
+        # La liste vient du disque : sans cette vérification, un fragment compté qui manque
+        # trouerait le corpus en silence, et décalerait les numéros des suivants.
+        verifier_les_fragments_comptes(source)
         fragments = sorted(source.glob("fragment-*.jsonl.gz"))
         if not fragments:
             raise DonneesManquantes(
