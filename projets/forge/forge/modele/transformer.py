@@ -28,6 +28,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
+from forge.modele.cache import CacheKV
 from forge.modele.config import ConfigModele, largeur_cachee
 
 EPSILON_RMSNORM = 1e-5
@@ -79,6 +80,22 @@ def rope_cos_sin(
     positions = torch.arange(longueur, device=peripherique, dtype=torch.float32)
     angles = torch.outer(positions, frequences)  # [longueur, dim_tete // 2]
     return angles.cos(), angles.sin()
+
+
+def rope_cos_sin_aux_positions(
+    positions: Tensor, dim_tete: int, base: float
+) -> tuple[Tensor, Tensor]:
+    """Cosinus et sinus de RoPE aux positions données, en `float32` : `[lot, 1, T, dim_tete // 2]`.
+
+    Les mêmes angles que `rope_cos_sin`, au bit près, mais pour des positions choisies
+    (`positions`, entiers `[lot, T]`) : avec un cache, le modèle ne lit que les nouveaux jetons,
+    à la suite de ceux déjà lus, et chaque texte d'un lot a ses propres positions (son bourrage
+    à gauche ne compte pas). Le `1` fait servir les mêmes angles à toutes les têtes.
+    """
+    paires = torch.arange(0, dim_tete, 2, device=positions.device, dtype=torch.float32)
+    frequences = base ** (-(paires / dim_tete))
+    angles = positions.float()[..., None] * frequences  # [lot, T, dim_tete // 2]
+    return angles.cos()[:, None], angles.sin()[:, None]
 
 
 def appliquer_rope(x: Tensor, cos: Tensor, sin: Tensor) -> Tensor:
@@ -144,7 +161,13 @@ class Attention(nn.Module):
         self.proj_sortie = nn.Linear(config.dim, config.dim, bias=False)
 
     def forward(
-        self, x: Tensor, cos: Tensor, sin: Tensor, masque: Tensor | None = None
+        self,
+        x: Tensor,
+        cos: Tensor,
+        sin: Tensor,
+        masque: Tensor | None = None,
+        cache: CacheKV | None = None,
+        couche: int = 0,
     ) -> Tensor:
         lot, positions, dim = x.shape
         q, k, v = self.proj_qkv(x).chunk(3, dim=-1)
@@ -153,6 +176,15 @@ class Attention(nn.Module):
             t.reshape(lot, positions, self.tetes, self.dim_tete).transpose(1, 2) for t in (q, k, v)
         )
         q, k = appliquer_rope(q, cos, sin), appliquer_rope(k, cos, sin)
+        if cache is not None:
+            # Les clés et valeurs des jetons déjà lus sont dans le cache (couche `couche`) : on
+            # y range les nouvelles, et les requêtes les comparent toutes.
+            if masque is None:
+                raise ValueError(
+                    "Avec un cache, il faut un masque : les requêtes ne sont que les nouveaux "
+                    "jetons, `is_causal` les alignerait mal. Passe par `Transformer.avancer`."
+                )
+            k, v = cache.ajouter(couche, k, v)
         if masque is None:
             # `is_causal=True` : un jeton ne voit que lui-même et ceux d'avant.
             sortie = F.scaled_dot_product_attention(q, k, v, is_causal=True)
@@ -202,8 +234,8 @@ class Bloc(nn.Module):
         self.norme_mlp = RMSNorm(config.dim)
         self.mlp = MLP(config)
 
-    def forward(self, x: Tensor, cos: Tensor, sin: Tensor, masque: Tensor | None = None) -> Tensor:
-        x = x + self.attention(self.norme_attention(x), cos, sin, masque)
+    def forward(self, x: Tensor, cos: Tensor, sin: Tensor, masque: Tensor | None = None, cache: CacheKV | None = None, couche: int = 0) -> Tensor:
+        x = x + self.attention(self.norme_attention(x), cos, sin, masque, cache, couche)
         return x + self.mlp(self.norme_mlp(x))
 
 
@@ -224,6 +256,9 @@ class Transformer(nn.Module):
     `documents` (facultatif, `[lot, positions]`, entiers, -1 pour le bourrage) dit à quelle
     conversation appartient chaque position d'une rangée qui en empaquette plusieurs : chacune
     ne voit alors qu'elle-même. Sans lui, tout le texte de la rangée est vu comme un seul.
+
+    `avancer(ids, positions, masque, cache)` lit la suite d'un texte dont les clés et les valeurs
+    sont déjà dans un `CacheKV` : c'est la génération rapide de `generer_lot`.
     """
 
     def __init__(self, config: ConfigModele) -> None:
@@ -276,3 +311,25 @@ class Transformer(nn.Module):
         if cibles is not None:
             perte = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), cibles.reshape(-1))
         return logits, perte
+
+    def avancer(self, ids: Tensor, positions: Tensor, masque: Tensor, cache: CacheKV) -> Tensor:
+        """Lit `ids` à la suite des jetons déjà dans `cache`, et rend leurs logits `[lot, T, V]`.
+
+        - `ids` : `[lot, T]`, les jetons à lire ;
+        - `positions` : `[lot, T]`, la position de chacun dans son texte, pour RoPE ;
+        - `masque` : `[lot, 1, T, cache.longueur + T]`, ce que le jeton `i` a le droit de
+          regarder parmi les positions `j` du cache, les nouvelles comprises : booléen (vrai :
+          permis), ou déjà en nombres ajoutés aux scores (0 : permis, -inf : interdit), dans le
+          type du calcul ;
+        - `cache` : il garde au retour les clés et valeurs de ces `T` jetons en plus.
+
+        C'est `forward` découpé dans le temps : lire un texte d'un coup, ou morceau par morceau
+        avec le même cache, donne les mêmes logits, aux arrondis près. `longueur_contexte`
+        n'est pas vérifiée ici : l'appelant ne la dépasse pas (voir `generer_lot`).
+        """
+        x = self.plongement(ids)
+        dim_tete = self.config.dim // self.config.tetes
+        cos, sin = rope_cos_sin_aux_positions(positions, dim_tete, self.config.base_rope)
+        for couche, bloc in enumerate(self.blocs):
+            x = bloc(x, cos, sin, masque, cache, couche)
+        return self.sortie(self.norme_finale(x))

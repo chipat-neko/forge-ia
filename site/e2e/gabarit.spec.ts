@@ -310,7 +310,7 @@ test('extrait par symbole : Bloc.forward de forge, ses 3 lignes, deux additions 
   const figure = page.locator('figure.code-explique', { hasText: 'transformer.py' });
   await expect(figure).toHaveCount(1);
   await expect(figure.locator('pre [data-l]')).toHaveCount(3);
-  await expect(figure.locator('pre [data-l]').first()).toContainText('def forward(self, x: Tensor, cos: Tensor, sin: Tensor, masque: Tensor | None = None) -> Tensor:');
+  await expect(figure.locator('pre [data-l]').first()).toContainText('def forward(self, x: Tensor, cos: Tensor, sin: Tensor, masque: Tensor | None = None, cache: CacheKV | None = None, couche: int = 0) -> Tensor:');
   // La docstring et les autres méthodes de la classe n'y sont pas.
   await expect(figure.locator('pre')).not.toContainText('__init__');
   const addition = figure.locator('.explications li[data-lignes="2-3"]');
