@@ -1,7 +1,7 @@
 """Point d'entrée en ligne de commande : `python -m forge <commande>`.
 
 Les commandes `donnees`, `tokenizer`, `compression`, `encoder`, `mesurer`,
-`entrainer`, `evaluer`, `exporter`, `publication`, `suivi`, `conversations` et `problemes` s'y branchent une par une, au fil des
+`entrainer`, `evaluer`, `exporter`, `publication`, `suivi`, `conversations`, `problemes` et `preparer` s'y branchent une par une, au fil des
 tâches du plan (chacune ajoute son sous-parseur dans `construire_parseur`). Toutes sont là.
 """
 
@@ -1080,6 +1080,88 @@ def _ajouter_problemes(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_problemes, parseur=commande)
 
 
+def _commande_preparer(choix: argparse.Namespace) -> int:
+    """`forge preparer` : assemble une recette de jeu d'affinage et l'écrit sur disque."""
+    # Imports ici : les autres commandes n'ont pas besoin des recettes.
+    from forge.affinage import recettes
+    from forge.chemins import PlaceInsuffisante, sous_forge_donnees
+    from forge.erreurs import DonneesManquantes
+    from forge.fichiers import ESPACE_FINE, entier
+
+    fine = ESPACE_FINE
+    if choix.recette not in recettes.RECETTES:
+        choix.parseur.error(
+            f"recette inconnue{fine}: {choix.recette!r}. Les recettes sont {', '.join(recettes.RECETTES)}."
+        )
+    recette = recettes.RECETTES[choix.recette]
+
+    def nombre(valeur: int) -> str:
+        return entier(valeur, milliers=fine)
+
+    def journal(message: str) -> None:
+        print(message, flush=True)
+
+    try:
+        index = recettes.preparer_jeu(recette, choix.sortie, journal=journal)
+    except (ValueError, DonneesManquantes, PlaceInsuffisante, RuntimeError) as erreur:
+        # Relancer tel quel échouerait de nouveau : le message dit quoi faire, rien d'autre.
+        print(f"Erreur{fine}: {erreur}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print(
+            f"Interrompu pendant la préparation de «{fine}{recette.nom}{fine}». Rien n'est resté à moitié écrit"
+            f"{fine}: le jeu n'est complet qu'à la fin. Relance la même commande{fine}: elle refait le même jeu.",
+            file=sys.stderr,
+        )
+        return 130
+    except OSError as erreur:  # disque, droits, coupure pendant l'écriture
+        print(
+            f"Erreur d'écriture pendant la préparation de «{fine}{recette.nom}{fine}»{fine}: {erreur}\n"
+            "Le jeu n'a pas été marqué complet. Corrige la cause, puis relance la même commande.",
+            file=sys.stderr,
+        )
+        return 1
+    for nom, source in index["sources"].items():
+        print(
+            f"{nom}{fine}: {nombre(source['lus'])} lus, {nombre(source['gardes'])} gardés, "
+            f"{nombre(source['doublons'])} doublons, {nombre(source['contamines'])} contaminés, "
+            f"{nombre(source['trop_longs'])} trop longs (licence{fine}: {source['licence']})"
+        )
+    jeux = index["decontamination"]["jeux"]
+    print(f"Décontamination{fine}: comparé à {', '.join(jeux) if jeux else "aucun jeu d'évaluation"}.")
+    dossier = sous_forge_donnees(choix.sortie if choix.sortie is not None else recette.nom, "affinage")
+    rangees = index["rangees"]
+    print(
+        f"Jeu «{fine}{recette.nom}{fine}»{fine}: {nombre(index['exemples'])} exemples, {nombre(index['jetons'])} jetons "
+        f"({nombre(index['jetons_appris'])} appris), {nombre(rangees['train'])} rangées d'entraînement et "
+        f"{nombre(rangees['val'])} de validation, {nombre(index['ecartes'])} écartés à l'empaquetage, dans {dossier}."
+    )
+    return 0
+
+
+def _ajouter_preparer(sous_parseurs) -> None:
+    commande = _nouvelle_commande(
+        sous_parseurs,
+        "preparer",
+        "Prépare un jeu d'affinage à partir d'une recette : lit les sources téléchargées, retire les doublons "
+        "et ce qui ressemble à un jeu d'évaluation, encode avec le format de conversation, empaquette et écrit "
+        "le jeu sous FORGE_DONNEES/affinage/NOM. Deux préparations donnent le même jeu à l'octet près.",
+    )
+    commande.add_argument(
+        "--recette",
+        required=True,
+        metavar="NOM",
+        help="la recette à préparer, par exemple sft-1.7 ou raisonnement-1.9 (la liste est dans le message d'une recette inconnue)",
+    )
+    commande.add_argument(
+        "--sortie",
+        default=None,
+        metavar="NOM",
+        help="le dossier du jeu, sous FORGE_DONNEES/affinage (par défaut, le nom de la recette)",
+    )
+    commande.set_defaults(fonction=_commande_preparer, parseur=commande)
+
+
 def construire_parseur() -> argparse.ArgumentParser:
     """Construit le parseur principal et ses sous-commandes."""
     parseur = argparse.ArgumentParser(
@@ -1116,6 +1198,7 @@ def construire_parseur() -> argparse.ArgumentParser:
     _ajouter_suivi(sous_parseurs)
     _ajouter_conversations(sous_parseurs)
     _ajouter_problemes(sous_parseurs)
+    _ajouter_preparer(sous_parseurs)
     return parseur
 
 

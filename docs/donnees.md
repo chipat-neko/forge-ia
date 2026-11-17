@@ -272,3 +272,57 @@ s'arrête après N éléments gardés (20 suffisent pour vérifier les colonnes)
 - **Licence :** MIT ([texte](https://opensource.org/license/mit)).
 - **Usage :** évaluation
 - **Ce qui est gardé :** `task_id`, `prompt`, `test`, `entry_point` et `canonical_solution`.
+
+## Vague 2 : les jeux d'affinage
+
+Un jeu d'affinage se prépare avec `python -m forge preparer --recette NOM` : la recette dit quelles
+sources entrent dans le jeu et combien d'exemples on tire de chacune (`forge/affinage/recettes.py`).
+Le jeu est écrit sous `FORGE_DONNEES/affinage/NOM/` avec son `index.json`, qui donne, pour chaque
+source, les exemples lus, gardés, écartés (doublons, ressemblance avec un jeu d'évaluation, trop longs),
+sa licence et son lien.
+
+| Recette | Parts |
+| --- | --- |
+| `sft-1.7` | `luth2_conversation` 150 000, `aya_fr` tout, `oasst2_fr` tout, `systeme_genere` 20 000, `identite` tout |
+| `raisonnement-1.9` | `problemes:entrainement-1.9` 60 000, `luth2_conversation` 12 000, `systeme_genere` 3 000, `identite` tout |
+
+- **Tirage :** les exemples d'une source sont tirés dans l'ordre de `Hasard(graine).melanger`, le même
+  à chaque préparation et d'une recette à l'autre : la part de rappel de `raisonnement-1.9` reprend les
+  premiers exemples de `sft-1.7`.
+- **Doublons :** retirés par l'empreinte du premier tour de l'utilisateur.
+- **Jeux d'évaluation :** une part qui en est un (IFEval-FR, MGSM-rev2, GSM8K-Platinum-fr, HumanEval,
+  HumanEval-FR) est refusée, avec une erreur qui la nomme. Des problèmes générés ne servent que
+  s'ils sont d'usage `entrainement`.
+- **Décontamination :** un exemple dont un tour d'utilisateur partage 8 mots de suite (sans casse ni
+  ponctuation) avec une invite d'un jeu d'évaluation déjà téléchargé est écarté et compté ; une invite
+  d'évaluation de moins de 8 mots est comparée en entier. Sont comparés les sources d'évaluation, les
+  problèmes générés d'évaluation et HumanEval-FR, quand ils sont là ; ceux qui manquent sont dits à
+  l'écran et dans l'index (`decontamination.absents`). Les problèmes générés d'entraînement et
+  d'évaluation emploient les mêmes phrases de gabarit : un problème d'entraînement n'est comparé aux
+  problèmes d'évaluation que mot pour mot (leurs prénoms sont différents, voir
+  `forge.raisonnement.problemes`), et aux autres jeux d'évaluation par suites de 8 mots.
+- **Identifiants :** `ids.txt.gz` (à côté de l'index) garde l'empreinte du premier tour de l'utilisateur
+  de chaque exemple gardé, pour que la préparation des paires de préférence ne reprenne pas une invite
+  déjà apprise.
+- **Reprise :** rien n'est écrit avant la fin de la lecture, l'écriture est atomique et `.complet` vient
+  en dernier. Après une coupure, la même commande refait le même jeu, à l'octet près.
+
+### Conversations générées par programme (`systeme_genere` et `identite`)
+
+Ces conversations ne viennent d'aucun jeu de tiers (`forge/conversation/generees.py`).
+
+- **`systeme_genere` :** une consigne de forme (réponse courte, en minuscules, sans virgule, avec un
+  titre, un mot imposé, des puces, une phrase de fin…) est donnée dans le message système, devant un
+  début de message tiré parmi 20 personnages écrits à la main (une fois sur deux). La réponse est celle
+  d'une conversation à un tour de la première source de conversations de la recette (Luth-2 pour les
+  deux recettes), transformée pour respecter la consigne, puis gardée seulement si le vérificateur de
+  `forge.evaluation.consignes` l'accepte. Les questions viennent d'exemples que la part principale de
+  cette source n'a pas pris.
+- **`identite` :** au moins 30 questions sur ton IA, avec leur réponse écrite à la main, une fois sans
+  et une fois avec un message système. Elles ne disent que des faits : son nom, le site qui l'a créée,
+  le français et le Python, sa taille, et qu'elle se trompe souvent. Elles ne prétendent pas que ton IA
+  répond bien aux questions ni que son code marche.
+- **Licence :** les personnages, les consignes et l'identité sont écrits dans le dépôt, sous sa licence
+  (MIT). Les réponses de `systeme_genere` viennent de Luth-2 (ou d'Aya) et restent sous la licence de leur
+  source (CC BY 4.0 pour Luth-2) : l'index du jeu le dit. Les problèmes de `problemes:<nom>` sont générés par
+  le code du dépôt (MIT).

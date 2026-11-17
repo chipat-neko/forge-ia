@@ -139,6 +139,32 @@ validation du RL (graines de 5 000 000 à 5 999 999, usage `validation_rl` dans 
 ne doit pas avoir vue. Une liste de graines ne peut pas enjamber l'une de ces deux plages. Les énoncés en double sont retirés, donc le jeu peut compter un peu moins
 de problèmes que demandé.
 
+## Préparer un jeu d'affinage
+
+`preparer` assemble les sources téléchargées (voir plus haut) selon une recette : elle tire les
+exemples, retire les doublons et tout ce qui ressemble à un jeu d'évaluation (8 mots de suite en
+commun avec une invite d'IFEval-FR, de MGSM, de GSM8K-Platinum-fr, de HumanEval ou d'un problème
+d'évaluation), encode les conversations avec le format de ton IA, les empaquette en rangées de
+2 049 jetons et écrit le jeu. Deux recettes existent : `sft-1.7` (le SFT de la partie 1.7) et
+`raisonnement-1.9` (le SFT de raisonnement de la partie 1.9) ; leurs parts sont dans
+`docs/donnees.md`, section « Vague 2 : les jeux d'affinage ».
+
+```powershell
+uv run --extra gpu python -m forge preparer --recette sft-1.7
+uv run --extra gpu python -m forge preparer --recette sft-1.7 --sortie sft-essai
+```
+
+Le jeu va sous `FORGE_DONNEES/affinage/<recette>/` (ou `<sortie>`) : `train/` et `val/`, `index.json`
+(les comptes de chaque source : lus, gardés, doublons, contaminés, trop longs, avec leur licence et
+leur lien), `ids.txt.gz` (les invites apprises) et `.complet`. Les sources de la recette doivent être
+téléchargées en entier (`forge conversations --source NOM`, `forge problemes --sortie NOM …`) : sinon
+la commande dit laquelle manque et quoi lancer. Une recette qui contient un jeu d'évaluation est
+refusée. Les jeux d'évaluation absents du disque sont dits : la décontamination ne les compare pas.
+
+Deux préparations donnent le même jeu, à l'octet près. Rien n'est écrit avant la fin de la lecture, et
+`.complet` vient en dernier : après une coupure ou un Ctrl+C, on relance la même commande, qui refait
+le même jeu.
+
 ## Le tokenizer de ton IA
 
 Le paquet `forge.tokenizer` contient le tokenizer de ton IA : un BPE sur les
