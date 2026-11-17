@@ -123,7 +123,21 @@ def test_une_reponse_coupee_est_signalee(tmp_path, monkeypatch, capsys):
         module_reponses, "repondre_lot", lambda *a, **k: [Reponse("Il était une", None, [], False)]
     )
     discuter(tmp_path, monkeypatch, ["Raconte", "/quitter"])
-    assert "coupée" in capsys.readouterr().out
+    sortie = capsys.readouterr().out
+    assert "coupée" in sortie and "n'est pas gardée" in sortie
+
+
+def test_une_reponse_coupee_n_entre_pas_dans_l_historique(tmp_path, monkeypatch):
+    reponses = iter([Reponse("Il était une", None, [], False), Reponse("Bonjour.", None, [], True)])
+    notes = []
+
+    def faux(modele, tok, conversations, **options):
+        notes.append(list(conversations[0]))
+        return [next(reponses)]
+
+    monkeypatch.setattr(module_reponses, "repondre_lot", faux)
+    discuter(tmp_path, monkeypatch, ["Raconte", "Salut", "/quitter"])
+    assert [len(t) for t in notes] == [1, 1]  # ni la réponse coupée ni sa question ne restent
 
 
 def test_la_pensee_s_affiche_a_part(tmp_path, monkeypatch, capsys):

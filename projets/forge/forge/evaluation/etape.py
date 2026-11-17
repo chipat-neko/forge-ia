@@ -50,8 +50,6 @@ from forge.evaluation.rapport import (
     nombre_fr,
     pourcent,
 )
-_n = nombre_fr
-_pourcent = pourcent
 from forge.evaluation.reponses import choisir_le_lot, repondre_lot
 from forge.fichiers import ESPACE_FINE, ecrire_texte
 from forge.fragments import lire_elements
@@ -64,6 +62,8 @@ from forge.tokenizer.bpe_octets import TokenizerOctets
 VERSION_DU_RAPPORT_D_ETAPE = 1
 
 _FINE = ESPACE_FINE
+_n = nombre_fr
+_pourcent = pourcent
 
 # Six questions, deux consignes, la présentation de ton IA et une demande de fonction Python : les mêmes dix
 # invites à chaque version, pour qu'on voie d'une version à l'autre ce qui change.
@@ -84,6 +84,7 @@ JETONS_IFEVAL = 512
 JETONS_PROBLEMES = 384
 JETONS_ECHANTILLONS = 200
 PROBLEMES_EVALUES = 400
+LOT_DES_ESSAIS = 32  # fixe : à température non nulle, le tirage dépend du lot, et la mémoire libre ne doit pas le changer
 ESSAIS = 8  # « réussite en 8 essais » : au moins une réponse juste sur 8 tirages (température 1, top-k 50)
 INVITES_DE_VALIDATION = 100
 MORCEAUX_D_OUBLI = 64
@@ -114,10 +115,16 @@ class ContexteDEvaluation:
         return n if self.n_max is None else min(n, self.n_max)
 
     def repondre(
-        self, conversations: list[list[Tour]], n_nouveaux: int, temperature: float = 0.0, top_k: int = 50, graine: int = 0
+        self,
+        conversations: list[list[Tour]],
+        n_nouveaux: int,
+        temperature: float = 0.0,
+        top_k: int = 50,
+        graine: int = 0,
+        lot_fixe: int | None = None,
     ) -> list[Reponse]:
         """`repondre_lot` avec le plus grand lot que la mémoire permet (`self.lot` l'impose, s'il est donné)."""
-        lot = self.lot
+        lot = lot_fixe or self.lot
         if lot is None:
             longueurs = [len(invite_de_reponse(self.tok, c)) for c in conversations]
             lot = choisir_le_lot(self.modele, max(longueurs, default=0) + n_nouveaux, max(longueurs, default=0))
@@ -321,12 +328,17 @@ def _problemes(ctx: ContexteDEvaluation) -> dict:
     """400 problèmes générés (graines d'évaluation) : exactitude en glouton, et réussite en 8 essais tirés."""
     problemes = generer_problemes(ctx.limiter(PROBLEMES_EVALUES), GRAINES_EVALUATION)
     conversations = [[Tour("utilisateur", p.enonce)] for p in problemes]
-    glouton = [est_juste(r, p.reponse) for r, p in zip(ctx.repondre(conversations, JETONS_PROBLEMES), problemes)]
-    tires = ctx.repondre(conversations * ESSAIS, JETONS_PROBLEMES, temperature=1.0, top_k=50)
+    reponses = ctx.repondre(conversations, JETONS_PROBLEMES)
+    glouton = [est_juste(r, p.reponse) for r, p in zip(reponses, problemes)]
+    tires = ctx.repondre(
+        conversations * ESSAIS, JETONS_PROBLEMES, temperature=1.0, top_k=50, lot_fixe=LOT_DES_ESSAIS
+    )
     n = len(problemes)
     essais = [[est_juste(tires[k * n + i], p.reponse) for k in range(ESSAIS)] for i, p in enumerate(problemes)]
     return {
         "exactitude": _part(glouton),
+        "terminee": _part([r.terminee for r in reponses]),
+        "lot": LOT_DES_ESSAIS,
         "reussite_8": _part([any(e) for e in essais]),
         "par_famille": _par_groupe(problemes, glouton, essais, lambda p: p.famille),
         "par_difficulte": _par_groupe(problemes, glouton, essais, lambda p: p.difficulte),
@@ -339,7 +351,11 @@ def _mesure_de_problemes_traduits(source: str) -> Callable[[ContexteDEvaluation]
     def mesure(ctx: ContexteDEvaluation) -> dict:
         lignes = _lire_source(source, ctx.n_max)
         reponses = ctx.repondre([[Tour("utilisateur", ligne["question"])] for ligne in lignes], JETONS_PROBLEMES)
-        return {"exactitude": _part([est_juste(r, ligne["reponse"]) for r, ligne in zip(reponses, lignes)]), "n": len(lignes)}
+        return {
+            "exactitude": _part([est_juste(r, ligne["reponse"]) for r, ligne in zip(reponses, lignes)]),
+            "terminee": _part([r.terminee for r in reponses]),
+            "n": len(lignes),
+        }
 
     return mesure
 
@@ -460,9 +476,16 @@ _LIGNES: dict[str, list[tuple[str, Callable[[dict], str]]]] = {
     "problemes": [
         ("Problèmes générés, exactitude en glouton", lambda m: f"{_pourcent(m['exactitude'])} ({_ex(m)})"),
         ("Problèmes générés, réussite en 8 essais", lambda m: _pourcent(m["reussite_8"])),
+        ("Problèmes générés, réponses terminées", lambda m: _pourcent(m["terminee"])),
     ],
-    "mgsm_fr": [("MGSM en français, exactitude", lambda m: f"{_pourcent(m['exactitude'])} ({_ex(m)})")],
-    "gsm8k_platinum_fr": [("GSM8K-Platinum en français, exactitude", lambda m: f"{_pourcent(m['exactitude'])} ({_ex(m)})")],
+    "mgsm_fr": [
+        ("MGSM en français, exactitude", lambda m: f"{_pourcent(m['exactitude'])} ({_ex(m)})"),
+        ("MGSM en français, réponses terminées", lambda m: _pourcent(m["terminee"])),
+    ],
+    "gsm8k_platinum_fr": [
+        ("GSM8K-Platinum en français, exactitude", lambda m: f"{_pourcent(m['exactitude'])} ({_ex(m)})"),
+        ("GSM8K-Platinum en français, réponses terminées", lambda m: _pourcent(m["terminee"])),
+    ],
 }
 
 

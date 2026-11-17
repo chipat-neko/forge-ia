@@ -208,9 +208,12 @@ def discuter(
             print(f"(pensée{_FINE}: {reponse.pensee})", flush=True)
         print(f"{version}{_FINE}: {reponse.texte}", flush=True)
         if not reponse.terminee:
+            # Une réponse coupée n'est pas un tour fini : la garder la ré-encoderait avec `<|fin_tour|>`.
             print(
                 f"(réponse coupée{_FINE}: ton IA n'avait pas fini quand la limite de "
-                f"{entier(limite, milliers=_FINE)} jetons est arrivée.)",
+                f"{entier(limite, milliers=_FINE)} jetons est arrivée. Elle n'est pas gardée dans la conversation, "
+                f"ni ta question{_FINE}: reformule-la, ou écris /nouveau.)",
                 flush=True,
             )
+            continue
         historique = [*tours, Tour("assistant", reponse.texte, pensee=reponse.pensee)]

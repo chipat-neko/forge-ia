@@ -58,9 +58,9 @@ CLES = {
     "ifeval_fr": {"invite_stricte", "consigne_stricte", "n"},
     "tenue": {"terminee", "fr", "autre", "indetermine", "mots_moyens", "n"},
     "oubli": {"perte", "bits_par_octet", "n"},
-    "problemes": {"exactitude", "reussite_8", "par_famille", "par_difficulte", "n"},
-    "mgsm_fr": {"exactitude", "n"},
-    "gsm8k_platinum_fr": {"exactitude", "n"},
+    "problemes": {"exactitude", "terminee", "lot", "reussite_8", "par_famille", "par_difficulte", "n"},
+    "mgsm_fr": {"exactitude", "terminee", "n"},
+    "gsm8k_platinum_fr": {"exactitude", "terminee", "n"},
 }
 
 
@@ -321,10 +321,11 @@ def test_mgsm_et_gsm8k_comptent_les_reponses_justes(donnees):
     ecrire_source(donnees, "mgsm_rev2_fr", [{"question": "Combien ?", "reponse": "9"}, {"question": "Et ?", "reponse": "10"}])
     ecrire_source(donnees, "gsm8k_platinum_fr", [{"question": "Combien ?", "reponse": "1 234"}])
     modele = faux_modele("La réponse est 9.")
-    assert MESURES["mgsm_fr"](contexte_de(modele)) == {"exactitude": 0.5, "n": 2}
-    assert MESURES["gsm8k_platinum_fr"](contexte_de(modele)) == {"exactitude": 0.0, "n": 1}
+    assert MESURES["mgsm_fr"](contexte_de(modele)) == {"exactitude": 0.5, "terminee": 1.0, "n": 2}
+    assert MESURES["gsm8k_platinum_fr"](contexte_de(modele)) == {"exactitude": 0.0, "terminee": 1.0, "n": 1}
     # Une réponse coupée est fausse, même si son dernier nombre est le bon.
-    assert MESURES["mgsm_fr"](contexte_de(faux_modele("La réponse est 9.", termine=False)))["exactitude"] == 0.0
+    coupe = MESURES["mgsm_fr"](contexte_de(faux_modele("La réponse est 9.", termine=False)))
+    assert coupe == {"exactitude": 0.0, "terminee": 0.0, "n": 2}  # la part terminée explique le 0 %
 
 
 def test_problemes_exactitude_reussite_et_decoupages(donnees, monkeypatch):
@@ -342,11 +343,30 @@ def test_problemes_exactitude_reussite_et_decoupages(donnees, monkeypatch):
     assert sum(g["n"] for g in r["par_famille"].values()) == len(p)
 
 
-def test_problemes_reussite_en_8_essais_depasse_l_exactitude_d_un_modele_au_hasard(donnees):
+def test_problemes_part_terminee_et_lot_ecrit(donnees):
+    termine = MESURES["problemes"](contexte_de(faux_modele("La réponse est 5."), n_max=6))
+    assert termine["terminee"] == 1.0 and termine["lot"] == module_etape.LOT_DES_ESSAIS
+    coupe = MESURES["problemes"](contexte_de(faux_modele("La réponse est 5.", termine=False), n_max=6))
+    assert coupe["terminee"] == 0.0 and coupe["exactitude"] == 0.0 and coupe["reussite_8"] == 0.0
+
+
+def test_reussite_8_ne_depend_pas_du_lot_de_generation(donnees, monkeypatch):
+    """À température 1, le tirage dépend du lot : celui des 8 essais est fixe, quel que soit `ctx.lot`."""
     torch.manual_seed(2)
     modele = Transformer(CONFIG).eval()
-    r = MESURES["problemes"](contexte_de(modele, n_max=3))
-    assert r["reussite_8"] >= r["exactitude"]
+    lots_vus = []
+    vrai = module_etape.repondre_lot
+
+    def espion(modele, tok, conversations, n_nouveaux, temperature, top_k, graine, lot):
+        lots_vus.append((temperature, lot))
+        return vrai(modele, tok, conversations, n_nouveaux, temperature, top_k, graine, lot)
+
+    monkeypatch.setattr(module_etape, "repondre_lot", espion)
+    petit = MESURES["problemes"](ContexteDEvaluation(modele, TOK, torch.device("cpu"), 4, lot=2))
+    grand = MESURES["problemes"](ContexteDEvaluation(modele, TOK, torch.device("cpu"), 4, lot=8))
+    assert petit["reussite_8"] == grand["reussite_8"] and petit["par_famille"] == grand["par_famille"]
+    assert {lot for temperature, lot in lots_vus if temperature == 1.0} == {module_etape.LOT_DES_ESSAIS}
+    assert {lot for temperature, lot in lots_vus if temperature == 0.0} == {2, 8}  # le glouton garde le lot demandé
 
 
 def test_oubli_est_la_perte_sur_des_morceaux_du_principal(donnees_completes):

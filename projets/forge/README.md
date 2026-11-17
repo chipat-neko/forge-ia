@@ -451,9 +451,13 @@ du rapport 1) : `version`, `empreinte` (SHA-256 des poids), `etape`, `date`, `me
   (`forge.evaluation.langue`, des parts de 0 à 1) et leur longueur ;
 - `oubli` : `{perte, bits_par_octet, n}`, sur 64 morceaux de `jetons/principal/val` (la mesure du plan 6) ;
 - `echantillons` : `[{invite, texte, pensee, terminee}]`, dix invites fixes en glouton, gardées telles quelles ;
-- `problemes` : `{exactitude, reussite_8, par_famille, par_difficulte, n}`, 400 problèmes générés de la
-  plage d'évaluation, en glouton puis en 8 essais (température 1, top-k 50) ;
-- `mgsm_fr` et `gsm8k_platinum_fr` : `{exactitude, n}`, en glouton, 384 jetons.
+- `problemes` : `{exactitude, terminee, lot, reussite_8, par_famille, par_difficulte, n}`, 400 problèmes générés
+  de la plage d'évaluation, en glouton puis en 8 essais (température 1, top-k 50, lot fixe de 32 écrit dans `lot`
+  : le tirage dépend du lot, donc `reussite_8` se refait à l'identique) ; `reussite_8` est « au moins un essai juste
+  sur 8 », sans le glouton : elle peut être plus basse que `exactitude` ;
+- `mgsm_fr` et `gsm8k_platinum_fr` : `{exactitude, terminee, n}`, en glouton, 384 jetons. `terminee` (de 0 à 1) est la
+  part de réponses finies avant la limite : un 0 % d'exactitude avec 0 % de réponses terminées veut dire « coupé »,
+  pas « faux ».
 
 Une réponse vide ou coupée par la limite de jetons est comptée telle quelle (fausse pour un problème). Une
 mesure dont les données manquent rend `{"absente": "<raison>"}` et dit quelle commande lancer
@@ -472,7 +476,8 @@ uv run --extra gpu python -m forge discuter --modele "$env:FORGE_DONNEES\publica
 Chaque ligne est un tour ; ton IA répond avec toute la conversation sous les yeux. `/nouveau` repart de zéro,
 `/quitter` sort. `--systeme "TEXTE"` ouvre la conversation par un message système (gardé après `/nouveau`).
 Quand la fenêtre de contexte est pleine, le message dit de faire `/nouveau`. Une réponse coupée par la limite
-de 512 jetons est signalée ; sa pensée, s'il y en a une, s'affiche à part.
+de 512 jetons est signalée et n'est pas gardée dans la conversation (ni sa question) ; sa pensée, s'il y en a une,
+s'affiche à part.
 
 ## Sous Linux
 
