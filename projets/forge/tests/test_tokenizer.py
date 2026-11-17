@@ -131,7 +131,7 @@ def test_motif_exact_et_compatible_javascript():
 
 def test_predecoupage_ne_perd_aucun_caractere():
     # Espaces insécables (U+00A0, U+202F), accents combinants, tabulations…
-    for texte in TEXTES_BIZARRES + [TEXTE_DE_TEST, "« Bonjour » ; l’été !", "été", "a b"]:
+    for texte in TEXTES_BIZARRES + [TEXTE_DE_TEST, "« Bonjour » ; l’été\u202f!", "été", "a b"]:
         assert "".join(pre_decouper(texte)) == texte
 
 

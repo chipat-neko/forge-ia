@@ -4,10 +4,12 @@ Le réseau est simulé : `urlretrieve` est remplacé par une copie depuis une fa
 dans `tmp_path`. Le modèle est minuscule (celui de `test_exporter`).
 """
 
+import hashlib
+import io
+import json
 import socket
-import warnings
 from pathlib import Path
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 import pytest
 
@@ -65,7 +67,7 @@ def test_aller_retour_d_une_publication(tmp_path):
     assert all(p.dtype == torch.float32 for p in pub.modele.parameters())
     with torch.no_grad():
         assert torch.equal(pub.modele(IDS)[0], attendu(IDS)[0])
-    assert pub.tokenizer.encoder("Bonjour") == pub.tokenizer.encoder("Bonjour")
+    assert pub.tokenizer.decoder(pub.tokenizer.encoder("Bonjour le monde")) == "Bonjour le monde"
 
 
 def test_deux_fichiers_de_poids_refuses(tmp_path):
@@ -117,16 +119,32 @@ def fausse_release(tmp_path, monkeypatch):
     for nom in (nom_des_poids(ETIQUETTE), "config.json", "tokenizer-ton-ia-v1.json"):
         (release / nom).write_bytes(nom.encode() * 100)
     appels: list[tuple[str, int | None]] = []
-    etat = {"couper_au": None}
+    etat = {"couper_au": None, "erreur": None, "api": "empreintes"}  # "empreintes" : les vraies ; sinon une réponse imposée
 
     def urlretrieve_simule(adresse, destination):
         appels.append((adresse, socket.getdefaulttimeout()))
+        if etat["erreur"] is not None:
+            raise etat["erreur"]
         if etat["couper_au"] == len(appels):
             Path(destination).write_bytes(b"debut seulement")  # un fichier à moitié écrit...
             raise URLError("connexion coupée")  # ...puis la coupure
         Path(destination).write_bytes((release / adresse.rsplit("/", 1)[1]).read_bytes())
 
+    def urlopen_simule(adresse, timeout=None):
+        """L'API des Releases : un champ `digest` par fichier, ou la réponse que le test impose."""
+        assert adresse == f"https://api.github.com/repos/{DEPOT}/releases/tags/{ETIQUETTE}"
+        if isinstance(etat["api"], BaseException):
+            raise etat["api"]
+        if etat["api"] == "empreintes":
+            fichiers = [
+                {"name": f.name, "digest": "sha256:" + hashlib.sha256(f.read_bytes()).hexdigest()} for f in release.iterdir()
+            ]
+        else:
+            fichiers = etat["api"]
+        return io.BytesIO(json.dumps({"assets": fichiers}).encode())
+
     monkeypatch.setattr(module_publication, "urlretrieve", urlretrieve_simule)
+    monkeypatch.setattr(module_publication, "urlopen", urlopen_simule)
     monkeypatch.delenv(VARIABLE_DES_VERSIONS, raising=False)
     return appels, etat, release
 
@@ -135,7 +153,7 @@ def test_telechargement_coupe_puis_repris(tmp_path, fausse_release):
     appels, etat, release = fausse_release
     cible = tmp_path / "telecharge"
     etat["couper_au"] = 2  # le 2e fichier est coupé
-    with pytest.raises(ConnectionError, match="Relance la même commande"):
+    with pytest.raises(ConnectionError, match="elance la même commande"):
         telecharger_publication(ETIQUETTE, cible)
     assert sorted(p.name for p in cible.iterdir()) == [nom_des_poids(ETIQUETTE)]  # aucun fichier final à moitié écrit, aucun .partiel
     avant = len(appels)
@@ -203,4 +221,68 @@ def test_sous_commande_publication_erreur_en_francais(tmp_path, fausse_release, 
     etat["couper_au"] = 1
     assert main(["publication", "--etiquette", ETIQUETTE, "--dossier", str(tmp_path / "t")]) == 1
     erreur = capsys.readouterr().err
-    assert erreur.startswith("Erreur : ") and "Relance la même commande" in erreur and "Traceback" not in erreur
+    assert erreur.startswith("Erreur : ") and "elance la même commande" in erreur and "Traceback" not in erreur
+
+
+def test_404_dit_que_l_etiquette_ou_le_fichier_est_introuvable(tmp_path, fausse_release):
+    _, etat, _ = fausse_release
+    etat["erreur"] = HTTPError("https://github.com/x", 404, "Not Found", {}, None)
+    with pytest.raises(FileNotFoundError) as erreur:
+        telecharger_publication(ETIQUETTE, tmp_path / "t")
+    message = str(erreur.value)
+    assert "ne trouve pas" in message and ETIQUETTE in message and "ton-ia-1.5" in message  # nomme les étiquettes connues
+    assert "connexion" not in message  # ce n'est pas un problème de réseau
+    assert not list((tmp_path / "t").iterdir())
+
+
+def test_sans_reseau_dit_de_verifier_la_connexion(tmp_path, fausse_release):
+    _, etat, _ = fausse_release
+    etat["erreur"] = URLError(socket.gaierror(11001, "getaddrinfo failed"))
+    with pytest.raises(ConnectionError) as erreur:
+        telecharger_publication(ETIQUETTE, tmp_path / "t")
+    message = str(erreur.value)
+    assert "connexion" in message and VARIABLE_DES_VERSIONS in message and "elance" in message
+    assert "ne trouve pas" not in message
+    assert not list((tmp_path / "t").iterdir())
+
+
+def test_erreur_du_serveur_dit_de_reessayer(tmp_path, fausse_release):
+    _, etat, _ = fausse_release
+    etat["erreur"] = HTTPError("https://github.com/x", 503, "Unavailable", {}, None)
+    with pytest.raises(ConnectionError, match="503.*Relance"):
+        telecharger_publication(ETIQUETTE, tmp_path / "t")
+
+
+def test_empreinte_differente_refusee_et_effacee(tmp_path, fausse_release):
+    _, etat, _ = fausse_release
+    etat["api"] = [{"name": "config.json", "digest": "sha256:" + "0" * 64}]
+    cible = tmp_path / "t"
+    with pytest.raises(ValueError) as erreur:
+        telecharger_fichiers(ETIQUETTE, ["config.json"], cible)
+    assert "0" * 64 in str(erreur.value) and "effacé" in str(erreur.value)
+    assert list(cible.iterdir()) == []  # ni fichier final, ni .partiel
+
+
+def test_empreinte_conforme_acceptee(tmp_path, fausse_release):
+    telecharger_publication(ETIQUETTE, tmp_path / "t")  # l'API simulée donne les vraies empreintes
+    assert (tmp_path / "t" / "config.json").is_file()
+
+
+@pytest.mark.parametrize(
+    "api",
+    [[{"name": "config.json"}], [{"name": "config.json", "digest": None}], OSError("pas de réseau"), HTTPError("u", 403, "limite", {}, None)],
+)
+def test_sans_empreinte_de_l_api_le_telechargement_a_lieu(tmp_path, fausse_release, api):
+    _, etat, _ = fausse_release
+    etat["api"] = api
+    telecharger_fichiers(ETIQUETTE, ["config.json"], tmp_path / "t")
+    assert (tmp_path / "t" / "config.json").is_file()
+
+
+def test_sous_commande_publication_ctrl_c(tmp_path, fausse_release, capsys):
+    _, etat, _ = fausse_release
+    etat["erreur"] = KeyboardInterrupt()
+    cible = tmp_path / "t"
+    assert main(["publication", "--etiquette", ETIQUETTE, "--dossier", str(cible)]) == 130
+    assert "interrompu" in capsys.readouterr().err
+    assert list(cible.iterdir()) == []

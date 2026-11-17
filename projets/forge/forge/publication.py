@@ -15,14 +15,15 @@ La variable d'environnement `FORGE_IA_MODELES` désigne un dossier qui contient 
 par étiquette (`<dossier>/ton-ia-1.5/…`) : le réseau n'est alors jamais utilisé.
 """
 
+import hashlib
 import json
 import os
 import socket
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.error import URLError
-from urllib.request import urlretrieve
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen, urlretrieve
 
 import torch
 from safetensors.torch import load_file
@@ -100,14 +101,14 @@ def charger_publication(dossier: Path, appareil: str = "cpu") -> Publication:
     if empreinte_du_tokenizer != EMPREINTE_DU_TOKENIZER:
         raise ValueError(
             f"{tokenizer_json} n'a pas l'empreinte SHA-256 du tokenizer de ton IA ({EMPREINTE_DU_TOKENIZER}, "
-            f"lue : {empreinte_du_tokenizer}). Le fichier a changé (fins de ligne réécrites, téléchargement coupé ?). {conseil}"
+            f"lue\u202f: {empreinte_du_tokenizer}). Le fichier a changé (fins de ligne réécrites, téléchargement coupé\u202f?). {conseil}"
         )
     tokenizer = TokenizerOctets.charger(tokenizer_json)
 
     try:
         poids = load_file(poids_safetensors)
     except Exception as erreur:  # fichier tronqué, ou qui n'est pas un safetensors
-        raise ValueError(f"{poids_safetensors} ne se lit pas ({type(erreur).__name__} : {erreur}). {conseil}") from erreur
+        raise ValueError(f"{poids_safetensors} ne se lit pas ({type(erreur).__name__}\u202f: {erreur}). {conseil}") from erreur
     if PLONGEMENT in poids:
         poids.setdefault(SORTIE, poids[PLONGEMENT])  # les poids liés : la sortie est le plongement
     modele = Transformer(config)
@@ -131,6 +132,32 @@ def _url(etiquette: str, nom: str) -> str:
     return f"https://github.com/{DEPOT}/releases/download/{etiquette}/{nom}"
 
 
+def _empreintes_annoncees(etiquette: str) -> dict[str, str]:
+    """Les empreintes SHA-256 que l'API publique de GitHub donne pour les fichiers de la Release (champ `digest`).
+
+    Rend `{nom: empreinte hexadécimale}`. Si l'API ne répond pas, ou ne donne pas d'empreinte, rend
+    ce qu'elle a donné (parfois rien) : le téléchargement a lieu sans cette vérification.
+    """
+    try:
+        with urlopen(f"https://api.github.com/repos/{DEPOT}/releases/tags/{etiquette}", timeout=DELAI_DU_SOCKET) as reponse:
+            fichiers = json.loads(reponse.read())["assets"]
+        return {
+            f["name"]: f["digest"].removeprefix("sha256:").lower()
+            for f in fichiers
+            if isinstance(f.get("digest"), str) and f["digest"].startswith("sha256:")
+        }
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):  # pas de réseau, limite de l'API, réponse inattendue
+        return {}
+
+
+def _empreinte(chemin: Path) -> str:
+    calcul = hashlib.sha256()
+    with open(chemin, "rb") as fichier:
+        for bloc in iter(lambda: fichier.read(1024**2), b""):
+            calcul.update(bloc)
+    return calcul.hexdigest()
+
+
 def telecharger_fichiers(etiquette: str, noms: Sequence[str], dossier: Path | None = None) -> Path:
     """Rend le dossier qui contient les fichiers `noms` de la Release `etiquette`, en les téléchargeant au besoin.
 
@@ -140,6 +167,9 @@ def telecharger_fichiers(etiquette: str, noms: Sequence[str], dossier: Path | No
       `publications/<etiquette>` sous `FORGE_DONNEES`). Un fichier se télécharge sous le nom
       `<nom>.partiel`, renommé quand il est complet : un fichier déjà complet n'est pas retéléchargé,
       et relancer après une coupure ne reprend que ce qui manque. Délai du socket : 60 s.
+      Quand GitHub donne l'empreinte SHA-256 du fichier, elle est vérifiée : un fichier qui en
+      diffère est effacé (`ValueError`). Étiquette ou fichier introuvable : `FileNotFoundError` ;
+      réseau absent ou coupé : `ConnectionError`.
     """
     imposee = os.environ.get(VARIABLE_DES_VERSIONS)
     if imposee:
@@ -158,24 +188,44 @@ def telecharger_fichiers(etiquette: str, noms: Sequence[str], dossier: Path | No
     ancien_delai = socket.getdefaulttimeout()
     socket.setdefaulttimeout(DELAI_DU_SOCKET)
     try:
-        for nom in noms:
+        a_telecharger = [nom for nom in noms if not (cible / nom).is_file()]
+        annoncees = _empreintes_annoncees(etiquette) if a_telecharger else {}
+        for nom in a_telecharger:
             final = cible / nom
-            if final.is_file():
-                continue
             partiel = cible / f"{nom}.partiel"
             adresse = _url(etiquette, nom)
             try:
                 urlretrieve(adresse, partiel)
-                remplacer(partiel, final)
-            except (URLError, OSError) as erreur:  # réseau coupé, 404, disque plein, délai dépassé
+            except HTTPError as erreur:
+                partiel.unlink(missing_ok=True)
+                if erreur.code == 404:
+                    raise FileNotFoundError(
+                        f"GitHub ne trouve pas {nom} dans la Release {etiquette} ({adresse}). Vérifie l'étiquette "
+                        f"(celles que forge connaît : {', '.join(ETIQUETTES)}) et que la Release est publiée avec ce fichier."
+                    ) from erreur
+                raise ConnectionError(
+                    f"GitHub a répondu {erreur.code} pour {adresse}. Relance la même commande dans quelques minutes : "
+                    "les fichiers déjà complets ne sont pas retéléchargés."
+                ) from erreur
+            except (URLError, OSError) as erreur:  # réseau absent ou coupé, délai dépassé, disque plein
                 partiel.unlink(missing_ok=True)
                 raise ConnectionError(
-                    f"Le téléchargement de {adresse} a échoué ({type(erreur).__name__} : {erreur}). "
-                    "Relance la même commande : les fichiers déjà complets ne sont pas retéléchargés."
+                    f"Le téléchargement de {adresse} a échoué ({type(erreur).__name__}\u202f: {erreur}). "
+                    "Vérifie la connexion au réseau, puis relance la même commande : les fichiers déjà complets ne "
+                    f"sont pas retéléchargés. Sans réseau, copie les fichiers dans un dossier {etiquette} sous "
+                    f"{VARIABLE_DES_VERSIONS}."
                 ) from erreur
             except BaseException:  # Ctrl+C : pas de demi-fichier
                 partiel.unlink(missing_ok=True)
                 raise
+            attendue = annoncees.get(nom)
+            if attendue is not None and _empreinte(partiel) != attendue:
+                partiel.unlink(missing_ok=True)
+                raise ValueError(
+                    f"{nom} téléchargé n'a pas l'empreinte SHA-256 que GitHub annonce ({attendue}) : le fichier est "
+                    "abîmé, il est effacé. Relance la même commande pour le télécharger de nouveau."
+                )
+            remplacer(partiel, final)
     finally:
         socket.setdefaulttimeout(ancien_delai)
     return cible

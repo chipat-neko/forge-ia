@@ -795,23 +795,22 @@ def _ajouter_exporter(sous_parseurs) -> None:
 
 def _commande_publication(choix: argparse.Namespace) -> int:
     """`forge publication` : télécharge une version publiée de ton IA et affiche ses fichiers."""
-    from forge.exporter import empreinte_sha256
+    from forge.exporter import NOM_DE_LA_CONFIG, empreinte_sha256
     from forge.fichiers import ESPACE_FINE, entier
-    from forge.publication import telecharger_publication
+    from forge.publication import NOM_DU_TOKENIZER, nom_des_poids, telecharger_publication
 
     try:
         dossier = telecharger_publication(choix.etiquette, choix.dossier)
-    except (FileNotFoundError, PermissionError, ConnectionError) as erreur:
+    except (FileNotFoundError, PermissionError, ConnectionError, ValueError) as erreur:
         print(f"Erreur : {erreur}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
         print("Téléchargement interrompu : aucun fichier n'est à moitié écrit. Relance la même commande.", file=sys.stderr)
         return 130
     print(f"Fichiers de {choix.etiquette} dans {dossier} :")
-    for chemin in sorted(dossier.iterdir()):
-        if chemin.is_file() and not chemin.name.endswith(".partiel"):
-            en_octets = entier(chemin.stat().st_size, milliers=ESPACE_FINE)
-            print(f"  {chemin.name} : {en_octets} octets, SHA-256 {empreinte_sha256(chemin)}")
+    for nom in (nom_des_poids(choix.etiquette), NOM_DE_LA_CONFIG, NOM_DU_TOKENIZER):  # seulement ceux de la version
+        en_octets = entier((dossier / nom).stat().st_size, milliers=ESPACE_FINE)
+        print(f"  {nom} : {en_octets} octets, SHA-256 {empreinte_sha256(dossier / nom)}")
     return 0
 
 
@@ -833,7 +832,7 @@ def _ajouter_publication(sous_parseurs) -> None:
         type=Path,
         default=None,
         metavar="DOSSIER",
-        help="où ranger les fichiers (par défaut publications/<étiquette> sous FORGE_DONNEES)",
+        help="où ranger les fichiers (par défaut publications/<étiquette> sous FORGE_DONNEES ; ignoré si FORGE_IA_MODELES est posée)",
     )
     commande.set_defaults(fonction=_commande_publication)
 

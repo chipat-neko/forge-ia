@@ -52,7 +52,7 @@ from forge.modele import ConfigModele, Transformer
 from forge.tokenizer import TokenizerOctets, entrainer_tokenizer
 
 RACINE_DU_PROJET = Path(__file__).resolve().parents[1]
-ESPACE_FINE = " "
+ESPACE_FINE = "\u202f"
 
 TEXTE_DE_TEST = (Path(__file__).parent / "donnees" / "corpus_test.txt").read_text(encoding="utf-8")
 PARAGRAPHES = [p.strip() for p in TEXTE_DE_TEST.split("\n\n") if p.strip()]

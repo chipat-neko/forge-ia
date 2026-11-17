@@ -31,7 +31,7 @@ PARAGRAPHES = [paragraphe.strip() for paragraphe in TEXTE_DE_TEST.split("\n\n") 
 # Des textes piégeux : ce qui ressemble à un jeton spécial, des émojis, des écritures variées.
 PIEGES = [
     "Un texte qui parle de <|fin_texte|> et de <|debut_texte|> sans jamais les émettre.",
-    "Des émojis : 🙂 🇫🇷 👨‍👩‍👧, et des tabulations\tici\tet là.",
+    "Des émojis : 🙂 🇫🇷 👨\u200d👩\u200d👧, et des tabulations\tici\tet là.",
     "日本語の文章と العربية et ελληνικά, mêlés au français.",
 ]
 

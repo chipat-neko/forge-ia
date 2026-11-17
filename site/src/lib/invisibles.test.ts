@@ -130,6 +130,8 @@ const A_LIRE = [
   ...sous('site/src/pages/annexes'),
   ...sous('site/e2e', /^(chapitre-0-[^/]*|chapitre-1-[12456]|annexes|brouillons|parution|figures-0-2)\.spec\.ts$/),
   ...dossiers('projets', /^(0\.|1\.[12456]-)/).flatMap((d) => sous(d, /\.py$|^pyproject\.toml$/)),
+  ...sous('projets/forge/forge', /\.py$/),
+  ...sous('projets/forge/tests', /\.py$/),
   ...sous('outils', /^[^/]*\.py$/),
   ...sous('notebooks', /^(0\.|1\.[12456]-)[^/]*\.ipynb$/),
   ...FICHIERS_SEULS.filter((f) => existsSync(join(RACINE, f))),

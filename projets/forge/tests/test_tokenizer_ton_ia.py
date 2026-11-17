@@ -122,7 +122,7 @@ def test_jetons_exacts_de_quelques_textes():
         ("Ligne\r\nDeux", [76, 1050, 13, 10, 8286]),
         # Espace insécable (U+00A0, un jeton à lui seul) et espace fine insécable (U+202F, trois octets
         # qui ne fusionnent pas : deux jetons) : le texte typographié français reste exact, mais coûte.
-        ("10 % ; 3 000 km", [899, 12287, 37, 767, 32, 51, 290, 175, 1498, 12287, 13030]),
+        ("10\u00a0% ; 3\u202f000\u00a0km", [899, 12287, 37, 767, 32, 51, 290, 175, 1498, 12287, 13030]),
         # Un émoji n'a aucune fusion : ses quatre octets font quatre jetons.
         ("Bravo 🙂 !", [26611, 2200, 32, 240, 159, 153, 130, 677]),
         # Une élision isolée, puis des élisions en début de phrase, avec ’ et ' : seule l'apostrophe
@@ -138,7 +138,7 @@ def test_encodages_exacts_de_cas_limites(texte, attendu):
 
 
 def test_espace_fine_insecable_est_coupee_en_octets():
-    assert [TOK.octets_du_jeton(i) for i in TOK.encoder("3 000")] == [b"3", b"\xe2\x80", b"\xaf", b"000"]
+    assert [TOK.octets_du_jeton(i) for i in TOK.encoder("3\u202f000")] == [b"3", b"\xe2\x80", b"\xaf", b"000"]
 
 
 @pytest.mark.parametrize(
