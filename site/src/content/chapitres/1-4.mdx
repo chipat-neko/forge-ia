@@ -497,7 +497,7 @@ Noam Shazeer, <a href={SOURCES.shazeer} lang="en">« GLU Variants Improve Transf
 Reste à assembler. Un bloc fait passer chaque vecteur par l'attention, puis par le MLP, chacun précédé d'une normalisation. Voici le bloc de forge :
 
 <CodeExplique fichier="projets/forge/forge/modele/transformer.py" symbole="Bloc.forward">
-  <li data-lignes="1">`forward` reçoit les vecteurs, et `cos` et `sin`, les tables de RoPE, calculées une fois pour tous les blocs.</li>
+  <li data-lignes="1">`forward` reçoit les vecteurs, et `cos` et `sin`, les tables de RoPE, calculées une fois pour tous les blocs. Le `masque` est facultatif : il ne sert que lorsque plusieurs conversations partagent une même rangée, et ce chapitre n'en a pas besoin.</li>
   <li data-lignes="2">La normalisation, l'attention, et son résultat ajouté à `x` : <code class="insecable">x + …</code>. L'attention n'écrit qu'une correction.</li>
   <li data-lignes="3">Même chose pour le MLP : la normalisation, le MLP, et l'ajout.</li>
 </CodeExplique>

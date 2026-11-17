@@ -50,7 +50,7 @@ describe('extraireSymbole', () => {
 
     it('Attention.forward et MLP.forward', () => {
       expect(extraireSymbole(t, 'Attention.forward').split('\n')[0]).toBe(
-        'def forward(self, x: Tensor, cos: Tensor, sin: Tensor) -> Tensor:',
+        'def forward(',
       );
       expect(extraireSymbole(t, 'MLP.forward')).toBe(
         'def forward(self, x: Tensor) -> Tensor:\n    return self.proj_basse(F.silu(self.proj_porte(x)) * self.proj_haute(x))',

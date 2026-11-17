@@ -102,6 +102,27 @@ def appliquer_rope(x: Tensor, cos: Tensor, sin: Tensor) -> Tensor:
     return tourne.flatten(-2).type_as(x)
 
 
+def masque_des_documents(documents: Tensor) -> Tensor:
+    """Masque d'attention pour des rangées qui empaquettent plusieurs conversations.
+
+    `documents` (`[lot, positions]`, entiers) donne le numéro du document de chaque position,
+    et -1 pour le bourrage. Le masque booléen `[lot, 1, positions, positions]` est vrai là où
+    la position `i` a le droit de regarder la position `j` : `j ≤ i` (causalité) ET même
+    document. Une conversation ne voit donc jamais celle qui la précède dans la rangée.
+
+    La diagonale est toujours vraie, bourrage compris : une ligne entièrement fausse donnerait
+    un softmax sur du vide, donc des NaN.
+
+    RoPE garde les positions de la rangée, sans les remettre à zéro à chaque document : le
+    score de RoPE ne dépend que de l'écart `m - n` entre deux positions, et à l'intérieur d'un
+    document cet écart est le même que si le document était seul. Le masque suffit.
+    """
+    positions = documents.shape[1]
+    causal = torch.ones(positions, positions, dtype=torch.bool, device=documents.device).tril()
+    meme_document = documents[:, :, None] == documents[:, None, :]
+    return (causal & meme_document)[:, None]
+
+
 class Attention(nn.Module):
     """Attention multi-têtes causale.
 
@@ -122,7 +143,9 @@ class Attention(nn.Module):
         # Revient dans le résidu : initialisée plus petite (voir `Transformer._initialiser`).
         self.proj_sortie = nn.Linear(config.dim, config.dim, bias=False)
 
-    def forward(self, x: Tensor, cos: Tensor, sin: Tensor) -> Tensor:
+    def forward(
+        self, x: Tensor, cos: Tensor, sin: Tensor, masque: Tensor | None = None
+    ) -> Tensor:
         lot, positions, dim = x.shape
         q, k, v = self.proj_qkv(x).chunk(3, dim=-1)
         # [lot, positions, dim] -> [lot, têtes, positions, dim_tete]
@@ -130,8 +153,12 @@ class Attention(nn.Module):
             t.reshape(lot, positions, self.tetes, self.dim_tete).transpose(1, 2) for t in (q, k, v)
         )
         q, k = appliquer_rope(q, cos, sin), appliquer_rope(k, cos, sin)
-        # `is_causal=True` : un jeton ne voit que lui-même et ceux d'avant.
-        sortie = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        if masque is None:
+            # `is_causal=True` : un jeton ne voit que lui-même et ceux d'avant.
+            sortie = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        else:
+            # Le masque (voir `masque_des_documents`) est déjà causal : pas de `is_causal`.
+            sortie = F.scaled_dot_product_attention(q, k, v, attn_mask=masque)
         return self.proj_sortie(sortie.transpose(1, 2).reshape(lot, positions, dim))
 
 
@@ -175,8 +202,8 @@ class Bloc(nn.Module):
         self.norme_mlp = RMSNorm(config.dim)
         self.mlp = MLP(config)
 
-    def forward(self, x: Tensor, cos: Tensor, sin: Tensor) -> Tensor:
-        x = x + self.attention(self.norme_attention(x), cos, sin)
+    def forward(self, x: Tensor, cos: Tensor, sin: Tensor, masque: Tensor | None = None) -> Tensor:
+        x = x + self.attention(self.norme_attention(x), cos, sin, masque)
         return x + self.mlp(self.norme_mlp(x))
 
 
@@ -193,6 +220,10 @@ class Transformer(nn.Module):
       suivant, de même forme que `ids`), ou `None` sans `cibles`. Une cible égale à -100 est
       ignorée. Un modèle qui devine au hasard a une perte de `ln(taille_vocabulaire)` (10,4
       pour 32 768 jetons) ; plus elle descend, mieux le modèle prédit.
+
+    `documents` (facultatif, `[lot, positions]`, entiers, -1 pour le bourrage) dit à quelle
+    conversation appartient chaque position d'une rangée qui en empaquette plusieurs : chacune
+    ne voit alors qu'elle-même. Sans lui, tout le texte de la rangée est vu comme un seul.
     """
 
     def __init__(self, config: ConfigModele) -> None:
@@ -222,7 +253,9 @@ class Transformer(nn.Module):
             nn.init.normal_(bloc.attention.proj_sortie.weight, mean=0.0, std=ecart_residuel)
             nn.init.normal_(bloc.mlp.proj_basse.weight, mean=0.0, std=ecart_residuel)
 
-    def forward(self, ids: Tensor, cibles: Tensor | None = None) -> tuple[Tensor, Tensor | None]:
+    def forward(
+        self, ids: Tensor, cibles: Tensor | None = None, documents: Tensor | None = None
+    ) -> tuple[Tensor, Tensor | None]:
         positions = ids.shape[1]
         if positions > self.config.longueur_contexte:
             raise ValueError(
@@ -233,8 +266,11 @@ class Transformer(nn.Module):
         x = self.plongement(ids)
         dim_tete = self.config.dim // self.config.tetes
         cos, sin = rope_cos_sin(positions, dim_tete, self.config.base_rope, ids.device)
+        # Sans `documents`, l'attention reste causale simple, comme avant. Avec, chaque
+        # document de la rangée ne voit que lui-même (`masque_des_documents`).
+        masque = None if documents is None else masque_des_documents(documents)
         for bloc in self.blocs:
-            x = bloc(x, cos, sin)
+            x = bloc(x, cos, sin, masque)
         logits = self.sortie(self.norme_finale(x))
         perte = None
         if cibles is not None:
