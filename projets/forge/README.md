@@ -268,31 +268,28 @@ chacun. La version publiée de ton IA est la Release `ton-ia-1.5` du dépôt : c
 plus `rapport.json` (son évaluation d'origine), `rapport-2026-11-17.json` (la même, aux bits
 par octet exacts), sa fiche `LISEZMOI.md` et son document `ton-ia-1.5.md` (dans le dépôt :
 `docs/mesures/ton-ia-1.5-LISEZMOI.md` et `docs/mesures/ton-ia-1.5.md`). Pour la recharger,
-depuis `projets/forge` :
+depuis `projets/forge`, la commande `publication` télécharge les trois fichiers du modèle
+(`publications/ton-ia-1.5` sous `FORGE_DONNEES`, ou le dossier de `--dossier`) et affiche la taille et
+l'empreinte SHA-256 de chacun. Un fichier se télécharge sous le nom `….partiel`, renommé quand il
+est complet : après une coupure, relance la même commande, seul ce qui manque est repris.
 
 ```powershell
-gh release download ton-ia-1.5 --repo chipat-neko/forge-ia --dir ton-ia-1.5
-uv run --extra cpu python ton_script.py   # avec une carte NVIDIA : --extra gpu
+uv run --extra gpu python -m forge publication --etiquette ton-ia-1.5   # --extra cpu sans carte NVIDIA
 ```
 
-où `ton_script.py` fait ce que dit la fiche :
+### Recharger une version publiée
+
+`charger_publication` fait ce que dit la fiche (poids liés rétablis, float32, mode évaluation) et
+vérifie le tokenizer par son empreinte. Le dossier doit contenir exactement un fichier
+`*.safetensors`, `config.json` et `tokenizer-ton-ia-v1.json`. Si tu as déjà les fichiers, mets-les
+dans `$FORGE_IA_MODELES/ton-ia-1.5` : `telecharger_publication` rend alors ce dossier, sans réseau.
 
 ```python
-import json
-from pathlib import Path
+from forge.modele import generer
+from forge.publication import charger_publication, telecharger_publication
 
-from safetensors.torch import load_file
-
-from forge.modele import ConfigModele, Transformer, generer
-from forge.tokenizer import TokenizerOctets
-
-dossier = Path("ton-ia-1.5")
-config = ConfigModele(**json.loads((dossier / "config.json").read_text(encoding="utf-8")))
-poids = load_file(dossier / "ton-ia-1.5.safetensors")
-poids.setdefault("sortie.weight", poids["plongement.weight"])  # les poids liés
-modele = Transformer(config)
-modele.load_state_dict(poids)
-tokenizer = TokenizerOctets.charger(dossier / "tokenizer-ton-ia-v1.json")
+pub = charger_publication(telecharger_publication("ton-ia-1.5"))  # pub.version, pub.empreinte_des_poids
+modele, tokenizer = pub.modele, pub.tokenizer
 
 # Faire écrire ton IA : elle prolonge le début donné.
 fin = tokenizer.id_special("<|fin_texte|>")  # pour ton IA, ce jeton marque aussi le début d'un texte

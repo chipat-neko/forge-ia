@@ -1,7 +1,7 @@
 """Point d'entrée en ligne de commande : `python -m forge <commande>`.
 
 Les commandes `donnees`, `tokenizer`, `compression`, `encoder`, `mesurer`,
-`entrainer`, `evaluer`, `exporter` et `suivi` s'y branchent une par une, au fil des
+`entrainer`, `evaluer`, `exporter`, `publication` et `suivi` s'y branchent une par une, au fil des
 tâches du plan (chacune ajoute son sous-parseur dans `construire_parseur`). Toutes sont là.
 """
 
@@ -793,6 +793,51 @@ def _ajouter_exporter(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_exporter)
 
 
+def _commande_publication(choix: argparse.Namespace) -> int:
+    """`forge publication` : télécharge une version publiée de ton IA et affiche ses fichiers."""
+    from forge.exporter import empreinte_sha256
+    from forge.fichiers import ESPACE_FINE, entier
+    from forge.publication import telecharger_publication
+
+    try:
+        dossier = telecharger_publication(choix.etiquette, choix.dossier)
+    except (FileNotFoundError, PermissionError, ConnectionError) as erreur:
+        print(f"Erreur : {erreur}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print("Téléchargement interrompu : aucun fichier n'est à moitié écrit. Relance la même commande.", file=sys.stderr)
+        return 130
+    print(f"Fichiers de {choix.etiquette} dans {dossier} :")
+    for chemin in sorted(dossier.iterdir()):
+        if chemin.is_file() and not chemin.name.endswith(".partiel"):
+            en_octets = entier(chemin.stat().st_size, milliers=ESPACE_FINE)
+            print(f"  {chemin.name} : {en_octets} octets, SHA-256 {empreinte_sha256(chemin)}")
+    return 0
+
+
+def _ajouter_publication(sous_parseurs) -> None:
+    commande = _nouvelle_commande(
+        sous_parseurs,
+        "publication",
+        "Télécharge une version publiée de ton IA (poids, config.json, tokenizer) depuis sa Release GitHub, "
+        "puis affiche chaque fichier avec sa taille et son empreinte SHA-256.",
+    )
+    commande.add_argument(
+        "--etiquette",
+        required=True,
+        metavar="ETIQUETTE",
+        help="l'étiquette de la Release, par exemple ton-ia-1.5",
+    )
+    commande.add_argument(
+        "--dossier",
+        type=Path,
+        default=None,
+        metavar="DOSSIER",
+        help="où ranger les fichiers (par défaut publications/<étiquette> sous FORGE_DONNEES)",
+    )
+    commande.set_defaults(fonction=_commande_publication)
+
+
 def _commande_suivi(choix: argparse.Namespace) -> int:
     """`forge suivi` : où en est l'entraînement, lu dans son journal."""
     # Le suivi n'importe pas PyTorch : il reste léger, on peut le lancer pendant l'entraînement.
@@ -856,6 +901,7 @@ def construire_parseur() -> argparse.ArgumentParser:
     _ajouter_entrainer(sous_parseurs)
     _ajouter_evaluer(sous_parseurs)
     _ajouter_exporter(sous_parseurs)
+    _ajouter_publication(sous_parseurs)
     _ajouter_suivi(sous_parseurs)
     return parseur
 
