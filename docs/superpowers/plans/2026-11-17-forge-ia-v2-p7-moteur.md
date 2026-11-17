@@ -83,6 +83,7 @@ Sources : `docs/superpowers/recherche/2026-11-17-vague-2-methodes.md` (« métho
 - **Les tests d'abord.** Tests rapides sur le processeur, sans réseau ; les tests `gpu` sont sautés sans CUDA. Les tests qui lancent des sous-processus prennent un délai d'au plus 2 s.
 - **Commandes :**
   - dans `projets/forge` : `uv run --extra gpu pytest -q -m "not gpu"` (jamais `--extra cpu` en local : le `.venv` de forge garde PyTorch pour la carte, et le repasser en processeur coûte 36 min de copie sur le disque D:), et `uv run --extra gpu pytest -q -m gpu` carte libre (`nvidia-smi` sous 10 %) ;
+  - **Renommer ou déplacer une fonction de forge** casse le site s'il la montre : `CodeExplique` extrait le code de forge par son nom (`symbole=`). Avant tout renommage, chercher le nom dans `site/src`, `site/e2e`, `projets/` et `docs/mesures/`, et mettre à jour chaque référence dans le même commit, avec `npx vitest run src/lib/symboles.test.ts` (leçon de la tâche 4 du plan 6).
   - avant toute commande forge, PowerShell : `. .\outils\env-forge.ps1; $env:TEMP = $env:TMP = "$env:FORGE_DONNEES\cache\tmp"` ;
   - pour les travaux longs, le Python de `projets/forge/.venv` (pas `uv run`, D: est en exFAT : une resynchronisation recopie tout).
 - **Données sous `FORGE_DONNEES`**, rangées par `sous_forge_donnees` : `conversations/`, `problemes/`, `affinage/`, `publications/`, `entrainements/`, `evaluations/`. Rien de lourd dans git.
