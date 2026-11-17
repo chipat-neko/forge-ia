@@ -398,3 +398,13 @@ def resume_court(rapport: dict) -> str:
                 f"hasard {_pourcent(mesures['hasard'])}, sur {_n(mesures['n'], 0)} questions ({verdict(mesures)})"
             )
     return "\n".join(lignes)
+
+
+# Les petits outils que `forge.evaluation.etape` et `forge discuter` réutilisent : des noms publics, pour que
+# personne n'importe un nom privé d'un autre module.
+choisir_appareil = _choisir_appareil
+bloc_de_code = _bloc_de_code
+guillemets = _guillemets
+json_valide = _json_valide
+nombre_fr = _n
+pourcent = _pourcent

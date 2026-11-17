@@ -424,6 +424,56 @@ print("Il était une fois" + tokenizer.decoder([jeton for jeton in suite if jeto
 Pour vérifier un fichier téléchargé, compare son empreinte à celle de la fiche :
 `Get-FileHash ton-ia-1.5.safetensors`.
 
+## Évaluer une étape : les mêmes mesures d'une version à l'autre
+
+`evaluer-etape` fait passer à une version publiée les mesures de son étape, et à ton-ia-1.5 les mêmes :
+le plan 8 montre ainsi ton IA d'un chapitre à l'autre, sur les mêmes tests. L'étape dit quelles mesures
+(`1.7` : perte de conversation, IFEval-FR, tenue des réponses, oubli, échantillons ; `1.9` : IFEval-FR,
+tenue, oubli, problèmes générés, MGSM, GSM8K-Platinum en français, échantillons). La version est un dossier
+publié (`ton-ia-1.5.safetensors`, `config.json`, `tokenizer-ton-ia-v1.json`) ; `--reference` en donne un
+second, qui passe les mêmes mesures, mises en regard dans le tableau :
+
+```powershell
+uv run --extra gpu python -m forge evaluer-etape --modele "$env:FORGE_DONNEES\publication\ton-ia-1.5" --etape 1.9
+uv run --extra gpu python -m forge evaluer-etape --modele "$env:FORGE_DONNEES\publications\ton-ia-1.7" --etape 1.7 --reference "$env:FORGE_DONNEES\publication\ton-ia-1.5" --n-max 20
+```
+
+Le rapport (`rapport.json` pour les programmes, `rapport.md` pour la lecture) va dans
+`FORGE_DONNEES/evaluations/<version>-<étape>/` (ou `--sortie`). `--n-max N` limite chaque mesure à ses N
+premiers exemples, pour un essai court ; `--appareil cpu` force le processeur. Le JSON est stable (version
+du rapport 1) : `version`, `empreinte` (SHA-256 des poids), `etape`, `date`, `mesures`, `secondes`, et
+`reference` s'il y en a une. Chaque mesure est écrite ainsi :
+
+- `perte_conversation` : `{perte, n}`, la perte d'affinage sur la validation de `affinage/sft-1.7` ;
+- `ifeval_fr` : `{invite_stricte, consigne_stricte, n}`, IFEval-FR en glouton, 512 jetons ;
+- `tenue` : `{terminee, fr, autre, indetermine, mots_moyens, n}`, sur les réponses d'IFEval-FR et aux 100
+  premières invites de la validation de `sft-1.7` : la part terminée par `<|fin_tour|>`, la langue des réponses
+  (`forge.evaluation.langue`, des parts de 0 à 1) et leur longueur ;
+- `oubli` : `{perte, bits_par_octet, n}`, sur 64 morceaux de `jetons/principal/val` (la mesure du plan 6) ;
+- `echantillons` : `[{invite, texte, pensee, terminee}]`, dix invites fixes en glouton, gardées telles quelles ;
+- `problemes` : `{exactitude, reussite_8, par_famille, par_difficulte, n}`, 400 problèmes générés de la
+  plage d'évaluation, en glouton puis en 8 essais (température 1, top-k 50) ;
+- `mgsm_fr` et `gsm8k_platinum_fr` : `{exactitude, n}`, en glouton, 384 jetons.
+
+Une réponse vide ou coupée par la limite de jetons est comptée telle quelle (fausse pour un problème). Une
+mesure dont les données manquent rend `{"absente": "<raison>"}` et dit quelle commande lancer
+(`forge conversations --source ifeval_fr`, `forge preparer --recette sft-1.7`, `forge encoder`). Sur la
+carte, le lot de génération est le plus grand que la mémoire libre permet.
+
+## Discuter avec une version publiée
+
+`discuter` ouvre une conversation dans le terminal avec une version affinée (ton-ia-1.7 et les suivantes ;
+ton-ia-1.5 ne sait que prolonger un texte et ne répond pas à une question) :
+
+```powershell
+uv run --extra gpu python -m forge discuter --modele "$env:FORGE_DONNEES\publications\ton-ia-1.7" --temperature 0.7
+```
+
+Chaque ligne est un tour ; ton IA répond avec toute la conversation sous les yeux. `/nouveau` repart de zéro,
+`/quitter` sort. `--systeme "TEXTE"` ouvre la conversation par un message système (gardé après `/nouveau`).
+Quand la fenêtre de contexte est pleine, le message dit de faire `/nouveau`. Une réponse coupée par la limite
+de 512 jetons est signalée ; sa pensée, s'il y en a une, s'affiche à part.
+
 ## Sous Linux
 
 Tout marche de même ; seules ces commandes diffèrent. Les données et les caches se règlent par

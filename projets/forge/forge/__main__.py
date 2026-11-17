@@ -1,7 +1,7 @@
 """Point d'entrée en ligne de commande : `python -m forge <commande>`.
 
 Les commandes `donnees`, `tokenizer`, `compression`, `encoder`, `mesurer`,
-`entrainer`, `evaluer`, `exporter`, `publication`, `suivi`, `conversations`, `problemes` et `preparer` s'y branchent une par une, au fil des
+`entrainer`, `evaluer`, `exporter`, `publication`, `suivi`, `conversations`, `problemes`, `preparer`, `evaluer-etape` et `discuter` s'y branchent une par une, au fil des
 tâches du plan (chacune ajoute son sous-parseur dans `construire_parseur`). Toutes sont là.
 """
 
@@ -1162,6 +1162,173 @@ def _ajouter_preparer(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_preparer, parseur=commande)
 
 
+def _entier_strictement_positif_ou_erreur(texte: str) -> int:
+    try:
+        valeur = int(texte)
+    except ValueError:
+        valeur = 0
+    if valeur < 1:
+        raise argparse.ArgumentTypeError(f"nombre d'exemples illisible : {texte!r}. Écris un entier, 1 ou plus.")
+    return valeur
+
+
+def _version_du_dossier(dossier: Path) -> str:
+    """Le nom de la version d'un dossier publié (le fichier de poids sans `.safetensors`), pour nommer le dossier du rapport."""
+    poids = sorted(dossier.glob("*.safetensors"))
+    return poids[0].stem if len(poids) == 1 else dossier.name
+
+
+def _commande_evaluer_etape(choix: argparse.Namespace) -> int:
+    """`forge evaluer-etape` : les mesures d'une étape sur une version publiée, en rapport."""
+    # Imports ici : PyTorch est long à charger, les autres commandes n'en ont pas besoin.
+    import torch
+
+    from forge.chemins import PlaceInsuffisante, sous_forge_donnees
+    from forge.erreurs import DonneesManquantes
+    from forge.evaluation.etape import evaluer_etape, resume_court
+    from forge.fichiers import ESPACE_FINE
+
+    fine = ESPACE_FINE
+    modele = Path(choix.modele)
+    sortie = choix.sortie or sous_forge_donnees(f"{_version_du_dossier(modele)}-{choix.etape}", "evaluations")
+    try:
+        rapport = evaluer_etape(modele, choix.etape, sortie, choix.reference, choix.appareil, choix.n_max)
+    except (FileNotFoundError, PermissionError, PlaceInsuffisante, DonneesManquantes, ValueError) as erreur:
+        print(f"Erreur{fine}: {erreur}", file=sys.stderr)
+        return 1
+    except torch.cuda.OutOfMemoryError:
+        print(
+            f"Erreur{fine}: la carte graphique manque de mémoire pour l'évaluation. Ferme les jeux ou logiciels 3D "
+            "ouverts (et l'entraînement, s'il tourne), ou évalue sur le processeur avec --appareil cpu.",
+            file=sys.stderr,
+        )
+        return 1
+    except KeyboardInterrupt:
+        print(f"Évaluation interrompue{fine}: aucun rapport écrit. Relance la même commande.", file=sys.stderr)
+        return 130
+    print(resume_court(rapport))
+    print(f"Rapport{fine}: {Path(sortie) / 'rapport.md'}")
+    return 0
+
+
+def _ajouter_evaluer_etape(sous_parseurs) -> None:
+    commande = _nouvelle_commande(
+        sous_parseurs,
+        "evaluer-etape",
+        "Évalue une version publiée de ton IA (ton-ia-1.5 ou une suivante) à une étape : IFEval-FR, problèmes "
+        "générés, MGSM, GSM8K-Platinum en français, langue et tenue des réponses. Les mêmes mesures d'une version "
+        "à l'autre, dans rapport.json et rapport.md.",
+    )
+    commande.add_argument(
+        "--modele",
+        required=True,
+        type=Path,
+        metavar="DOSSIER",
+        help="le dossier de la version publiée (poids .safetensors, config.json, tokenizer-ton-ia-v1.json)",
+    )
+    commande.add_argument("--etape", required=True, metavar="ETAPE", help="l'étape : 1.7 ou 1.9")
+    commande.add_argument(
+        "--reference",
+        type=Path,
+        default=None,
+        metavar="DOSSIER",
+        help="le dossier d'une autre version (ton-ia-1.5, par exemple) qui passe les mêmes mesures, mises en regard",
+    )
+    commande.add_argument(
+        "--sortie",
+        type=Path,
+        default=None,
+        metavar="DOSSIER",
+        help="le dossier des rapports (par défaut : FORGE_DONNEES/evaluations/<version>-<étape>/)",
+    )
+    commande.add_argument(
+        "--appareil",
+        type=_appareil,
+        default=None,
+        metavar="cuda|cpu",
+        help="où calculer (la carte graphique si PyTorch la voit, sinon le processeur)",
+    )
+    commande.add_argument(
+        "--n-max",
+        type=_entier_strictement_positif_ou_erreur,
+        default=None,
+        metavar="N",
+        help="au plus N exemples par mesure (tous par défaut) : pour un essai court",
+    )
+    commande.set_defaults(fonction=_commande_evaluer_etape, parseur=commande)
+
+
+def _commande_discuter(choix: argparse.Namespace) -> int:
+    """`forge discuter` : une conversation en ligne de commande avec une version publiée."""
+    # Imports ici : PyTorch est long à charger, les autres commandes n'en ont pas besoin.
+    import torch
+
+    from forge.evaluation import reponses
+    from forge.evaluation.rapport import choisir_appareil
+    from forge.fichiers import ESPACE_FINE
+    from forge.publication import charger_publication
+
+    fine = ESPACE_FINE
+    if not choix.temperature >= 0:
+        print(
+            f"Erreur{fine}: la température vaut {choix.temperature}, elle doit être 0 (toujours le mot le plus "
+            "probable) ou plus. Essaie 0.7.",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        appareil = choisir_appareil(choix.appareil)
+        publication = charger_publication(Path(choix.modele), appareil.type)
+    except (FileNotFoundError, PermissionError, ValueError) as erreur:
+        print(f"Erreur{fine}: {erreur}", file=sys.stderr)
+        return 1
+    try:
+        return reponses.discuter(
+            publication.modele, publication.tokenizer, publication.version, choix.systeme, choix.temperature
+        )
+    except KeyboardInterrupt:
+        print("\nConversation interrompue.")
+        return 130
+    except torch.cuda.OutOfMemoryError:
+        print(
+            f"Erreur{fine}: la carte graphique manque de mémoire. Ferme les jeux ou logiciels 3D ouverts, "
+            "ou converse sur le processeur avec --appareil cpu.",
+            file=sys.stderr,
+        )
+        return 1
+
+
+def _ajouter_discuter(sous_parseurs) -> None:
+    commande = _nouvelle_commande(
+        sous_parseurs,
+        "discuter",
+        "Converse avec une version publiée de ton IA, dans le terminal. /nouveau repart de zéro, /quitter sort.",
+    )
+    commande.add_argument(
+        "--modele",
+        required=True,
+        type=Path,
+        metavar="DOSSIER",
+        help="le dossier de la version publiée (poids .safetensors, config.json, tokenizer-ton-ia-v1.json)",
+    )
+    commande.add_argument("--systeme", default=None, metavar="TEXTE", help="un message système, en tête de la conversation")
+    commande.add_argument(
+        "--temperature",
+        type=float,
+        default=0.7,
+        metavar="T",
+        help="le hasard des réponses : 0 donne toujours la réponse la plus probable, 0.7 par défaut",
+    )
+    commande.add_argument(
+        "--appareil",
+        type=_appareil,
+        default=None,
+        metavar="cuda|cpu",
+        help="où calculer (la carte graphique si PyTorch la voit, sinon le processeur)",
+    )
+    commande.set_defaults(fonction=_commande_discuter, parseur=commande)
+
+
 def construire_parseur() -> argparse.ArgumentParser:
     """Construit le parseur principal et ses sous-commandes."""
     parseur = argparse.ArgumentParser(
@@ -1199,6 +1366,8 @@ def construire_parseur() -> argparse.ArgumentParser:
     _ajouter_conversations(sous_parseurs)
     _ajouter_problemes(sous_parseurs)
     _ajouter_preparer(sous_parseurs)
+    _ajouter_evaluer_etape(sous_parseurs)
+    _ajouter_discuter(sous_parseurs)
     return parseur
 
 
