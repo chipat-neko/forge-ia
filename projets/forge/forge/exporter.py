@@ -189,21 +189,27 @@ def _verifier_le_tokenizer_de_la_sauvegarde(etat: dict, fichier: str) -> None:
 
     L'empreinte comparée est celle des fusions (le SHA-1 d'`empreinte_du_tokenizer`, celle
     d'`index.json`), pas le SHA-256 du fichier (`EMPREINTE_DU_TOKENIZER`). Elle vient de la
-    sauvegarde ; une ancienne sauvegarde ne l'a pas, on la lit alors dans l'`index.json` de ses
-    données (`config["donnees"]`). Si on ne la trouve nulle part, l'export a lieu, avec un
-    avertissement (`TokenizerNonVerifie`) qui dit ce qui n'a pas été vérifié.
+    sauvegarde : pour un affinage, c'est celle du tokenizer de sa version de départ. Une ancienne
+    sauvegarde de pré-entraînement ne l'a pas, on la lit alors dans l'`index.json` de ses jetons
+    (`config["donnees"]`, sous `jetons/`) ; ce repli ne vaut que pour le pré-entraînement. Si on
+    ne la trouve nulle part, l'export a lieu, avec un avertissement (`TokenizerNonVerifie`) qui dit
+    ce qui n'a pas été vérifié.
     """
     attendue = empreinte_du_tokenizer(TokenizerOctets.charger(TOKENIZER))
     trouvee, origine = etat.get("empreinte_du_tokenizer"), "la sauvegarde"
+    config = etat.get("config") or {}
+    pre_entrainement = config.get("methode", "pre_entrainement") == "pre_entrainement"
+    if trouvee is None and pre_entrainement and config.get("donnees"):
+        index = sous_forge_donnees(config["donnees"], "jetons") / "index.json"
+        trouvee, origine = empreinte_du_tokenizer_des_jetons(index.parent), str(index)
     if trouvee is None:
-        donnees = (etat.get("config") or {}).get("donnees")
-        if donnees:
-            index = sous_forge_donnees(donnees, "jetons") / "index.json"
-            trouvee, origine = empreinte_du_tokenizer_des_jetons(index.parent), str(index)
-    if trouvee is None:
+        pourquoi = (
+            "la sauvegarde ne retient pas son empreinte, et l'index.json de ses données est introuvable"
+            if pre_entrainement
+            else "la sauvegarde de cet affinage ne retient pas l'empreinte du tokenizer de sa version de départ"
+        )
         warnings.warn(
-            f"Le tokenizer de {fichier} n'a pas pu être vérifié : la sauvegarde ne retient pas son "
-            "empreinte, et l'index.json de ses données est introuvable. Rien ne dit qu'elle a été "
+            f"Le tokenizer de {fichier} n'a pas pu être vérifié : {pourquoi}. Rien ne dit qu'elle a été "
             "entraînée avec le tokenizer figé de ton IA ; vérifie-le avant de publier.",
             TokenizerNonVerifie,
             stacklevel=3,

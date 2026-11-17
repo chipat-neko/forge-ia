@@ -398,6 +398,16 @@ def _ajouter_encoder(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_encoder)
 
 
+def _numero_de_pas(texte: str) -> int:
+    try:
+        valeur = int(texte)
+    except ValueError:
+        valeur = -1
+    if valeur < 0:
+        raise argparse.ArgumentTypeError(f"numéro de pas illisible : {texte!r}. Écris un entier, 0 ou plus.")
+    return valeur
+
+
 def _commande_entrainer(choix: argparse.Namespace) -> int:
     """`forge entrainer` : entraîne ton IA ; Ctrl+C met en pause, `--reprendre` repart de là."""
     # Imports ici : PyTorch est long à charger, les autres commandes n'en ont pas besoin.
@@ -407,7 +417,7 @@ def _commande_entrainer(choix: argparse.Namespace) -> int:
 
     reprise = f"python -m forge entrainer --config {choix.config} --reprendre"
     try:
-        entrainer(lire_config(choix.config), reprendre=choix.reprendre)
+        entrainer(lire_config(choix.config), reprendre=choix.reprendre, arreter_apres=choix.arreter_apres)
     except PlaceInsuffisante as erreur:
         print(f"Erreur : {erreur}\nUne fois la place libérée : {reprise}", file=sys.stderr)
         return 1
@@ -449,8 +459,9 @@ def _ajouter_entrainer(sous_parseurs) -> None:
     commande = _nouvelle_commande(
         sous_parseurs,
         "entrainer",
-        "Entraîne ton IA sur les jetons encodés. Ctrl+C met en pause (avec sauvegarde) ; "
-        "--reprendre repart de la dernière sauvegarde.",
+        "Entraîne ton IA : pré-entraînement sur les jetons encodés, ou affinage (methode = \"sft\") "
+        "depuis une version publiée. Ctrl+C met en pause (avec sauvegarde) ; --reprendre repart de la "
+        "dernière sauvegarde.",
     )
     commande.add_argument(
         "--config",
@@ -462,6 +473,13 @@ def _ajouter_entrainer(sous_parseurs) -> None:
         "--reprendre",
         action="store_true",
         help="reprendre à la dernière sauvegarde (après une pause, un plantage ou une coupure)",
+    )
+    commande.add_argument(
+        "--arreter-apres",
+        type=_numero_de_pas,
+        default=None,
+        metavar="N",
+        help="s'arrêter (avec sauvegarde) au pas N, pour un essai chronométré ; --reprendre continue ensuite",
     )
     commande.set_defaults(fonction=_commande_entrainer)
 

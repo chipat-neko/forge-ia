@@ -180,6 +180,47 @@ a été entraînée et évaluée le 3 novembre 2026 : durées, courbe, évaluati
 `docs/mesures/ton-ia-mini.md`. L'entraînement principal (`configs/principal.toml`, 433,6 millions de
 paramètres, 139 h de carte) est raconté dans `docs/mesures/ton-ia-1.5.md`.
 
+## Affiner ton IA
+
+`entrainer` affine aussi une version publiée de ton IA, au lieu de partir de poids tirés au hasard.
+C'est la même boucle : pause, reprise, journal et sauvegardes ne changent pas. Trois réglages du TOML
+décident de ce qui change :
+
+- `methode` : `"pre_entrainement"` (par défaut : la section précédente) ou `"sft"`, l'affinage
+  supervisé. Ton IA apprend alors des conversations, et la perte ne porte que sur les jetons appris
+  (les réponses de l'assistant) : c'est leur moyenne sur tout le pas, tous micro-lots compris ;
+- `depart` : la version publiée d'où l'on part, obligatoire pour un affinage. Un nom va sous
+  `FORGE_DONNEES/publications/` (le dossier que remplit `python -m forge publication --etiquette
+  ton-ia-1.5`), un chemin absolu est gardé tel quel. Ses poids sont copiés dans le modèle avant le
+  premier pas ; ses dimensions doivent être celles du `preset`, et son tokenizer celui du jeu ;
+- `donnees` : pour le SFT, un jeu d'affinage, sous `FORGE_DONNEES/affinage/`. Ses rangées ont la
+  longueur `longueur` (par défaut, le contexte du modèle), et `taille_lot_jetons` compte leurs
+  positions, bourrage compris.
+
+Par exemple, les lignes propres à un affinage de `ton-ia-1.5` (433,6 millions de paramètres, preset
+« tres_grand ») ; les autres réglages sont ceux de `configs/mini.toml` :
+
+```toml
+methode = "sft"
+depart = "ton-ia-1.5"        # FORGE_DONNEES/publications/ton-ia-1.5
+preset = "tres_grand"        # les dimensions de la version de départ
+poids_decroissance = 0.0     # ne pas tirer les poids vers 0, loin de la version de départ
+```
+
+La pause et la reprise sont celles du pré-entraînement : Ctrl+C, puis la même commande avec
+`--reprendre`. En reprenant, le chemin de `depart` peut changer (la même version, rangée ailleurs) ;
+une autre version est refusée, car la sauvegarde retient le nom de la version de départ et
+l'empreinte SHA-256 de ses poids. Elle retient aussi la méthode et l'empreinte du tokenizer de la
+version de départ, que `forge exporter` vérifie.
+
+Pour un essai chronométré, `--arreter-apres N` s'arrête au pas N, avec une sauvegarde ;
+`--reprendre` continue ensuite jusqu'à la fin prévue :
+
+```powershell
+uv run --extra gpu python -m forge entrainer --config configs/mini.toml --arreter-apres 20
+uv run --extra gpu python -m forge entrainer --config configs/mini.toml --reprendre
+```
+
 ## Suivre un entraînement
 
 `suivi` lit le journal d'un entraînement et dit où il en est : état (en cours, en pause, fini,
@@ -258,8 +299,9 @@ uv run --extra gpu python -m forge exporter `
 - `tokenizer-ton-ia-v1.json` : la copie exacte du tokenizer figé, vérifiée par son empreinte SHA-256.
 
 Avant d'écrire quoi que ce soit, l'export vérifie aussi que la sauvegarde vient de ce tokenizer :
-il compare l'empreinte de ses fusions (SHA-1) que retient la sauvegarde, ou à défaut celle de
-l'`index.json` de ses données, à celle du tokenizer figé. Un autre tokenizer est refusé ; si
+il compare l'empreinte de ses fusions (SHA-1) que retient la sauvegarde (pour un affinage, celle du
+tokenizer de sa version de départ), ou à défaut, pour un pré-entraînement, celle de l'`index.json` de
+ses jetons, à celle du tokenizer figé. Un autre tokenizer est refusé ; si
 l'empreinte est introuvable, l'export a lieu, avec un message « Attention » qui dit ce qui n'a pas
 été vérifié.
 
