@@ -84,6 +84,35 @@ version de `datasets`), la commande s'arrête avec un message, sans rien écrire
 terminée que lorsque son fichier `.complet` existe. Le mélange par défaut est défini une seule fois,
 dans `forge.donnees.melange.MELANGE_PAR_DEFAUT`.
 
+## Télécharger les conversations de la vague 2
+
+Pour affiner ton IA, la vague 2 lit neuf sources de conversations et d'évaluation sur Hugging
+Face (Luth-2, Aya, OASST2, OpenCoder, IFEval-FR, MGSM-rev2, GSM8K-Platinum-fr et HumanEval ;
+licences, liens et filtres dans `docs/donnees.md`, section « Vague 2 »). `--liste` donne pour
+chacune son usage, sa licence et son lien :
+
+```powershell
+uv run --extra gpu python -m forge conversations --liste
+```
+
+Une source se télécharge en flux, par fragments de 50 000 éléments, sous
+`FORGE_DONNEES/conversations/<source>/`. `--exemples-max` s'arrête après N éléments gardés (20
+suffisent pour vérifier les colonnes) ; sans lui, la commande va jusqu'au bout de la source :
+
+```powershell
+uv run --extra gpu python -m forge conversations --source aya_fr --exemples-max 20
+```
+
+La reprise est celle des textes : après une coupure (réseau, courant, disque plein) ou un Ctrl+C,
+on relance la même commande, qui repart de la position du flux gardée dans `etat.json` et rend les
+mêmes fichiers qu'un téléchargement d'une traite. Ctrl+C valide le fragment en cours et affiche la
+commande de reprise ; un second Ctrl+C arrête tout de suite. `.complet` garde le nom, la licence,
+l'usage et les comptes (lignes lues, gardées, écartées par raison).
+
+Quatre sources sont réservées à l'évaluation : IFEval-FR, MGSM-rev2, GSM8K-Platinum-fr et
+HumanEval. Elles ne vont jamais dans un entraînement : `forge.conversation.sources.source_d_entrainement`
+et `forge.conversation.telechargement.lire_pour_entrainement` les refusent.
+
 ## Le tokenizer de ton IA
 
 Le paquet `forge.tokenizer` contient le tokenizer de ton IA : un BPE sur les

@@ -163,6 +163,17 @@ def lecteur_hugging_face(
         )
     else:
         jeu = load_dataset(source.depot, split="train", streaming=True)
+    return ouvrir_le_flux(source.nom, jeu, etat_du_flux, ignorer)
+
+
+def ouvrir_le_flux(nom: str, jeu, etat_du_flux: dict | None = None, ignorer: int = 0) -> LecteurDeFlux:
+    """Le lecteur d'un jeu `datasets` déjà ouvert : le saut, l'état du flux et le refus d'état.
+
+    C'est la reprise du plan 6, commune aux sources de textes (`lecteur_hugging_face`) et aux sources de
+    conversations (`forge.conversation.telechargement`) : `nom` n'y sert qu'aux messages. `ignorer`
+    documents du début sont sautés (`jeu.skip`), puis l'état du flux, s'il est donné, est rechargé : il
+    ne se recharge que sur un jeu sauté du même nombre que lorsqu'il a été pris.
+    """
     if ignorer:
         jeu = jeu.skip(ignorer)
     if etat_du_flux is None:
@@ -170,7 +181,7 @@ def lecteur_hugging_face(
 
     def refus(erreur: Exception) -> EtatDuFluxRefuse:
         return EtatDuFluxRefuse(
-            f"{source.nom} : le jeu refuse l'état du flux enregistré dans etat.json "
+            f"{nom} : le jeu refuse l'état du flux enregistré dans etat.json "
             f"({type(erreur).__name__} : {erreur}). La source ou la version de `datasets` a "
             "sans doute changé. Relancer la même commande échouera de nouveau. Pour garder les "
             "fragments déjà écrits, retire la ligne `etat_du_flux` d'etat.json : le flux sera "

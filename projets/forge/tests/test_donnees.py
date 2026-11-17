@@ -141,6 +141,24 @@ def test_la_documentation_des_sources():
         assert "etat_du_flux" in texte and "depuis le début du jeu" in texte and "18 minutes" in texte
 
 
+def test_les_sources_de_conversations_sont_documentees():
+    from forge.conversation.sources import SOURCES_CONVERSATIONS
+
+    doc = (Path(__file__).parents[3] / "docs" / "donnees.md").read_text(encoding="utf-8")
+    assert "## Vague 2\u202f: affiner ton IA" in doc
+    vague_2 = doc.split("## Vague 2\u202f: affiner ton IA", 1)[1]
+    for nom, source in SOURCES_CONVERSATIONS.items():
+        assert f"`{nom}`" in vague_2, nom
+        assert f"https://huggingface.co/datasets/{source.depot})" in vague_2, nom
+        assert source.licence in vague_2, nom
+        assert f"({source.url_licence})" in vague_2, nom
+        usage = "évaluation" if source.usage == "evaluation" else "entraînement"
+        assert f"**Usage\u202f:** {usage}" in vague_2, nom
+    # Les jeux réservés à l'évaluation le disent, et disent pourquoi ils ne vont jamais à l'entraînement.
+    assert "réservés à l'évaluation" in " ".join(vague_2.split())
+    assert "jamais dans un entraînement" in " ".join(vague_2.split())
+
+
 def test_aucun_caractere_de_controle_dans_les_fichiers_ecrits_a_la_main():
     racine = Path(__file__).parents[1]
     fichiers = [*racine.joinpath("forge").rglob("*.py"), *racine.joinpath("tests").glob("*.py")]

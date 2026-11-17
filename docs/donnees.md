@@ -158,3 +158,117 @@ travaille hors du dépôt, sous `FORGE_DONNEES/jetons/<dossier>/`.
 ```powershell
 uv run --extra gpu python -m forge encoder --donnees echantillon --tokenizer forge/ressources/tokenizer-ton-ia-v1.json
 ```
+
+## Vague 2 : affiner ton IA
+
+La vague 2 affine ton IA avec des conversations, puis la mesure sur des jeux d'évaluation. Les
+sources ci-dessous se téléchargent avec `python -m forge conversations --source NOM`, en flux, par
+fragments de 50 000 éléments repris après une coupure, sous
+`FORGE_DONNEES/conversations/<source>/` (`conversations-00000.jsonl.gz`, `etat.json` et `.complet`,
+qui garde le nom, la licence, l'usage et les comptes : lignes lues, gardées, écartées par raison).
+`--liste` donne le nom, l'usage, la licence et le lien de chaque source ; `--exemples-max N`
+s'arrête après N éléments gardés (20 suffisent pour vérifier les colonnes).
+
+- **Reprise :** la même que celle des textes. À chaque fragment, `etat.json` garde l'état du flux
+  (`etat_du_flux`) et le saut fait à l'ouverture du flux (`sautes_a_l_ouverture`) : la relance
+  recharge l'un sur un jeu sauté de l'autre. Un téléchargement repris rend les mêmes fichiers
+  qu'un téléchargement d'une traite. Ctrl+C valide le fragment en cours, puis affiche la commande
+  de reprise.
+- **Deux usages :** `entraînement` (le jeu nourrit un affinage) ou `évaluation` (le jeu ne sert qu'à
+  mesurer). Les jeux réservés à l'évaluation (IFEval-FR, MGSM-rev2, GSM8K-Platinum-fr et HumanEval)
+  ne vont jamais dans un entraînement : leurs énoncés se retrouveraient dans les données, et la
+  mesure serait faussée. Aucune lecture pour l'entraînement ne les accepte (`source_d_entrainement`,
+  `lire_pour_entrainement`), et chacun de leurs éléments porte `"usage": "evaluation"`.
+- **Licences :** un jeu d'entraînement porte sa licence et son lien. On écarte les jeux dont les
+  invites ou les réponses viennent de Llama ou d'OpenAI, les licences non commerciales et les jeux
+  sans licence ; le partage à l'identique (CC BY-SA) est réservé à l'évaluation. Le détail et les
+  fiches lues sont dans `docs/superpowers/recherche/2026-11-17-vague-2-donnees.md`.
+
+### Luth-2 (`luth2_conversation` et `luth2_code`)
+
+- **Dépôt :** [kurakurai/Luth-2-Post-Training-SFT](https://huggingface.co/datasets/kurakurai/Luth-2-Post-Training-SFT)
+  (1 969 768 lignes, 20 fichiers parquet, sans formulaire d'accès). Les invites sont traduites en
+  français et les réponses régénérées par des modèles ouverts.
+- **Licence :** CC BY 4.0 ([texte](https://creativecommons.org/licenses/by/4.0/)). Les lignes
+  tirées de StackOverflow restent en CC BY-SA 4.0 : elles sont écartées.
+- **Usage :** entraînement
+- **Ce qui est gardé (`luth2_conversation`) :** le domaine `knowledge` ou `if` ; un générateur dont
+  le nom commence par `Qwen/` (Apache-2.0, sans clause sur l'usage des sorties) ; aucun appel d'outil
+  (`tool_calls`) ni rôle `tool` ; une colonne `source` sans `stackoverflow`, `smoltalk` ni `magpie`
+  (en minuscules). StackOverflow est en CC BY-SA ; Smol-Magpie viendrait de Llama. La liste des
+  sources amont écartées (`SOURCES_AMONT_ECARTEES`) sera complétée après la lecture des fiches des
+  autres sources amont.
+- **Ce qui est gardé (`luth2_code`) :** le domaine `code`, avec les mêmes filtres, et une réponse qui
+  contient un bloc de code Python (balise `python`). Le jeu n'est pas filtré par langage de programmation.
+- **Raisons comptées :** `domaine`, `generateur`, `appel_d_outil`, `source_amont`, `pas_de_python`,
+  `conversation_invalide`.
+
+### Aya français (`aya_fr`)
+
+- **Dépôt :** [CohereLabs/aya_dataset](https://huggingface.co/datasets/CohereLabs/aya_dataset)
+  (205 568 lignes toutes langues, sans formulaire d'accès). Écrit ou corrigé par des bénévoles.
+- **Licence :** Apache-2.0 ([texte](https://www.apache.org/licenses/LICENSE-2.0)).
+- **Usage :** entraînement
+- **Ce qui est gardé :** les lignes dont `language_code` vaut `fra` (colonnes `inputs` et `targets`),
+  une question et une réponse par conversation. La fiche signale des erreurs de langue et du
+  contenu offensant possible.
+
+### OpenAssistant OASST2 français (`oasst2_fr`)
+
+- **Dépôt :** [OpenAssistant/oasst2](https://huggingface.co/datasets/OpenAssistant/oasst2), fichier
+  `2023-11-05_oasst2_ready.trees.jsonl.gz` (un arbre de conversation par ligne, sans formulaire
+  d'accès). Écrit par des bénévoles. `datasets` ne sait pas inférer le schéma de ces arbres
+  imbriqués : le fichier est téléchargé, puis lu ligne à ligne.
+- **Licence :** Apache-2.0 ([texte](https://www.apache.org/licenses/LICENSE-2.0)).
+- **Usage :** entraînement
+- **Ce qui est gardé :** les arbres dont la racine est en français (`lang` vaut `fr`). Chaque arbre
+  donne une conversation : la racine, puis la réponse d'assistant de rang 0, puis la réponse
+  d'utilisateur la plus ancienne, et ainsi de suite, tant que les messages sont en français. Les
+  réponses supprimées ou refusées à la relecture sont ignorées. La conversation finit toujours par
+  l'assistant.
+
+### OpenCoder educational_instruct (`opc_educational`)
+
+- **Dépôt :** [OpenCoder-LLM/opc-sft-stage2](https://huggingface.co/datasets/OpenCoder-LLM/opc-sft-stage2),
+  configuration `educational_instruct` (sans formulaire d'accès). Des triplets (instruction, code,
+  test) validés par un compilateur Python. Les autres configurations reprennent des jeux dérivés de
+  sorties d'OpenAI : on ne les prend pas.
+- **Licence :** MIT ([texte](https://opensource.org/license/mit)).
+- **Usage :** entraînement (après traduction des consignes)
+- **Ce qui est gardé :** l'instruction, le code, les tests (`testcase`) et le point d'entrée. Les
+  consignes sont en anglais : elles se traduisent avant l'entraînement.
+
+### IFEval-FR (`ifeval_fr`)
+
+- **Dépôt :** [kurakurai/IFEval-FR](https://huggingface.co/datasets/kurakurai/IFEval-FR) (235 invites,
+  sans formulaire d'accès). Partie française de M-IFEval : des instructions propres à la langue,
+  relues par un locuteur natif.
+- **Licence :** Apache-2.0 ([texte](https://www.apache.org/licenses/LICENSE-2.0)).
+- **Usage :** évaluation
+- **Ce qui est gardé :** l'invite (`prompt`), `instruction_id_list` et `kwargs`.
+
+### MGSM-rev2 français (`mgsm_rev2_fr`)
+
+- **Dépôt :** [lightonai/mgsm-rev2](https://huggingface.co/datasets/lightonai/mgsm-rev2),
+  configuration `fr` (250 problèmes, split `test`, sans formulaire d'accès). Version corrigée de MGSM.
+- **Licence :** CC BY-SA 4.0 ([texte](https://creativecommons.org/licenses/by-sa/4.0/)). Le partage à
+  l'identique est une raison de plus pour ne jamais l'entraîner.
+- **Usage :** évaluation
+- **Ce qui est gardé :** la question et la réponse numérique (`answer_number`).
+
+### GSM8K-Platinum français (`gsm8k_platinum_fr`)
+
+- **Dépôt :** [cmh/gsm8k-platinum_fr](https://huggingface.co/datasets/cmh/gsm8k-platinum_fr)
+  (1 196 problèmes, split `test`, sans formulaire d'accès). Traduction de GSM8K-Platinum ; la fiche ne
+  dit pas qui l'a faite : on la relit par échantillon avant de s'y fier.
+- **Licence :** MIT ([texte](https://opensource.org/license/mit)).
+- **Usage :** évaluation
+- **Ce qui est gardé :** la question et la réponse finale (ce qui suit `####`, s'il y en a).
+
+### HumanEval (`humaneval`)
+
+- **Dépôt :** [openai/openai_humaneval](https://huggingface.co/datasets/openai/openai_humaneval)
+  (164 problèmes Python, split `test`, sans formulaire d'accès). Énoncés en anglais.
+- **Licence :** MIT ([texte](https://opensource.org/license/mit)).
+- **Usage :** évaluation
+- **Ce qui est gardé :** `task_id`, `prompt`, `test`, `entry_point` et `canonical_solution`.

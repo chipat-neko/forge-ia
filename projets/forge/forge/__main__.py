@@ -1,7 +1,7 @@
 """Point d'entrée en ligne de commande : `python -m forge <commande>`.
 
 Les commandes `donnees`, `tokenizer`, `compression`, `encoder`, `mesurer`,
-`entrainer`, `evaluer`, `exporter`, `publication` et `suivi` s'y branchent une par une, au fil des
+`entrainer`, `evaluer`, `exporter`, `publication`, `suivi` et `conversations` s'y branchent une par une, au fil des
 tâches du plan (chacune ajoute son sous-parseur dans `construire_parseur`). Toutes sont là.
 """
 
@@ -886,6 +886,92 @@ def _ajouter_suivi(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_suivi)
 
 
+def _commande_conversations(choix: argparse.Namespace) -> int:
+    """`forge conversations` : télécharge une source de conversations ou d'évaluation, ou les liste."""
+    # Imports ici : les autres commandes n'ont pas besoin des sources de conversations.
+    from forge.chemins import PlaceInsuffisante
+    from forge.conversation import telechargement
+    from forge.conversation.sources import SOURCES_CONVERSATIONS
+    from forge.donnees.telechargement import EtatDuFluxRefuse
+    from forge.erreurs import DonneesManquantes
+    from forge.fichiers import ESPACE_FINE, entier
+    from forge.fragments import lire_elements
+
+    fine = ESPACE_FINE
+
+    if choix.liste:
+        for nom, source in SOURCES_CONVERSATIONS.items():
+            usage = "évaluation" if source.usage == "evaluation" else "entraînement"
+            print(f"{nom}\u202f: {usage}, licence {source.licence}, https://huggingface.co/datasets/{source.depot}")
+        return 0
+    if choix.source is None:
+        choix.parseur.error("donne --source NOM (la source à télécharger) ou --liste (les sources connues).")
+    if choix.source not in SOURCES_CONVERSATIONS:
+        choix.parseur.error(
+            f"source inconnue\u202f: {choix.source!r}. Les sources sont {', '.join(SOURCES_CONVERSATIONS)}."
+        )
+    if choix.exemples_max is not None and choix.exemples_max < 1:
+        choix.parseur.error("--exemples-max doit être au moins 1.")
+    source = SOURCES_CONVERSATIONS[choix.source]
+
+    def journal(message: str) -> None:
+        print(message, flush=True)
+
+    # Cette commande a besoin du réseau : si la session coupe Hugging Face, on le permet pour ce processus.
+    _lever_le_mode_hors_ligne(journal, "ce téléchargement")
+    try:
+        dossier = telechargement.telecharger_source(source, choix.exemples_max, journal=journal)
+    except telechargement.TelechargementEnPause as pause:
+        print(pause, file=sys.stderr)
+        return 130
+    except (PlaceInsuffisante, EtatDuFluxRefuse, DonneesManquantes, RuntimeError) as erreur:
+        # Relancer tel quel échouerait de nouveau : le message dit quoi faire, rien d'autre.
+        print(f"Erreur{fine}: {erreur}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print(
+            f"Interrompu pendant «{fine}{source.nom}{fine}». Relance la même commande{fine}: les fragments "
+            "déjà validés sont gardés, la reprise repart de la position du flux enregistrée avec le dernier.",
+            file=sys.stderr,
+        )
+        return 130
+    except Exception as erreur:  # réseau coupé, Hugging Face indisponible, disque…
+        print(
+            f"Erreur pendant le téléchargement de «{fine}{source.nom}{fine}» ({type(erreur).__name__}){fine}: "
+            f"{erreur}\nSi le réseau ou Hugging Face est en cause, relance la même commande{fine}: elle "
+            "reprendra au dernier fragment validé, sans doublon.",
+            file=sys.stderr,
+        )
+        return 1
+    n = sum(1 for _ in lire_elements(dossier, telechargement.PREFIXE))
+    print(f"{entier(n, milliers=fine)} éléments dans {dossier}.")
+    return 0
+
+
+def _ajouter_conversations(sous_parseurs) -> None:
+    commande = _nouvelle_commande(
+        sous_parseurs,
+        "conversations",
+        "Télécharge en flux une source de conversations (affinage) ou d'évaluation de la vague 2, par "
+        "fragments repris après une coupure, avec sa licence et son usage. Les jeux d'évaluation ne vont "
+        "jamais dans un entraînement.",
+    )
+    commande.add_argument("--source", default=None, metavar="NOM", help="la source à télécharger (voir --liste)")
+    commande.add_argument(
+        "--exemples-max",
+        type=int,
+        default=None,
+        metavar="N",
+        help="s'arrête après N éléments gardés (par exemple 20, pour vérifier les colonnes) ; sans lui, jusqu'au bout",
+    )
+    commande.add_argument(
+        "--liste",
+        action="store_true",
+        help="liste les sources avec leur usage, leur licence et leur lien, puis quitte",
+    )
+    commande.set_defaults(fonction=_commande_conversations, parseur=commande)
+
+
 def construire_parseur() -> argparse.ArgumentParser:
     """Construit le parseur principal et ses sous-commandes."""
     parseur = argparse.ArgumentParser(
@@ -920,6 +1006,7 @@ def construire_parseur() -> argparse.ArgumentParser:
     _ajouter_exporter(sous_parseurs)
     _ajouter_publication(sous_parseurs)
     _ajouter_suivi(sous_parseurs)
+    _ajouter_conversations(sous_parseurs)
     return parseur
 
 
