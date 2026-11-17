@@ -44,7 +44,7 @@ Source : `docs/superpowers/recherche/2026-11-17-vague-2-methodes.md`, section 6.
 - **Langue :** noms, commentaires et messages en français. Un message d'erreur dit ce qui se passe et quoi faire ensuite.
 - **Les tests d'abord :** chaque changement de comportement commence par un test rouge.
 - **Commandes :**
-  - dans `projets/forge`, `uv run --extra cpu pytest -q`, et `uv run --extra gpu pytest -q -m gpu` quand la carte est libre (`nvidia-smi` sous 10 %) ;
+  - dans `projets/forge`, `uv run --extra gpu pytest -q -m "not gpu"` (jamais `--extra cpu` en local : le `.venv` garde PyTorch pour la carte), et `uv run --extra gpu pytest -q -m gpu` quand la carte est libre (`nvidia-smi` sous 10 %) ;
   - avant toute commande forge : `. .\outils\env-forge.ps1` (PowerShell), ou les mêmes variables exportées sous Git Bash.
 - **La carte graphique ne sert que quand elle est libre.** Au « stop » de l'utilisateur, la commande en cours finit et aucune autre ne part sur la carte avant son « go ».
 - **Fichiers interdits en écriture :**
@@ -89,7 +89,7 @@ Source : `docs/superpowers/recherche/2026-11-17-vague-2-methodes.md`, section 6.
   - Un `etat_du_flux` refusé par `load_state_dict` (autre source, autre version) : message français qui dit d'effacer `etat.json` et les fragments au-delà du dernier compté, ou de relancer en ancienne voie, sans rien écrire de faux.
 - [ ] **Étape 2 : implémenter.** Le `state_dict()` se prend au moment de `valider()`, après le dernier document gardé du fragment. Les documents lus et écartés (trop courts, doublons) sont comptés comme avant.
 - [ ] **Étape 3 : les textes.** Le README, `docs/donnees.md` et le message de Ctrl+C disent le vrai. La reprise repart du fichier et du groupe de lignes où le flux s'était arrêté. Un téléchargement commencé avant cette version relit le flux depuis le début (18 min pour 15,6 millions de documents, mesuré dans `docs/mesures/entrainement-2026-11.md`). `projets/forge/tests/test_donnees.py` relit `docs/donnees.md` : il doit rester vert.
-- [ ] **Étape 4 : vérifier**, avec `uv run --extra cpu pytest -q`, puis committer « Forge : reprise du téléchargement au fragment près ».
+- [ ] **Étape 4 : vérifier**, avec `uv run --extra gpu pytest -q -m "not gpu"`, puis committer « Forge : reprise du téléchargement au fragment près ».
 
 ### Tâche 2 : les bits par octet exacts, et la réévaluation de ton IA
 
