@@ -18,7 +18,6 @@ Ce module ne doit importer de `forge.entrainement` que des sous-modules (`charge
 import dataclasses
 import json
 import math
-import os
 import re
 import time
 from datetime import datetime
@@ -26,13 +25,14 @@ from pathlib import Path
 
 import torch
 
-from forge.chemins import racine_donnees
-from forge.donnees.jetons import _empreinte_du_tokenizer
+from forge.chemins import sous_forge_donnees
+from forge.donnees.jetons import empreinte_du_tokenizer
 from forge.entrainement.chargeur import ChargeurJetons
-from forge.entrainement.sauvegarde import charger, charger_derniere, nom_etape, remplacer
+from forge.entrainement.sauvegarde import CONSEIL_DE_REPRISE, lire_sauvegarde
 from forge.evaluation.echantillons import TEMPERATURE, TOP_K, echantillons
 from forge.evaluation.perte import bits_par_octet, lire_octets_par_jeton, perplexite, perte_validation
 from forge.evaluation.qcm import TOTAL_DES_QUESTIONS, charger_frenchbench, evaluer_qcm
+from forge.fichiers import ESPACE_FINE, ecrire_texte, nombre
 from forge.modele import ConfigModele, Transformer, nombre_parametres
 from forge.processeur import fils_disponibles
 from forge.tokenizer.bpe_octets import TokenizerOctets
@@ -52,58 +52,15 @@ JETONS_D_ECHANTILLON = 60
 # Les deux tests, dans l'ordre d'affichage, avec leur nom lisible.
 TESTS_QCM = {"hellaswag": "HellaSwag (français)", "arc": "ARC-Challenge (français)"}
 
-_FINE = " "  # l'espace fine insécable, de la typographie française
+_FINE = ESPACE_FINE
 
 
 # --- Lire la sauvegarde et les données ----------------------------------------------------
 
 
-def _lire_sauvegarde(chemin: Path) -> tuple[dict, str]:
-    """Lit une sauvegarde de l'entraînement : un fichier `.pt`, ou le dossier `sauvegardes/`.
-
-    Un dossier donne sa dernière `etape-*.pt`. Renvoie la sauvegarde et le fichier lu.
-    """
-    # Import ici : la boucle d'entraînement importe ce paquet (voir l'en-tête du module).
-    from forge.entrainement.boucle import VERSION_DE_LA_SAUVEGARDE
-
-    if chemin.is_dir():
-        etat = charger_derniere(chemin)
-        if etat is None:
-            raise FileNotFoundError(
-                f"Aucune sauvegarde etape-*.pt dans {chemin}. Donne un fichier .pt, par exemple {chemin / 'meilleur.pt'}."
-            )
-        lu = str(chemin / nom_etape(etat["pas"])) if "pas" in etat else str(chemin)
-    elif chemin.is_file():
-        try:
-            etat = charger(chemin)
-        except Exception as erreur:  # fichier tronqué, ou qui n'est pas de PyTorch
-            raise ValueError(
-                f"{chemin} ne se lit pas comme une sauvegarde de la forge ({type(erreur).__name__}). "
-                "Prends un fichier etape-*.pt ou meilleur.pt du dossier sauvegardes/ d'un entraînement."
-            ) from erreur
-        lu = str(chemin)
-    else:
-        raise FileNotFoundError(
-            f"Sauvegarde introuvable : {chemin}. Donne un fichier .pt du dossier sauvegardes/ d'un "
-            "entraînement (etape-*.pt ou meilleur.pt)."
-        )
-    if not isinstance(etat, dict) or "modele" not in etat or "config_modele" not in etat:
-        raise ValueError(
-            f"{chemin} n'est pas une sauvegarde de la forge : il n'y a ni « modele » ni « config_modele » "
-            "dedans. Prends un fichier etape-*.pt ou meilleur.pt du dossier sauvegardes/ d'un entraînement."
-        )
-    if etat.get("version") != VERSION_DE_LA_SAUVEGARDE:
-        raise ValueError(
-            f"Sauvegarde de version {etat.get('version')!r} : cette version de la forge lit la "
-            f"version {VERSION_DE_LA_SAUVEGARDE}."
-        )
-    return etat, lu
-
-
 def _dossier_des_jetons(donnees: Path) -> Path:
     """Un chemin absolu est gardé tel quel ; un nom va sous `FORGE_DONNEES/jetons/` (comme l'entraînement)."""
-    donnees = Path(donnees)
-    return donnees if donnees.is_absolute() else racine_donnees() / "jetons" / donnees
+    return sous_forge_donnees(donnees, "jetons")
 
 
 def _verifier_tokenizer(tokenizer: TokenizerOctets, fichier: Path, config: ConfigModele, donnees: Path) -> None:
@@ -119,7 +76,7 @@ def _verifier_tokenizer(tokenizer: TokenizerOctets, fichier: Path, config: Confi
         empreinte = index["tokenizer"]["empreinte"]
     except (OSError, ValueError, KeyError, TypeError):
         return  # pas d'empreinte dans l'index : on ne peut pas comparer
-    if empreinte != _empreinte_du_tokenizer(tokenizer):
+    if empreinte != empreinte_du_tokenizer(tokenizer):
         raise ValueError(
             f"Les jetons de {donnees} ont été encodés avec un autre tokenizer que {fichier} : les "
             "mesures n'auraient aucun sens. Donne le tokenizer qui a servi à `python -m forge encoder` "
@@ -173,7 +130,7 @@ def evaluer(
     sauvegarde, tokenizer, sortie = Path(sauvegarde), Path(tokenizer), Path(sortie)
     appareil_choisi = _choisir_appareil(appareil)
     dossier_jetons = _dossier_des_jetons(donnees)
-    etat, fichier_lu = _lire_sauvegarde(sauvegarde)
+    etat, fichier_lu = lire_sauvegarde(sauvegarde)
     config = ConfigModele(**etat["config_modele"])
     tok = TokenizerOctets.charger(tokenizer)
 
@@ -234,11 +191,12 @@ def evaluer(
         "secondes": round(time.perf_counter() - debut, 1),
     }
     sortie.mkdir(parents=True, exist_ok=True)
-    _ecrire_texte(
+    ecrire_texte(
         sortie / "rapport.json",
         json.dumps(_json_valide(rapport), ensure_ascii=False, indent=2, allow_nan=False) + "\n",
+        conseil=CONSEIL_DE_REPRISE,
     )
-    _ecrire_texte(sortie / "rapport.md", rapport_markdown(rapport))
+    ecrire_texte(sortie / "rapport.md", rapport_markdown(rapport), conseil=CONSEIL_DE_REPRISE)
     return rapport
 
 
@@ -257,16 +215,6 @@ def _json_valide(valeur):
     return valeur
 
 
-def _ecrire_texte(chemin: Path, texte: str) -> None:
-    """Écrit `chemin` d'un coup (UTF-8, fins de ligne `\\n`) : un fichier à moitié écrit n'existe jamais."""
-    temporaire = chemin.with_name(chemin.name + ".tmp")
-    with open(temporaire, "w", encoding="utf-8", newline="\n") as fichier:
-        fichier.write(texte)
-        fichier.flush()
-        os.fsync(fichier.fileno())
-    remplacer(temporaire, chemin)
-
-
 # --- Raconter en français -----------------------------------------------------------------
 
 
@@ -280,7 +228,7 @@ def _n(valeur: float | None, decimales: int = 1) -> str:
         return "indéfini"
     if math.isinf(valeur):
         return "∞" if valeur > 0 else "−∞"
-    return f"{valeur:,.{decimales}f}".replace(",", _FINE).replace(".", ",")
+    return nombre(valeur, decimales, milliers=_FINE)
 
 
 def _points(pourcentage: float) -> str:

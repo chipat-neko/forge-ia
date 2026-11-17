@@ -27,13 +27,13 @@ from __future__ import annotations
 import heapq
 import json
 import operator
-import os
 import time
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Sequence
 from itertools import chain
 from pathlib import Path
 
+from forge.fichiers import ecrire_texte
 from forge.tokenizer.predecoupage import MOTIF_COMPILE, MOTIF_TON_IA
 from forge.tokenizer.speciaux import NOMBRE_SPECIAUX, SPECIAUX, TAILLE_VOCABULAIRE
 
@@ -303,12 +303,7 @@ class TokenizerOctets:
             f'  "fusions": {fusions}\n'
             "}\n"
         )
-        temporaire = chemin.with_name(chemin.name + ".tmp")
-        with open(temporaire, "w", encoding="utf-8", newline="\n") as fichier:
-            fichier.write(texte)
-            fichier.flush()
-            os.fsync(fichier.fileno())
-        os.replace(temporaire, chemin)
+        ecrire_texte(chemin, texte)
 
     @classmethod
     def charger(cls, chemin: Path) -> TokenizerOctets:

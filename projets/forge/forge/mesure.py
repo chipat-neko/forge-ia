@@ -5,7 +5,7 @@ Avant un entraînement qui dure des heures, on fait un essai chronométré : com
 appareil ? De là on déduit la durée de tout l'entraînement et la place qu'il prend sur le disque.
 
 Ce que l'on chronomètre est **exactement le pas d'entraînement de la boucle** :
-`forge.entrainement.boucle._pas_d_optimisation` (calcul de la perte, `backward`, écrêtage des
+`forge.entrainement.boucle.pas_d_optimisation` (calcul de la perte, `backward`, écrêtage des
 gradients, pas d'AdamW), avec les mêmes calculs en `bfloat16` sur la carte graphique, le même
 optimiseur. Seules les données diffèrent : des jetons tirés au hasard, de la forme exacte de
 ceux du chargeur (`micro_lot` lignes de `longueur_contexte` jetons). La vitesse d'un pas ne
@@ -34,7 +34,9 @@ from collections.abc import Callable
 import psutil
 import torch
 
-from forge.entrainement.boucle import ConfigEntrainement, _creer_optimiseur, _pas_d_optimisation
+from forge.chemins import plus_proche_existant, racine_donnees
+from forge.entrainement.boucle import ConfigEntrainement, creer_optimiseur, pas_d_optimisation
+from forge.fichiers import ESPACE_FINE, nombre
 from forge.modele import PRESETS, ConfigModele, Transformer, nombre_parametres
 from forge.processeur import fils_disponibles
 
@@ -282,11 +284,11 @@ def _mesurer(
         torch.cuda.reset_peak_memory_stats()
     torch.manual_seed(0)
     modele = Transformer(config).to(appareil)
-    optimiseur = _creer_optimiseur(modele, reglages, appareil)
+    optimiseur = creer_optimiseur(modele, reglages, appareil)
     chargeur = _ChargeurAleatoire(config, micro_lot)
 
     def un_pas() -> float:
-        return _pas_d_optimisation(modele, optimiseur, chargeur, accumulation, _TAUX, reglages.ecretage, appareil)
+        return pas_d_optimisation(modele, optimiseur, chargeur, accumulation, _TAUX, reglages.ecretage, appareil)
 
     try:
         for _ in range(echauffement):
@@ -517,7 +519,7 @@ def mesurer_presets(
         "torch": torch.__version__,
         **decrire_la_compilation(),
         "charge_au_repos_pct": charge_au_repos(),
-        "disque_libre_go": round(shutil.disk_usage(_dossier_des_donnees()).free / _OCTETS_PAR_GO, 1),
+        "disque_libre_go": round(shutil.disk_usage(plus_proche_existant(racine_donnees())).free / _OCTETS_PAR_GO, 1),
     }
     journal(f"Charge du processeur au repos : {machine['charge_au_repos_pct']:.0f} %.")
     mesure_gpu = cuda_disponible()
@@ -593,23 +595,14 @@ def _mesurer_les_tailles(
     return resultats
 
 
-def _dossier_des_donnees():
-    from forge.chemins import racine_donnees
-
-    chemin = racine_donnees()
-    while not chemin.exists() and chemin != chemin.parent:
-        chemin = chemin.parent
-    return chemin
-
-
 # --- Le tableau, en français ----------------------------------------------------------------------
 
-_FINE = "\u202f"  # espace fine insécable : milliers, avant « % : ; ! ? » et dans les guillemets
+_FINE = ESPACE_FINE  # espace fine insécable : milliers, avant « % : ; ! ? » et dans les guillemets
 
 
 def _decimal(valeur: float, decimales: int = 1) -> str:
     """12 345,6 : virgule décimale, espace fine entre les milliers."""
-    return f"{valeur:,.{decimales}f}".replace(",", _FINE).replace(".", ",")
+    return nombre(valeur, decimales, milliers=_FINE)
 
 
 def _entier(valeur: float) -> str:

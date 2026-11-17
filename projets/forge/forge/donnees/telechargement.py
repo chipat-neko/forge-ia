@@ -29,9 +29,10 @@ from itertools import islice
 from pathlib import Path
 from typing import BinaryIO
 
-from forge.chemins import racine_donnees, verifier_place
+from forge.chemins import sous_forge_donnees, verifier_place
 from forge.donnees.nettoyage import empreinte_du_texte_nettoye, nettoyer
 from forge.donnees.sources import Source
+from forge.fichiers import ecrire_atomique, nombre
 
 # Taille visée d'un fragment : environ 100 Mo de texte (un Mo vaut 1024² octets ici).
 TAILLE_FRAGMENT = 100 * 1024**2
@@ -44,7 +45,7 @@ _OCTETS_PAR_EMPREINTE = 8  # on garde 64 bits du SHA-1 : assez pour des millions
 
 def en_mo(octets: int) -> str:
     """Écrit une taille en Mo (1024² octets) avec une décimale et la virgule française."""
-    return f"{octets / 1024**2:.1f}".replace(".", ",")
+    return nombre(octets / 1024**2, 1)
 
 
 def dossier_des_textes(dossier: Path) -> Path:
@@ -53,7 +54,7 @@ def dossier_des_textes(dossier: Path) -> Path:
     C'est le dossier que le téléchargement remplit et que le tokenizer lit : une seule
     définition pour les deux.
     """
-    return racine_donnees() / "textes" / dossier
+    return sous_forge_donnees(dossier, "textes")
 
 
 @dataclass
@@ -174,23 +175,6 @@ def lecteur_hugging_face(
     return LecteurDeFlux(jeu, refus)
 
 
-def _ecrire_atomique(chemin: Path, ecrire: Callable[[BinaryIO], None]) -> None:
-    """Écrit `chemin` d'un coup : un `.tmp`, forcé sur le disque, puis `os.replace`.
-
-    Si quoi que ce soit échoue, le `.tmp` est effacé et `chemin` reste tel qu'il était.
-    """
-    temporaire = chemin.with_name(chemin.name + ".tmp")
-    try:
-        with open(temporaire, "wb") as fichier:
-            ecrire(fichier)
-            fichier.flush()
-            os.fsync(fichier.fileno())
-        os.replace(temporaire, chemin)
-    except BaseException:
-        temporaire.unlink(missing_ok=True)
-        raise
-
-
 def _ecrire_fragment(dossier: Path, numero: int, textes: list[str]) -> None:
     """Écrit le fragment `numero` : une ligne `{"texte": …}` par texte, compressée en gzip."""
     def ecrire(fichier: BinaryIO) -> None:
@@ -200,13 +184,13 @@ def _ecrire_fragment(dossier: Path, numero: int, textes: list[str]) -> None:
                 ligne = json.dumps({"texte": texte}, ensure_ascii=False) + "\n"
                 compresse.write(ligne.encode("utf-8"))
 
-    _ecrire_atomique(dossier / f"fragment-{numero:05d}.jsonl.gz", ecrire)
+    ecrire_atomique(dossier / f"fragment-{numero:05d}.jsonl.gz", ecrire)
 
 
 def _ecrire_etat(dossier: Path, etat: _Etat) -> None:
     """Écrit `etat.json` (atomique) : à appeler seulement après le fragment qu'il compte."""
     contenu = json.dumps(asdict(etat), indent=2).encode("utf-8")
-    _ecrire_atomique(dossier / "etat.json", lambda fichier: fichier.write(contenu))
+    ecrire_atomique(dossier / "etat.json", lambda fichier: fichier.write(contenu))
 
 
 def _lire_etat(dossier: Path) -> _Etat | None:
@@ -270,7 +254,7 @@ def _effacer_restes(dossier: Path, etat: _Etat) -> None:
 def _poser_marqueur(dossier: Path, etat: _Etat) -> None:
     """Pose `.complet` en dernier : sa présence dit que rien ne manque."""
     contenu = json.dumps(asdict(etat), indent=2).encode("utf-8")
-    _ecrire_atomique(dossier / ".complet", lambda fichier: fichier.write(contenu))
+    ecrire_atomique(dossier / ".complet", lambda fichier: fichier.write(contenu))
 
 
 def _texte_a_garder(source: Source, ligne: dict) -> str | None:

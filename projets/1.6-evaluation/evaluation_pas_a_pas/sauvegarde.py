@@ -1,7 +1,7 @@
 """Charger une sauvegarde de l'entraînement de forge (un fichier `etape-*.pt` ou `meilleur.pt`).
 
 `charger_sauvegarde` passe par `forge.entrainement.sauvegarde.charger`, puis reconstruit le modèle
-comme le fait l'évaluation de forge (`forge.evaluation.rapport._lire_sauvegarde`) : la configuration
+comme le fait l'évaluation de forge (`forge.entrainement.sauvegarde.lire_sauvegarde`) : la configuration
 du modèle est dans la sauvegarde, avec ses poids. Le modèle rendu est en mode évaluation, sur
 l'appareil demandé.
 """

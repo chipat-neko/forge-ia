@@ -18,17 +18,19 @@ nouvelle et l'ancienne coexistent le temps de l'écriture.
 
 import errno
 import math
-import os
 import re
 import shutil
 import sys
-import time
 from collections.abc import Callable
 from pathlib import Path
 
 import torch
 
-from forge.chemins import PlaceInsuffisante, verifier_place
+from forge.chemins import PlaceInsuffisante, en_go, verifier_place
+from forge.fichiers import ecrire_atomique
+
+# La version du format des sauvegardes, écrite dans chacune et vérifiée à la lecture.
+VERSION_DE_LA_SAUVEGARDE = 1
 
 # `etape-0000123.pt` : le pas, sur 7 chiffres. Rien d'autre (ni `.tmp`, ni copie) n'est pris.
 MOTIF_ETAPE = re.compile(r"etape-(\d{7})\.pt")
@@ -113,25 +115,20 @@ def _octets_libres(dossier: Path) -> int:
         return 2**63  # inconnu : on ne conclut pas à un disque plein
 
 
-def _go(octets: int, arrondi) -> str:
-    """Une taille en Go (1024³ octets), une décimale, virgule française."""
-    return f"{arrondi(octets / 1024**3 * 10) / 10:.1f}".replace(".", ",")
-
-
 def _message_disque_plein(chemin: Path, estimation: int) -> str:
     """Le message d'un disque rempli pendant l'écriture : combien il manque, et quoi faire."""
     libres = _octets_libres(chemin.parent)  # après l'effacement du `.tmp`
     besoin = 2 * estimation
     if libres < besoin:
         manque = (
-            f"Il manque {_go(besoin - libres, math.ceil)} Go : {_go(libres, math.floor)} Go libres, "
-            f"{_go(besoin, math.ceil)} Go nécessaires (la nouvelle sauvegarde et l'ancienne, le "
+            f"Il manque {en_go(besoin - libres, math.ceil)} Go : {en_go(libres, math.floor)} Go libres, "
+            f"{en_go(besoin, math.ceil)} Go nécessaires (la nouvelle sauvegarde et l'ancienne, le "
             "temps de l'écriture)."
         )
     else:
         manque = (
             f"Un autre programme a sans doute rempli le disque en même temps : il faut "
-            f"{_go(besoin, math.ceil)} Go libres pour écrire cette sauvegarde."
+            f"{en_go(besoin, math.ceil)} Go libres pour écrire cette sauvegarde."
         )
     return (
         f"Le disque s'est rempli pendant l'écriture de {chemin}. {manque} Les sauvegardes "
@@ -140,27 +137,10 @@ def _message_disque_plein(chemin: Path, estimation: int) -> str:
     )
 
 
-# Attentes entre deux essais de `os.replace` quand Windows refuse (fichier ouvert par un
-# antivirus, l'Explorateur ou une évaluation en cours) : 3 secondes en tout.
-_ATTENTES_DU_REMPLACEMENT = (0.1, 0.2, 0.4, 0.8, 1.6)
-
-
-def remplacer(temporaire: Path, chemin: Path) -> None:
-    """`os.replace`, réessayé quelques fois si Windows refuse l'accès un instant."""
-    for attente in _ATTENTES_DU_REMPLACEMENT:
-        try:
-            os.replace(temporaire, chemin)
-            return
-        except PermissionError:
-            time.sleep(attente)
-    try:
-        os.replace(temporaire, chemin)
-    except PermissionError as erreur:
-        raise PermissionError(
-            f"Windows refuse de remplacer {chemin} : un autre programme le garde ouvert "
-            "(antivirus, Explorateur, évaluation en cours…). Ferme-le, puis relance avec "
-            "--reprendre : l'entraînement repartira de la dernière sauvegarde complète."
-        ) from erreur
+# Ce que dit l'erreur d'un remplacement refusé par Windows, pour une sauvegarde de l'entraînement.
+CONSEIL_DE_REPRISE = (
+    "Ferme-le, puis relance avec --reprendre : l'entraînement repartira de la dernière sauvegarde complète."
+)
 
 
 def _avertir(message: str) -> None:
@@ -195,22 +175,22 @@ def sauvegarder(dossier: Path, etat: dict, nom: str, noter: Callable[[str], None
     verifier_place(estimation * 2, dossier)
     dossier.mkdir(parents=True, exist_ok=True)
     chemin = dossier / nom
-    temporaire = chemin.with_name(nom + ".tmp")
-    try:
-        with open(temporaire, "wb") as fichier:
-            torch.save(etat, fichier)
-            fichier.flush()
-            os.fsync(fichier.fileno())
-        remplacer(temporaire, chemin)
-    except BaseException as erreur:
-        # Disque plein ? On regarde AVANT d'effacer le `.tmp`, qui occupe encore la place.
-        plein = isinstance(erreur, Exception) and (
-            _cause_disque_plein(erreur) or _octets_libres(dossier) < estimation
-        )
+    plein_pendant_l_ecriture: list[bool] = []
+
+    def ecrire(fichier) -> None:
         try:
-            temporaire.unlink(missing_ok=True)  # Ctrl+C, disque plein ou autre : jamais de demi-fichier
-        except OSError:
-            pass  # jamais lu (ce n'est pas une `etape-*.pt`), et effacé à la sauvegarde suivante
+            torch.save(etat, fichier)
+        except Exception as erreur:
+            # Disque plein ? On regarde AVANT d'effacer le `.tmp`, qui occupe encore la place.
+            plein_pendant_l_ecriture.append(_cause_disque_plein(erreur) or _octets_libres(dossier) < estimation)
+            raise
+
+    try:
+        ecrire_atomique(chemin, ecrire, conseil=CONSEIL_DE_REPRISE)  # efface le `.tmp` en cas d'échec
+    except BaseException as erreur:
+        plein = isinstance(erreur, Exception) and (
+            any(plein_pendant_l_ecriture) or _cause_disque_plein(erreur) or _octets_libres(dossier) < estimation
+        )
         if plein:
             raise PlaceInsuffisante(_message_disque_plein(chemin, estimation)) from erreur
         raise
@@ -244,3 +224,42 @@ def charger_derniere(dossier: Path) -> dict | None:
                 file=sys.stderr,
             )
     return None
+
+
+def lire_sauvegarde(chemin: Path) -> tuple[dict, str]:
+    """Lit une sauvegarde de l'entraînement : un fichier `.pt`, ou le dossier `sauvegardes/`.
+
+    Un dossier donne sa dernière `etape-*.pt`. Renvoie la sauvegarde et le fichier lu.
+    """
+    if chemin.is_dir():
+        etat = charger_derniere(chemin)
+        if etat is None:
+            raise FileNotFoundError(
+                f"Aucune sauvegarde etape-*.pt dans {chemin}. Donne un fichier .pt, par exemple {chemin / 'meilleur.pt'}."
+            )
+        lu = str(chemin / nom_etape(etat["pas"])) if "pas" in etat else str(chemin)
+    elif chemin.is_file():
+        try:
+            etat = charger(chemin)
+        except Exception as erreur:  # fichier tronqué, ou qui n'est pas de PyTorch
+            raise ValueError(
+                f"{chemin} ne se lit pas comme une sauvegarde de la forge ({type(erreur).__name__}). "
+                "Prends un fichier etape-*.pt ou meilleur.pt du dossier sauvegardes/ d'un entraînement."
+            ) from erreur
+        lu = str(chemin)
+    else:
+        raise FileNotFoundError(
+            f"Sauvegarde introuvable : {chemin}. Donne un fichier .pt du dossier sauvegardes/ d'un "
+            "entraînement (etape-*.pt ou meilleur.pt)."
+        )
+    if not isinstance(etat, dict) or "modele" not in etat or "config_modele" not in etat:
+        raise ValueError(
+            f"{chemin} n'est pas une sauvegarde de la forge : il n'y a ni « modele » ni « config_modele » "
+            "dedans. Prends un fichier etape-*.pt ou meilleur.pt du dossier sauvegardes/ d'un entraînement."
+        )
+    if etat.get("version") != VERSION_DE_LA_SAUVEGARDE:
+        raise ValueError(
+            f"Sauvegarde de version {etat.get('version')!r} : cette version de la forge lit la "
+            f"version {VERSION_DE_LA_SAUVEGARDE}."
+        )
+    return etat, lu

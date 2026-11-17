@@ -1,6 +1,6 @@
 """La boucle d'entraînement de « ton IA » : apprendre, noter, sauvegarder, se mettre en pause.
 
-Un entraînement est une suite de pas d'optimisation. À chaque pas (`_pas_d_optimisation`) :
+Un entraînement est une suite de pas d'optimisation. À chaque pas (`pas_d_optimisation`) :
 
 1. on lit `accumulation` micro-lots de jetons. Pour chacun, le modèle prédit le jeton suivant
    à chaque position, on mesure son erreur (la perte) et on calcule dans quelle direction
@@ -47,17 +47,23 @@ import numpy as np
 import torch
 from torch import nn
 
-from forge.chemins import PlaceInsuffisante, racine_donnees
+from forge.chemins import PlaceInsuffisante, sous_forge_donnees
+from forge.erreurs import DonneesManquantes
 from forge.entrainement.chargeur import ChargeurJetons, empreinte_du_tokenizer_des_jetons
 from forge.entrainement.planning import taux
-from forge.entrainement.sauvegarde import charger_derniere, est_disque_plein, nom_etape, remplacer, sauvegarder
+from forge.entrainement.sauvegarde import (
+    CONSEIL_DE_REPRISE,
+    VERSION_DE_LA_SAUVEGARDE,
+    charger_derniere,
+    est_disque_plein,
+    nom_etape,
+    sauvegarder,
+)
 from forge.evaluation.perte import autocast as _autocast  # bf16 sur la carte graphique, 32 bits sur le processeur
 from forge.evaluation.perte import perte_sur_morceaux as _perte_validation  # la mesure est celle de `evaluer`
+from forge.fichiers import duree, ecrire_texte, entier, nombre
 from forge.modele import PRESETS, ConfigModele, Transformer, nombre_parametres
 from forge.processeur import fils_disponibles
-from forge.tokenizer.apprentissage import DonneesManquantes
-
-VERSION_DE_LA_SAUVEGARDE = 1
 
 # Nombre de morceaux de validation lus pour mesurer la perte de validation : toujours les
 # mêmes, quel que soit `micro_lot` (moins si `val/` en a moins).
@@ -95,12 +101,6 @@ class PerteNonFinie(ArithmeticError):
 
 
 # --- La configuration -----------------------------------------------------------------
-
-
-def _chemin_sous_la_racine(valeur: str, sous_dossier: str) -> Path:
-    """Un chemin absolu est gardé tel quel ; un nom va sous `FORGE_DONNEES/<sous_dossier>/`."""
-    chemin = Path(valeur)
-    return chemin if chemin.is_absolute() else racine_donnees() / sous_dossier / chemin
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -221,11 +221,11 @@ class ConfigEntrainement:
 
     @property
     def dossier_donnees(self) -> Path:
-        return _chemin_sous_la_racine(self.donnees, "jetons")
+        return sous_forge_donnees(self.donnees, "jetons")
 
     @property
     def dossier_sortie(self) -> Path:
-        return _chemin_sous_la_racine(self.sortie, "entrainements")
+        return sous_forge_donnees(self.sortie, "entrainements")
 
 
 def lire_config(chemin: Path | str) -> ConfigEntrainement:
@@ -254,31 +254,6 @@ def lire_config(chemin: Path | str) -> ConfigEntrainement:
 
 
 # --- Petits outils ----------------------------------------------------------------------
-
-
-def _nombre(valeur: float, decimales: int) -> str:
-    """Un nombre à la française : virgule décimale."""
-    return f"{valeur:.{decimales}f}".replace(".", ",")
-
-
-def _entier(valeur: float) -> str:
-    """Un entier avec une espace entre les milliers : 52 000."""
-    return f"{round(valeur):,}".replace(",", " ")
-
-
-def _duree(secondes: float) -> str:
-    """Une durée lisible : 2 j 3 h, 1 h 05 min, 4 min 10 s, 12 s."""
-    secondes = max(0, round(secondes))
-    jours, reste = divmod(secondes, 86400)
-    heures, reste = divmod(reste, 3600)
-    minutes, secondes = divmod(reste, 60)
-    if jours:
-        return f"{jours} j {heures} h"
-    if heures:
-        return f"{heures} h {minutes:02d} min"
-    if minutes:
-        return f"{minutes} min {secondes:02d} s"
-    return f"{secondes} s"
 
 
 def _commande_de_reprise(config: ConfigEntrainement) -> str:
@@ -361,9 +336,8 @@ def _couper_journal(chemin: Path, pas: int) -> None:
             continue
         if isinstance(contenu, dict) and isinstance(contenu.get("pas"), int) and contenu["pas"] <= pas:
             gardees.append(ligne + "\n")
-    temporaire = chemin.with_name(chemin.name + ".tmp")
-    temporaire.write_text("".join(gardees), encoding="utf-8")
-    remplacer(temporaire, chemin)  # réessayé si `forge suivi` lit le journal à cet instant
+    # Réessayé si `forge suivi` lit le journal à cet instant ; fins de ligne du système, comme avant.
+    ecrire_texte(chemin, "".join(gardees), conseil=CONSEIL_DE_REPRISE, fins_de_ligne=None)
 
 
 class _Pause:
@@ -461,7 +435,7 @@ def _sans_mise_en_veille():
 # --- Le modèle et l'optimiseur ----------------------------------------------------------
 
 
-def _creer_optimiseur(modele: nn.Module, config: ConfigEntrainement, appareil: torch.device):
+def creer_optimiseur(modele: nn.Module, config: ConfigEntrainement, appareil: torch.device):
     """AdamW, avec décroissance des poids sur les matrices seulement (pas sur les RMSNorm)."""
     matrices = [p for p in modele.parameters() if p.dim() >= 2]
     vecteurs = [p for p in modele.parameters() if p.dim() < 2]
@@ -528,7 +502,7 @@ def _preparer_compilation(
 # --- Un pas d'optimisation, la validation ------------------------------------------------
 
 
-def _pas_d_optimisation(
+def pas_d_optimisation(
     modele: nn.Module,
     optimiseur: torch.optim.Optimizer,
     chargeur: ChargeurJetons,
@@ -647,7 +621,7 @@ def _signaler_manque_de_memoire(config: ConfigEntrainement, appareil: torch.devi
         torch.cuda.empty_cache()  # rend à la carte ce que cet entraînement gardait en réserve
         try:
             octets_libres, octets_total = torch.cuda.mem_get_info()
-            libre = f"{_nombre(octets_libres / 1024**3, 1)} Go sur {_nombre(octets_total / 1024**3, 1)} Go"
+            libre = f"{nombre(octets_libres / 1024**3, 1)} Go sur {nombre(octets_total / 1024**3, 1)} Go"
         except RuntimeError:
             pass
     fichier = config.fichier or "<fichier>"
@@ -669,7 +643,7 @@ def _manque_de_memoire_avec_un_micro_lot_de_1(config: ConfigEntrainement, memoir
     fichier = config.fichier or "<fichier>"
     parametres = nombre_parametres(config.modele)
     taille = f"preset « {config.preset} »" if isinstance(config.preset, str) else "table [preset]"
-    millions = _nombre(parametres / 1e6, 1)
+    millions = nombre(parametres / 1e6, 1)
     plus_petits = [nom for nom, modele in PRESETS.items() if nombre_parametres(modele) < parametres]
     lignes = [
         f"La carte graphique manque de mémoire, même avec micro_lot = 1 : ce modèle ({taille}, "
@@ -769,7 +743,7 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
         torch.set_num_threads(fils_disponibles())  # tous les fils que ce processus peut utiliser
     _semer(config.graine)
     modele = Transformer(config.modele).to(appareil)
-    optimiseur = _creer_optimiseur(modele, config, appareil)
+    optimiseur = creer_optimiseur(modele, config, appareil)
     chargeur = ChargeurJetons(config.dossier_donnees / "train", longueur, config.micro_lot, config.graine)
     validation, depart_validation, morceaux_validation, sans_validation = None, None, 0, ""
     try:
@@ -805,8 +779,8 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
                 {"evenement": "validation", "pas": pas, "message": f"Pas de perte de validation : {sans_validation}"}
             )
         print(
-            f"{debut} Modèle de {_entier(nombre_parametres(config.modele))} paramètres, "
-            f"{_entier(config.taille_lot_jetons)} jetons par pas ({config.accumulation} × "
+            f"{debut} Modèle de {entier(nombre_parametres(config.modele))} paramètres, "
+            f"{entier(config.taille_lot_jetons)} jetons par pas ({config.accumulation} × "
             f"{config.micro_lot} lignes de {longueur}), sur "
             f"{'la carte graphique' if appareil.type == 'cuda' else 'le processeur'}.\n"
             f"Journal : {chemin_journal}\nSauvegardes : {sauvegardes}\n"
@@ -849,7 +823,7 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
                 pas += 1
                 taux_du_pas = taux(pas, pas_total, config.taux_max, config.echauffement)
                 try:
-                    perte = _pas_d_optimisation(
+                    perte = pas_d_optimisation(
                         modele_entraine, optimiseur, chargeur, config.accumulation, taux_du_pas, config.ecretage, appareil
                     )
                 except PerteNonFinie as erreur:
@@ -891,11 +865,11 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
                 ):
                     dernier_affichage = maintenant
                     restant = (pas_total - pas) * config.taille_lot_jetons / vitesse
-                    val = f" · validation {_nombre(ligne['perte_val'], 3)}" if "perte_val" in ligne else ""
+                    val = f" · validation {nombre(ligne['perte_val'], 3)}" if "perte_val" in ligne else ""
                     print(
-                        f"pas {pas}/{pas_total} · perte {_nombre(perte, 3)}{val} · "
+                        f"pas {pas}/{pas_total} · perte {nombre(perte, 3)}{val} · "
                         f"taux {f'{taux_du_pas:.1e}'.replace('.', ',')} · "
-                        f"{_entier(vitesse)} jetons/s · reste ≈ {_duree(restant)}",
+                        f"{entier(vitesse)} jetons/s · reste ≈ {duree(restant)}",
                         flush=True,
                     )
 

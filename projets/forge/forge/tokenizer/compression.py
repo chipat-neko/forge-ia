@@ -17,18 +17,19 @@ from pathlib import Path
 
 from forge.donnees.melange import MELANGE_PAR_DEFAUT, est_validation
 from forge.donnees.nettoyage import empreinte_du_texte_nettoye
+from forge.fichiers import entier, nombre
 from forge.tokenizer.apprentissage import lire_fragments, verifier_dossier
 from forge.tokenizer.bpe_octets import TokenizerOctets
 
 PARTIES = ("validation", "apprentissage")
 
 
-def _separer_les_milliers(nombre: int) -> str:
-    return f"{nombre:,}".replace(",", " ")
+def _separer_les_milliers(valeur: int) -> str:
+    return entier(valeur)
 
 
-def _virgule(nombre: float) -> str:
-    return f"{nombre:.2f}".replace(".", ",")
+def _virgule(valeur: float) -> str:
+    return nombre(valeur, 2)
 
 
 def mesurer_compression(

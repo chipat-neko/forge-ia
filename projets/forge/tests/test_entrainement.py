@@ -132,7 +132,7 @@ def test_disque_plein_avant_sauvegarde(tmp_path, monkeypatch):
 
 def test_memoire_gpu_message(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(
-        "forge.entrainement.boucle._pas_d_optimisation",
+        "forge.entrainement.boucle.pas_d_optimisation",
         lambda *a, **k: (_ for _ in ()).throw(torch.cuda.OutOfMemoryError("CUDA out of memory")),
     )
     with pytest.raises(SystemExit) as sortie:
@@ -162,7 +162,7 @@ def test_memoire_gpu_message_quand_micro_lot_vaut_deja_1(capsys):
 
 def test_memoire_gpu_message_micro_lot_1_pendant_l_entrainement(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(
-        "forge.entrainement.boucle._pas_d_optimisation",
+        "forge.entrainement.boucle.pas_d_optimisation",
         lambda *a, **k: (_ for _ in ()).throw(torch.cuda.OutOfMemoryError("CUDA out of memory")),
     )
     with pytest.raises(SystemExit) as sortie:
@@ -314,6 +314,42 @@ def test_chargeur_refuse_un_encodage_inacheve(tmp_path):
         ChargeurJetons(tmp_path / "train", longueur=16, taille_lot=2, graine=0)
 
 
+@pytest.mark.parametrize("version", [0, 2, None])
+def test_chargeur_refuse_une_version_d_index_inconnue(tmp_path, version):
+    ecrire_corpus(tmp_path)
+    chemin = tmp_path / "index.json"
+    index = json.loads(chemin.read_text(encoding="utf-8"))
+    if version is None:
+        del index["version"]
+    else:
+        index["version"] = version
+    chemin.write_text(json.dumps(index), encoding="utf-8")
+    with pytest.raises(DonneesManquantes, match="version") as erreur:
+        ChargeurJetons(tmp_path / "train", longueur=16, taille_lot=2, graine=0)
+    assert "encod" in str(erreur.value)  # le message dit de réencoder
+
+
+def test_donnees_manquantes_vient_de_forge_erreurs_et_reste_importable_d_avant():
+    from forge.erreurs import DonneesManquantes as officielle
+    from forge.tokenizer.apprentissage import DonneesManquantes as ancienne
+
+    assert officielle is ancienne is DonneesManquantes
+
+
+def test_les_modules_de_forge_n_importent_pas_de_nom_prive_d_un_autre_module():
+    import ast
+    from pathlib import Path
+
+    import forge
+
+    fautes = []
+    for fichier in Path(forge.__file__).parent.rglob("*.py"):
+        for noeud in ast.walk(ast.parse(fichier.read_text(encoding="utf-8"))):
+            if isinstance(noeud, ast.ImportFrom) and noeud.module and noeud.module.startswith("forge"):
+                fautes += [f"{fichier.name} : {noeud.module}.{a.name}" for a in noeud.names if a.name.startswith("_")]
+    assert not fautes, fautes
+
+
 def test_chargeur_refuse_l_etat_d_autres_donnees(tmp_path):
     ecrire_corpus(tmp_path / "un")
     ecrire_deux_sources(tmp_path / "autre")
@@ -447,8 +483,8 @@ def test_remplacement_reessaye_si_windows_refuse(tmp_path, monkeypatch):
             raise PermissionError(13, "Accès refusé")
         vrai_replace(source, cible)
 
-    monkeypatch.setattr("forge.entrainement.sauvegarde.os.replace", replace_bloque_deux_fois)
-    monkeypatch.setattr("forge.entrainement.sauvegarde.time.sleep", lambda secondes: None)
+    monkeypatch.setattr("forge.fichiers.os.replace", replace_bloque_deux_fois)
+    monkeypatch.setattr("forge.fichiers.time.sleep", lambda secondes: None)
     chemin = sauvegarder(tmp_path, {"pas": 1}, "etape-0000001.pt")
     assert len(refus) == 2 and charger_derniere(tmp_path)["pas"] == 1
     assert sorted(f.name for f in tmp_path.iterdir()) == [chemin.name]
@@ -497,7 +533,7 @@ def test_journal_et_meilleure_sauvegarde(tmp_path):
 def test_pause_par_ctrl_c(tmp_path, monkeypatch, capsys):
     reference = entrainer(config_test(tmp_path / "ref"), arreter_apres=8)["pertes"]
 
-    vrai_pas = boucle._pas_d_optimisation
+    vrai_pas = boucle.pas_d_optimisation
     faits = []
 
     def pas_puis_ctrl_c(*a, **k):
@@ -507,7 +543,7 @@ def test_pause_par_ctrl_c(tmp_path, monkeypatch, capsys):
             signal.raise_signal(signal.SIGINT)  # comme Ctrl+C au milieu du pas 3
         return perte
 
-    monkeypatch.setattr(boucle, "_pas_d_optimisation", pas_puis_ctrl_c)
+    monkeypatch.setattr(boucle, "pas_d_optimisation", pas_puis_ctrl_c)
     config = config_test(tmp_path / "pause", fichier="configs/essai.toml")
     r = entrainer(config, arreter_apres=8)
     assert r["en_pause"] and r["pas"] == 3 and len(r["pertes"]) == 3
@@ -519,7 +555,7 @@ def test_pause_par_ctrl_c(tmp_path, monkeypatch, capsys):
     assert signal.getsignal(signal.SIGINT) is signal.default_int_handler
     assert charger_derniere(tmp_path / "pause" / "sauvegardes")["pas"] == 3
 
-    monkeypatch.setattr(boucle, "_pas_d_optimisation", vrai_pas)
+    monkeypatch.setattr(boucle, "pas_d_optimisation", vrai_pas)
     suite = entrainer(config, reprendre=True, arreter_apres=8)["pertes"]
     assert reference[3:8] == suite  # au bit près sur le processeur
 
@@ -527,7 +563,7 @@ def test_pause_par_ctrl_c(tmp_path, monkeypatch, capsys):
 def test_sigterm_met_en_pause_comme_ctrl_c(tmp_path, monkeypatch, capsys):
     """Un arrêt du système, `docker stop` ou `timeout` envoient SIGTERM : on sauvegarde, comme pour Ctrl+C."""
     avant = signal.getsignal(signal.SIGTERM)
-    vrai_pas = boucle._pas_d_optimisation
+    vrai_pas = boucle.pas_d_optimisation
     faits = []
 
     def pas_puis_sigterm(*a, **k):
@@ -540,7 +576,7 @@ def test_sigterm_met_en_pause_comme_ctrl_c(tmp_path, monkeypatch, capsys):
             gestionnaire(signal.SIGTERM, None)
         return perte
 
-    monkeypatch.setattr(boucle, "_pas_d_optimisation", pas_puis_sigterm)
+    monkeypatch.setattr(boucle, "pas_d_optimisation", pas_puis_sigterm)
     r = entrainer(config_test(tmp_path), arreter_apres=8)
     assert r["en_pause"] and r["pas"] == 2
     assert charger_derniere(tmp_path / "sauvegardes")["pas"] == 2
@@ -637,7 +673,7 @@ def test_reprise_jetons_total_augmente_et_taux_max_baisse(tmp_path):
 
 
 def test_perte_infinie_arrete_sans_sauvegarder(tmp_path, monkeypatch, capsys):
-    vrai_pas = boucle._pas_d_optimisation
+    vrai_pas = boucle.pas_d_optimisation
     appels = []
 
     def pas_qui_diverge(modele, *a, **k):
@@ -647,7 +683,7 @@ def test_perte_infinie_arrete_sans_sauvegarder(tmp_path, monkeypatch, capsys):
                 modele.plongement.weight.fill_(math.nan)  # comme une divergence
         return vrai_pas(modele, *a, **k)
 
-    monkeypatch.setattr(boucle, "_pas_d_optimisation", pas_qui_diverge)
+    monkeypatch.setattr(boucle, "pas_d_optimisation", pas_qui_diverge)
     with pytest.raises(SystemExit) as sortie:
         # Sauvegarde à chaque pas : les pas 1 et 2 sont sauvegardés, le pas 3 ne doit pas l'être.
         entrainer(config_test(tmp_path, sauvegarde_minutes=1e-9), arreter_apres=10)
@@ -679,7 +715,7 @@ def test_accumulation_moyenne_les_gradients(tmp_path):
         modele = boucle.Transformer(MODELE_TEST)
         optimiseur = torch.optim.AdamW(modele.parameters(), lr=0.0)
         chargeur = ChargeurJetons(tmp_path / "train", longueur=16, taille_lot=micro_lot, graine=8)
-        boucle._pas_d_optimisation(modele, optimiseur, chargeur, accumulation, 0.0, 1e9, torch.device("cpu"))
+        boucle.pas_d_optimisation(modele, optimiseur, chargeur, accumulation, 0.0, 1e9, torch.device("cpu"))
         gradients.append([p.grad.clone() for p in modele.parameters()])
     for deux_fois_deux, une_fois_quatre in zip(*gradients):
         assert torch.allclose(deux_fois_deux, une_fois_quatre, atol=1e-6, rtol=1e-5)
@@ -934,7 +970,7 @@ def test_sans_mise_en_veille_ne_fait_rien_hors_de_windows(monkeypatch):
 def test_l_entrainement_empeche_la_veille_jusqu_a_la_pause(tmp_path, monkeypatch):
     appels = []
     monkeypatch.setattr(boucle, "_etat_d_execution_windows", lambda: appels.append)
-    vrai_pas = boucle._pas_d_optimisation
+    vrai_pas = boucle.pas_d_optimisation
 
     def pas_puis_ctrl_c(*a, **k):
         assert appels == [ES_CONTINUOUS | ES_SYSTEM_REQUIRED]  # pendant la boucle : pas de veille
@@ -942,6 +978,6 @@ def test_l_entrainement_empeche_la_veille_jusqu_a_la_pause(tmp_path, monkeypatch
         signal.raise_signal(signal.SIGINT)
         return perte
 
-    monkeypatch.setattr(boucle, "_pas_d_optimisation", pas_puis_ctrl_c)
+    monkeypatch.setattr(boucle, "pas_d_optimisation", pas_puis_ctrl_c)
     assert entrainer(config_test(tmp_path), arreter_apres=5)["en_pause"]
     assert appels == [ES_CONTINUOUS | ES_SYSTEM_REQUIRED, ES_CONTINUOUS]  # la pause rend la veille

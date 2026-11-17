@@ -43,9 +43,10 @@ import numpy as np
 from forge.chemins import verifier_place
 from forge.donnees.melange import est_validation
 from forge.donnees.nettoyage import empreinte_du_texte_nettoye
-from forge.donnees.telechargement import MARGE_PLACE, _ecrire_atomique, en_mo
+from forge.donnees.telechargement import MARGE_PLACE, en_mo
+from forge.erreurs import DonneesManquantes
+from forge.fichiers import ecrire_atomique, nombre
 from forge.processeur import fils_disponibles
-from forge.tokenizer.apprentissage import DonneesManquantes
 from forge.tokenizer.bpe_octets import TokenizerOctets
 
 # Les jetons sont rangés sur 16 bits, petit-boutiste, quelle que soit la machine.
@@ -113,7 +114,7 @@ def lire_jetons(fichier: Path) -> np.memmap:
 def _ecrire(chemin: Path, octets: int, ecrire: Callable[[BinaryIO], None]) -> None:
     """Écrit `chemin` d'un coup, après avoir vérifié la place pour `octets` octets et 2 Go de marge."""
     verifier_place(octets + MARGE_PLACE, chemin.parent)
-    _ecrire_atomique(chemin, ecrire)
+    ecrire_atomique(chemin, ecrire)
 
 
 def _ecrire_json(chemin: Path, contenu: dict) -> None:
@@ -494,7 +495,7 @@ def encoder_corpus(
     if encodes:
         secondes = max(time.perf_counter() - debut, 1e-9)
         octets = sum(r["octets"] for r in encodes)
-        vitesse = f"{octets / 1024**2 / secondes:.2f}".replace(".", ",")
+        vitesse = nombre(octets / 1024**2 / secondes, 2)
         ecrire(
             f"Terminé : {len(encodes)} fragments encodés, {en_mo(octets)} Mo de texte en {secondes:.0f} s, "
             f"soit {vitesse} Mo/s."

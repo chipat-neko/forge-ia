@@ -14,12 +14,9 @@ from pathlib import Path
 from forge.donnees.melange import MELANGE_PAR_DEFAUT, est_validation
 from forge.donnees.nettoyage import empreinte_du_texte_nettoye
 from forge.donnees.telechargement import dossier_des_textes
+from forge.erreurs import DonneesManquantes  # noqa: F401  (réexportée : les anciens imports restent valables)
 from forge.tokenizer.bpe_octets import NOMBRE_OCTETS, TokenizerOctets, entrainer_tokenizer
 from forge.tokenizer.speciaux import NOMBRE_SPECIAUX
-
-
-class DonneesManquantes(Exception):
-    """Les textes attendus sont absents, ou leur téléchargement n'est pas fini."""
 
 
 def verifier_dossier(dossier: Path) -> None:

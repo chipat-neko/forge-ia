@@ -31,7 +31,8 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-from forge.chemins import racine_donnees
+from forge.chemins import sous_forge_donnees
+from forge.fichiers import ESPACE_FINE, duree, entier, nombre
 
 # Le débit (et donc le temps restant) est mesuré sur les 100 derniers pas : environ 50 minutes
 # pour l'entraînement principal, assez pour lisser une validation ou une sauvegarde.
@@ -40,7 +41,7 @@ PAS_RECENTS = 100
 # La perte d'un pas varie d'un lot à l'autre : on montre aussi la moyenne des 20 derniers.
 PERTES_RECENTES = 20
 
-_FINE = "\u202f"  # espace fine insécable : milliers, avant « : ; ? ! % »
+_FINE = ESPACE_FINE  # espace fine insécable : milliers, avant « : ; ? ! % »
 
 # Les états, et leur nom à l'écran.
 JAMAIS_LANCE = "jamais lancé"
@@ -104,9 +105,7 @@ def lire_reglages(chemin: Path | str) -> Reglages:
     sortie = valeurs["sortie"]
     if not isinstance(sortie, str) or not sortie:
         raise ValueError(f"sortie vaut {sortie!r} dans {chemin}{_FINE}: il faut un nom de dossier.")
-    dossier = Path(sortie)
-    if not dossier.is_absolute():
-        dossier = racine_donnees() / "entrainements" / dossier
+    dossier = sous_forge_donnees(sortie, "entrainements")
     return Reglages(
         fichier=str(chemin),
         sortie=sortie,
@@ -313,11 +312,11 @@ def calculer_suivi(lignes: list[dict], pas_total: int, taille_lot: int, actif: b
 
 def _entier(valeur: float) -> str:
     """12 345 : espace fine insécable entre les milliers."""
-    return f"{round(valeur):,}".replace(",", _FINE)
+    return entier(valeur, milliers=_FINE)
 
 
 def _decimal(valeur: float, decimales: int) -> str:
-    return f"{valeur:,.{decimales}f}".replace(",", _FINE).replace(".", ",")
+    return nombre(valeur, decimales, milliers=_FINE)
 
 
 def _pourcent(pas: int, total: int) -> str:
@@ -325,21 +324,6 @@ def _pourcent(pas: int, total: int) -> str:
     dixiemes = pas * 1000 // total if total else 0
     texte = _decimal(dixiemes / 10, 1).removesuffix(",0")
     return f"{texte}{_FINE}%"
-
-
-def _duree(secondes: float) -> str:
-    """Une durée lisible : 2 j 3 h, 1 h 05 min, 4 min 10 s, 12 s."""
-    secondes = max(0, round(secondes))
-    jours, reste = divmod(secondes, 86400)
-    heures, reste = divmod(reste, 3600)
-    minutes, secondes = divmod(reste, 60)
-    if jours:
-        return f"{jours} j {heures} h"
-    if heures:
-        return f"{heures} h {minutes:02d} min"
-    if minutes:
-        return f"{minutes} min {secondes:02d} s"
-    return f"{secondes} s"
 
 
 def texte_du_suivi(suivi: Suivi, reglages: Reglages) -> str:
@@ -407,7 +391,7 @@ def texte_du_suivi(suivi: Suivi, reglages: Reglages) -> str:
             lignes.append(f"  Temps restant estimé{_FINE}: inconnu (aucun pas fini pour l'instant)")
         else:
             lignes.append(
-                f"  Temps restant estimé{_FINE}: {_duree(suivi.restant)} (au débit récent, pauses non comptées)"
+                f"  Temps restant estimé{_FINE}: {duree(suivi.restant)} (au débit récent, pauses non comptées)"
             )
     if suivi.sauvegarde is None:
         lignes.append(f"  Dernière sauvegarde{_FINE}: aucune pour l'instant")

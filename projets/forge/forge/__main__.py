@@ -192,7 +192,8 @@ def _ajouter_donnees(sous_parseurs) -> None:
 def _commande_tokenizer(choix: argparse.Namespace) -> int:
     """`forge tokenizer` : apprend le tokenizer sur les textes téléchargés."""
     # Import ici : les autres commandes n'ont pas besoin du tokenizer.
-    from forge.tokenizer.apprentissage import DonneesManquantes, apprendre_depuis_dossier
+    from forge.erreurs import DonneesManquantes
+    from forge.tokenizer.apprentissage import apprendre_depuis_dossier
 
     def journal(message: str) -> None:
         print(message, flush=True)
@@ -259,7 +260,7 @@ def _commande_compression(choix: argparse.Namespace) -> int:
     """`forge compression` : mesure les octets par jeton d'un tokenizer sur les textes téléchargés."""
     # Imports ici : les autres commandes n'ont pas besoin de la mesure.
     from forge.donnees.telechargement import dossier_des_textes
-    from forge.tokenizer.apprentissage import DonneesManquantes
+    from forge.erreurs import DonneesManquantes
     from forge.tokenizer.bpe_octets import TokenizerOctets
     from forge.tokenizer.compression import mesurer_compression, tableau_de_compression
 
@@ -323,7 +324,8 @@ def _commande_encoder(choix: argparse.Namespace) -> int:
     from forge.donnees.jetons import FragmentInaccessible
     from forge.donnees.melange import MELANGE_PAR_DEFAUT
     from forge.donnees.telechargement import dossier_des_textes
-    from forge.tokenizer.apprentissage import DonneesManquantes, verifier_dossier
+    from forge.erreurs import DonneesManquantes
+    from forge.tokenizer.apprentissage import verifier_dossier
     from forge.tokenizer.bpe_octets import TokenizerOctets
 
     def journal(message: str) -> None:
@@ -354,7 +356,9 @@ def _commande_encoder(choix: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
-    octets_par_jeton = f"{resume['octets_par_jeton']:.2f}".replace(".", ",")
+    from forge.fichiers import nombre
+
+    octets_par_jeton = nombre(resume["octets_par_jeton"], 2)
     print(
         f"Jetons prêts dans {sortie} : {resume['jetons_train']} jetons d'entraînement, "
         f"{resume['jetons_val']} de validation, {octets_par_jeton} octets par jeton."
@@ -396,7 +400,7 @@ def _commande_entrainer(choix: argparse.Namespace) -> int:
     # Imports ici : PyTorch est long à charger, les autres commandes n'en ont pas besoin.
     from forge.chemins import PlaceInsuffisante
     from forge.entrainement import CompilationImpossible, entrainer, lire_config
-    from forge.tokenizer.apprentissage import DonneesManquantes
+    from forge.erreurs import DonneesManquantes
 
     reprise = f"python -m forge entrainer --config {choix.config} --reprendre"
     try:
@@ -627,7 +631,7 @@ def _commande_evaluer(choix: argparse.Namespace) -> int:
 
     from forge.chemins import PlaceInsuffisante
     from forge.evaluation.rapport import evaluer, resume_court
-    from forge.tokenizer.apprentissage import DonneesManquantes
+    from forge.erreurs import DonneesManquantes
 
     sauvegarde = Path(choix.sauvegarde)
     sortie = choix.sortie or _sortie_par_defaut_de_l_evaluation(sauvegarde)
@@ -726,8 +730,10 @@ def _commande_exporter(choix: argparse.Namespace) -> int:
     print(f"Fichiers écrits dans {choix.sortie} :")
     for chemin in ecrits:
         octets = chemin.stat().st_size
-        en_octets = f"{octets:,}".replace(",", "\u202f")  # espace fine entre les milliers
-        en_mo = f"{octets / 1024**2:.1f}".replace(".", ",")
+        from forge.fichiers import ESPACE_FINE, entier, nombre
+
+        en_octets = entier(octets, milliers=ESPACE_FINE)  # espace fine entre les milliers
+        en_mo = nombre(octets / 1024**2, 1)
         print(f"  {chemin.name} : {en_octets} octets ({en_mo} Mo), SHA-256 {empreinte_sha256(chemin)}")
     return 0
 

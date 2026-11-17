@@ -34,8 +34,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from forge.donnees.jetons import lire_jetons
-from forge.tokenizer.apprentissage import DonneesManquantes
+from forge.donnees.jetons import VERSION_DE_L_INDEX, lire_jetons
+from forge.erreurs import DonneesManquantes
 
 VERSION_DE_L_ETAT = 3
 
@@ -57,11 +57,17 @@ def _lister_fragments(dossier: Path) -> tuple[list[Path], list[int]]:
     try:
         index = json.loads((racine / "index.json").read_text(encoding="utf-8"))
         fichiers = index["fichiers"]
-    except (OSError, ValueError, KeyError, TypeError) as erreur:
+        version = index.get("version")
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as erreur:
         raise DonneesManquantes(
             f"L'index des jetons {racine / 'index.json'} est absent ou illisible ({erreur}). "
             f"Relance l'encodage : {encoder}"
         ) from erreur
+    if version != VERSION_DE_L_INDEX:
+        raise DonneesManquantes(
+            f"L'index des jetons {racine / 'index.json'} est de version {version!r} : cette version de la "
+            f"forge lit la version {VERSION_DE_L_INDEX}. Réencode les textes : {encoder}"
+        )
     noms = sorted(nom for nom in fichiers if nom.startswith(f"{partie}/"))
     if not noms:
         raise DonneesManquantes(

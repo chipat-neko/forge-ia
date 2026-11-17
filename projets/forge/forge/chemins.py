@@ -9,6 +9,8 @@ import os
 import shutil
 from pathlib import Path
 
+from forge.fichiers import nombre
+
 # Un « Go » est ici 1024³ octets : c'est la valeur que l'Explorateur de Windows
 # affiche, et celle de `outils/env-forge.ps1`.
 _OCTETS_PAR_GO = 1024**3
@@ -26,6 +28,12 @@ def racine_donnees() -> Path:
     return Path.home() / "forge-ia-donnees"
 
 
+def sous_forge_donnees(nom_ou_chemin: str | Path, sorte: str) -> Path:
+    """Un chemin absolu est gardé tel quel ; un nom va sous `FORGE_DONNEES/<sorte>/`."""
+    chemin = Path(nom_ou_chemin)
+    return chemin if chemin.is_absolute() else racine_donnees() / sorte / chemin
+
+
 def dossier(*parties: str) -> Path:
     """Renvoie `racine_donnees()/parties…`, en le créant s'il n'existe pas."""
     chemin = racine_donnees().joinpath(*parties)
@@ -33,7 +41,7 @@ def dossier(*parties: str) -> Path:
     return chemin
 
 
-def _plus_proche_existant(chemin: Path) -> Path:
+def plus_proche_existant(chemin: Path) -> Path:
     """Remonte jusqu'au premier dossier qui existe (le dossier visé peut ne pas être créé)."""
     chemin = chemin.absolute()
     while not chemin.exists() and chemin != chemin.parent:
@@ -41,10 +49,9 @@ def _plus_proche_existant(chemin: Path) -> Path:
     return chemin.resolve()
 
 
-def _en_go(octets: int, arrondi) -> str:
-    """Écrit une taille en Go avec une décimale (virgule française)."""
-    valeur = arrondi(octets / _OCTETS_PAR_GO * 10) / 10
-    return f"{valeur:.1f}".replace(".", ",")
+def en_go(octets: int, arrondi) -> str:
+    """Écrit une taille en Go (1024³ octets) avec une décimale (virgule française)."""
+    return nombre(arrondi(octets / _OCTETS_PAR_GO * 10) / 10, 1)
 
 
 def verifier_place(octets_requis: int, chemin: Path | None = None) -> None:
@@ -55,15 +62,15 @@ def verifier_place(octets_requis: int, chemin: Path | None = None) -> None:
     ne suffit pas. Les chiffres sont arrondis de façon prudente : le manque et
     la place nécessaire vers le haut, la place libre vers le bas.
     """
-    cible = _plus_proche_existant(chemin if chemin is not None else racine_donnees())
+    cible = plus_proche_existant(chemin if chemin is not None else racine_donnees())
     libres = shutil.disk_usage(cible).free
     if libres >= octets_requis:
         return
     lecteur = cible.drive or cible.anchor
     raise PlaceInsuffisante(
-        f"Il manque {_en_go(octets_requis - libres, math.ceil)} Go sur {lecteur} : "
-        f"{_en_go(libres, math.floor)} Go libres, "
-        f"{_en_go(octets_requis, math.ceil)} Go nécessaires. "
+        f"Il manque {en_go(octets_requis - libres, math.ceil)} Go sur {lecteur} : "
+        f"{en_go(libres, math.floor)} Go libres, "
+        f"{en_go(octets_requis, math.ceil)} Go nécessaires. "
         "Libère de la place, puis relance la même commande : "
         "elle reprendra là où elle s'est arrêtée."
     )

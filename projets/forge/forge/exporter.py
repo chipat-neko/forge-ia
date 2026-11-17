@@ -30,20 +30,18 @@ moitié écrit n'existe jamais sous son vrai nom.
 import dataclasses
 import hashlib
 import json
-import os
 import shutil
 import warnings
-from collections.abc import Callable
 from pathlib import Path
 
 import torch
 from safetensors.torch import save_file
 
-from forge.chemins import verifier_place
+from forge.chemins import sous_forge_donnees, verifier_place
 from forge.donnees.jetons import empreinte_du_tokenizer
-from forge.entrainement.boucle import _chemin_sous_la_racine
 from forge.entrainement.chargeur import empreinte_du_tokenizer_des_jetons
-from forge.evaluation.rapport import _lire_sauvegarde
+from forge.entrainement.sauvegarde import lire_sauvegarde
+from forge.fichiers import ecrire_atomique_vers, ecrire_texte
 from forge.modele import ConfigModele, Transformer
 from forge.tokenizer.bpe_octets import TokenizerOctets
 
@@ -120,24 +118,6 @@ def _verifier_nom_des_poids(nom: str) -> None:
         )
 
 
-def _ecrire_d_un_coup(chemin: Path, ecrire: Callable[[Path], None]) -> None:
-    """`ecrire(temporaire)`, forcé sur le disque, puis renommé en `chemin` d'un seul coup."""
-    temporaire = chemin.with_name(chemin.name + ".tmp")
-    try:
-        ecrire(temporaire)
-        with open(temporaire, "rb+") as fichier:
-            os.fsync(fichier.fileno())
-        os.replace(temporaire, chemin)
-    except BaseException:
-        temporaire.unlink(missing_ok=True)  # Ctrl+C, disque plein ou autre : jamais de demi-fichier
-        raise
-
-
-def _ecrire_texte(chemin: Path, texte: str) -> None:
-    with open(chemin, "w", encoding="utf-8", newline="\n") as fichier:
-        fichier.write(texte)
-
-
 def _copier_le_tokenizer(temporaire: Path) -> None:
     shutil.copyfile(TOKENIZER, temporaire)
     if empreinte_sha256(temporaire) != EMPREINTE_DU_TOKENIZER:
@@ -159,7 +139,7 @@ def _verifier_le_tokenizer_de_la_sauvegarde(etat: dict, fichier: str) -> None:
     if trouvee is None:
         donnees = (etat.get("config") or {}).get("donnees")
         if donnees:
-            index = _chemin_sous_la_racine(str(donnees), "jetons") / "index.json"
+            index = sous_forge_donnees(donnees, "jetons") / "index.json"
             trouvee, origine = empreinte_du_tokenizer_des_jetons(index.parent), str(index)
     if trouvee is None:
         warnings.warn(
@@ -197,7 +177,7 @@ def exporter(sauvegarde: Path, dossier: Path, nom_des_poids: str = NOM_DES_POIDS
             f"({EMPREINTE_DU_TOKENIZER}) : il a été modifié (fins de ligne changées par git ou un "
             "éditeur ?). Remets-le comme dans le dépôt (git checkout -- sur ce fichier), puis relance."
         )
-    etat, fichier_lu = _lire_sauvegarde(Path(sauvegarde))
+    etat, fichier_lu = lire_sauvegarde(Path(sauvegarde))
     _verifier_le_tokenizer_de_la_sauvegarde(etat, fichier_lu)
     config = ConfigModele(**etat["config_modele"])
     poids = poids_a_publier(etat["modele"])
@@ -213,8 +193,8 @@ def exporter(sauvegarde: Path, dossier: Path, nom_des_poids: str = NOM_DES_POIDS
     informations = {"format": "pt"}  # « pt » : des tenseurs de PyTorch
     if pas is not None:  # une sauvegarde sans pas n'en écrit pas (jamais « None »)
         informations["pas"] = str(pas)
-    _ecrire_d_un_coup(chemins[0], lambda chemin: save_file(poids, chemin, metadata=informations))
+    ecrire_atomique_vers(chemins[0], lambda chemin: save_file(poids, chemin, metadata=informations))
     texte = json.dumps(dataclasses.asdict(config), ensure_ascii=False, indent=2) + "\n"
-    _ecrire_d_un_coup(chemins[1], lambda chemin: _ecrire_texte(chemin, texte))
-    _ecrire_d_un_coup(chemins[2], _copier_le_tokenizer)
+    ecrire_texte(chemins[1], texte)
+    ecrire_atomique_vers(chemins[2], _copier_le_tokenizer)
     return chemins
