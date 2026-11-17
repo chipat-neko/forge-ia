@@ -113,6 +113,31 @@ Quatre sources sont réservées à l'évaluation : IFEval-FR, MGSM-rev2, GSM8K-P
 HumanEval. Elles ne vont jamais dans un entraînement : `forge.conversation.sources.source_d_entrainement`
 et `forge.conversation.telechargement.lire_pour_entrainement` les refusent.
 
+## Générer des problèmes de raisonnement
+
+Pour apprendre à ton IA à raisonner (le SFT de raisonnement puis le mini-GRPO de la partie 1.9), la forge
+fabrique elle-même des problèmes de calcul en français, plus faciles que GSM8K : addition, soustraction,
+multiplication, partage, achats et âges, de 1 à 3 étapes. Chacun vient d'une graine, avec sa réponse et
+une trace courte (`23 + 41 = 64`, une étape par ligne) : la réponse est calculée en même temps que l'énoncé
+s'écrit, donc toujours juste. `forge.raisonnement.verification` lit la réponse d'une sortie de ton IA
+(écritures françaises comprises : `1 234`, `12,5`, `−3`) et la compare à la bonne ; seul le texte compte,
+jamais la pensée.
+
+```powershell
+uv run --extra gpu python -m forge problemes --sortie entrainement --nombre 20000 --graine-depart 0
+uv run --extra gpu python -m forge problemes --sortie evaluation --nombre 500 --graine-depart 1000000 --difficultes 1,2 --familles addition,partage
+```
+
+Les fichiers vont sous `FORGE_DONNEES/problemes/<sortie>/` : `problemes-*.jsonl.gz` par fragments,
+`index.json` (l'usage, les graines, les familles, les difficultés) et `.complet` à la fin. Relancer la
+même commande ne refait rien ; une coupure en cours d'écriture reprend au dernier fragment. Chaque usage
+a sa plage de graines (entraînement 0, évaluation 1 000 000, RL 2 000 000, préférences 3 000 000, victoire
+4 000 000, validation RL 5 000 000) : les graines de 1 000 000 à 1 999 999 sont celles de l'évaluation, qui
+ne va jamais dans un entraînement. Ses problèmes n'emploient que des prénoms que les autres usages
+n'emploient jamais : aucun problème d'entraînement ne peut leur être identique. Une liste de graines ne
+peut pas enjamber cette plage. Les énoncés en double sont retirés, donc le jeu peut compter un peu moins
+de problèmes que demandé.
+
 ## Le tokenizer de ton IA
 
 Le paquet `forge.tokenizer` contient le tokenizer de ton IA : un BPE sur les

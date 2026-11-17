@@ -1,7 +1,7 @@
 """Point d'entrée en ligne de commande : `python -m forge <commande>`.
 
 Les commandes `donnees`, `tokenizer`, `compression`, `encoder`, `mesurer`,
-`entrainer`, `evaluer`, `exporter`, `publication`, `suivi` et `conversations` s'y branchent une par une, au fil des
+`entrainer`, `evaluer`, `exporter`, `publication`, `suivi`, `conversations` et `problemes` s'y branchent une par une, au fil des
 tâches du plan (chacune ajoute son sous-parseur dans `construire_parseur`). Toutes sont là.
 """
 
@@ -972,6 +972,114 @@ def _ajouter_conversations(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_conversations, parseur=commande)
 
 
+def _liste_d_entiers(texte: str, nom: str) -> list[int]:
+    """Lit « 1,2 » : une liste d'entiers séparés par des virgules ; `ValueError` dit quoi écrire à la place."""
+    try:
+        return [int(x) for x in texte.split(",") if x.strip()]
+    except ValueError:
+        raise ValueError(f"{nom} illisible : {texte!r}. Écris des entiers séparés par des virgules, par exemple 1,2.") from None
+
+
+def _commande_problemes(choix: argparse.Namespace) -> int:
+    """`forge problemes` : génère des problèmes de calcul en français, par fragments, avec leur réponse et leur trace."""
+    # Imports ici : les autres commandes n'ont pas besoin des problèmes.
+    import json
+
+    from forge.chemins import sous_forge_donnees
+    from forge.fichiers import ESPACE_FINE, ecrire_texte, entier
+    from forge.fragments import SortieParFragments
+    from forge.raisonnement.problemes import DIFFICULTES, FAMILLES, generer_problemes, usage_de_la_graine
+
+    fine = ESPACE_FINE
+
+    def erreur(message: str) -> int:
+        print(f"Erreur{fine}: {message}", file=sys.stderr)
+        return 1
+
+    try:
+        difficultes = _liste_d_entiers(choix.difficultes, "--difficultes") if choix.difficultes else list(DIFFICULTES)
+        familles = [f.strip() for f in choix.familles.split(",") if f.strip()] if choix.familles else list(FAMILLES)
+        if choix.nombre < 1:
+            return erreur("--nombre doit être au moins 1.")
+        problemes = generer_problemes(choix.nombre, choix.graine_depart, familles, difficultes)
+    except ValueError as probleme:
+        return erreur(str(probleme))
+    usage = usage_de_la_graine(choix.graine_depart)
+    index = {
+        "usage": usage,
+        "graine_depart": choix.graine_depart,
+        "nombre": choix.nombre,
+        "familles": familles,
+        "difficultes": difficultes,
+        "elements": len(problemes),
+    }
+    dossier = sous_forge_donnees(choix.sortie, "problemes")
+    chemin_de_l_index = dossier / "index.json"
+    if chemin_de_l_index.is_file():
+        ancien = json.loads(chemin_de_l_index.read_text(encoding="utf-8"))
+        if ancien != index:
+            return erreur(
+                f"{dossier} contient déjà des problèmes d'autres réglages (graine de départ {ancien.get('graine_depart')}, "
+                f"{ancien.get('nombre')} demandés). Donne un autre nom à --sortie, ou supprime ce dossier pour recommencer."
+            )
+    sortie = SortieParFragments(dossier, "problemes")
+    if sortie.complet:
+        print(f"Déjà fait{fine}: {entier(sortie.deja, milliers=fine)} problèmes dans {dossier}, rien à refaire.")
+        return 0
+    ecrire_texte(chemin_de_l_index, json.dumps(index, indent=2, ensure_ascii=False) + "\n")
+    try:
+        for p in problemes[sortie.deja:]:
+            sortie.ajouter({
+                "id": p.id, "famille": p.famille, "difficulte": p.difficulte,
+                "enonce": p.enonce, "etapes": list(p.etapes), "reponse": p.reponse,
+            })
+            if sortie.plein:
+                sortie.valider()
+    except KeyboardInterrupt:
+        sortie.valider()
+        print(
+            f"Interrompu{fine}: {entier(sortie.deja, milliers=fine)} problèmes sur "
+            f"{entier(len(problemes), milliers=fine)} sont écrits dans {dossier}. Relance la même commande{fine}: "
+            "elle reprend là, sans doublon.",
+            file=sys.stderr,
+        )
+        return 130
+    sortie.terminer({"usage": usage, "elements": len(problemes), "graine_depart": choix.graine_depart})
+    mot = "évaluation" if usage == "evaluation" else "entraînement"
+    print(
+        f"{entier(len(problemes), milliers=fine)} problèmes ({mot}) dans {dossier}, "
+        f"{entier(choix.nombre - len(problemes), milliers=fine)} énoncés en double retirés."
+    )
+    return 0
+
+
+def _ajouter_problemes(sous_parseurs) -> None:
+    commande = _nouvelle_commande(
+        sous_parseurs,
+        "problemes",
+        "Génère des problèmes de calcul en français (plus faciles que GSM8K), avec leur réponse et leur trace, "
+        "par fragments sous FORGE_DONNEES/problemes/NOM. Les graines de 1 000 000 à 1 999 999 sont celles "
+        "de l'évaluation : ces problèmes ne vont jamais dans un entraînement.",
+    )
+    commande.add_argument("--sortie", required=True, metavar="NOM", help="le dossier du jeu, sous FORGE_DONNEES/problemes")
+    commande.add_argument("--nombre", required=True, type=int, metavar="N", help="combien de problèmes (les doublons sont retirés)")
+    commande.add_argument(
+        "--graine-depart",
+        required=True,
+        type=int,
+        metavar="G",
+        help="la graine du premier problème : le i-ème vient de G + i (évaluation : de 1000000 à 1999999)",
+    )
+    commande.add_argument("--difficultes", default=None, metavar="1,2", help="les difficultés permises (par défaut 1,2,3)")
+    commande.add_argument(
+        "--familles",
+        default=None,
+        metavar="a,b",
+        help="les familles permises, parmi addition, soustraction, multiplication, partage, achats, ages (par défaut toutes)",
+    )
+    commande.set_defaults(fonction=_commande_problemes, parseur=commande)
+
+
 def construire_parseur() -> argparse.ArgumentParser:
     """Construit le parseur principal et ses sous-commandes."""
     parseur = argparse.ArgumentParser(
@@ -1007,6 +1115,7 @@ def construire_parseur() -> argparse.ArgumentParser:
     _ajouter_publication(sous_parseurs)
     _ajouter_suivi(sous_parseurs)
     _ajouter_conversations(sous_parseurs)
+    _ajouter_problemes(sous_parseurs)
     return parseur
 
 
