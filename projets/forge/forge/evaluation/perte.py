@@ -8,7 +8,8 @@ perte de `ln(32768) = 10,4` ; plus elle descend, mieux le modèle prédit.
 - la perplexité, `exp(perte)`, dit « le modèle hésite comme s'il choisissait entre autant de
   jetons également probables » ;
 - les bits par octet, `perte / ln 2 / octets_par_jeton`, ramènent la perte à un octet de texte
-  au lieu d'un jeton. Un jeton ne vaut pas le même nombre d'octets d'un tokenizer à l'autre
+  au lieu d'un jeton (ici `octets_par_jeton` compte tous les jetons, `<|fin_texte|>` compris,
+  comme la perte : voir `lire_octets_par_jeton`). Un jeton ne vaut pas le même nombre d'octets d'un tokenizer à l'autre
   (environ 4,4 octets par jeton ici sur le mélange, voir `docs/mesures/tokenizer-ton-ia-v1.md`,
   1 pour un tokenizer d'octets purs) : seuls les bits par octet se comparent d'un tokenizer à
   l'autre.
@@ -116,26 +117,26 @@ def bits_par_octet(perte: float, octets_par_jeton: float) -> float:
 
 
 def lire_octets_par_jeton(dossier: Path) -> float:
-    """Nombre moyen d'octets UTF-8 par jeton du corpus encodé dans `dossier`.
+    """Nombre moyen d'octets UTF-8 par jeton du corpus encodé dans `dossier`, `<|fin_texte|>` compris.
 
-    `forge encoder` écrit, dans `index.json`, le nombre d'octets des textes (`octets`) et de
-    leurs jetons sans les `<|fin_texte|>` (`jetons_sans_fin`) ; leur quotient est lu d'abord. À
-    défaut, on prend `octets_par_jeton` du marqueur `.complet`, qui contient le même nombre.
+    `forge encoder` écrit, dans `index.json`, le nombre d'octets des textes (`octets`) et les
+    jetons de `train/` et de `val/` (`jetons_train`, `jetons_val`), `<|fin_texte|>` compris. On
+    divise les octets par **tous** ces jetons : la perte moyenne compte aussi les positions qui
+    prédisent `<|fin_texte|>`, donc le dénominateur doit les compter. Diviser par les seuls jetons
+    sans fin (`jetons_sans_fin`) mélangeait deux conventions et sous-estimait les bits par octet
+    (0,802 au lieu de 0,803 pour ton IA). Ce n'est pas `octets_par_jeton` de `forge encoder`, qui
+    mesure la compression du tokenizer, fins exclues.
     Ce nombre vaut pour tout le corpus (train et val ensemble) : c'est la meilleure mesure
-    disponible pour la validation seule.
+    disponible pour la validation seule. Le marqueur `.complet` ne sert plus de repli : il
+    compte sans les fins.
     """
     dossier = Path(dossier)
     try:
         index = json.loads((dossier / "index.json").read_text(encoding="utf-8"))
-        octets, jetons = index["octets"], index["jetons_sans_fin"]
+        octets = index["octets"]
+        jetons = index["jetons_train"] + index["jetons_val"]
         if octets > 0 and jetons > 0:
             return octets / jetons
-    except (OSError, ValueError, KeyError, TypeError):
-        pass
-    try:
-        valeur = json.loads((dossier / ".complet").read_text(encoding="utf-8"))["octets_par_jeton"]
-        if isinstance(valeur, int | float) and not isinstance(valeur, bool) and valeur > 0:
-            return float(valeur)
     except (OSError, ValueError, KeyError, TypeError):
         pass
     raise ValueError(

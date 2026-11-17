@@ -143,6 +143,8 @@ def ecrire_donnees_test(dossier: Path) -> None:
         },
         "octets": octets,
         "jetons_sans_fin": sans_fin,
+        "jetons_train": fichiers["train/fragment-00000.bin"],
+        "jetons_val": fichiers["val/fragment-00000.bin"],
         "fichiers": fichiers,
     }
     (dossier / "index.json").write_text(json.dumps(index), encoding="utf-8")
@@ -246,22 +248,39 @@ def test_perplexite():
 
 
 def test_octets_par_jeton_de_l_index(tmp_path):
+    """Les octets divisés par TOUS les jetons du corpus, `<|fin_texte|>` compris."""
     ecrire_donnees_test(tmp_path)
-    assert lire_octets_par_jeton(tmp_path) == pytest.approx(1.0)  # un octet par jeton
-    # Sans les totaux dans l'index, on retombe sur le nombre gardé dans `.complet`.
     index = json.loads((tmp_path / "index.json").read_text(encoding="utf-8"))
-    del index["octets"], index["jetons_sans_fin"]
+    attendu = index["octets"] / (index["jetons_train"] + index["jetons_val"])
+    assert attendu < index["octets"] / index["jetons_sans_fin"]  # les fins comptent : le quotient baisse
+    assert lire_octets_par_jeton(tmp_path) == pytest.approx(attendu)
+    # Sur un index fabriqué à la main.
+    index.update(octets=1000, jetons_train=300, jetons_val=200)
+    (tmp_path / "index.json").write_text(json.dumps(index), encoding="utf-8")
+    assert lire_octets_par_jeton(tmp_path) == pytest.approx(2.0)
+    # Le `.complet` ne sert plus de repli : il compte sans les fins, ce serait l'ancien calcul.
+    del index["jetons_train"], index["jetons_val"]
     (tmp_path / "index.json").write_text(json.dumps(index), encoding="utf-8")
     (tmp_path / ".complet").write_text(json.dumps({"octets_par_jeton": 3.5}), encoding="utf-8")
-    assert lire_octets_par_jeton(tmp_path) == 3.5
-    # Ni l'un ni l'autre : message qui dit quoi faire.
-    (tmp_path / ".complet").write_text("{}", encoding="utf-8")
     with pytest.raises(ValueError, match="python -m forge encoder"):
         lire_octets_par_jeton(tmp_path)
 
 
+def test_bits_par_octet_publies_de_ton_ia(tmp_path):
+    """Les chiffres de `docs/mesures/entrainement-2026-11.md` : 0,803 bit par octet, pas 0,802."""
+    octets, jetons_train, jetons_val = 38_619_056_781, 8_841_217_367, 44_490_991  # 8 885 708 358 jetons en tout
+    index = {"octets": octets, "jetons_train": jetons_train, "jetons_val": jetons_val, "jetons_sans_fin": 8_875_353_461}
+    (tmp_path / "index.json").write_text(json.dumps(index), encoding="utf-8")
+    perte = 2.4186856746673584  # perte de validation de ton IA, `evaluation/meilleur/rapport.json`
+    assert bits_par_octet(perte, lire_octets_par_jeton(tmp_path)) == pytest.approx(0.803, abs=1e-3)
+
+
 def test_octets_par_jeton_lit_la_sortie_de_l_encodeur(tmp_path):
-    """Le même nombre que le résumé de `forge encoder`, lu dans ce qu'il a écrit."""
+    """Lu dans ce que `forge encoder` a écrit : les octets divisés par tous les jetons, fins comprises.
+
+    Ce n'est pas `octets_par_jeton` du résumé de l'encodeur, qui mesure la compression du tokenizer
+    (fins exclues) et ne change pas de sens.
+    """
     source = tmp_path / "textes" / "web_fr"
     source.mkdir(parents=True)
     with gzip.GzipFile(source / "fragment-00000.jsonl.gz", mode="wb", mtime=0) as fichier:
@@ -270,8 +289,11 @@ def test_octets_par_jeton_lit_la_sortie_de_l_encodeur(tmp_path):
             fichier.write((json.dumps({"texte": texte}, ensure_ascii=False) + "\n").encode("utf-8"))
     (source / ".complet").write_text("{}", encoding="utf-8")
     resume = encoder_corpus([source], TOK_TEST, tmp_path / "jetons", processus=1)
-    assert lire_octets_par_jeton(tmp_path / "jetons") == pytest.approx(resume["octets_par_jeton"])
     assert resume["octets_par_jeton"] == pytest.approx(1.0)
+    octets = json.loads((tmp_path / "jetons" / "index.json").read_text(encoding="utf-8"))["octets"]
+    assert lire_octets_par_jeton(tmp_path / "jetons") == pytest.approx(
+        octets / (resume["jetons_train"] + resume["jetons_val"])
+    )
 
 
 def test_perte_validation_d_un_modele_neuf_vaut_ln_du_vocabulaire(donnees_test):
@@ -725,10 +747,12 @@ def test_rapport_ecrit_json_et_markdown_en_francais(tmp_path, sauvegarde_minuscu
     r = evaluer(sauvegarde_minuscule, donnees_test, tok_fichier_test, tmp_path / "sortie", n_qcm=0, appareil="cpu")
     ecrit, md = lire_rapport(tmp_path / "sortie")
     assert ecrit == json.loads(json.dumps(r))  # le JSON est ce que `evaluer` renvoie
-    # Les chiffres sont cohérents entre eux : un octet par jeton avec ce tokenizer.
-    assert r["octets_par_jeton"] == pytest.approx(1.0)
+    # Les chiffres sont cohérents entre eux : un octet par jeton de texte avec ce tokenizer, un peu moins
+    # une fois comptés les `<|fin_texte|>`, comme dans la perte.
+    assert r["octets_par_jeton"] == pytest.approx(lire_octets_par_jeton(donnees_test))
+    assert r["octets_par_jeton"] < 1.0
     assert r["perplexite"] == pytest.approx(math.exp(r["perte_val"]))
-    assert r["bits_par_octet"] == pytest.approx(r["perte_val"] / math.log(2))
+    assert r["bits_par_octet"] == pytest.approx(r["perte_val"] / math.log(2) / r["octets_par_jeton"])
     assert r["perte_hasard"] == pytest.approx(math.log(VOCABULAIRE))
     assert r["perte_val"] < r["perte_hasard"]  # 4 pas ont déjà appris quelque chose
     assert r["pas"] == 4 and r["qcm"] == {}
@@ -745,7 +769,7 @@ def test_rapport_ecrit_json_et_markdown_en_francais(tmp_path, sauvegarde_minuscu
     verifier_typographie(md)
     # Les bits par octet sont une estimation, et le rapport le dit.
     assert "Bits par octet (estimation)" in md and "octets par jeton du corpus entier" in md
-    assert "la perte compte aussi les fins de texte" in md
+    assert "fins de texte comprises comme dans la perte" in md
     for invite in INVITES:
         assert invite.strip() in md
 
@@ -812,7 +836,7 @@ def test_rapport_ecrit_null_et_jamais_infinity(
 
     ecrit = json.loads(texte, parse_constant=refuser)  # un analyseur strict accepte le fichier
     assert ecrit["perplexite"] is None and ecrit["perte_val"] == 1000.0
-    assert ecrit["bits_par_octet"] == pytest.approx(1000 / math.log(2))  # fini : écrit tel quel
+    assert ecrit["bits_par_octet"] == pytest.approx(1000 / math.log(2) / r["octets_par_jeton"])  # fini : écrit tel quel
     md = (tmp_path / "rapport.md").read_text(encoding="utf-8")
     assert "| Perplexité | ∞ |" in md
     verifier_typographie(md)

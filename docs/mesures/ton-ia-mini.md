@@ -23,7 +23,7 @@ Windows et les autres documents de ce dossier).
 - **La courbe :** la perte d'entraînement part de 10,477 au pas 1, le niveau du hasard (ln 32 768 = 10,4) ; la perte de
   validation, mesurée pour la première fois au pas 100, y est à 6,30 et finit à 3,455 d'après le
   journal de l'entraînement (3,428 à l'évaluation finale, sur plus de morceaux).
-- **L'évaluation :** perplexité **30,8**, **1,133 bit par octet**. Aux QCM
+- **L'évaluation :** perplexité **30,8**, **1,134 bit par octet**. Aux QCM
   français : HellaSwag 27,2 % contre 25,0 % au hasard (**au-dessus du hasard**, de peu),
   ARC-Challenge 23,6 % contre 25,0 % (**pas différent du hasard**).
 - **Ce que cela donne :** un modèle qui écrit des phrases françaises souvent bien formées, avec le ton
@@ -181,8 +181,10 @@ pour la ligne « début », qui est le pas 1 seul).
 | --- | --- | --- |
 | Perte de validation | 3,428 nats par jeton | contre 10,397 pour le hasard |
 | Perplexité | 30,8 | le modèle hésite comme s'il choisissait entre 31 jetons également probables, au lieu de 32 768 |
-| Octets par jeton | 4,37 | taille moyenne d'un jeton dans ces données |
-| Bits par octet (estimation) | 1,133 | la perte ramenée à un octet de texte |
+| Octets par jeton | 4,36 | taille moyenne d'un jeton dans ces données, `<|fin_texte|>` compris |
+| Bits par octet (estimation) | 1,134 | la perte ramenée à un octet de texte |
+
+*Corrigé le 17/11/2026 : les bits par octet valaient 1,133 ; ils valent 1,134. L'ancien calcul divisait les octets par les jetons sans les `<|fin_texte|>`, alors que la perte moyenne compte aussi les positions qui prédisent `<|fin_texte|>` ; le calcul exact divise par tous les jetons (240 449 292). Rien d'autre ne change : la perte, la perplexité, les QCM et les échantillons sont ceux du rapport d'origine, revérifiés sur la même sauvegarde. Le rapport corrigé est `evaluation\meilleur-2026-11-17\rapport.json`.*
 
 La perte de l'évaluation (3,428) diffère un peu de la dernière valeur du journal (3,455) : ce ne sont pas
 les mêmes morceaux (1 024 ici, 64 dans la boucle). L'évaluation, sur 16 fois plus de jetons, est la plus

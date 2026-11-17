@@ -349,8 +349,8 @@ def rapport_markdown(rapport: dict) -> str:
         f"| Octets par jeton | {_n(rapport['octets_par_jeton'], 2)} | la taille moyenne d'un jeton dans les données encodées |",
         f"| Bits par octet (estimation) | {_n(rapport['bits_par_octet'], 3)} | perte ÷ ln 2 ÷ octets par jeton{_FINE}: "
         "la perte ramenée à un octet de texte, comparable d'un tokenizer à l'autre. "
-        f"Estimation{_FINE}: octets par jeton du corpus entier{_FINE}; la perte compte aussi les fins de texte "
-        "(écart attendu de l'ordre de quelques millièmes) |",
+        f"Estimation{_FINE}: octets par jeton du corpus entier{_FINE}, fins de texte comprises comme dans la perte "
+        f"(le corpus entier et non la validation seule{_FINE}: écart attendu de l'ordre de quelques millièmes) |",
         "",
         "## Questions à choix multiples (FrenchBench)",
         "",

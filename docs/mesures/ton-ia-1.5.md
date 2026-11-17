@@ -27,7 +27,7 @@ l'Explorateur de Windows et les autres documents de ce dossier). Les pertes sont
   (ln 32 768 = 10,397). La perte de validation, mesurée tous les 200 pas, est à 5,404 au pas 200 et
   finit à **2,467** au pas 16 540. Elle a baissé à chaque mesure, sans exception.
 - **L'évaluation** (sur `meilleur.pt`, le pas 16 540) : perte 2,419, **perplexité 11,2**,
-  **0,802 bit par octet**. Aux QCM français : HellaSwag **34,8 %** contre 25,0 % au hasard
+  **0,803 bit par octet**. Aux QCM français : HellaSwag **34,8 %** contre 25,0 % au hasard
   (**au-dessus du hasard**, de 9,8 points), ARC-Challenge 25,1 % contre 25,0 % (**pas différent du
   hasard**).
 - **Ce que cela donne :** un français bien plus sûr que celui de « mini » : des phrases le plus
@@ -233,8 +233,10 @@ Sur 1 024 morceaux fixes de 2 048 jetons de la validation, soit 2 097 15
 | --- | --- | --- |
 | Perte de validation | 2,419 nats par jeton | contre 10,397 pour le hasard |
 | Perplexité | 11,2 | le modèle hésite comme s'il choisissait entre 11 jetons également probables, au lieu de 32 768 |
-| Octets par jeton | 4,35 | taille moyenne d'un jeton dans ces données |
-| Bits par octet (estimation) | 0,802 | la perte ramenée à un octet de texte |
+| Octets par jeton | 4,35 | taille moyenne d'un jeton dans ces données, `<|fin_texte|>` compris |
+| Bits par octet (estimation) | 0,803 | la perte ramenée à un octet de texte |
+
+*Corrigé le 17/11/2026 : les bits par octet valaient 0,802 ; ils valent 0,803. L'ancien calcul divisait les octets par les jetons sans les `<|fin_texte|>`, alors que la perte moyenne compte aussi les positions qui prédisent `<|fin_texte|>` ; le calcul exact divise par tous les jetons (8 885 708 358). Rien d'autre ne change : la perte, la perplexité, les QCM et les échantillons sont ceux du rapport d'origine, revérifiés sur la même sauvegarde. Le nouveau rapport est `rapport-2026-11-17.json` dans la Release.*
 
 La perte de l'évaluation (2,419) diffère de la dernière valeur du journal (2,467) : ce ne sont pas les
 mêmes morceaux (1 024 ici, 64 dans la boucle). L'évaluation, sur 16 fois plus de jetons, est la plus
@@ -250,7 +252,7 @@ fiable.
 | Contexte | 512 jetons | 2 048 jetons |
 | Perte de validation (évaluation) | 3,428 | 2,419 |
 | Perplexité | 30,8 | 11,2 |
-| Bits par octet | 1,133 | 0,802 |
+| Bits par octet | 1,134 | 0,803 |
 | HellaSwag (exactitude normalisée) | 27,2 % | 34,8 % |
 | ARC-Challenge (exactitude normalisée) | 23,6 % | 25,1 % |
 
@@ -438,7 +440,7 @@ dans `D:\forge-ia-donnees\publication\ton-ia-1.5\` :
 | `ton-ia-1.5.safetensors` | 867 161 248 octets (827,0 Mo) | `0e89f94133ea47a65e2cd19c111beb24f3ae210c9e332f92c6538a2e22b0d6ea` | les poids, en bf16 |
 | `config.json` | 134 octets | `ae0207b367080a6577c2d95ef81ba5fb84c6bf2be11d03a07eedd8a9fe598621` | les dimensions du modèle |
 | `tokenizer-ton-ia-v1.json` | 546 692 octets (0,5 Mo) | `3001e7ab40630739c4dec807c7a92c0d4fb469cc0fc4afa368704395391f21ba` | le tokenizer, copie à l'octet près de celui du dépôt |
-| `rapport.json` | 5 800 octets | `059355969c2eab459b9d19b20c6540450fa4f3e52b361bbcd343e86321a140bc` | le rapport de `forge evaluer`, tel quel |
+| `rapport.json` | 5 800 octets | `059355969c2eab459b9d19b20c6540450fa4f3e52b361bbcd343e86321a140bc` | le rapport de `forge evaluer`, tel quel (0,802 bit par octet, corrigé le 17/11/2026 : voir `rapport-2026-11-17.json`) |
 | `ton-ia-1.5.md` | — | — | ce document |
 | `LISEZMOI.md` | — | — | la fiche de la version (source : `docs/mesures/ton-ia-1.5-LISEZMOI.md`) |
 
@@ -511,6 +513,7 @@ modele.load_state_dict(poids)
   - l'entraînement, laissé tel quel : `entrainements\ton-ia\journal.jsonl` (2,48 Mo) et
     `entrainements\ton-ia\sauvegardes\` (`etape-0016518.pt`, `etape-0016540.pt`, `meilleur.pt`) ;
   - le rapport d'évaluation : `entrainements\ton-ia\evaluation\meilleur\rapport.json` et `rapport.md` ;
+  - le rapport corrigé du 17/11/2026 (bits par octet exacts) : `entrainements\ton-ia\evaluation\meilleur-2026-11-17\rapport.json` et `rapport.md` ;
   - les journaux d'écran : `journaux\entrainement-principal.log`, `journaux\pause-entrainement.log` et
     `journaux\evaluation-ton-ia-1.5.log` ;
   - les fichiers de la version : `publication\ton-ia-1.5\` ;

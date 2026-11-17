@@ -16,8 +16,10 @@ le français et le code Python. Cette version est celle du chapitre 1.5 : elle
   l'entraînement a duré 11 j 3 h 43 min.
 - **Une perplexité de 11,2.** Pour deviner le jeton suivant, ton IA hésite en moyenne comme entre 11
   choix également probables. Au hasard, ce serait 32 768.
-- **0,802 bit par octet.** C'est l'erreur de prédiction, ramenée à un octet de texte : plus c'est
-  bas, mieux le modèle prédit.
+- **0,803 bit par octet.** C'est l'erreur de prédiction, ramenée à un octet de texte : plus c'est
+  bas, mieux le modèle prédit. *Corrigé le 17/11/2026 : cette valeur était de 0,802. L'ancien calcul
+  oubliait les fins de texte (`<|fin_texte|>`) dans le nombre de jetons. Le rapport corrigé est
+  `rapport-2026-11-17.json` ; `rapport.json`, publié avec les poids, garde l'ancienne valeur.*
 - **Des QCM en français.** Un QCM est un questionnaire à choix multiples : pour chaque question, il
   faut choisir la bonne réponse parmi plusieurs. Ceux-ci viennent de FrenchBench, des traductions
   automatiques en français :
@@ -59,7 +61,8 @@ Ces mesures viennent de `rapport.json`, joint. Le récit complet est dans `ton-i
 | `ton-ia-1.5.safetensors` | 867 161 248 octets (827,0 Mo) | `0e89f94133ea47a65e2cd19c111beb24f3ae210c9e332f92c6538a2e22b0d6ea` | les poids du modèle |
 | `config.json` | 134 octets | `ae0207b367080a6577c2d95ef81ba5fb84c6bf2be11d03a07eedd8a9fe598621` | les dimensions du modèle |
 | `tokenizer-ton-ia-v1.json` | 546 692 octets | `3001e7ab40630739c4dec807c7a92c0d4fb469cc0fc4afa368704395391f21ba` | le tokenizer |
-| `rapport.json` | 5 800 octets | `059355969c2eab459b9d19b20c6540450fa4f3e52b361bbcd343e86321a140bc` | les mesures de l'évaluation |
+| `rapport.json` | 5 800 octets | `059355969c2eab459b9d19b20c6540450fa4f3e52b361bbcd343e86321a140bc` | les mesures de l'évaluation (0,802 bit par octet : l'ancien calcul) |
+| `rapport-2026-11-17.json` | — | — | les mêmes mesures, avec les bits par octet exacts (0,803) |
 | `ton-ia-1.5.md` | — | — | le récit complet de l'entraînement et de l'évaluation |
 | `LISEZMOI.md` | — | — | cette fiche |
 

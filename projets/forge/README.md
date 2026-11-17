@@ -221,8 +221,8 @@ Le rapport (`rapport.md` pour la lecture, `rapport.json` pour les programmes) va
 
 - la perte de validation (en nats par jeton), la perplexité (`exp(perte)`) et les bits par octet
   (`perte ÷ ln 2 ÷ octets par jeton`) : la perte ramenée à un octet de texte, la seule qui se compare
-  d'un tokenizer à l'autre. C'est une estimation : les octets par jeton sont ceux du corpus entier, et la
-  perte compte aussi les fins de texte (écart attendu de l'ordre de quelques millièmes). La perte est mesurée
+  d'un tokenizer à l'autre. C'est une estimation : les octets par jeton sont ceux du corpus entier (train et val),
+  fins de texte comprises comme dans la perte (écart attendu de l'ordre de quelques millièmes). La perte est mesurée
   sur 1 024 morceaux fixes de `val/` au plus ;
 - les QCM français de FrenchBench (HellaSwag et ARC-Challenge, des traductions automatiques),
   comparés au hasard (1 ÷ nombre de choix). Le verdict est prudent : un score à moins de la marge du hasard

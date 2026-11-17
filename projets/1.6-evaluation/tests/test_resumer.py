@@ -167,7 +167,7 @@ def test_le_releve_de_mini_dit_ce_que_dit_le_document():
     document = MINI_MD.read_text(encoding="utf-8").replace("\u202f", " ").replace("\u00a0", " ")
     assert releve["nom"] == "ton-ia-mini" and releve["pas"] == 6370
     assert f"perplexité **{virgule(releve['perplexite'], 1)}**" in document  # 30,8
-    assert f"**{virgule(releve['bits_par_octet'], 3)} bit par octet**" in document  # 1,133
+    assert f"**{virgule(releve['bits_par_octet'], 3)} bit par octet**" in document  # 1,134
     assert f"HellaSwag {virgule(100 * releve['qcm']['hellaswag']['exactitude_normalisee'], 1)} %" in document  # 27,2 %
     assert f"ARC-Challenge {virgule(100 * releve['qcm']['arc']['exactitude_normalisee'], 1)} %" in document  # 23,6 %
     assert releve["qcm"]["hellaswag"]["verdict"] == "au-dessus" and releve["qcm"]["arc"]["verdict"] == "pas-different"
@@ -193,7 +193,7 @@ def test_le_releve_de_ton_ia_dit_ce_que_dit_le_document():
     # Le nom est celui de la version publiée, pas celui du dossier de l'entraînement (« ton-ia »).
     assert releve["nom"] == "ton-ia-1.5" and releve["pas"] == 16540
     assert f"**perplexité {virgule(releve['perplexite'], 1)}**" in document  # 11,2
-    assert f"**{virgule(releve['bits_par_octet'], 3)} bit par octet**" in document  # 0,802
+    assert f"**{virgule(releve['bits_par_octet'], 3)} bit par octet**" in document  # 0,803
     assert f"HellaSwag **{virgule(100 * releve['qcm']['hellaswag']['exactitude_normalisee'], 1)} %**" in document  # 34,8 %
     assert f"ARC-Challenge {virgule(100 * releve['qcm']['arc']['exactitude_normalisee'], 1)} %" in document  # 25,1 %
     assert releve["qcm"]["hellaswag"]["verdict"] == "au-dessus" and releve["qcm"]["arc"]["verdict"] == "pas-different"

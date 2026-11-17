@@ -173,15 +173,15 @@ qui manque arrête la construction.
 
 | Fichier | D'où il vient | Date du champ `releve_le` |
 | --- | --- | --- |
-| `mesures/evaluation-mini.json` | le rapport d'évaluation de la version d'une heure de « ton IA » (le modèle « mini », pas 6 370), écrit par `resumer` | 03/11/2026, la date du rapport de forge ; le fichier est entré dans le dépôt le 10/11/2026 |
+| `mesures/evaluation-mini.json` | le rapport d'évaluation de la version d'une heure de « ton IA » (le modèle « mini », pas 6 370), écrit par `resumer` | 17/11/2026, la date de la réévaluation avec les bits par octet exacts (le rapport d'origine date du 03/11/2026) ; le fichier est entré dans le dépôt le 10/11/2026 |
 | `mesures/qcm-mini.json` | six questions de MMMLU en français, notées par « mini » sur le processeur, écrit par `qcm-exemples` | 10/11/2026 |
-| `mesures/evaluation-1.5.json` | le rapport d'évaluation de la version publiée de « ton IA » (`ton-ia-1.5`, pas 16 540, le `rapport.json` publié avec ses poids), écrit par `resumer --nom ton-ia-1.5` | 14/11/2026, la date du rapport de forge ; le fichier est entré dans le dépôt le 15/11/2026 |
+| `mesures/evaluation-1.5.json` | le rapport d'évaluation de la version publiée de « ton IA » (`ton-ia-1.5`, pas 16 540, le `rapport.json` publié avec ses poids), écrit par `resumer --nom ton-ia-1.5` | 17/11/2026, la date de la réévaluation avec les bits par octet exacts (le rapport d'origine date du 14/11/2026) ; le fichier est entré dans le dépôt le 15/11/2026 |
 | `mesures/qcm-1.5.json` | les six mêmes questions de MMMLU, notées par `ton-ia-1.5` sur le processeur, écrit par `qcm-exemples --modele` | 15/11/2026 |
 | `sorties/cartes-ton-ia.json` | les cartes d'attention de `ton-ia-1.5` pour la phrase « Le forgeron chauffe le fer puis il le tord. », sur le processeur : la couche et les deux têtes choisies par `cartes --choisir`, et les chiffres du choix | 15/11/2026 |
 | `sorties/ton-ia-suivants.json` | les dix jetons que `ton-ia-1.5` juge les plus probables après « Le forgeron frappe le », sur le processeur, écrit par `suivants --modele` | 15/11/2026 |
 
 Les chiffres de `mesures/evaluation-mini.json` sont ceux de
-`docs/mesures/ton-ia-mini.md` : perplexité 30,8, 1,133 bit par octet, HellaSwag
+`docs/mesures/ton-ia-mini.md` : perplexité 30,8, 1,134 bit par octet, HellaSwag
 27,2 % d'exactitude normalisée (au-dessus du hasard), ARC 23,6 % d'exactitude normalisée
 (pas différent du hasard). Le fichier a
 `nom`, `releve_le`, `pas`, `perte_val`, `perplexite`, `bits_par_octet`, `qcm` et
@@ -198,7 +198,7 @@ reçoit son `verdict`.
 ignorées au tirage.
 
 Les chiffres de `mesures/evaluation-1.5.json` sont ceux de
-`docs/mesures/ton-ia-1.5.md` : perplexité 11,2, 0,802 bit par octet, HellaSwag
+`docs/mesures/ton-ia-1.5.md` : perplexité 11,2, 0,803 bit par octet, HellaSwag
 34,8 % d'exactitude normalisée (au-dessus du hasard), ARC 25,1 % d'exactitude
 normalisée (pas différent du hasard). `mesures/qcm-1.5.json` note les six
 questions de `mesures/qcm-mini.json`, tirées de la même façon (graine 0).

@@ -1,10 +1,10 @@
 {
  "nom": "ton-ia-1.5",
- "releve_le": "2026-11-14",
+ "releve_le": "2026-11-17",
  "pas": 16540,
  "perte_val": 2.4186856746673584,
  "perplexite": 11.231088306178787,
- "bits_par_octet": 0.8019327809540503,
+ "bits_par_octet": 0.802868397927976,
  "qcm": {
   "hellaswag": {
    "exactitude": 0.2971728421503534,

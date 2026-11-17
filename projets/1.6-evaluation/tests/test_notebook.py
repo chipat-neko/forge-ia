@@ -72,7 +72,7 @@ def test_notebook_s_execute_de_bout_en_bout():
     assert "ln 32 768 = 10,397" in sorties
     assert "la perte de validation est 3,428 et la perplexité 30,8" in sorties
     # 2. Les bits par octet de « mini » sont ceux du document.
-    assert "Bits par octet de « mini » : 1,133" in sorties
+    assert "Bits par octet de « mini » : 1,134" in sorties
     # 3. Le QCM noté sans écrire un mot : mêmes scores que forge, et six questions de MMMLU avec leur licence.
     assert "Mêmes scores que forge, à 10⁻⁵ près en relatif : True" in sorties
     assert "6 questions de openai/MMMLU (FR_FR), licence MIT : https://huggingface.co/datasets/openai/MMMLU" in sorties
@@ -91,9 +91,9 @@ def test_notebook_s_execute_de_bout_en_bout():
     assert "Téléchargement de" not in sorties
     assert "Empreinte SHA-256 du tokenizer : 3001e7ab…21ba, la même que celle de forge : True" in sorties
     assert f"Ton IA a {entier(nombre_parametres(CONFIG))} paramètres, chargés sur le processeur en" in sorties
-    assert "Son évaluation, au pas 16 540, relevée le 2026-11-14 :" in sorties
+    assert "Son évaluation, au pas 16 540, relevée le 2026-11-17 :" in sorties
     assert "perte de validation 2,419, perplexité 11,2 (« mini » : 30,8)" in sorties
-    assert "bits par octet 0,802 (« mini » : 1,133)" in sorties
+    assert "bits par octet 0,803 (« mini » : 1,134)" in sorties
     assert "hellaswag : 34,8 % sur 9 338 questions, hasard 25,0 %, verdict : au-dessus (celui du relevé : au-dessus)" in sorties
     assert "arc : 25,1 % sur 1 169 questions, hasard 25,0 %, verdict : pas-different (celui du relevé : pas-different)" in sorties
     suites = sorties.split("Ton IA, sur le processeur (température 0,8, tirage parmi les 50 jetons les plus probables, graine 0) :", 1)[1]
