@@ -82,7 +82,7 @@ Sources : `docs/superpowers/recherche/2026-11-17-vague-2-methodes.md` (« métho
 - **Langue :** noms, commentaires et messages en français. Un message d'erreur dit ce qui se passe et quoi faire ensuite. Les sorties à l'écran utilisent l'espace fine (`\u202f`) comme la vague 1.
 - **Les tests d'abord.** Tests rapides sur le processeur, sans réseau ; les tests `gpu` sont sautés sans CUDA. Les tests qui lancent des sous-processus prennent un délai d'au plus 2 s.
 - **Commandes :**
-  - dans `projets/forge` : `uv run --extra cpu pytest -q`, et `uv run --extra gpu pytest -q -m gpu` carte libre (`nvidia-smi` sous 10 %) ;
+  - dans `projets/forge` : `uv run --extra gpu pytest -q -m "not gpu"` (jamais `--extra cpu` en local : le `.venv` de forge garde PyTorch pour la carte, et le repasser en processeur coûte 36 min de copie sur le disque D:), et `uv run --extra gpu pytest -q -m gpu` carte libre (`nvidia-smi` sous 10 %) ;
   - avant toute commande forge, PowerShell : `. .\outils\env-forge.ps1; $env:TEMP = $env:TMP = "$env:FORGE_DONNEES\cache\tmp"` ;
   - pour les travaux longs, le Python de `projets/forge/.venv` (pas `uv run`, D: est en exFAT : une resynchronisation recopie tout).
 - **Données sous `FORGE_DONNEES`**, rangées par `sous_forge_donnees` : `conversations/`, `problemes/`, `affinage/`, `publications/`, `entrainements/`, `evaluations/`. Rien de lourd dans git.
@@ -190,7 +190,7 @@ def test_telechargement_coupe_puis_repris(tmp_path, monkeypatch): ...
 def test_variable_des_versions(tmp_path, monkeypatch): ... # FORGE_IA_MODELES : aucun appel réseau
 ```
 
-- [ ] **Étape 2 : vérifier l'échec**, avec `uv run --extra cpu pytest -q tests/test_publication.py`.
+- [ ] **Étape 2 : vérifier l'échec**, avec `uv run --extra gpu pytest -q -m "not gpu" tests/test_publication.py`.
 - [ ] **Étape 3 : écrire le module, la commande et la section du README** (« Recharger une version publiée », qui remplace le script d'exemple par `charger_publication`).
 - [ ] **Étape 4 : vérifier** que tous les tests de forge passent.
 - [ ] **Étape 5 : commit**, « Forge : charger et télécharger une version publiée de ton IA ».
@@ -365,7 +365,7 @@ def test_longueur_differente_de_l_index(tmp_path): ...  # ValueError claire
   Les tests existants (`test_entrainement.py`, `test_evaluation.py`, `test_exporter.py`) passent sans changement.
 - [ ] **Étape 2 : vérifier l'échec.**
 - [ ] **Étape 3 : écrire.** Le README gagne « Affiner ton IA » : `methode`, `depart`, la commande de reprise, `--arreter-apres`.
-- [ ] **Étape 4 : vérifier**, `--extra cpu` puis `--extra gpu -m gpu` (un SFT de 20 pas sur la carte dont la perte baisse).
+- [ ] **Étape 4 : vérifier**, `--extra gpu -m "not gpu"` puis `--extra gpu -m gpu` (un SFT de 20 pas sur la carte dont la perte baisse).
 - [ ] **Étape 5 : commit**, « Forge : une boucle, plusieurs méthodes ; l'affinage supervisé depuis une version publiée ».
 
 ### Tâche 7 : les sources de conversations et leur téléchargement
@@ -841,7 +841,7 @@ def test_grpo_refuse_jetons_total(): ...           # ValueError : le nombre de p
   - Le README de forge : une section par étape (commandes dans l'ordre, versions courte et complète, durées mesurées, reprise).
   - `docs/donnees.md` à jour.
   - Les durées réelles remplacent les estimations dans `docs/mesures/`.
-  - `uv run --extra cpu pytest -q --durations=15` : si le job « Tests de forge » approche ses 25 minutes, le porter à 35 et le dire.
+  - `uv run --extra gpu pytest -q -m "not gpu" --durations=15` : si le job « Tests de forge » approche ses 25 minutes, le porter à 35 et le dire.
 - [ ] **Étape 6 : commit**, puis **(contrôleur)** Release `ton-ia-1.10`, et le jalon : « Projet forge-ia (La Forge IA) : moteur de la vague 2 fini ; ton-ia-1.7, 1.8, 1.9 et 1.10 publiées le JJ/MM/AAAA, chacune affinée depuis la précédente (SFT, DPO, GRPO si signal, code et FIM). »
 
 ---
