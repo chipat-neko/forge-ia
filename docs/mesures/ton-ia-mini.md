@@ -181,7 +181,7 @@ pour la ligne « début », qui est le pas 1 seul).
 | --- | --- | --- |
 | Perte de validation | 3,428 nats par jeton | contre 10,397 pour le hasard |
 | Perplexité | 30,8 | le modèle hésite comme s'il choisissait entre 31 jetons également probables, au lieu de 32 768 |
-| Octets par jeton | 4,36 | taille moyenne d'un jeton dans ces données, `<|fin_texte|>` compris |
+| Octets par jeton | 4,36 | taille moyenne d'un jeton dans ces données, fins de texte comprises |
 | Bits par octet (estimation) | 1,134 | la perte ramenée à un octet de texte |
 
 *Corrigé le 17/11/2026 : les bits par octet valaient 1,133 ; ils valent 1,134. L'ancien calcul divisait les octets par les jetons sans les `<|fin_texte|>`, alors que la perte moyenne compte aussi les positions qui prédisent `<|fin_texte|>` ; le calcul exact divise par tous les jetons (240 449 292). Rien d'autre ne change : la perte, la perplexité, les QCM et les échantillons sont ceux du rapport d'origine, revérifiés sur la même sauvegarde. Le rapport corrigé est `evaluation\meilleur-2026-11-17\rapport.json`.*

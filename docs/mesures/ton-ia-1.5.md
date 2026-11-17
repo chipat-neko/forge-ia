@@ -233,7 +233,7 @@ Sur 1 024 morceaux fixes de 2 048 jetons de la validation, soit 2 097 15
 | --- | --- | --- |
 | Perte de validation | 2,419 nats par jeton | contre 10,397 pour le hasard |
 | Perplexité | 11,2 | le modèle hésite comme s'il choisissait entre 11 jetons également probables, au lieu de 32 768 |
-| Octets par jeton | 4,35 | taille moyenne d'un jeton dans ces données, `<|fin_texte|>` compris |
+| Octets par jeton | 4,35 | taille moyenne d'un jeton dans ces données, fins de texte comprises |
 | Bits par octet (estimation) | 0,803 | la perte ramenée à un octet de texte |
 
 *Corrigé le 17/11/2026 : les bits par octet valaient 0,802 ; ils valent 0,803. L'ancien calcul divisait les octets par les jetons sans les `<|fin_texte|>`, alors que la perte moyenne compte aussi les positions qui prédisent `<|fin_texte|>` ; le calcul exact divise par tous les jetons (8 885 708 358). Rien d'autre ne change : la perte, la perplexité, les QCM et les échantillons sont ceux du rapport d'origine, revérifiés sur la même sauvegarde. Le nouveau rapport est `rapport-2026-11-17.json` dans la Release.*
