@@ -8,8 +8,9 @@ s'appuient dessus.
 
 Chaque usage a sa plage de graines (`GRAINES_ENTRAINEMENT`, `GRAINES_EVALUATION`, …). Les problèmes de
 l'évaluation sont réservés à l'évaluation, et aucun problème d'un autre usage ne peut leur être identique,
-**par construction** et pas seulement par chance : l'évaluation puise ses prénoms dans `PRENOMS_EVALUATION`
-(6 des 30), et tous les autres usages dans `PRENOMS_ENTRAINEMENT` (les 24 autres). Chaque énoncé nomme au
+**par construction** et pas seulement par chance : trois lots de prénoms disjoints, `PRENOMS_ENTRAINEMENT` (20, pour
+l'entraînement, le RL, les préférences et la victoire), `PRENOMS_VALIDATION_RL` (4, pour la validation du RL, que le
+RL ne doit pas avoir vue) et `PRENOMS_EVALUATION` (6, pour l'évaluation). Chaque énoncé nomme au
 moins une personne : deux énoncés dont les prénoms viennent de listes disjointes sont forcément différents.
 
 Ce que le jumeau TypeScript du site doit reproduire (plan 8), pour une même graine, à l'identique :
@@ -20,7 +21,7 @@ Ce que le jumeau TypeScript du site doit reproduire (plan 8), pour une même gra
    que ce choix ne soit pas lié au contenu du problème. Les tirages suivent ensuite, dans l'ordre exact écrit
    dans chaque fonction `_addition`, `_soustraction`… (prénoms, objets, nombres, variante de phrase).
 3. Les listes `GENRES_DES_PRENOMS` (30, dans cet ordre ; les 24 premiers sont ceux de l'entraînement, les 6
-   derniers ceux de l'évaluation) et `OBJETS` (20, dans cet ordre), avec leur genre et leur fourchette de prix.
+   derniers ceux de l'évaluation, les 4 d'avant ceux de la validation du RL) et `OBJETS` (20, dans cet ordre), avec leur genre et leur fourchette de prix.
 4. Le choix des prénoms et des objets distincts (`_tirer_distincts` : un indice dans les restants, retiré
    ensuite), l'accord (`quantite`, `euros`, `ans` : le singulier jusqu'à 1 inclus, 0 compris), l'élision
    (`de`, `que`) et l'article (`un`) et les gabarits de phrases, caractère pour caractère.
@@ -65,20 +66,23 @@ GRAINES_PREFERENCES = 3_000_000
 GRAINES_VICTOIRE = 4_000_000
 GRAINES_VALIDATION_RL = 5_000_000
 
+_LARGEUR_DES_PLAGES = 1_000_000
 _GRAINE_MAX = 2**32 - 1  # au-delà, SplitMix32 rejouerait une graine déjà vue
 
-# Les 30 prénoms, avec leur genre. Les 24 premiers servent à tous les usages sauf l'évaluation, les 6 derniers
-# (3 féminins, 3 masculins) à l'évaluation seule. Pas de « h » aspiré : l'élision de « de » est toujours juste.
+# Les 30 prénoms, avec leur genre. Les 20 premiers servent à l'entraînement, au RL, aux préférences et à la victoire,
+# les 4 suivants (2 féminins, 2 masculins) à la validation du RL seule, les 6 derniers (3 féminins, 3 masculins) à
+# l'évaluation seule. Pas de « h » aspiré : l'élision de « de » est toujours juste.
 GENRES_DES_PRENOMS: tuple[tuple[str, str], ...] = (
     ("Léa", "f"), ("Lucas", "m"), ("Alice", "f"), ("Hugo", "m"), ("Chloé", "f"), ("Thomas", "m"),
     ("Emma", "f"), ("Nathan", "m"), ("Inès", "f"), ("Théo", "m"), ("Jade", "f"), ("Louis", "m"),
     ("Lina", "f"), ("Arthur", "m"), ("Manon", "f"), ("Jules", "m"), ("Camille", "f"), ("Adam", "m"),
     ("Sarah", "f"), ("Enzo", "m"), ("Zoé", "f"), ("Maxime", "m"), ("Louise", "f"), ("Paul", "m"),
-    # réservés à l'évaluation
+    # réservés à l'évaluation (les quatre d'avant : à la validation du RL)
     ("Éva", "f"), ("Émile", "m"), ("Océane", "f"), ("Ethan", "m"), ("Clara", "f"), ("Gabriel", "m"),
 )
 PRENOMS = tuple(nom for nom, _ in GENRES_DES_PRENOMS)
-PRENOMS_ENTRAINEMENT = PRENOMS[:24]
+PRENOMS_ENTRAINEMENT = PRENOMS[:20]
+PRENOMS_VALIDATION_RL = PRENOMS[20:24]
 PRENOMS_EVALUATION = PRENOMS[24:]
 _GENRE_DU_PRENOM = dict(GENRES_DES_PRENOMS)
 
@@ -194,8 +198,13 @@ def _tirer_distincts(h: Hasard, suite: Sequence[T], k: int) -> list[T]:
 
 
 def usage_de_la_graine(graine: int) -> str:
-    """« evaluation » pour les graines de [GRAINES_EVALUATION, GRAINES_RL[, « entrainement » pour toutes les autres."""
-    return "evaluation" if GRAINES_EVALUATION <= graine < GRAINES_RL else "entrainement"
+    """« evaluation » de [GRAINES_EVALUATION, GRAINES_RL[, « validation_rl » de [GRAINES_VALIDATION_RL, +1 000 000[,
+    « entrainement » pour toutes les autres."""
+    if GRAINES_EVALUATION <= graine < GRAINES_RL:
+        return "evaluation"
+    if GRAINES_VALIDATION_RL <= graine < GRAINES_VALIDATION_RL + _LARGEUR_DES_PLAGES:
+        return "validation_rl"
+    return "entrainement"
 
 
 # --- Les familles : chacune rend (énoncé, étapes, réponse) ---
@@ -368,6 +377,12 @@ def _ages(h: Hasard, d: int, prenoms: Sequence[str]) -> tuple[str, list[str], in
     return f"{presentation} {question}", etapes, actuel + k if futur else actuel - k
 
 
+_PRENOMS_DE_L_USAGE = {
+    "entrainement": PRENOMS_ENTRAINEMENT,
+    "validation_rl": PRENOMS_VALIDATION_RL,
+    "evaluation": PRENOMS_EVALUATION,
+}
+
 _GENERATEURS = {
     "addition": _addition,
     "soustraction": _soustraction,
@@ -383,7 +398,8 @@ def generer_probleme(famille: str, difficulte: int, graine: int) -> Probleme:
 
     Un couple (famille, difficulté) absent de `FORMES` lève `ValueError`, comme une graine qui n'est pas
     de 0 à 2^32 − 1. Les prénoms viennent de `PRENOMS_EVALUATION` pour les graines d'évaluation, de
-    `PRENOMS_ENTRAINEMENT` pour toutes les autres : un problème d'évaluation ne peut jamais être identique à celui d'un autre usage.
+    `PRENOMS_VALIDATION_RL` pour celles de la validation du RL, de `PRENOMS_ENTRAINEMENT` pour toutes les autres :
+    un problème d'évaluation ou de validation du RL ne peut jamais être identique à celui d'un autre usage.
     """
     if famille not in FORMES:
         raise ValueError(f"Famille inconnue : {famille!r}. Les familles sont {', '.join(FAMILLES)}.")
@@ -397,7 +413,7 @@ def generer_probleme(famille: str, difficulte: int, graine: int) -> Probleme:
         raise ValueError(f"La graine {graine!r} doit être un entier de 0 à 2^32 − 1 (4 294 967 295) : donne une autre graine.")
     h = Hasard(graine)
     h.suivant32()  # réservé au choix du couple (famille, difficulté) de `generer_problemes`
-    prenoms = PRENOMS_EVALUATION if usage_de_la_graine(graine) == "evaluation" else PRENOMS_ENTRAINEMENT
+    prenoms = _PRENOMS_DE_L_USAGE[usage_de_la_graine(graine)]
     enonce, etapes, reponse = _GENERATEURS[famille](h, difficulte, prenoms)
     return Probleme(f"{famille}-{difficulte}-{graine}", famille, difficulte, enonce, tuple(etapes), reponse)
 
@@ -420,8 +436,8 @@ def generer_problemes(
 
     Le couple (famille, difficulté) de chaque problème est tiré de la même graine, parmi ceux de `FORMES`
     que `familles` et `difficultes` permettent (`ValueError` s'il n'y en a aucun). Les énoncés en double sont
-    retirés : la liste peut donc avoir moins de `n` éléments. Une liste ne peut pas enjamber la plage d'évaluation :
-    ses problèmes seraient mélangés à ceux de l'entraînement.
+    retirés : la liste peut donc avoir moins de `n` éléments. Une liste ne peut pas enjamber la plage d'évaluation ni celle de la
+    validation du RL : ses problèmes seraient mélangés à ceux d'un autre usage.
     """
     if n < 0:
         raise ValueError(f"Le nombre de problèmes ne peut pas être négatif (reçu {n}).")
@@ -442,13 +458,17 @@ def generer_problemes(
     if n == 0:
         return []
     derniere = graine_depart + n - 1
-    en_partie = graine_depart < GRAINES_RL and derniere >= GRAINES_EVALUATION
-    if en_partie and not (graine_depart >= GRAINES_EVALUATION and derniere < GRAINES_RL):
-        raise ValueError(
-            f"Les graines de {graine_depart} à {derniere} enjambent la plage d'évaluation "
-            f"({GRAINES_EVALUATION} à {GRAINES_RL - 1}) : les problèmes de l'évaluation se mélangeraient aux autres. "
-            "Choisis des graines entièrement dedans ou entièrement dehors, ou donne moins de problèmes."
-        )
+    for debut, fin, nom in (
+        (GRAINES_EVALUATION, GRAINES_RL, "d'évaluation"),
+        (GRAINES_VALIDATION_RL, GRAINES_VALIDATION_RL + _LARGEUR_DES_PLAGES, "de validation du RL"),
+    ):
+        touche = graine_depart < fin and derniere >= debut
+        if touche and not (graine_depart >= debut and derniere < fin):
+            raise ValueError(
+                f"Les graines de {graine_depart} à {derniere} enjambent la plage {nom} ({debut} à {fin - 1}) : "
+                "ses problèmes se mélangeraient aux autres. "
+                "Choisis des graines entièrement dedans ou entièrement dehors, ou donne moins de problèmes."
+            )
     vus: set[str] = set()
     problemes = []
     for i in range(n):

@@ -1,6 +1,7 @@
 """Les problèmes de raisonnement : générés par programme, justes par construction, et leur vérification."""
 
 import gzip
+import hashlib
 import json
 import re
 from fractions import Fraction
@@ -148,7 +149,8 @@ def test_les_enonces_sont_en_francais():
     problemes = generer_problemes(500, 0)
     assert len(problemes) > 400
     assert all(langue(p.enonce) != "autre" for p in problemes)
-    assert all(langue(p.enonce) == "fr" for p in problemes[:100])
+    # Quelques énoncés très courts (« … de moins qu'Adam … ») ont moins de 3 mots outils : indéterminés, jamais « autre ».
+    assert sum(langue(p.enonce) == "fr" for p in problemes) >= 0.97 * len(problemes)
 
 
 def test_quantite_accorde_le_nom_sur_toutes_les_valeurs():
@@ -254,17 +256,52 @@ def test_aucun_enonce_commun_entre_entrainement_et_evaluation():
     assert {p.enonce for p in entrainement}.isdisjoint({p.enonce for p in evaluation})
 
 
-def test_l_evaluation_a_ses_propres_prenoms_par_construction():
-    reserves = set(pb.PRENOMS_EVALUATION)
-    assert 0 < len(reserves) < len(PRENOMS) and reserves <= set(PRENOMS)
+def test_les_trois_lots_de_prenoms_sont_disjoints_et_couvrent_les_30():
+    lots = (pb.PRENOMS_ENTRAINEMENT, pb.PRENOMS_VALIDATION_RL, pb.PRENOMS_EVALUATION)
+    assert [len(lot) for lot in lots] == [20, 4, 6]
+    assert set(lots[0]).isdisjoint(lots[1]) and set(lots[0]).isdisjoint(lots[2]) and set(lots[1]).isdisjoint(lots[2])
+    assert set(lots[0]) | set(lots[1]) | set(lots[2]) == set(PRENOMS)
+    genres = dict(pb.GENRES_DES_PRENOMS)
+    for lot in lots:  # chaque lot a des deux genres
+        assert {genres[n] for n in lot} == {"f", "m"}
+
+
+def test_chaque_usage_n_emploie_que_les_prenoms_de_son_lot_sur_toutes_les_plages():
     motif = re.compile(r"\b(" + "|".join(PRENOMS) + r")\b")
-    for debut, en_evaluation in [(GRAINES_ENTRAINEMENT, False), (GRAINES_EVALUATION, True), (GRAINES_RL, False),
-                                 (GRAINES_PREFERENCES, False), (GRAINES_VICTOIRE, False),
-                                 (GRAINES_VALIDATION_RL, False), (GRAINES_EVALUATION + 999_000, True)]:
+    lots = {
+        "entrainement": set(pb.PRENOMS_ENTRAINEMENT),
+        "validation_rl": set(pb.PRENOMS_VALIDATION_RL),
+        "evaluation": set(pb.PRENOMS_EVALUATION),
+    }
+    for debut, usage in [(GRAINES_ENTRAINEMENT, "entrainement"), (GRAINES_EVALUATION, "evaluation"),
+                         (GRAINES_RL, "entrainement"), (GRAINES_PREFERENCES, "entrainement"),
+                         (GRAINES_VICTOIRE, "entrainement"), (GRAINES_VALIDATION_RL, "validation_rl"),
+                         (GRAINES_EVALUATION + 999_000, "evaluation"),
+                         (GRAINES_VALIDATION_RL + 999_000, "validation_rl")]:
+        assert pb.usage_de_la_graine(debut) == usage
         for p in generer_problemes(300, debut):
             noms = set(motif.findall(p.enonce))
-            assert noms, p.enonce
-            assert (noms <= reserves) if en_evaluation else noms.isdisjoint(reserves), (debut, p.enonce)
+            assert noms and noms <= lots[usage], (debut, p.enonce)
+
+
+def test_la_validation_du_rl_n_a_aucun_enonce_commun_avec_le_rl():
+    rl = generer_problemes(20_000, GRAINES_RL)
+    validation = generer_problemes(2000, GRAINES_VALIDATION_RL)
+    assert len(rl) > 15_000 and len(validation) > 1500
+    assert {p.enonce for p in rl}.isdisjoint({p.enonce for p in validation})
+    entrainement = {p.enonce for p in generer_problemes(2000, GRAINES_ENTRAINEMENT)}
+    assert entrainement.isdisjoint({p.enonce for p in validation})
+
+
+def test_les_problemes_d_evaluation_deja_fixes_ne_changent_pas():
+    # Les 6 prénoms de l'évaluation et leur ordre n'ont pas bougé : les énoncés d'évaluation sont ceux d'avant
+    # la ronde 1 (empreinte relevée sur d8a99f7).
+    evaluation = generer_problemes(500, GRAINES_EVALUATION)
+    empreinte = hashlib.sha256("\n".join(f"{p.id}|{p.enonce}|{p.reponse}" for p in evaluation).encode()).hexdigest()
+    assert empreinte == "d84718231abf20919d8fe361b91f8abc1be65a43ad47d376b03fc1b6ceaaf555"
+    assert evaluation[0].enonce == (
+        "Océane a 36 jouets. Elle les partage en parts égales entre 9 amis. Combien de jouets reçoit chaque ami ?"
+    )
 
 
 def test_l_usage_d_une_graine():
@@ -273,7 +310,10 @@ def test_l_usage_d_une_graine():
     assert pb.usage_de_la_graine(GRAINES_EVALUATION) == "evaluation"
     assert pb.usage_de_la_graine(GRAINES_RL - 1) == "evaluation"
     assert pb.usage_de_la_graine(GRAINES_RL) == "entrainement"
-    assert pb.usage_de_la_graine(GRAINES_VALIDATION_RL + 7) == "entrainement"
+    assert pb.usage_de_la_graine(GRAINES_VALIDATION_RL - 1) == "entrainement"
+    assert pb.usage_de_la_graine(GRAINES_VALIDATION_RL) == "validation_rl"
+    assert pb.usage_de_la_graine(GRAINES_VALIDATION_RL + 999_999) == "validation_rl"
+    assert pb.usage_de_la_graine(GRAINES_VALIDATION_RL + 1_000_000) == "entrainement"
 
 
 def test_une_liste_ne_peut_pas_enjamber_la_plage_d_evaluation():
@@ -285,6 +325,15 @@ def test_une_liste_ne_peut_pas_enjamber_la_plage_d_evaluation():
         generer_problemes(3_000_000, 0)
     assert generer_problemes(10, GRAINES_EVALUATION - 10)  # juste avant : permis
     assert generer_problemes(10, GRAINES_RL)  # juste après : permis
+
+
+def test_une_liste_ne_peut_pas_enjamber_la_plage_de_validation_du_rl():
+    with pytest.raises(ValueError, match="validation du RL"):
+        generer_problemes(10, GRAINES_VALIDATION_RL - 5)
+    with pytest.raises(ValueError, match="validation du RL"):
+        generer_problemes(10, GRAINES_VALIDATION_RL + 999_995)
+    assert generer_problemes(10, GRAINES_VALIDATION_RL - 10)
+    assert generer_problemes(10, GRAINES_VALIDATION_RL + 1_000_000)
 
 
 def test_une_graine_hors_des_32_bits_est_refusee():
@@ -437,6 +486,31 @@ def test_est_juste_cas_ambigus():
     assert not est_juste(_reponse("La réponse est 42."), "")
 
 
+def test_est_juste_refuse_une_reponse_coupee():
+    coupee = Reponse(texte="La réponse est 12", pensee=None, ids=[], terminee=False)  # « 123 » coupé en « 12 »
+    assert not est_juste(coupee, 12)
+    assert not est_juste(coupee, 123)
+    assert not est_juste(Reponse(texte="La réponse est 42.", pensee="42", ids=[], terminee=False), 42)
+    assert est_juste(Reponse(texte="La réponse est 123.", pensee=None, ids=[], terminee=True), 123)
+
+
+def test_est_juste_refuse_un_attendu_qui_n_est_ni_un_entier_ni_une_chaine():
+    for attendu in (12.0, 0.1, True, None, Fraction(1, 2), [12]):
+        with pytest.raises(TypeError, match="entier ou une chaîne"):
+            est_juste(_reponse("12"), attendu)
+
+
+@pytest.mark.parametrize("texte", ["٣", "٠", "３", "est ٤٢", "²"])
+def test_extraire_nombre_ne_lit_que_les_chiffres_ascii(texte):
+    # En Python, `\d` lirait ces chiffres Unicode ; le jumeau TypeScript ne lira que 0 à 9.
+    assert extraire_nombre(texte) is None
+
+
+def test_extraire_nombre_chiffres_ascii_a_cote_de_chiffres_unicode():
+    assert extraire_nombre("٣ puis 7") == 7
+    assert extraire_nombre("7 puis ٣") == 7
+
+
 # --- La commande ---
 
 
@@ -483,6 +557,21 @@ def test_la_commande_marque_l_usage_evaluation(tmp_path, monkeypatch):
     assert main(["problemes", "--sortie", "rl", "--nombre", "50", "--graine-depart", str(GRAINES_RL)]) == 0
     index = json.loads((tmp_path / "problemes" / "rl" / "index.json").read_text(encoding="utf-8"))
     assert index["usage"] == "entrainement"
+    assert main(["problemes", "--sortie", "val", "--nombre", "50", "--graine-depart", str(GRAINES_VALIDATION_RL)]) == 0
+    index = json.loads((tmp_path / "problemes" / "val" / "index.json").read_text(encoding="utf-8"))
+    assert index["usage"] == "validation_rl"
+
+
+def test_la_commande_annonce_le_nombre_de_doublons_retires(tmp_path, monkeypatch, capsys):
+    from forge.__main__ import main
+
+    monkeypatch.setenv("FORGE_DONNEES", str(tmp_path))
+    args = ["--familles", "multiplication", "--difficultes", "1"]
+    attendus = len(generer_problemes(3000, 0, familles=("multiplication",), difficultes=(1,)))
+    assert main(["problemes", "--sortie", "d", "--nombre", "3000", "--graine-depart", "0", *args]) == 0
+    sortie = capsys.readouterr().out.replace("\u202f", "")
+    assert f"{attendus} problèmes" in sortie
+    assert f"{3000 - attendus} énoncés en double retirés" in sortie
 
 
 def test_la_commande_filtre_les_difficultes_et_les_familles(tmp_path, monkeypatch):

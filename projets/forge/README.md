@@ -134,8 +134,9 @@ même commande ne refait rien ; une coupure en cours d'écriture reprend au dern
 a sa plage de graines (entraînement 0, évaluation 1 000 000, RL 2 000 000, préférences 3 000 000, victoire
 4 000 000, validation RL 5 000 000) : les graines de 1 000 000 à 1 999 999 sont celles de l'évaluation, qui
 ne va jamais dans un entraînement. Ses problèmes n'emploient que des prénoms que les autres usages
-n'emploient jamais : aucun problème d'entraînement ne peut leur être identique. Une liste de graines ne
-peut pas enjamber cette plage. Les énoncés en double sont retirés, donc le jeu peut compter un peu moins
+n'emploient jamais : aucun problème d'entraînement ne peut leur être identique. Il en va de même de la
+validation du RL (graines de 5 000 000 à 5 999 999, usage `validation_rl` dans `index.json`), que le RL
+ne doit pas avoir vue. Une liste de graines ne peut pas enjamber l'une de ces deux plages. Les énoncés en double sont retirés, donc le jeu peut compter un peu moins
 de problèmes que demandé.
 
 ## Le tokenizer de ton IA
