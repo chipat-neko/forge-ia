@@ -235,8 +235,9 @@ def test_les_problemes_d_evaluation_et_les_jeux_absents_sont_dits(donnees):
     messages: list[str] = []
     resume = preparer_jeu(recette(Part("luth2_conversation", None)), journal=messages.append)
     assert resume["decontamination"]["jeux"] == ["problemes/evaluation"]
-    assert set(resume["decontamination"]["absents"]) == {"ifeval_fr", "mgsm_rev2_fr", "gsm8k_platinum_fr", "humaneval"}
-    assert any("mgsm_rev2_fr" in m and "décontamin" in m for m in messages)
+    assert set(resume["decontamination"]["absents"]) == {"ifeval_fr", "mgsm_rev2_fr", "gsm8k_platinum_fr", "humaneval", "humaneval_fr"}
+    assert any("humaneval_fr" in m and "mgsm_rev2_fr" in m and "décontamin" in m for m in messages)
+    assert all(not re.search(r"[ ][:;!?]", m) for m in messages)  # espace fine insécable, jamais ordinaire
     assert lire_index(donnees / "affinage" / "essai")["decontamination"] == resume["decontamination"]
 
 
@@ -493,7 +494,7 @@ def test_la_commande_preparer(donnees, monkeypatch, capsys):
     assert principal.main(["preparer", "--recette", "essai-cli"]) == 0
     sortie = capsys.readouterr().out
     assert "luth2_conversation" in sortie and "identite" in sortie and "\u202f" in sortie
-    assert "20 lus" in sortie and "contaminés" in sortie and str(donnees / "affinage" / "essai-cli") in sortie
+    assert "20 lus" in sortie and "contaminés" in sortie and "0 invalides" in sortie and str(donnees / "affinage" / "essai-cli") in sortie
     assert (donnees / "affinage" / "essai-cli" / ".complet").is_file()
     assert principal.main(["preparer", "--recette", "essai-cli", "--sortie", "autre-nom"]) == 0
     assert (donnees / "affinage" / "autre-nom" / ".complet").is_file()

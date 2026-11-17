@@ -87,7 +87,7 @@ class Part:
     def __post_init__(self) -> None:
         if self.exemples_max is not None and self.exemples_max < 1:
             raise ValueError(
-                f"{self.source} : exemples_max doit valoir au moins 1 (reçu {self.exemples_max}). "
+                f"{self.source}\u202f: exemples_max doit valoir au moins 1 (reçu {self.exemples_max}). "
                 "Donne un nombre d'exemples, ou None pour tout prendre."
             )
 
@@ -118,7 +118,7 @@ class Recette:
         if not 1 <= self.jetons_max_exemple <= self.longueur + 1:
             raise ValueError(
                 f"jetons_max_exemple ({self.jetons_max_exemple}) doit tenir dans une rangée de "
-                f"{self.longueur + 1} jetons : entre 1 et {self.longueur + 1}."
+                f"{self.longueur + 1} jetons\u202f: entre 1 et {self.longueur + 1}."
             )
         if not 0 <= self.part_validation < 1:
             raise ValueError(f"part_validation doit être au moins 0 et moins de 1, pas {self.part_validation}.")
@@ -186,7 +186,7 @@ def _verifier_les_parts(recette: Recette) -> None:
             continue
         for prefixe, tache in PREFIXES_A_VENIR.items():
             if nom.startswith(prefixe):
-                raise ValueError(f"{nom} : les parts « {prefixe}… » arrivent avec {tache}. Elles ne sont pas encore disponibles.")
+                raise ValueError(f"{nom}\u202f: les parts «\u202f{prefixe}…\u202f» arrivent avec {tache}. Elles ne sont pas encore disponibles.")
         source = SOURCES_CONVERSATIONS.get(nom)
         if source is None:
             if nom.lower() in NOMS_RESERVES_A_L_EVALUATION or est_reservee_a_l_evaluation(nom, ""):
@@ -198,7 +198,7 @@ def _verifier_les_parts(recette: Recette) -> None:
         source_d_entrainement(nom)  # UsageInterdit si elle est réservée à l'évaluation
         if source.sorte != "conversation":
             raise ValueError(
-                f"{nom} n'est pas une source de conversations (sa sorte est {source.sorte}) : elle ne "
+                f"{nom} n'est pas une source de conversations (sa sorte est {source.sorte})\u202f: elle ne "
                 "peut pas être une part d'un jeu d'affinage de conversations."
             )
     if any(p.source == SYSTEME_GENERE for p in recette.parts):
@@ -208,7 +208,7 @@ def _verifier_les_parts(recette: Recette) -> None:
                 "luth2_conversation) : ses questions en viennent. Ajoute-la à la recette."
             )
         if next(p for p in recette.parts if p.source == SYSTEME_GENERE).exemples_max is None:
-            raise ValueError(f"{SYSTEME_GENERE} a besoin d'un nombre d'exemples (exemples_max), pas de « tout ».")
+            raise ValueError(f"{SYSTEME_GENERE} a besoin d'un nombre d'exemples (exemples_max), pas de «\u202ftout\u202f».")
 
 
 def _part_de_base(recette: Recette) -> Part | None:
@@ -254,14 +254,14 @@ def _lecteur_de_problemes(nom: str) -> Callable[[], Iterator[dict]]:
     index = dossier / "index.json"
     if not (dossier / ".complet").is_file() or not index.is_file():
         raise DonneesManquantes(
-            f"Les problèmes {nom!r} ne sont pas (ou pas entièrement) générés : {dossier / '.complet'} manque. "
-            f"Lance, avec les bons nombre et graine : {commande}"
+            f"Les problèmes {nom!r} ne sont pas (ou pas entièrement) générés\u202f: {dossier / '.complet'} manque. "
+            f"Lance, avec les bons nombre et graine\u202f: {commande}"
         )
     usage = json.loads(index.read_text(encoding="utf-8")).get("usage")
     if usage != "entrainement":
         raise ValueError(
-            f"{PREFIXE_DES_PROBLEMES}{nom} : ces problèmes sont d'usage {usage!r}, pas d'entraînement. "
-            "Ils ne vont jamais dans un jeu d'entraînement : génère des problèmes avec des graines d'entraînement "
+            f"{PREFIXE_DES_PROBLEMES}{nom}\u202f: ces problèmes sont d'usage {usage!r}, pas d'entraînement. "
+            "Ils ne vont jamais dans un jeu d'entraînement\u202f: génère des problèmes avec des graines d'entraînement "
             "(de 0 à 999 999)."
         )
     return lambda: lire_elements(dossier, "problemes")
@@ -347,14 +347,14 @@ def _charger_l_evaluation(journal: Callable[[str], None]) -> _Decontamination:
     """Lit les jeux d'évaluation déjà téléchargés ; dit lesquels manquent."""
     decontamination = _Decontamination()
     dossiers = {nom: dossier_de_la_source(s) for nom, s in SOURCES_CONVERSATIONS.items() if s.usage == "evaluation"}
-    if "humaneval_fr" not in SOURCES_CONVERSATIONS:  # HumanEval-FR arrive à la tâche 20, hors du registre
+    if "humaneval_fr" not in SOURCES_CONVERSATIONS:  # HumanEval-FR arrive à la tâche 20, hors du registre : manquant, il est dit comme les autres
         dossiers["humaneval_fr"] = sous_forge_donnees("humaneval_fr", "conversations")
     for nom, dossier in dossiers.items():
         if (dossier / ".complet").is_file():
             for element in lire_elements(dossier, PREFIXE):
                 decontamination.ajouter_externe(element)
             decontamination.jeux.append(nom)
-        elif nom in SOURCES_CONVERSATIONS:
+        else:
             decontamination.absents.append(nom)
     racine = racine_donnees() / "problemes"
     if racine.is_dir():
@@ -367,8 +367,8 @@ def _charger_l_evaluation(journal: Callable[[str], None]) -> _Decontamination:
             decontamination.jeux.append(f"problemes/{dossier.name}")
     if decontamination.absents:
         journal(
-            f"Attention : décontamination sans {', '.join(decontamination.absents)} (pas téléchargés). "
-            "Les exemples ne sont pas comparés à ces jeux ; télécharge-les avec "
+            f"Attention\u202f: décontamination sans {', '.join(decontamination.absents)} (pas téléchargés). "
+            "Les exemples ne sont pas comparés à ces jeux\u202f; télécharge-les avec "
             "python -m forge conversations --source NOM, puis refais la préparation."
         )
     return decontamination
@@ -400,7 +400,7 @@ def _licence_de(part: Part, base: Part | None) -> tuple[str, str]:
     assert base is not None
     source = SOURCES_CONVERSATIONS[base.source]
     return (
-        f"{LICENCE_DU_PROJET} (messages système du dépôt) ; réponses transformées de {source.nom} ({source.licence})",
+        f"{LICENCE_DU_PROJET} (messages système du dépôt)\u202f; réponses transformées de {source.nom} ({source.licence})",
         LIEN_DE_LA_LICENCE_DU_PROJET,
     )
 
@@ -467,7 +467,7 @@ def preparer_jeu(
             produites = conversations_systeme(questions, part.exemples_max, recette.graine)
             if len(produites) < part.exemples_max:
                 ecrire_message(
-                    f"{nom} : {len(produites)} conversations sur {part.exemples_max} demandées "
+                    f"{nom}\u202f: {len(produites)} conversations sur {part.exemples_max} demandées "
                     f"(il n'y a pas assez de questions de {base.source} à transformer)."
                 )
             yield from produites
@@ -486,7 +486,7 @@ def preparer_jeu(
     identifiants: dict[str, None] = {}
     comptes: dict[str, _Comptes] = {}
     for part in recette.parts:
-        ecrire_message(f"{part.source} : préparation…")
+        ecrire_message(f"{part.source}\u202f: préparation…")
         c = comptes[part.source] = _Comptes()
         est_probleme = part.source.startswith(PREFIXE_DES_PROBLEMES)
         for tours in conversations_de(part):

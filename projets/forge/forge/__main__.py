@@ -1125,7 +1125,7 @@ def _commande_preparer(choix: argparse.Namespace) -> int:
         print(
             f"{nom}{fine}: {nombre(source['lus'])} lus, {nombre(source['gardes'])} gardés, "
             f"{nombre(source['doublons'])} doublons, {nombre(source['contamines'])} contaminés, "
-            f"{nombre(source['trop_longs'])} trop longs (licence{fine}: {source['licence']})"
+            f"{nombre(source['trop_longs'])} trop longs, {nombre(source['invalides'])} invalides (licence{fine}: {source['licence']})"
         )
     jeux = index["decontamination"]["jeux"]
     print(f"Décontamination{fine}: comparé à {', '.join(jeux) if jeux else "aucun jeu d'évaluation"}.")
