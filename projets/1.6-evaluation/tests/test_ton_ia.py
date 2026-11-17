@@ -8,6 +8,7 @@ redonner les logits du modèle d'origine au bit près.
 """
 
 import json
+import struct
 
 import pytest
 import torch
@@ -39,6 +40,19 @@ def test_le_dossier_a_le_format_de_la_version_publiee(dossier):
         assert "plongement.weight" in poids.keys() and "sortie.weight" not in poids.keys()
         assert poids.get_tensor("plongement.weight").dtype == torch.bfloat16
     assert json.loads((dossier / "config.json").read_text(encoding="utf-8"))["dim"] == CONFIG.dim
+
+
+def test_charger_ton_ia_relit_un_en_tete_aux_cles_triees(origine, dossier):
+    """L'export trie l'en-tête safetensors (même fichier à chaque export) : `charger_ton_ia` le relit."""
+    contenu = (dossier / "ton-ia-1.5.safetensors").read_bytes()
+    taille = struct.unpack("<Q", contenu[:8])[0]
+    noms = [nom for nom, _ in json.loads(contenu[8 : 8 + taille], object_pairs_hook=lambda paires: paires)]
+    assert noms == sorted(noms) and "__metadata__" in noms
+    modele, _ = charger_ton_ia(dossier)
+    with torch.no_grad():
+        attendus, _ = origine(ids())
+        lus, _ = modele(ids())
+    assert torch.equal(lus, attendus)
 
 
 def test_charger_ton_ia_redonne_les_logits_du_modele_d_origine(origine, dossier):

@@ -494,6 +494,55 @@ def test_une_erreur_de_lecture_passagere_ne_fait_rien_effacer(corpus, tokenizer_
     assert not (sortie / ".complet").exists()
 
 
+@pytest.mark.parametrize("endroit", ["ouverture", "empreinte"])
+def test_un_fragment_manquant_dit_de_relancer_donnees_puis_encoder(corpus, tokenizer_de_test, tmp_path, monkeypatch, endroit):
+    """Un fragment disparu (supprimé, jamais téléchargé) : `forge donnees` le refait, puis `forge encoder`."""
+    dossiers = dossiers_copies(corpus, tmp_path)
+    sortie = tmp_path / "jetons"
+    nom = "fragment-00001.jsonl.gz"
+
+    def introuvable(chemin, *a, **k):
+        raise FileNotFoundError(2, "Le fichier spécifié est introuvable", str(chemin))
+
+    if endroit == "ouverture":
+        vrai_open = module_jetons.gzip.open
+        monkeypatch.setattr(
+            module_jetons.gzip, "open", lambda chemin, *a, **k: introuvable(chemin) if Path(chemin).name == nom else vrai_open(chemin, *a, **k)
+        )
+    else:
+        vraie = module_jetons._empreinte_du_fichier
+        monkeypatch.setattr(
+            module_jetons, "_empreinte_du_fichier", lambda chemin: introuvable(chemin) if Path(chemin).name == nom else vraie(chemin)
+        )
+    with pytest.raises(FileNotFoundError) as erreur:
+        encoder_corpus(dossiers, tokenizer_de_test, sortie, processus=1)
+    message = str(erreur.value)
+    assert nom in message and "forge donnees" in message and "forge encoder" in message
+    assert message.index("forge donnees") < message.index("forge encoder")
+    assert "Supprime" not in message and not (sortie / ".complet").exists()
+
+
+def test_sous_commande_encoder_fragment_manquant(donnees_de_la_session, capsys, monkeypatch):
+    donnees = donnees_de_la_session
+    dossier = donnees.textes / "wikipedia_fr"
+    premier = sorted(dossier.glob("fragment-*.jsonl.gz"))[0]
+
+    # Le fragment est listé, puis il disparaît avant d'être lu : on le supprime après le listage.
+    vraie_liste = module_jetons._lister_les_travaux
+
+    def liste_puis_supprime(dossiers):
+        travaux = vraie_liste(dossiers)
+        premier.unlink()
+        return travaux
+
+    monkeypatch.setattr(module_jetons, "_lister_les_travaux", liste_puis_supprime)
+    arguments = ["encoder", "--donnees", "essai", "--tokenizer", str(donnees.tokenizer), "--processus", "1"]
+    assert main(arguments) == 1
+    erreur = capsys.readouterr().err
+    assert erreur.startswith("Erreur : ") and premier.name in erreur
+    assert "forge donnees" in erreur and "forge encoder" in erreur and "Traceback" not in erreur
+
+
 def test_sous_commande_encoder_erreur_de_lecture_passagere(donnees_de_la_session, monkeypatch, capsys):
     def open_refuse(chemin, *a, **k):
         raise PermissionError(13, "Accès refusé", str(chemin))

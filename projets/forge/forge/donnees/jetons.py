@@ -186,6 +186,24 @@ def _marqueur_a_jour(fait: dict, identite: dict, sortie: Path, nom: str) -> bool
     return True
 
 
+def _fragment_manquant(fragment: Path) -> FileNotFoundError:
+    """L'erreur d'un fragment de textes introuvable : `forge donnees` le refait, puis `forge encoder`."""
+    source = fragment.parent
+    return FileNotFoundError(
+        f"Le fragment {fragment} est introuvable. Relance d'abord : python -m forge donnees --octets "
+        f"<taille> --dossier {source.parent.name} (il refait le fragment manquant), puis : "
+        "python -m forge encoder --donnees <nom> --tokenizer <chemin>"
+    )
+
+
+def _taille_du_fragment(fragment: Path) -> int:
+    """La taille d'un fragment d'entrée ; s'il a disparu, l'erreur dit comment le refaire."""
+    try:
+        return fragment.stat().st_size
+    except FileNotFoundError as erreur:
+        raise _fragment_manquant(fragment) from erreur
+
+
 def _encoder_les_textes(tokenizer: TokenizerOctets, fin: int, fragment: Path) -> tuple[array, array, dict]:
     """Encode les documents d'un fragment ; renvoie (jetons train, jetons val, chiffres)."""
     train, val = array("H"), array("H")  # 'H' : 16 bits non signés, comme `DTYPE_JETONS`
@@ -223,6 +241,8 @@ def _encoder_les_textes(tokenizer: TokenizerOctets, fin: int, fragment: Path) ->
             f"Supprime le dossier {source}, puis relance le téléchargement avec : "
             f"python -m forge donnees --octets <taille> --dossier {source.parent.name}"
         ) from erreur
+    except FileNotFoundError as erreur:  # avant `OSError`, dont elle hérite : un fragment disparu
+        raise _fragment_manquant(fragment) from erreur
     # Toute autre erreur d'entrée-sortie ne dit rien du fragment : disque débranché ou endormi,
     # droit d'accès, antivirus… Effacer la source perdrait des heures de téléchargement pour rien.
     except OSError as erreur:
@@ -246,10 +266,14 @@ def _encoder_fragment(
     """
     debut = time.perf_counter()
     marqueur = sortie / f"{travail.nom}.fait"
+    try:
+        empreinte_fragment = _empreinte_du_fichier(travail.fragment)
+    except FileNotFoundError as erreur:
+        raise _fragment_manquant(travail.fragment) from erreur
     identite = {
         "dossier": travail.source.name,
         "fragment": travail.fragment.name,
-        "empreinte_fragment": _empreinte_du_fichier(travail.fragment),
+        "empreinte_fragment": empreinte_fragment,
         "empreinte_tokenizer": empreinte_tokenizer,
     }
     fait = _lire_marqueur(marqueur)
@@ -365,7 +389,7 @@ def _encoder_tous_les_fragments(
     """Encode tous les fragments ; renvoie le résultat de chacun, par numéro de fragment."""
     # Les plus gros d'abord : le dernier fragment de chaque source est souvent le plus petit,
     # et il ne doit pas faire attendre les autres à la fin.
-    ordre = sorted(travaux, key=lambda travail: (-travail.fragment.stat().st_size, travail.numero))
+    ordre = sorted(travaux, key=lambda travail: (-_taille_du_fragment(travail.fragment), travail.numero))
     resultats: dict[int, dict] = {}
     utiles = _processus_utiles(processus, len(travaux))
     if utiles <= 1:

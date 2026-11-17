@@ -456,7 +456,6 @@ def gpu_occupe(etat: dict | None) -> str | None:
     return None
 
 
-
 def decrire_la_compilation() -> dict:
     """Ce qui est vrai sur cette machine pour `torch.compile` : `{"triton": bool, "compilation": texte}`.
 

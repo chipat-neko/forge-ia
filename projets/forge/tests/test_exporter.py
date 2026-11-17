@@ -353,3 +353,70 @@ def test_l_export_d_un_petit_modele_reste_identique_a_l_octet_pres(tmp_path):
     assert en_tete.pop("__metadata__") == {"format": "pt", "pas": "7"}
     assert "sortie.weight" not in en_tete and {d["dtype"] for d in en_tete.values()} == {"BF16"}
     assert hashlib.sha256(contenu[8 + taille_de_l_en_tete :]).hexdigest().startswith(SHA256_DES_NOMBRES_AVANT)
+
+
+# --------------------------------------------------------------------------------------
+# L'en-tête safetensors : mêmes clés triées, donc même fichier à chaque export
+# --------------------------------------------------------------------------------------
+
+
+def lire_l_en_tete(chemin: Path) -> tuple[int, bytes]:
+    """La taille déclarée de l'en-tête d'un fichier safetensors, et ses octets (remplissage compris)."""
+    contenu = chemin.read_bytes()
+    taille = struct.unpack("<Q", contenu[:8])[0]
+    return taille, contenu[8 : 8 + taille]
+
+
+def test_l_en_tete_des_poids_a_ses_cles_triees(tmp_path, sauvegarde_test):
+    sauvegarde, _ = sauvegarde_test
+    poids = exporter(sauvegarde, tmp_path / "publication")[0]
+    taille, en_tete = lire_l_en_tete(poids)
+    assert taille == len(en_tete) and en_tete.endswith((b"}", b" "))
+    contenu = json.loads(en_tete, object_pairs_hook=lambda paires: paires)  # l'ordre du fichier
+    noms = [nom for nom, _ in contenu]
+    assert noms == sorted(noms)
+    for nom, valeur in contenu:
+        cles = [cle for cle, _ in valeur]
+        assert cles == (sorted(cles) if nom == "__metadata__" else ["dtype", "shape", "data_offsets"]), nom
+
+
+def test_deux_exports_de_suite_ont_le_meme_sha256(tmp_path, sauvegarde_test):
+    sauvegarde, _ = sauvegarde_test
+    premier = exporter(sauvegarde, tmp_path / "un")[0]
+    second = exporter(sauvegarde, tmp_path / "deux")[0]
+    assert sha256(premier) == sha256(second)
+
+
+def test_trier_l_en_tete_garde_la_taille_et_les_nombres(tmp_path):
+    """Un en-tête dans le désordre, avec son remplissage d'espaces : remis en ordre, de même longueur, mêmes nombres."""
+    en_tete = b'{"b":{"shape":[1],"dtype":"F32","data_offsets":[0,4]},"__metadata__":{"pas":"7","format":"pt"}}'
+    en_tete += b" " * 5
+    chemin = tmp_path / "desordre.safetensors"
+    chemin.write_bytes(struct.pack("<Q", len(en_tete)) + en_tete + b"\x01\x02\x03\x04")
+    module_exporter.trier_l_en_tete(chemin)
+    taille, trie = lire_l_en_tete(chemin)
+    assert taille == len(en_tete) and len(trie) == len(en_tete)
+    assert trie.rstrip(b" ") == (
+        b'{"__metadata__":{"format":"pt","pas":"7"},"b":{"dtype":"F32","shape":[1],"data_offsets":[0,4]}}'
+    )
+    assert trie.endswith(b"}" + b" " * 5)
+    assert chemin.read_bytes()[8 + taille :] == b"\x01\x02\x03\x04"
+    assert load_file(chemin)["b"].shape == (1,)
+
+
+def test_trier_l_en_tete_refuse_un_fichier_qui_n_est_pas_safetensors(tmp_path):
+    chemin = tmp_path / "faux.safetensors"
+    chemin.write_bytes(struct.pack("<Q", 10**9) + b"{}")
+    with pytest.raises(ValueError, match="en-tête"):
+        module_exporter.trier_l_en_tete(chemin)
+
+
+def test_safetensors_relit_le_fichier_reecrit(tmp_path, sauvegarde_test):
+    sauvegarde, modele = sauvegarde_test
+    poids = exporter(sauvegarde, tmp_path / "publication")[0]
+    relus = load_file(poids)
+    assert "sortie.weight" not in relus
+    assert torch.equal(relus["plongement.weight"], modele.plongement.weight.detach().to(torch.bfloat16))
+    with safe_open(poids, framework="pt") as ouvert:
+        assert ouvert.metadata() == {"format": "pt", "pas": "7"}
+    recharger(tmp_path / "publication")

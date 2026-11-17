@@ -189,7 +189,7 @@ Le fichier `tests/attendus.json` a trois sections :
   Le jumeau (`site/src/lib/partie-1/rope.ts`) les retrouve à 10⁻¹² près ;
 - `residus` : le pari « sans le `x +`, que devient l'entrée ? » du chapitre.
   Deux suites de 16 jetons tirés au hasard, pareilles sauf leur dernier jeton,
-  traversent les 6 blocs d'un transformer de la taille mini, aux poids tirés
+  passent par les 6 blocs d'un transformer de la taille mini, aux poids tirés
   au hasard comme forge les tire au départ, avant tout entraînement, avec la
   graine 0. Ce ne sont pas les poids de départ de ton IA : son entraînement
   tire les siens avec sa propre graine. Elles passent une fois par

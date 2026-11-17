@@ -13,7 +13,7 @@ Il lit aussi, sans le refaire, ce que deviennent deux suites de jetons sans le `
   passent par `pow`, `cos` et `sin` des bibliothèques mathématiques du système, qui peuvent
   différer d'un bit : les tests les comparent à 10⁻⁹ près ;
 - `residus` : deux suites de `JETONS_RESIDUS` jetons tirés au hasard, qui ne diffèrent que par
-  leur dernier jeton, traversent les blocs d'un transformer de la taille mini, aux poids tirés au
+  leur dernier jeton, passent par les blocs d'un transformer de la taille mini, aux poids tirés au
   hasard comme forge les tire au départ, avant tout entraînement (graine `GRAINE_RESIDUS`, 0).
   Ce ne sont pas les poids de départ de « ton IA » : son entraînement tire les siens avec sa
   propre graine. Une fois avec `pieces.bloc`, une fois sans ses `x +` (`bloc_sans_residus`).

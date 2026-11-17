@@ -31,6 +31,7 @@ import dataclasses
 import hashlib
 import json
 import shutil
+import struct
 import warnings
 from pathlib import Path
 
@@ -67,6 +68,55 @@ def empreinte_sha256(chemin: Path) -> str:
         for bloc in iter(lambda: fichier.read(1024**2), b""):
             empreinte.update(bloc)
     return empreinte.hexdigest()
+
+
+# L'ordre des champs d'un tenseur dans l'en-tête, celui que `safetensors` écrit toujours.
+_CHAMPS_D_UN_TENSEUR = ("dtype", "shape", "data_offsets")
+
+
+def _en_tete_dans_l_ordre(en_tete: dict) -> dict:
+    """L'en-tête avec un seul ordre possible : noms triés, métadonnées triées, champs des tenseurs dans l'ordre de `safetensors`."""
+    resultat = {}
+    for nom in sorted(en_tete):
+        valeur = en_tete[nom]
+        if nom == "__metadata__":
+            valeur = {cle: valeur[cle] for cle in sorted(valeur)}
+        elif isinstance(valeur, dict):
+            connus = [cle for cle in _CHAMPS_D_UN_TENSEUR if cle in valeur]
+            valeur = {cle: valeur[cle] for cle in (*connus, *sorted(set(valeur) - set(connus)))}
+        resultat[nom] = valeur
+    return resultat
+
+
+def trier_l_en_tete(chemin: Path) -> None:
+    """Réécrit l'en-tête JSON d'un fichier safetensors dans un ordre fixe, sans bouger d'un octet le reste.
+
+    `safetensors` écrit les métadonnées de l'en-tête (`__metadata__` : `format`, `pas`) dans un ordre
+    qui change d'un lancement à l'autre : deux exports du même modèle n'avaient donc pas la même
+    empreinte. Les noms de tenseurs et les clés des métadonnées sont ici triés ; les champs d'un
+    tenseur restent dans l'ordre fixe de la bibliothèque (`dtype`, `shape`, `data_offsets`).
+    Le format (https://github.com/huggingface/safetensors) : 8 octets (un entier, petit-boutiste)
+    qui donnent la taille N de l'en-tête, puis N octets de JSON en UTF-8, complétés à droite par des
+    espaces, puis les nombres. L'en-tête réécrit, sans espace, n'est jamais plus long que l'ancien ;
+    on le complète d'espaces jusqu'à N. La partie « nombres » et les `data_offsets` ne bougent pas.
+    """
+    with open(chemin, "r+b") as fichier:
+        debut = fichier.read(8)
+        if len(debut) < 8:
+            raise ValueError(f"{chemin} n'est pas un fichier safetensors : l'en-tête est tronqué.")
+        taille = struct.unpack("<Q", debut)[0]
+        brut = fichier.read(taille)
+        if len(brut) != taille:
+            raise ValueError(f"{chemin} n'est pas un fichier safetensors : en-tête de {taille} octets annoncé, il est tronqué.")
+        try:
+            en_tete = json.loads(brut)
+        except ValueError as erreur:
+            raise ValueError(f"{chemin} n'est pas un fichier safetensors : l'en-tête n'est pas du JSON ({erreur}).") from erreur
+        trie = json.dumps(_en_tete_dans_l_ordre(en_tete), separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        if len(trie) > taille:
+            raise ValueError(f"L'en-tête réécrit de {chemin} ({len(trie)} octets) est plus long que l'original ({taille}).")
+        fichier.seek(8)
+        fichier.write(trie.ljust(taille, b" "))
 
 
 def _meme_matrice(a: torch.Tensor, b: torch.Tensor) -> bool:
@@ -193,7 +243,12 @@ def exporter(sauvegarde: Path, dossier: Path, nom_des_poids: str = NOM_DES_POIDS
     informations = {"format": "pt"}  # « pt » : des tenseurs de PyTorch
     if pas is not None:  # une sauvegarde sans pas n'en écrit pas (jamais « None »)
         informations["pas"] = str(pas)
-    ecrire_atomique_vers(chemins[0], lambda chemin: save_file(poids, chemin, metadata=informations))
+
+    def ecrire_les_poids(chemin: Path) -> None:
+        save_file(poids, chemin, metadata=informations)
+        trier_l_en_tete(chemin)  # le même modèle donne le même fichier, à l'octet près
+
+    ecrire_atomique_vers(chemins[0], ecrire_les_poids)
     texte = json.dumps(dataclasses.asdict(config), ensure_ascii=False, indent=2) + "\n"
     ecrire_texte(chemins[1], texte)
     ecrire_atomique_vers(chemins[2], _copier_le_tokenizer)
