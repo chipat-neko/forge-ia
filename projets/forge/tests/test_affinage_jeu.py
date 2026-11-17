@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import torch
 
 from forge.affinage.empaquetage import Rangee, empaqueter
 from forge.affinage.jeu import (
@@ -77,7 +78,7 @@ def _jeu(tmp_path: Path, sorte: str = "sft", train: int = 12, val: int = 2) -> P
         rangees[:train],
         val_rangees[:val],
         sorte,
-        {"ecartes": ecartes, "sources": {"essai": {"exemples": len(exemples), "licence": "CC0", "lien": "https://x"}}},
+        {"ecartes": ecartes, "sources": {"essai": {"exemples": 36, "licence": "CC0", "lien": "x"}}},
         TOK,
     )
     return dossier
@@ -211,20 +212,48 @@ def test_dpo_exige_un_nombre_pair_de_rangees(tmp_path):
 
 def test_reference_lue_si_presente(tmp_path):
     dossier = _jeu(tmp_path)
-    valeurs = np.arange(12, dtype="<f4") / 4
+    valeurs = np.arange(12, dtype="<f8") / 4
     valeurs.tofile(dossier / "train" / "reference.bin")
     ids, _ = _rangees_du_disque(dossier)
     debuts = {int(ids[k, 0]): k for k in range(12)}
     lot = ChargeurAffinage(dossier, "train", taille_lot=12, graine=0).lot()
+    assert lot.reference.dtype == torch.float64
     for i in range(12):
         assert lot.reference[i].item() == valeurs[debuts[int(lot.ids[i, 0])]]
-    np.arange(3, dtype="<f4").tofile(dossier / "train" / "reference.bin")
+    np.arange(3, dtype="<f8").tofile(dossier / "train" / "reference.bin")
     with pytest.raises(ValueError, match="reference.bin"):
         ChargeurAffinage(dossier, "train", taille_lot=12, graine=0)
 
 
 def test_index_partage_le_bloc_tokenizer(tmp_path):
     index = lire_index(_jeu(tmp_path))
-    attendu = module_jetons._assembler_l_index({}, [], TOK, module_jetons.empreinte_du_tokenizer(TOK))["tokenizer"]
+    empreinte = module_jetons.empreinte_du_tokenizer(TOK)
+    attendu = module_jetons._assembler_l_index({}, [], TOK, empreinte)["tokenizer"]
     assert index["tokenizer"] == attendu
     assert set(attendu) == {"nom", "taille_vocabulaire", "empreinte"}
+
+
+def test_reecriture_efface_l_ancienne_reference(tmp_path):
+    dossier = _jeu(tmp_path)
+    for partie in ("train", "val"):
+        np.zeros(12 if partie == "train" else 2, dtype="<f8").tofile(dossier / partie / "reference.bin")
+        (dossier / partie / "reference.json").write_text("{}", encoding="utf-8")
+    dossier = _jeu(tmp_path)  # même jeu, réécrit
+    for partie in ("train", "val"):
+        assert not (dossier / partie / "reference.bin").exists()
+        assert not (dossier / partie / "reference.json").exists()
+    assert ChargeurAffinage(dossier, "train", taille_lot=4, graine=0).lot().reference is None
+
+
+def test_pas_de_cible_a_la_frontiere_de_deux_documents(tmp_path):
+    premier_appris = ExempleMasque(ids=[1, 2, 3], appris=[True, True, True])
+    rangees, _ = empaqueter([premier_appris, premier_appris], longueur=5, bourrage=B)
+    ecrire_jeu(tmp_path / "j", rangees, rangees, "sft", {}, TOK)
+    lot = ChargeurAffinage(tmp_path / "j", "train", taille_lot=1, graine=0).lot()
+    assert lot.cibles[0].tolist() == [2, 3, -100, 2, 3]  # le 1 qui ouvre le 2e document n'est pas visé
+
+
+def test_identifiant_trop_grand_refuse(tmp_path):
+    rangees, _ = empaqueter([ExempleMasque(ids=[70000], appris=[True])], longueur=3, bourrage=B)
+    with pytest.raises(ValueError, match="16 bits"):
+        ecrire_jeu(tmp_path / "j", rangees, [], "sft", {}, TOK)

@@ -4,7 +4,7 @@ Un jeu est un dossier, `sous_forge_donnees(nom, "affinage")` :
 
 - `train/` et `val/` : `ids.bin` (`uint16`), `appris.bin` (`uint8`, 0 ou 1) et `documents.bin`
   (`int16`, -1 pour le bourrage), rangée après rangée, de `longueur + 1` valeurs chacune ;
-  `reference.bin` (`float32`, une valeur par rangée) s'y ajoute quand le DPO a calculé la
+  `reference.bin` (`float64`, une valeur par rangée) s'y ajoute quand le DPO a calculé la
   référence ;
 - `index.json` : la version, la sorte (`sft` ou `dpo`), la longueur, les comptes, les sources
   (avec licence et lien) et le bloc `tokenizer`, le même que l'index des jetons de
@@ -40,7 +40,7 @@ IGNORE = -100  # la cible que la perte ne compte pas
 _DTYPE_IDS = np.dtype("<u2")
 _DTYPE_APPRIS = np.dtype("u1")
 _DTYPE_DOCUMENTS = np.dtype("<i2")
-_DTYPE_REFERENCE = np.dtype("<f4")
+_DTYPE_REFERENCE = np.dtype("<f8")
 
 
 # --- Écrire -------------------------------------------------------------------------
@@ -92,8 +92,23 @@ def ecrire_jeu(
                 "un nombre impair. Écris chaque paire en deux rangées à la suite."
             )
 
+    toutes = parties["train"] + parties["val"]
+    if any(
+        min(r.ids) < 0
+        or max(r.ids) > np.iinfo(_DTYPE_IDS).max
+        or max(r.documents) > np.iinfo(_DTYPE_DOCUMENTS).max
+        for r in toutes
+    ):
+        raise ValueError(
+            "Un identifiant de jeton ne tient pas dans 16 bits (ou une rangée a plus de 32 767 "
+            "documents). Vérifie le tokenizer et la longueur des rangées."
+        )
+
     dossier = Path(dossier)
     (dossier / ".complet").unlink(missing_ok=True)  # un jeu à moitié refait n'est pas complet
+    for partie in PARTIES:  # une référence calculée sur l'ancien jeu ne vaut plus rien
+        for ancien in ("reference.bin", "reference.json"):
+            (dossier / partie / ancien).unlink(missing_ok=True)
     for partie, rangees in parties.items():
         (dossier / partie).mkdir(parents=True, exist_ok=True)
         _ecrire(dossier / partie / "ids.bin", np.array([r.ids for r in rangees], dtype=_DTYPE_IDS).reshape(-1))
@@ -105,7 +120,6 @@ def ecrire_jeu(
             dossier / partie / "documents.bin",
             np.array([r.documents for r in rangees], dtype=_DTYPE_DOCUMENTS).reshape(-1),
         )
-    toutes = parties["train"] + parties["val"]
     index = {
         **infos,
         "version": VERSION_DU_JEU,
@@ -153,7 +167,7 @@ def lire_index(dossier: Path) -> dict:
 class LotAffinage:
     """Un lot : `ids`, `cibles` (-100 là où rien n'est appris) et `documents`, `[lot, longueur]`.
 
-    `reference` (`[lot]`, `float32`) n'existe que si le jeu a un `reference.bin` (DPO).
+    `reference` (`[lot]`, `float64`) n'existe que si le jeu a un `reference.bin` (DPO).
     """
 
     ids: torch.Tensor
@@ -221,7 +235,7 @@ class ChargeurAffinage:
         self._ordre = hasard.permutation(self.unites)
 
     def lot(self) -> LotAffinage:
-        """Le lot suivant, en `int64` ; `reference` en `float32` s'il y a un `reference.bin`."""
+        """Le lot suivant, en `int64` ; `reference` en `float64` s'il y a un `reference.bin`."""
         voulues = self.taille_lot // self._groupe
         unites: list[int] = []
         while len(unites) < voulues:
@@ -236,10 +250,14 @@ class ChargeurAffinage:
         ids = np.stack([self._ids[n] for n in numeros]).astype(np.int64)
         appris = np.stack([self._appris[n] for n in numeros]).astype(bool)
         documents = np.stack([self._documents[n] for n in numeros]).astype(np.int64)
-        cibles = np.where(appris[:, 1:], ids[:, 1:], IGNORE)
+        # Pas de cible à la frontière de deux documents : le premier jeton du suivant n'est
+        # pas la suite de celui qui précède.
+        suite = appris[:, 1:] & (documents[:, 1:] == documents[:, :-1])
+        cibles = np.where(suite, ids[:, 1:], IGNORE)
         reference = None
         if self._reference is not None:
-            reference = torch.from_numpy(np.array([self._reference[n, 0] for n in numeros], dtype=np.float32))
+            valeurs = [self._reference[n, 0] for n in numeros]
+            reference = torch.from_numpy(np.array(valeurs, dtype=np.float64))
         return LotAffinage(
             ids=torch.from_numpy(ids[:, :-1].copy()),
             cibles=torch.from_numpy(cibles.astype(np.int64)),
