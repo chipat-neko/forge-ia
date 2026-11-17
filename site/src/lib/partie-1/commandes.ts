@@ -100,13 +100,15 @@ export const REPRENDRE = 'uv run --extra gpu python -m forge entrainer --config 
 // projets/1.6-evaluation/evaluation_pas_a_pas/__main__.py ; ces commandes sont celles du README
 // du projet, et elles écrivent les relevés que lit le chapitre (FICHIERS_EVALUATION, FICHIERS_QCM
 // d'evaluation.ts) : commandes.test.ts le vérifie. Les deux premières visent le rapport et la
-// sauvegarde du dernier pas de la version d'une heure, sur le PC de l'auteur (chemins D:\).
+// sauvegarde du dernier pas de la version d'une heure, sur le PC de l'auteur (chemins D:\). Le
+// rapport est celui de la réévaluation du 17/11/2026, aux bits par octet exacts : son dossier
+// s'appelle meilleur-2026-11-17, mais il évalue bien etape-0006370.pt, le dernier pas.
 
 /** Entrer dans le projet du chapitre 1.6, depuis le dossier où le dépôt a été cloné. */
 export const ALLER_AU_PROJET_1_6 = 'cd forge-ia/projets/1.6-evaluation';
 /** Le relevé du rapport d'évaluation de la version d'une heure : la commande qui a écrit mesures/evaluation-mini.json. */
 export const EVALUATION_RESUMER =
-  'uv run --extra cpu python -m evaluation_pas_a_pas resumer --rapport D:\\forge-ia-donnees\\entrainements\\ton-ia-mini\\evaluation\\etape-0006370\\rapport.json --json mesures/evaluation-mini.json';
+  'uv run --extra cpu python -m evaluation_pas_a_pas resumer --rapport D:\\forge-ia-donnees\\entrainements\\ton-ia-mini\\evaluation\\meilleur-2026-11-17\\rapport.json --json mesures/evaluation-mini.json';
 /** Six questions de MMMLU notées par la version d'une heure, sur le processeur : la commande qui a écrit mesures/qcm-mini.json. */
 export const EVALUATION_QCM =
   'uv run --extra cpu python -m evaluation_pas_a_pas qcm-exemples --sauvegarde D:\\forge-ia-donnees\\entrainements\\ton-ia-mini\\sauvegardes\\etape-0006370.pt --appareil cpu --json mesures/qcm-mini.json';
@@ -122,11 +124,11 @@ export const EVALUATION_TESTS = 'uv run --extra cpu pytest -q';
 // vérifie. Le dossier D:\forge-ia-donnees\cache\ton-ia-1.5 est celui du PC de l'auteur. Le chapitre 1.6
 // les montre à son étape 10 ; les chapitres 1.1 et 1.4 y renvoient.
 
-/** Télécharger tous les fichiers de la version publiée (dont les poids, leur configuration, le tokenizer et le rapport d'évaluation) dans un dossier. */
+/** Télécharger tous les fichiers de la version publiée (dont les poids, leur configuration, le tokenizer et les rapports d'évaluation) dans un dossier. */
 export const TELECHARGER_TON_IA = 'gh release download ton-ia-1.5 --dir D:\\forge-ia-donnees\\cache\\ton-ia-1.5';
-/** Le relevé du rapport d'évaluation publié avec les poids, sous le nom de la version : mesures/evaluation-1.5.json. */
+/** Le relevé du rapport d'évaluation corrigé du 17/11/2026 (bits par octet exacts), joint à la version, sous le nom de la version : mesures/evaluation-1.5.json. */
 export const EVALUATION_RESUMER_TON_IA =
-  'uv run --extra cpu python -m evaluation_pas_a_pas resumer --rapport D:\\forge-ia-donnees\\cache\\ton-ia-1.5\\rapport.json --nom ton-ia-1.5 --json mesures/evaluation-1.5.json';
+  'uv run --extra cpu python -m evaluation_pas_a_pas resumer --rapport D:\\forge-ia-donnees\\cache\\ton-ia-1.5\\rapport-2026-11-17.json --nom ton-ia-1.5 --json mesures/evaluation-1.5.json';
 /** Les six mêmes questions de MMMLU, notées par ton IA sur le processeur : mesures/qcm-1.5.json. */
 export const EVALUATION_QCM_TON_IA =
   'uv run --extra cpu python -m evaluation_pas_a_pas qcm-exemples --modele D:\\forge-ia-donnees\\cache\\ton-ia-1.5 --appareil cpu --json mesures/qcm-1.5.json';

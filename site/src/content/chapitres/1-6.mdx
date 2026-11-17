@@ -605,13 +605,13 @@ Ils comparent chaque mesure refaite à celle de forge, sur le processeur. Si tu 
 
 <BlocCommande commandes={[EVALUATION_RESUMER, EVALUATION_QCM]} ou="un terminal, dans le dossier du projet" />
 
-Les chemins en `D:\` sont ceux du PC de l'auteur : remplace-les par ceux de ton entraînement. La seconde commande lit les questions de MMMLU sur Hugging Face : il lui faut le réseau. Le projet utilise PyTorch, comme ceux des chapitres 1.4 et 1.5 : `--extra cpu` prend sa version pour le processeur, qui suffit ici.
+Les chemins en `D:\` sont ceux du PC de l'auteur : remplace-les par ceux de ton entraînement. Le rapport relevé est celui de la réévaluation du 17/11/2026, aux bits par octet exacts : malgré le nom de son dossier, `meilleur-2026-11-17`, elle porte sur la sauvegarde du dernier pas. La seconde commande lit les questions de MMMLU sur Hugging Face : il lui faut le réseau. Le projet utilise PyTorch, comme ceux des chapitres 1.4 et 1.5 : `--extra cpu` prend sa version pour le processeur, qui suffit ici.
 
 Ton IA, la vraie, se relève de la même façon, à partir de sa version publiée. La première commande la télécharge avec `gh`, l'outil de GitHub pour le terminal ; sans lui, prends ses fichiers à la main sur <a href={VERSION_PUBLIEE.adresse}>la page de la version</a>. Les suivantes refont ses relevés : son rapport d'évaluation et ses six questions de l'étape 8, puis ses cartes d'attention, montrées au {LIENS.l14 ? <a href={LIENS.l14}>chapitre 1.4</a> : 'chapitre 1.4'}, et ses jetons suivants, au {LIENS.l11 ? <a href={LIENS.l11}>chapitre 1.1</a> : 'chapitre 1.1'} :
 
 <BlocCommande commandes={[TELECHARGER_TON_IA, EVALUATION_RESUMER_TON_IA, EVALUATION_QCM_TON_IA, EVALUATION_CARTES_TON_IA, EVALUATION_SUIVANTS_TON_IA]} ou="un terminal, dans le dossier du projet" />
 
-Ici aussi, le dossier en `D:\` est celui du PC de l'auteur : remplace-le par celui où tu as téléchargé ton IA. `--nom ton-ia-1.5` donne au relevé le nom de la version publiée, et `cartes --choisir` choisit lui-même le bloc et les deux têtes que montre le chapitre 1.4. Comme pour la version d'une heure, `qcm-exemples` lit les questions de MMMLU sur Hugging Face.
+Ici aussi, le dossier en `D:\` est celui du PC de l'auteur : remplace-le par celui où tu as téléchargé ton IA. `resumer` lit `rapport-2026-11-17.json`, le rapport corrigé joint à la version : le `rapport.json` d'origine garde l'ancien calcul des bits par octet. `--nom ton-ia-1.5` donne au relevé le nom de la version publiée, et `cartes --choisir` choisit lui-même le bloc et les deux têtes que montre le chapitre 1.4. Comme pour la version d'une heure, `qcm-exemples` lit les questions de MMMLU sur Hugging Face.
 
 Le projet complet, avec un notebook qui refait l'évaluation pas à pas, est sur GitHub :
 

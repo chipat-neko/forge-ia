@@ -9,7 +9,15 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CLONER_DEPOT, METTRE_A_JOUR_DEPOT } from '../partie-0/commandes';
 import * as commandes from './commandes';
-import { FICHIERS_EVALUATION, FICHIERS_QCM, FICHIERS_SORTIES_TON_IA, lireCartes, lireSuivants, VERSION_PUBLIEE } from './evaluation';
+import {
+  FICHIERS_EVALUATION,
+  FICHIERS_QCM,
+  FICHIERS_SORTIES_TON_IA,
+  lireCartes,
+  lireEvaluation,
+  lireSuivants,
+  VERSION_PUBLIEE,
+} from './evaluation';
 import { FICHIERS_ENTRAINEMENT } from './journal';
 import { MESURES_PARTIE_1 } from './mesures';
 import { GRAINE_INITIALE, LONGUEUR_SUITE, N_INITIAL, TEMPERATURE_INITIALE } from './paris-1-1';
@@ -331,7 +339,7 @@ describe('commandes du chapitre 1.6', () => {
   it('les commandes, à l’identique', () => {
     expect(commandes.ALLER_AU_PROJET_1_6).toBe('cd forge-ia/projets/1.6-evaluation');
     expect(commandes.EVALUATION_RESUMER).toBe(
-      'uv run --extra cpu python -m evaluation_pas_a_pas resumer --rapport D:\\forge-ia-donnees\\entrainements\\ton-ia-mini\\evaluation\\etape-0006370\\rapport.json --json mesures/evaluation-mini.json',
+      'uv run --extra cpu python -m evaluation_pas_a_pas resumer --rapport D:\\forge-ia-donnees\\entrainements\\ton-ia-mini\\evaluation\\meilleur-2026-11-17\\rapport.json --json mesures/evaluation-mini.json',
     );
     expect(commandes.EVALUATION_QCM).toBe(
       'uv run --extra cpu python -m evaluation_pas_a_pas qcm-exemples --sauvegarde D:\\forge-ia-donnees\\entrainements\\ton-ia-mini\\sauvegardes\\etape-0006370.pt --appareil cpu --json mesures/qcm-mini.json',
@@ -363,9 +371,16 @@ describe('commandes du chapitre 1.6', () => {
     const projet = 'projets/1.6-evaluation/';
     expect(`${projet}${/--json (\S+)/.exec(commandes.EVALUATION_RESUMER)![1]}`).toBe(FICHIERS_EVALUATION['ton-ia-mini']);
     expect(`${projet}${/--json (\S+)/.exec(commandes.EVALUATION_QCM)![1]}`).toBe(FICHIERS_QCM['ton-ia-mini']);
-    // Le rapport et la sauvegarde sont ceux du dernier pas de la version d'une heure.
-    expect(commandes.EVALUATION_RESUMER).toContain('entrainements\\ton-ia-mini\\evaluation\\etape-0006370\\rapport.json');
+    // Le rapport est celui de la réévaluation du 17/11/2026 (bits par octet exacts) : malgré le nom de son
+    // dossier, elle porte sur la sauvegarde du dernier pas, celle que note qcm-exemples.
+    expect(commandes.EVALUATION_RESUMER).toContain('entrainements\\ton-ia-mini\\evaluation\\meilleur-2026-11-17\\rapport.json');
     expect(commandes.EVALUATION_QCM).toContain('entrainements\\ton-ia-mini\\sauvegardes\\etape-0006370.pt');
+  });
+
+  it('resumer relit le rapport du relevé, daté du même jour', () => {
+    // resumer recopie la date du rapport dans releve_le : le chemin du rapport porte cette date.
+    const rapport = /--rapport (\S+)/.exec(commandes.EVALUATION_RESUMER)![1];
+    expect(rapport).toContain(lireEvaluation('ton-ia-mini', RACINE)!.releve_le);
   });
 
   it('ce sont les commandes du README du projet', () => {
@@ -396,7 +411,13 @@ describe('commandes de ton IA, la vraie', () => {
     expect(commandes.TELECHARGER_TON_IA).toBe(`gh release download ${VERSION_PUBLIEE.nom} --dir ${DOSSIER_TON_IA}`);
     expect(VERSION_PUBLIEE.adresse.endsWith(`/releases/tag/${VERSION_PUBLIEE.nom}`)).toBe(true);
     for (const c of DU_MODELE) expect(option(c, 'modele'), c).toBe(DOSSIER_TON_IA);
-    expect(option(commandes.EVALUATION_RESUMER_TON_IA, 'rapport')).toBe(`${DOSSIER_TON_IA}\\rapport.json`);
+    // Le rapport corrigé du 17/11/2026, joint à la version publiée, et non son rapport.json d'origine.
+    expect(option(commandes.EVALUATION_RESUMER_TON_IA, 'rapport')).toBe(`${DOSSIER_TON_IA}\\rapport-2026-11-17.json`);
+  });
+
+  it('resumer relit le rapport du relevé, daté du même jour', () => {
+    // resumer recopie la date du rapport dans releve_le : le nom du rapport porte cette date.
+    expect(option(commandes.EVALUATION_RESUMER_TON_IA, 'rapport')).toContain(lireEvaluation('ton-ia-1.5', RACINE)!.releve_le);
   });
 
   it('resumer, qcm-exemples, cartes et suivants sont des commandes du script, avec leurs options', () => {

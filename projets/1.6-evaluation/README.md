@@ -81,7 +81,7 @@ cd forge-ia/projets/1.6-evaluation
 Si tu as déjà récupéré le dépôt, mets-le à jour (`git -C forge-ia pull`) avant de revenir dans ce dossier.
 
 ```bash
-uv run --extra cpu python -m evaluation_pas_a_pas resumer --rapport D:\forge-ia-donnees\entrainements\ton-ia-mini\evaluation\etape-0006370\rapport.json --json mesures/evaluation-mini.json
+uv run --extra cpu python -m evaluation_pas_a_pas resumer --rapport D:\forge-ia-donnees\entrainements\ton-ia-mini\evaluation\meilleur-2026-11-17\rapport.json --json mesures/evaluation-mini.json
 uv run --extra cpu python -m evaluation_pas_a_pas qcm-exemples --sauvegarde D:\forge-ia-donnees\entrainements\ton-ia-mini\sauvegardes\etape-0006370.pt --appareil cpu --json mesures/qcm-mini.json
 uv run --extra cpu python -m evaluation_pas_a_pas cartes --sauvegarde <etape.pt> --phrase "Le forgeron dit qu'il frappe le fer" --couche 3 --tete 0 --appareil cpu --json cartes.json
 uv run --extra cpu python -m evaluation_pas_a_pas suivants --sauvegarde <etape.pt> --phrase "Il était une fois" --appareil cpu --json suivants.json
@@ -92,7 +92,7 @@ fichiers, téléchargés une fois (avec l'outil `gh` de GitHub, ou à la main de
 
 ```bash
 gh release download ton-ia-1.5 --dir D:\forge-ia-donnees\cache\ton-ia-1.5
-uv run --extra cpu python -m evaluation_pas_a_pas resumer --rapport D:\forge-ia-donnees\cache\ton-ia-1.5\rapport.json --nom ton-ia-1.5 --json mesures/evaluation-1.5.json
+uv run --extra cpu python -m evaluation_pas_a_pas resumer --rapport D:\forge-ia-donnees\cache\ton-ia-1.5\rapport-2026-11-17.json --nom ton-ia-1.5 --json mesures/evaluation-1.5.json
 uv run --extra cpu python -m evaluation_pas_a_pas qcm-exemples --modele D:\forge-ia-donnees\cache\ton-ia-1.5 --appareil cpu --json mesures/qcm-1.5.json
 uv run --extra cpu python -m evaluation_pas_a_pas cartes --modele D:\forge-ia-donnees\cache\ton-ia-1.5 --phrase "Le forgeron chauffe le fer puis il le tord." --choisir --appareil cpu --json sorties/cartes-ton-ia.json
 uv run --extra cpu python -m evaluation_pas_a_pas suivants --modele D:\forge-ia-donnees\cache\ton-ia-1.5 --phrase "Le forgeron frappe le" --appareil cpu --json sorties/ton-ia-suivants.json
@@ -115,9 +115,14 @@ uv run --extra cpu python -m evaluation_pas_a_pas suivants --modele D:\forge-ia-
   tokenizer que le tokenizer figé de « ton IA » (`forge/ressources/tokenizer-ton-ia-v1.json`).
 - `--modele` est le dossier des fichiers publiés de « ton IA » (`config.json`, `ton-ia-1.5.safetensors`,
   `tokenizer-ton-ia-v1.json`), lus par `charger_ton_ia` (voir plus bas) ; il prend la place de `--sauvegarde`,
-  et son tokenizer celle de `--tokenizer`. Le relevé porte alors le nom `ton-ia-1.5`. `resumer` prend le
-  `rapport.json` publié avec les poids, et `--nom ton-ia-1.5` : sans `--nom`, le relevé prendrait le nom du
-  dossier de l'entraînement (`ton-ia`).
+  et son tokenizer celle de `--tokenizer`. Le relevé porte alors le nom `ton-ia-1.5`. `resumer` prend
+  `rapport-2026-11-17.json`, le rapport corrigé joint à la version (bits par octet exacts : 0,803 ; le
+  `rapport.json` publié avec les poids garde l'ancien calcul, 0,802), et `--nom ton-ia-1.5` : sans `--nom`,
+  le relevé prendrait le nom du dossier de l'entraînement (`ton-ia`).
+- Le rapport de « mini » est celui de sa réévaluation du 17/11/2026, aux bits par octet exacts, rangée dans
+  `evaluation\meilleur-2026-11-17\`. Malgré ce nom, elle porte sur `etape-0006370.pt`, la sauvegarde du
+  dernier pas (celle que note `qcm-exemples`) ; `evaluation\etape-0006370\rapport.json` garde l'ancien
+  calcul.
 - `cartes --choisir` choisit lui-même la couche et deux têtes à montrer (voir « Les cartes d'attention du
   site ») ; il ne prend alors ni `--couche` ni `--tete`.
 - Sans `--appareil`, le projet prend la carte si PyTorch la voit, sinon le processeur (ou ce que dit la
@@ -173,9 +178,9 @@ qui manque arrête la construction.
 
 | Fichier | D'où il vient | Date du champ `releve_le` |
 | --- | --- | --- |
-| `mesures/evaluation-mini.json` | le rapport d'évaluation de la version d'une heure de « ton IA » (le modèle « mini », pas 6 370), écrit par `resumer` | 17/11/2026, la date de la réévaluation avec les bits par octet exacts (le rapport d'origine date du 03/11/2026) ; le fichier est entré dans le dépôt le 10/11/2026 |
+| `mesures/evaluation-mini.json` | le rapport d'évaluation de la version d'une heure de « ton IA » (le modèle « mini », pas 6 370, `evaluation\meilleur-2026-11-17\rapport.json`, qui évalue `etape-0006370.pt`), écrit par `resumer` | 17/11/2026, la date de la réévaluation avec les bits par octet exacts (le rapport d'origine date du 03/11/2026) ; le fichier est entré dans le dépôt le 10/11/2026 |
 | `mesures/qcm-mini.json` | six questions de MMMLU en français, notées par « mini » sur le processeur, écrit par `qcm-exemples` | 10/11/2026 |
-| `mesures/evaluation-1.5.json` | le rapport d'évaluation de la version publiée de « ton IA » (`ton-ia-1.5`, pas 16 540, le `rapport.json` publié avec ses poids), écrit par `resumer --nom ton-ia-1.5` | 17/11/2026, la date de la réévaluation avec les bits par octet exacts (le rapport d'origine date du 14/11/2026) ; le fichier est entré dans le dépôt le 15/11/2026 |
+| `mesures/evaluation-1.5.json` | le rapport d'évaluation de la version publiée de « ton IA » (`ton-ia-1.5`, pas 16 540, `rapport-2026-11-17.json`, le rapport corrigé joint à ses poids), écrit par `resumer --nom ton-ia-1.5` | 17/11/2026, la date de la réévaluation avec les bits par octet exacts (le rapport d'origine date du 14/11/2026) ; le fichier est entré dans le dépôt le 15/11/2026 |
 | `mesures/qcm-1.5.json` | les six mêmes questions de MMMLU, notées par `ton-ia-1.5` sur le processeur, écrit par `qcm-exemples --modele` | 15/11/2026 |
 | `sorties/cartes-ton-ia.json` | les cartes d'attention de `ton-ia-1.5` pour la phrase « Le forgeron chauffe le fer puis il le tord. », sur le processeur : la couche et les deux têtes choisies par `cartes --choisir`, et les chiffres du choix | 15/11/2026 |
 | `sorties/ton-ia-suivants.json` | les dix jetons que `ton-ia-1.5` juge les plus probables après « Le forgeron frappe le », sur le processeur, écrit par `suivants --modele` | 15/11/2026 |
