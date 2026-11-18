@@ -49,10 +49,11 @@ micro_lot = 1
 
 # Taux d'apprentissage : montée de 0 à taux_max pendant les 50 premiers pas, puis descente en
 # cosinus jusqu'à taux_max ÷ 10 au dernier pas. Aucune source pour un modèle de cette taille
-# entraîné de zéro : choisi par le balayage de 1e-5, 3e-5 et 1e-4 (300 pas chacun). 1e-4 finit avec
-# la plus basse perte de validation (1,279, contre 1,398 et 1,526). C'est le plus grand taux essayé :
-# un taux plus grand n'a pas été mesuré.
-taux_max = 1e-4
+# entraîné de zéro : choisi par un balayage de 300 pas par taux. 1e-5, 3e-5 et 1e-4 d'abord, puis
+# 3e-4, car 1e-4 était au bord. 3e-4 finit avec la plus basse perte de validation (1,214, contre
+# 1,279, 1,398 et 1,526). C'est encore le plus grand taux essayé : un taux plus grand n'a pas été
+# mesuré.
+taux_max = 3e-4
 echauffement = 50
 
 # Réglages d'AdamW et écrêtage des gradients : ceux de principal.toml, sauf la décroissance des

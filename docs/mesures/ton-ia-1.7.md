@@ -19,8 +19,8 @@ courte, l'évaluation et les échantillons viendront ensuite.
 - **La carte, pas le processeur :** 13 444 jetons par seconde sur la carte (micro-lot 1, 12,8 Go au
   plus), 196,6 sur le processeur avec ses 16 fils : 68 fois moins.
 - **Le masque par document coûte 34 %** d'un pas complet : 4,885 s contre 3,651 s sans masque.
-- **Le taux d'apprentissage : 1e-4.** Trois essais de 300 pas : la perte de validation finit à 1,279
-  avec 1e-4, 1,398 avec 3e-5 et 1,526 avec 1e-5. C'est le plus grand taux essayé.
+- **Le taux d'apprentissage : 3e-4.** Quatre essais de 300 pas : la perte de validation finit à 1,214
+  avec 3e-4, 1,279 avec 1e-4, 1,398 avec 3e-5 et 1,526 avec 1e-5. C'est le plus grand taux essayé.
 - **Les deux entraînements qui suivent :** le complet, 3 338 pas (deux époques), environ 4 h 45 min ;
   le court, 739 pas, environ 1 h 03 min.
 
@@ -151,11 +151,11 @@ masque : sans lui, une conversation lirait la fin de la précédente.
 ## 3. Le balayage du taux d'apprentissage
 
 Aucune source ne donne le taux d'un SFT pour un modèle de 433,6 millions de paramètres entraîné de zéro.
-Trois essais de 300 pas (`jetons_total = 19_660_800`, 19,7 millions de positions), avec les taux
-maximaux 1e-5, 3e-5 et 1e-4, chacun dans sa sortie (`entrainements/sft-1.7-balayage-<taux>`). Tout le
-reste est `configs/sft-1.7.toml` : micro-lot 1, échauffement de 50 pas, puis descente en cosinus jusqu'au
-dixième du taux au pas 300. La perte de validation est mesurée aux pas 100, 200 et 300, sur les mêmes
-64 rangées de validation.
+Des essais de 300 pas (`jetons_total = 19_660_800`, 19,7 millions de positions), chacun dans sa
+sortie (`entrainements/sft-1.7-balayage-<taux>`) : 1e-5, 3e-5 et 1e-4 d'abord ; puis 3e-4, parce que
+1e-4 finissait devant, au bord du balayage. Tout le reste est `configs/sft-1.7.toml` : micro-lot 1,
+échauffement de 50 pas, puis descente en cosinus jusqu'au dixième du taux au pas 300. La perte de
+validation est mesurée aux pas 100, 200 et 300, sur les mêmes 64 rangées de validation.
 
 **La règle**, fixée avant les essais : garder le taux dont la dernière perte de validation est la plus
 basse ; en cas d'égalité à 0,005 près, le plus petit taux.
@@ -164,36 +164,38 @@ basse ; en cas d'égalité à 0,005 près, le plus petit taux.
 | --- | ---: | ---: | ---: | ---: |
 | 1e-5 | 1,643 | 1,547 | 1,526 | 25 min 56 s |
 | 3e-5 | 1,515 | 1,421 | 1,398 | 25 min 47 s |
-| 1e-4 | 1,422 | 1,317 | **1,279** | 25 min 49 s |
+| 1e-4 | 1,422 | 1,317 | 1,279 | 25 min 49 s |
+| 3e-4 | 1,418 | 1,283 | **1,214** | 25 min 54 s |
 
 La perte d'entraînement, en moyenne par tranche de 25 pas :
 
-| Pas | 1e-5 | 3e-5 | 1e-4 |
-| --- | ---: | ---: | ---: |
-| 1 à 25 | 2,203 | 2,102 | 1,964 |
-| 26 à 50 | 1,935 | 1,755 | 1,613 |
-| 51 à 75 | 1,750 | 1,607 | 1,505 |
-| 76 à 100 | 1,673 | 1,545 | 1,454 |
-| 101 à 125 | 1,604 | 1,482 | 1,393 |
-| 126 à 150 | 1,585 | 1,466 | 1,377 |
-| 151 à 175 | 1,534 | 1,415 | 1,322 |
-| 176 à 200 | 1,559 | 1,438 | 1,342 |
-| 201 à 225 | 1,535 | 1,414 | 1,313 |
-| 226 à 250 | 1,504 | 1,382 | 1,277 |
-| 251 à 275 | 1,516 | 1,391 | 1,281 |
-| 276 à 300 | 1,526 | 1,404 | 1,294 |
+| Pas | 1e-5 | 3e-5 | 1e-4 | 3e-4 |
+| --- | ---: | ---: | ---: | ---: |
+| 1 à 25 | 2,203 | 2,102 | 1,964 | 1,851 |
+| 26 à 50 | 1,935 | 1,755 | 1,613 | 1,552 |
+| 51 à 75 | 1,750 | 1,607 | 1,505 | 1,491 |
+| 76 à 100 | 1,673 | 1,545 | 1,454 | 1,453 |
+| 101 à 125 | 1,604 | 1,482 | 1,393 | 1,391 |
+| 126 à 150 | 1,585 | 1,466 | 1,377 | 1,374 |
+| 151 à 175 | 1,534 | 1,415 | 1,322 | 1,308 |
+| 176 à 200 | 1,559 | 1,438 | 1,342 | 1,319 |
+| 201 à 225 | 1,535 | 1,414 | 1,313 | 1,278 |
+| 226 à 250 | 1,504 | 1,382 | 1,277 | 1,233 |
+| 251 à 275 | 1,516 | 1,391 | 1,281 | 1,230 |
+| 276 à 300 | 1,526 | 1,404 | 1,294 | 1,238 |
 
-**Le choix : 1e-4.** Sa dernière perte de validation (1,279) est la plus basse, 0,118 sous celle de
-3e-5 : il n'y a pas d'égalité à 0,005 près. Les trois courbes descendent sans saut ni divergence, et à
-chaque mesure le plus grand taux est devant. Deux réserves :
+**Le choix : 3e-4.** Sa dernière perte de validation (1,214) est la plus basse, 0,066 sous celle
+de 1e-4 : il n'y a pas d'égalité à 0,005 près. Les quatre courbes descendent sans saut ni divergence, et
+à chaque mesure le plus grand taux est devant ; au pas 100, 3e-4 n'a que 0,004 d'avance sur 1e-4. Deux
+réserves :
 
-- 1e-4 est le bord haut du balayage. Un taux plus grand pourrait aller plus bas, ou diverger sur 3 338
-  pas : il n'a pas été essayé.
+- 3e-4 est à nouveau le bord haut du balayage. Un taux plus grand pourrait aller plus bas, ou diverger
+  sur 3 338 pas : il n'a pas été essayé.
 - Un taux plus grand éloigne aussi plus vite ton IA de 1.5. La perte de validation ne mesure que les
   conversations ; ce que 1.7 oublie de 1.5 sera mesuré à l'évaluation (`oubli`, `forge evaluer-etape`).
 
-Les sauvegardes de 1e-5 et de 3e-5 sont effacées (leurs journaux restent). Celle de 1e-4 reste dans
-`entrainements/sft-1.7-balayage-1e-4`.
+Les sauvegardes de 1e-5, 3e-5 et 1e-4 sont effacées (leurs journaux restent). Celle de 3e-4 reste dans
+`entrainements/sft-1.7-balayage-3e-4`.
 
 **Les durées.** Chaque essai a fait ses 300 pas en 1 486 à 1 504 s de calcul : 4,88 s par pas en
 médiane, plus environ 10 s à chaque validation, écriture de `meilleur.pt` (1,62 Gio) comprise. Avec le
