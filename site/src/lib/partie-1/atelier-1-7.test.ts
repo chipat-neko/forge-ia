@@ -81,21 +81,28 @@ describe('les conversations de l’atelier', () => {
     }
   });
 
-  it('le compte et le défi : plus de la moitié des jetons appris', () => {
+  it('le compte et le défi : avec un message système et un deuxième tour, plus de la moitié des jetons appris', () => {
     expect(texteDuCompte(30, 9)).toBe('30 jetons, dont 9 appris.');
-    const bonjour = etatDeLAtelier(CONVERSATIONS, { nom: 'sans-systeme', systeme: false, deuxieme: false });
-    const capitale = etatDeLAtelier(CONVERSATIONS, reglageDeReference(CONVERSATIONS, 'avec-systeme'));
-    expect(defiReussi(bonjour)).toBe(2 * bonjour.appris > bonjour.jetons);
-    expect(defiReussi(capitale)).toBe(false);
-    expect(texteDuDefi(capitale)).toMatch(new RegExp(`pas encore la moitié`));
-    // Au moins un réglage réussit le défi : il est faisable.
-    const reussis = NOMS_DE_L_ATELIER.flatMap((nom) =>
-      [false, true].flatMap((systeme) => [false, true].filter((deuxieme) => defiReussi(etatDeLAtelier(CONVERSATIONS, { nom, systeme, deuxieme })))),
-    );
-    expect(reussis.length).toBeGreaterThan(0);
-    const vide = etatDeLAtelier(CONVERSATIONS, reglageDeReference(CONVERSATIONS, 'reponse-vide'));
-    expect(defiReussi(vide)).toBe(false);
-    expect(texteDuDefi(vide)).toBe(`Cette conversation n’a aucun jeton${FINE}: forge la refuse.`);
+    // Sans les deux ajouts, le défi n'est pas réussi, même au-delà de la moitié : il les demande.
+    const bonjourSeul = { nom: 'sans-systeme', systeme: false, deuxieme: false } as const;
+    const bonjour = etatDeLAtelier(CONVERSATIONS, bonjourSeul);
+    expect(2 * bonjour.appris).toBeGreaterThan(bonjour.jetons);
+    expect(defiReussi(bonjour, bonjourSeul)).toBe(false);
+    expect(texteDuDefi(bonjour, bonjourSeul)).toMatch(/le défi veut aussi les deux ajouts/);
+    // Avec les deux ajouts, une seule conversation y arrive : celle où l'assistant écrit une pensée.
+    const reussis = NOMS_DE_L_ATELIER.filter((nom) => {
+      const reglage = { nom, systeme: true, deuxieme: true };
+      return defiReussi(etatDeLAtelier(CONVERSATIONS, reglage), reglage);
+    });
+    expect(reussis).toStrictEqual(['pensee']);
+    const capitale = { nom: 'avec-systeme', systeme: true, deuxieme: true } as const;
+    expect(texteDuDefi(etatDeLAtelier(CONVERSATIONS, capitale), capitale)).toMatch(/pas encore la moitié/);
+    const pensee = { nom: 'pensee', systeme: true, deuxieme: true } as const;
+    expect(texteDuDefi(etatDeLAtelier(CONVERSATIONS, pensee), pensee)).toMatch(/^Défi réussi/);
+    const videReglage = reglageDeReference(CONVERSATIONS, 'reponse-vide');
+    const vide = etatDeLAtelier(CONVERSATIONS, videReglage);
+    expect(defiReussi(vide, videReglage)).toBe(false);
+    expect(texteDuDefi(vide, videReglage)).toBe(`Cette conversation n’a aucun jeton${FINE}: forge la refuse.`);
   });
 
   it('les espaces d’un jeton se voient', () => {

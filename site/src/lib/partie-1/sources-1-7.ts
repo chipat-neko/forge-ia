@@ -44,7 +44,8 @@
 //   lues dans une copie (Wind River), d'où l'étiquette tiers.
 //
 // La fiche du plan écrivait « environ 13 000 invites de SFT » pour InstructGPT : l'article dit « about 13k ».
-// Le chapitre dit « environ 13 000 ». Les 192 heures de cartes de Tülu 3 sont dérivées : 32 cartes × 6 heures.
+// Le chapitre dit « environ 13 000 ». Deux chiffres sont dérivés, calculés ici sur des chiffres publiés : la part de
+// l'affinage d'InstructGPT dans le calcul de GPT-3 (4,9 ÷ 3 640), et les 192 heures de carte de Tülu 3 (32 cartes × 6 heures).
 //
 // Ce module n'importe que des types : l'atelier, dans le navigateur, et les parcours Playwright peuvent l'importer.
 
@@ -123,6 +124,8 @@ export const INSTRUCTGPT = Object.freeze({
   petaflopsSft: chiffre(4.9, ARTICLE_INSTRUCTGPT, 'section 5.1 (« our 175B SFT model requires 4.9 petaflops/s-days »)'),
   /** Celui du pré-entraînement de GPT-3. */
   petaflopsGpt3: chiffre(3_640, ARTICLE_INSTRUCTGPT, 'section 5.1 (« compared to 3,640 petaflops/s-days for GPT-3 »)'),
+  /** Dérivé : la part de l'affinage dans le calcul du pré-entraînement de GPT-3, 4,9 pétaflops/s-jours sur 3 640. */
+  partDuPreEntrainement: chiffre(4.9 / 3_640, ARTICLE_INSTRUCTGPT, 'section 5.1 : 4,9 ÷ 3 640 pétaflops/s-jours, calcul fait ici', 'dérivé'),
   /** Les époques de l'affinage. */
   epoques: chiffre(16, ARTICLE_INSTRUCTGPT, 'section 3.5, « Supervised fine-tuning (SFT) » (« We trained for 16 epochs »)'),
 });

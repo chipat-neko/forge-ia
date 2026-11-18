@@ -329,17 +329,31 @@ export function lireReglagesDeLEssai(racineDepot: string | URL = '..'): Reglages
   return { tauxAffinage: lire('TAUX_D_AFFINAGE'), tauxPreEntrainement: lire('TAUX_DU_PRE_ENTRAINEMENT'), pasPreEntrainement: lire('PAS_DU_PRE_ENTRAINEMENT') };
 }
 
-/**
- * Ce que le chapitre dit du code de forge, relu dans ce code : le pré-entraînement sépare ses textes par
- * <|fin_texte|> (forge/donnees/jetons.py), et le plongement d'entrée et la projection de sortie sont la même
- * matrice, les « poids liés » (forge/modele/transformer.py).
- */
-export function faitsDeForge(racineDepot: string | URL = '..'): { finDeTexteEntreLesTextes: boolean; poidsLies: boolean } {
+/** Ce que le chapitre dit du code et des réglages de forge, relu dans les fichiers. */
+export interface FaitsDeForge {
+  /** Le pré-entraînement sépare ses textes par <|fin_texte|> (forge/donnees/jetons.py). */
+  finDeTexteEntreLesTextes: boolean;
+  /** Le plongement d'entrée et la projection de sortie sont la même matrice, les « poids liés » (forge/modele/transformer.py). */
+  poidsLies: boolean;
+  /** Sans masque, l'attention dit seulement « causal » à PyTorch ; avec le masque par document, elle lui passe un masque complet. */
+  attentionCausaleOuMasquee: boolean;
+  /** La configuration de l'affinage dit qu'aucune source ne donne son taux, et qu'il a été choisi par un balayage (configs/sft-1.7.toml). */
+  tauxSansSourceParBalayage: boolean;
+}
+
+/** Les faits de forge que le chapitre cite, relus dans le code et les réglages de forge. */
+export function faitsDeForge(racineDepot: string | URL = '..'): FaitsDeForge {
   const jetons = lireTexte(racineDepot, 'projets/forge/forge/donnees/jetons.py');
   const transformer = lireTexte(racineDepot, 'projets/forge/forge/modele/transformer.py');
+  const reglages = lireTexte(racineDepot, FICHIERS_REGLAGES_SFT['sft-1.7']);
   return {
     finDeTexteEntreLesTextes: jetons.includes('JETON_FIN_DE_TEXTE = "<|fin_texte|>"'),
     poidsLies: transformer.includes('sont la MÊME matrice (« poids liés »)'),
+    attentionCausaleOuMasquee:
+      transformer.includes('F.scaled_dot_product_attention(q, k, v, is_causal=True)') &&
+      transformer.includes('F.scaled_dot_product_attention(q, k, v, attn_mask=masque)'),
+    tauxSansSourceParBalayage:
+      reglages.includes('Aucune source pour un modèle de cette taille') && reglages.includes('entraîné de zéro : choisi par un balayage'),
   };
 }
 
@@ -359,7 +373,7 @@ export const QUESTION_FIN = 'Ton IA 1.5, qui n’a jamais vu de conversation, fi
 /** Les tranches du pari « fin », en part des réponses qui finissent par <|fin_tour|>. */
 export const TRANCHES_FIN: readonly Tranche[] = Object.freeze([
   Object.freeze({ texte: 'Presque jamais', jusqua: 0.1 }),
-  Object.freeze({ texte: 'Une fois sur deux, à peu près', jusqua: 0.9 }),
+  Object.freeze({ texte: 'Parfois', jusqua: 0.9 }),
   Object.freeze({ texte: 'Presque toujours', jusqua: Infinity }),
 ]);
 
@@ -521,6 +535,9 @@ export function choixConsignes(racineDepot: string | URL = '..'): Choix[] | null
 /** L'écart des pertes sur le texte du web en deçà duquel elle « ne bouge pas ». */
 export const TOLERANCE_OUBLI = 0.01;
 
+/** L'écart (en nats par jeton) sous lequel la phrase de l'oubli dit qu'elle a perdu « un peu » ; au-delà, « une part ». */
+export const SEUIL_UN_PEU_OUBLI = 0.1;
+
 export type SensDeLOubli = 'monte' | 'baisse' | 'stable';
 
 /** Les choix du pari « oubli », dans l'ordre des sens. */
@@ -564,7 +581,9 @@ export function phraseDeLOubli(racineDepot: string | URL = '..'): string | null 
   if (f === null || sens === null) return null;
   const de = (x: number) => `${nombre(f.avant, 3)} à ${nombre(x, 3)}`;
   if (sens === 'monte') {
-    return `Sa perte sur le texte du web monte, de ${de(f.apres)}${FINE}: l’affinage lui a fait perdre un peu de ce qu’elle savait prédire du français brut.`;
+    // « Un peu » seulement sous le seuil : au-delà, la phrase ne minimise pas.
+    const combien = f.ecart < SEUIL_UN_PEU_OUBLI ? 'un peu de ce' : 'une part de ce';
+    return `Sa perte sur le texte du web monte, de ${de(f.apres)}${FINE}: l’affinage lui a fait perdre ${combien} qu’elle savait prédire du français brut.`;
   }
   if (sens === 'baisse') {
     return `Sa perte sur le texte du web baisse, de ${de(f.apres)}${FINE}: l’affinage ne lui a rien fait perdre de mesurable sur ces textes, au contraire.`;

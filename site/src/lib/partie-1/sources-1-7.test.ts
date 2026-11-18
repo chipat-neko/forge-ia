@@ -58,7 +58,14 @@ describe('les sources du chapitre 1.7', () => {
   });
 
   it('les valeurs relues à la source le 18 novembre 2026', () => {
-    expect(valeurs(INSTRUCTGPT)).toStrictEqual({ parametres: 175e9, invitesSft: 13_000, petaflopsSft: 4.9, petaflopsGpt3: 3_640, epoques: 16 });
+    expect(valeurs(INSTRUCTGPT)).toStrictEqual({
+      parametres: 175e9,
+      invitesSft: 13_000,
+      petaflopsSft: 4.9,
+      petaflopsGpt3: 3_640,
+      partDuPreEntrainement: 4.9 / 3_640,
+      epoques: 16,
+    });
     expect(valeurs(LLAMA_2)).toStrictEqual({ annotationsSft: 27_540, longueur: 4096, epoques: 2, perteSurLesReponses: true });
     expect(valeurs(TULU_3)).toStrictEqual({ invitesSft: 939_344, parametres8B: 8e9, cartes8B: 32, heures8B: 6, heuresDeCartes8B: 192, longueur: 4096, epoques: 2 });
     expect(valeurs(SMOLLM3)).toStrictEqual({ parametres: 3e9, jetonsSft: 1.8e9, jetonsRaisonnement: 0.8e9, epoques: 4, bfd: true, perteMasquee: true });
@@ -68,8 +75,10 @@ describe('les sources du chapitre 1.7', () => {
   it('les chiffres dérivés sont le calcul qu’ils disent, et seulement eux', () => {
     expect(TULU_3.heuresDeCartes8B.valeur).toBe(TULU_3.cartes8B.valeur * TULU_3.heures8B.valeur);
     expect(TULU_3.heuresDeCartes8B.etiquette).toBe('dérivé');
+    expect(INSTRUCTGPT.partDuPreEntrainement.valeur).toBe(INSTRUCTGPT.petaflopsSft.valeur / INSTRUCTGPT.petaflopsGpt3.valeur);
+    expect(INSTRUCTGPT.partDuPreEntrainement.etiquette).toBe('dérivé');
     const derives = Object.values(GROUPES).flatMap((g) => Object.values(g as Record<string, ChiffreSource<unknown>>)).filter((c) => c.etiquette === 'dérivé');
-    expect(derives).toHaveLength(1);
+    expect(derives).toHaveLength(2);
     // Les conditions d'OpenAI sont lues dans une copie : tiers.
     expect(DONNEES_1_7.openai.etiquette).toBe('tiers');
     expect(DONNEES_1_7.openai.url).toBe(COPIE_CONDITIONS_OPENAI.url);

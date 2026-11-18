@@ -186,11 +186,18 @@ test('l’atelier : appris en indigo plein, non appris en lavande, spéciaux en 
   await expect(nonAppris).not.toHaveCSS('background-color', 'rgb(35, 32, 87)');
   const special = atelier.locator('[data-jeton][data-special]').first();
   expect(await special.evaluate((e) => getComputedStyle(e).fontFamily)).toMatch(/JetBrains Mono/);
-  // Le défi : plus de la moitié des jetons appris. La capitale, avec son message système, n'y est pas.
-  await expect(atelier.locator('[data-test="cv-defi"]')).toContainText('pas encore la moitié');
+  // Le défi : avec un message système et un deuxième tour, plus de la moitié des jetons appris. À l'arrivée, il
+  // manque le deuxième tour ; un bonjour seul dépasse la moitié, mais sans les deux ajouts, le défi n'est pas réussi.
+  await expect(atelier.locator('[data-test="cv-defi"]')).toContainText('le défi veut aussi les deux ajouts');
   await regler(page, 'sans-systeme', false, false);
-  const etat = etatDeLAtelier(CONVERSATIONS, { nom: 'sans-systeme', systeme: false, deuxieme: false });
-  expect(2 * etat.appris).toBeGreaterThan(etat.jetons);
+  const bonjour = etatDeLAtelier(CONVERSATIONS, { nom: 'sans-systeme', systeme: false, deuxieme: false });
+  expect(2 * bonjour.appris).toBeGreaterThan(bonjour.jetons);
+  await expect(atelier.locator('[data-test="cv-defi"]')).toContainText('le défi veut aussi les deux ajouts');
+  await regler(page, 'sans-systeme', true, true);
+  await expect(atelier.locator('[data-test="cv-defi"]')).toContainText('pas encore la moitié');
+  await regler(page, 'pensee', true, true);
+  const pensee = etatDeLAtelier(CONVERSATIONS, { nom: 'pensee', systeme: true, deuxieme: true });
+  expect(2 * pensee.appris).toBeGreaterThan(pensee.jetons);
   await expect(atelier.locator('[data-test="cv-defi"]')).toContainText('Défi réussi');
   await verifierAxe(page);
 });

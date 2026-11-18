@@ -6,7 +6,7 @@ chapeau: "Ton IA prolonge un texte, mais ne te répond pas. Tu lui donnes le for
 programme: "10 étapes, 4 paris, environ 40 minutes."
 acquis:
   - cle: fin
-    texte: "Un modèle pré-entraîné ne sait pas finir sa réponse : il prolonge le texte jusqu'à ce qu'on l'arrête."
+    texte: "Ton IA 1.5, seulement pré-entraînée, ne finit pas ses réponses : elle prolonge le texte jusqu'à ce que forge l'arrête."
     ou: "à l'étape 1"
   - cle: gabarit
     texte: "Une conversation s'écrit avec des jetons spéciaux, que forge pose lui-même : aucun texte tapé ne peut les imiter."
@@ -157,8 +157,9 @@ export const OUVERTURE = (() => {
   exiger(e.texte.startsWith(INVITE_DE_L_OUVERTURE), 'la réponse de ton IA 1.5 à « Qui es-tu ? » ne commence plus par la question');
   exiger(tourneEnBoucle(e.texte.slice(INVITE_DE_L_OUVERTURE.length)), 'la réponse de ton IA 1.5 à « Qui es-tu ? » ne tourne plus en boucle');
   exiger(!e.terminee, 'la réponse de ton IA 1.5 à « Qui es-tu ? » finit maintenant d’elle-même');
-  // « Ses dix réponses fixes, plus bas, font toutes de même » (étape 8) : aucune ne finit.
+  // « Ses dix réponses aux questions fixes de forge tournent toutes en boucle, et aucune ne finit » (étapes 1 et 8).
   exiger(TON_IA_15.echantillons.every((x) => !x.terminee), 'une des réponses fixes de ton IA 1.5 finit maintenant d’elle-même');
+  exiger(TON_IA_15.echantillons.every((x) => tourneEnBoucle(x.texte)), 'une des réponses fixes de ton IA 1.5 ne tourne plus en boucle');
   return { n: enLettres(TON_IA_15.echantillons.length) };
 })();
 
@@ -227,32 +228,39 @@ export const MASQUE = (() => {
 })();
 
 export const DEFI = (() => {
-  // La réponse du défi : les réglages qui font plus de la moitié de jetons appris, calculés par le jumeau.
-  const etat = (nom, systeme, deuxieme) => etatDeLAtelier(CONVERSATIONS, { nom, systeme, deuxieme });
-  const bonjour = etat('sans-systeme', false, false);
-  const bonjourSysteme = etat('sans-systeme', true, false);
-  const pensee = etat('pensee', false, false);
-  const penseeSysteme = etat('pensee', true, true);
-  exiger(defiReussi(bonjour) && defiReussi(pensee) && defiReussi(penseeSysteme), 'le bonjour ou la pensée ne réussissent plus le défi');
-  exiger(!defiReussi(bonjourSysteme), 'avec un message système, le bonjour réussit maintenant le défi');
-  // « La réponse est plus longue que la question. »
+  // La réponse du défi : avec un message système et un deuxième tour, seule « une pensée » dépasse la moitié de
+  // jetons appris (calculé par le jumeau) ; la meilleure des autres en reste loin.
+  const tout = (nom) => ({ nom, systeme: true, deuxieme: true });
+  const etats = CONVERSATIONS.map((c) => ({ nom: c.nom, etat: etatDeLAtelier(CONVERSATIONS, tout(c.nom)) }));
+  const reussis = etats.filter((x) => defiReussi(x.etat, tout(x.nom))).map((x) => x.nom);
+  exiger(reussis.length === 1 && reussis[0] === 'pensee', 'avec les deux ajouts, une autre conversation que « une pensée » réussit le défi, ou aucune');
+  const pensee = etats.find((x) => x.nom === 'pensee').etat;
+  const autres = etats.filter((x) => x.nom !== 'pensee' && x.etat.erreur === null);
+  const meilleure = autres.reduce((m, x) => (x.etat.appris / x.etat.jetons > m.etat.appris / m.etat.jetons ? x : m));
+  // « Seule, la conversation du bonjour dépasse la moitié ; avec les deux ajouts, elle tombe sous la moitié. »
+  const bonjour = etatDeLAtelier(CONVERSATIONS, { nom: 'sans-systeme', systeme: false, deuxieme: false });
+  const bonjourTout = etatDeLAtelier(CONVERSATIONS, tout('sans-systeme'));
+  exiger(2 * bonjour.appris > bonjour.jetons && 2 * bonjourTout.appris <= bonjourTout.jetons, 'le bonjour seul ne dépasse plus la moitié, ou la dépasse encore avec les deux ajouts');
+  // « Sa réponse est plus longue que sa question. »
   const c = CONVERSATIONS.find((x) => x.nom === 'sans-systeme');
   exiger(c.tours[1].ids.length > c.tours[0].ids.length, 'la réponse du bonjour n’est plus plus longue que sa question');
-  // « Un message système n'ajoute que des jetons lus » : la même conversation, même nombre de jetons appris.
+  // « Le message système n'ajoute que des jetons lus » : la même conversation, avec lui, a autant de jetons appris.
+  const bonjourSysteme = etatDeLAtelier(CONVERSATIONS, { nom: 'sans-systeme', systeme: true, deuxieme: false });
   exiger(bonjourSysteme.appris === bonjour.appris && bonjourSysteme.jetons > bonjour.jetons, 'un message système ajoute maintenant des jetons appris');
   const part = (e) => pourcent(e.appris / e.jetons, 0);
+  const nom = (n) => typographier(`« ${LIBELLES_DE_L_ATELIER[n]} »`);
   return {
-    bonjour: typographier(`« ${LIBELLES_DE_L_ATELIER['sans-systeme']} »`),
-    pensee: typographier(`« ${LIBELLES_DE_L_ATELIER.pensee} »`),
-    appris: nombre(bonjour.appris),
-    jetons: nombre(bonjour.jetons),
-    partBonjour: part(bonjour),
-    partSysteme: part(bonjourSysteme),
+    pensee: nom('pensee'),
+    bonjour: nom('sans-systeme'),
+    meilleure: nom(meilleure.nom),
+    appris: nombre(pensee.appris),
+    jetons: nombre(pensee.jetons),
     partPensee: part(pensee),
-    partPenseeTout: part(penseeSysteme),
+    partMeilleure: part(meilleure.etat),
+    partBonjour: part(bonjour),
+    partBonjourTout: part(bonjourTout),
   };
 })();
-
 
 export const SFT = lireReglagesSft('sft-1.7', RACINE);
 export const SFT_COURT = lireReglagesSft('sft-1.7-court', RACINE);
@@ -272,6 +280,8 @@ export const FIGURE = (() => {
 
 export const FUITE = (() => {
   const f = lireFuite(RACINE);
+  // « Sans masque, forge dit seulement « causal » à PyTorch ; avec lui, il passe le masque complet » : le code de l'attention.
+  exiger(faitsDeForge(RACINE).attentionCausaleOuMasquee, 'l’attention de forge ne choisit plus entre is_causal et un masque complet');
   exiger(choixFuite(RACINE).find((c) => c.juste)?.texte === 'voit la première', 'sans masque, la deuxième conversation ne voit plus la première');
   exiger(f.avec_masque <= ECART_D_ARRONDI && f.avec_masque > 0, 'avec le masque, l’écart n’est plus celui de l’arrondi des calculs');
   return {
@@ -312,8 +322,8 @@ export const ESSAI = (() => {
   // « Avant, aucune ne finit son tour ; après, toutes. »
   exiger(e.fin_de_tour_avant === 0 && e.fin_de_tour_apres === 1, 'le petit affinage ne passe plus d’aucune réponse finie à toutes');
   // « Ses réponses ne veulent rien dire : « . », « Une font font font ». »
-  const textes = e.reponses_apres.map((x) => x.texte);
-  exiger(textes.includes('.') && textes.includes('Une font font font'), 'les réponses du petit modèle affiné ne sont plus celles que cite l’étape 6');
+  const reponse = (texte) => e.reponses_apres.find((x) => x.texte === texte);
+  exiger(reponse('.') !== undefined && reponse('Une font font font') !== undefined, 'les réponses du petit modèle affiné ne sont plus celles que cite l’étape 6');
   // « {fois} fois celui de son pré-entraînement » : un rapport entier.
   const fois = r.tauxAffinage / r.tauxPreEntrainement;
   exiger(Math.abs(fois - Math.round(fois)) < 1e-9, 'le taux du petit affinage n’est plus un multiple entier de celui de son pré-entraînement');
@@ -332,11 +342,15 @@ export const ESSAI = (() => {
     apres: pourcent(e.fin_de_tour_apres),
     taux: reglage(r.tauxAffinage),
     fois: enLettres(Math.round(fois)),
+    question1: typographier(`« ${reponse('.').invite} »`),
+    question2: typographier(`« ${reponse('Une font font font').invite} »`),
   };
 })();
 
 
 export const AFFINAGE = (() => {
+  // « La configuration le dit en commentaire : aucune source … choisi par un balayage » (configs/sft-1.7.toml).
+  exiger(faitsDeForge(RACINE).tauxSansSourceParBalayage, 'configs/sft-1.7.toml ne dit plus qu’aucune source ne donne le taux, ni qu’il vient d’un balayage');
   exiger(SFT.methode === 'sft' && SFT.depart === 'ton-ia-1.5', 'configs/sft-1.7.toml n’affine plus ton IA 1.5 par la méthode sft');
   exiger(SFT_COURT.taux_max === SFT.taux_max && SFT_COURT.depart === SFT.depart, 'la version courte n’a plus les réglages de l’affinage complet');
   const pas = (r) => r.jetons_total / r.taille_lot_jetons;
@@ -373,8 +387,12 @@ export const CONSIGNES = (() => {
   const avant = pourcent(ifeval15.invite_stricte, 1);
   // « Sa perte sur des conversations n'a pas encore été mesurée : son évaluation a eu lieu avant que le jeu d'affinage existe. »
   exiger('absente' in TON_IA_15.mesures.perte_conversation, 'la perte sur des conversations de ton IA 1.5 est maintenant mesurée : l’étape 8 dit le contraire');
-  if (choix === null) return { choix: null, avant, apres: null, juste: null };
-  return { choix, avant, apres: pourcent(TON_IA_17.mesures.ifeval_fr.invite_stricte, 1), juste: choix.find((c) => c.juste).texte };
+  // « Sa part de réponses finies n'y compte que les réponses d'IFEval-FR. »
+  exiger(TON_IA_15.mesures.tenue.n === ifeval15.n, 'la tenue de ton IA 1.5 ne compte plus seulement les réponses d’IFEval-FR : l’étape 8 dit le contraire');
+  const releve = formaterDate(TON_IA_15.releve_le);
+  const nIfeval = nombre(ifeval15.n);
+  if (choix === null) return { choix: null, avant, releve, nIfeval, apres: null, juste: null };
+  return { choix, avant, releve, nIfeval, apres: pourcent(TON_IA_17.mesures.ifeval_fr.invite_stricte, 1), juste: choix.find((c) => c.juste).texte };
 })();
 
 export const OUBLI = (() => {
@@ -399,7 +417,7 @@ export const LABO = (() => {
     iInvites: nombre(i.invitesSft.valeur),
     iSft: nombre(i.petaflopsSft.valeur, 1),
     iGpt3: nombre(i.petaflopsGpt3.valeur),
-    iPart: pourcent(i.petaflopsSft.valeur / i.petaflopsGpt3.valeur, 2),
+    iPart: pourcent(i.partDuPreEntrainement.valeur, 2),
     iEpoques: nombre(i.epoques.valeur),
     lAnnotations: nombre(LLAMA_2.annotationsSft.valeur),
     lLongueur: nombre(LLAMA_2.longueur.valeur),
@@ -427,7 +445,7 @@ export const SUITE = (() => {
 
 <OuvertureConversation />
 
-Tu as posé une question à ton IA, celle du {LIENS.l15 ? <a href={LIENS.l15}>chapitre 1.5</a> : 'chapitre 1.5'}. Elle ne te répond pas. Elle répète ta question, puis enchaîne une phrase qui revient en boucle, jusqu'à ce que forge la coupe. Ce n'est pas un hasard de ce texte-là : ton IA n'a appris qu'à prolonger des textes, comme le {LIENS.l16 ? <a href={LIENS.l16}>chapitre 1.6</a> : 'chapitre 1.6'} l'a montré. Pour elle, une question est un début de texte comme un autre.
+Forge a posé cette question à ton IA, celle qui est née au {LIENS.l15 ? <a href={LIENS.l15}>chapitre 1.5</a> : 'chapitre 1.5'}. Elle ne répond pas : elle répète la question, puis enchaîne une phrase qui revient en boucle, jusqu'à ce que forge la coupe. Ce n'est pas un accident de cette question-là : ses {OUVERTURE.n} réponses aux questions fixes de forge, à l'étape 8, tournent toutes en boucle, et aucune ne finit. Ton IA n'a appris qu'à prolonger des textes, comme le {LIENS.l16 ? <a href={LIENS.l16}>chapitre 1.6</a> : 'chapitre 1.6'} l'a montré.
 
 <Pari
   id="fin"
@@ -493,7 +511,7 @@ Puis la conversation entière :
   <li data-lignes="9">Les jetons et leur masque, ensemble : un exemple prêt pour l'affinage.</li>
 </CodeExplique>
 
-Un détail compte pour la suite. Sauf `<|fin_texte|>`, ton IA n'a jamais lu ces jetons pendant son pré-entraînement : aucun de ses textes ne les contenait, puisque le tokenizer ne les produit jamais. Le vecteur qui représente chacun d'eux, son plongement, n'a donc jamais servi à les lire. Il n'a été corrigé que par la sortie, où les poids liés du {LIENS.l14 ? <a href={LIENS.l14}>chapitre 1.4</a> : 'chapitre 1.4'} le font aussi servir : à chaque pas, ton IA apprenait seulement à ne jamais prédire ces jetons. Ce qu'ils veulent dire quand elle les lit, personne ne le lui a appris. C'est une déduction, pas une mesure. Elle expliquerait en partie les réponses de l'étape 1 : ta question lui arrive entourée de jetons qui, pour elle, ne disent rien. L'affinage leur donnera un sens.
+Un détail compte pour la suite. Sauf `<|fin_texte|>`, ton IA n'a jamais lu ces jetons pendant son pré-entraînement : aucun de ses textes ne les contenait, puisque le tokenizer ne les produit jamais. Le vecteur qui représente chacun d'eux, son plongement, n'a donc jamais servi à les lire. Il n'a été corrigé que par la sortie, où les poids liés du {LIENS.l14 ? <a href={LIENS.l14}>chapitre 1.4</a> : 'chapitre 1.4'} le font aussi servir : à chaque pas, ton IA apprenait seulement à ne jamais prédire ces jetons. Ce qu'ils veulent dire quand elle les lit, personne ne le lui a appris. C'est une déduction, pas une mesure. Elle pourrait expliquer en partie les réponses de l'étape 1 : la question lui arrive entourée de jetons qu'elle n'a jamais lus. L'affinage, lui, les lui fait lire dans chaque conversation.
 
 <Fragment slot="note">
 
@@ -529,9 +547,9 @@ C'est le masque de perte : un oui ou un non par jeton, que forge calcule en mêm
 <details class="reponse-defi">
 <summary><span class="bascule-soleil">La réponse du défi</span></summary>
 
-<p>{typographier(`La conversation ${DEFI.bonjour}, sans message système ni deuxième tour : ${DEFI.appris} de ses ${DEFI.jetons} jetons sont appris, ${DEFI.partBonjour}. La réponse y est plus longue que la question. ${DEFI.pensee} réussit aussi, avec ou sans le reste : l'assistant y écrit sa pensée, puis sa réponse, et tout cela est appris (${DEFI.partPensee}, et encore ${DEFI.partPenseeTout} avec un message système et un deuxième tour).`)}</p>
+<p>{typographier(`La conversation ${DEFI.pensee} est la seule : avec un message système et un deuxième tour, ${DEFI.appris} de ses ${DEFI.jetons} jetons sont appris, ${DEFI.partPensee}. L'assistant y écrit sa pensée, puis sa réponse, et tout cela est appris. La meilleure des autres, ${DEFI.meilleure}, n'arrive qu'à ${DEFI.partMeilleure}.`)}</p>
 
-Un message système, lui, n'ajoute que des jetons lus : avec le sien, le même bonjour tombe à {DEFI.partSysteme}. Une longue question et une réponse d'un mot, au contraire, n'apprennent presque rien. C'est pourquoi la perte de l'affinage divise par le nombre de jetons appris, pas par le nombre de jetons lus.
+Le message système et la question n'ajoutent que des jetons lus. Seule, la conversation {DEFI.bonjour} dépasse la moitié, à {DEFI.partBonjour}, car sa réponse est plus longue que sa question ; avec les deux ajouts, elle tombe à {DEFI.partBonjourTout}. C'est pourquoi la perte de l'affinage divise par le nombre de jetons appris, pas par le nombre de jetons lus : une réponse courte, dans une longue conversation, compte quand même.
 
 </details>
 
@@ -607,7 +625,7 @@ Le masque par document est un masque d'attention : un jeton ne regarde que les j
   <li data-lignes="5">Les deux à la fois : avant, et dans la même conversation.</li>
 </CodeExplique>
 
-Ce masque a un prix : la carte graphique ne peut plus prendre son chemin le plus rapide pour l'attention, et chaque pas d'affinage dure plus longtemps. Forge le garde quand même : sans lui, une conversation lirait la fin de la précédente.
+Sans masque par document, forge dit seulement à l'attention de PyTorch que le calcul est causal (`is_causal=True`) ; avec lui, il lui passe ce masque complet, position par position (`attn_mask`). Forge le garde pour l'affinage : sans lui, une conversation lirait la fin de la précédente.
 
 <Fragment slot="note">
 
@@ -662,7 +680,7 @@ Le projet du chapitre refait tout cela en tout petit, sur ton processeur, en moi
   absent="À mesurer : le petit affinage sur le processeur."
 />
 
-Sa perte passe de {ESSAI.premiere} à {ESSAI.derniere}, et ses réponses finissent leur tour : {ESSAI.avant} avant l'affinage, {ESSAI.apres} après. Il a appris à s'arrêter. Mais ce qu'il répond ne veut rien dire : « . », « Une font font font ». En {ESSAI.pas} pas, sur {ESSAI.exemples} conversations, un si petit modèle n'apprend que la forme. Son taux d'affinage, {ESSAI.taux}, {ESSAI.fois} fois celui de son pré-entraînement, a été choisi après quelques essais, en regardant ce qui se passait. L'essai mesure l'arrêt, pas la qualité des réponses.
+Sa perte passe de {ESSAI.premiere} à {ESSAI.derniere}, et ses réponses finissent leur tour : {ESSAI.avant} avant l'affinage, {ESSAI.apres} après. Il a appris à s'arrêter. Mais regarde ce qu'il répond : « . » à {ESSAI.question1}, « Une font font font » à {ESSAI.question2}. L'essai mesure l'arrêt, pas ce que disent les réponses. Son taux d'affinage est {ESSAI.taux}, {ESSAI.fois} fois celui de son pré-entraînement.
 
 </Etape>
 
@@ -670,7 +688,7 @@ Sa perte passe de {ESSAI.premiere} à {ESSAI.derniere}, et ses réponses finisse
 
 Ton IA, la vraie, s'affine de la même façon, sur la carte graphique de l'auteur. Elle part de sa version publiée, `ton-ia-1.5`, et lit le jeu d'affinage que forge a préparé à partir des sources de l'étape 5, en rangées de {AFFINAGE.longueur} jetons. Ses réglages sont dans `configs/sft-1.7.toml`, dans le dossier de forge : {AFFINAGE.pas} pas de {AFFINAGE.lot} jetons, bourrage compris, soit {AFFINAGE.jetons} jetons en tout. Le taux d'apprentissage monte en {AFFINAGE.echauffement} pas jusqu'à {AFFINAGE.taux}, puis redescend jusqu'à {AFFINAGE.tauxMin}, sur le planning du {LIENS.l15 ? <a href={LIENS.l15}>chapitre 1.5</a> : 'chapitre 1.5'}.
 
-Pour le taux, l'auteur n'a trouvé aucune source qui donne celui d'un affinage, pour un modèle de cette taille entraîné de zéro. Il l'a donc cherché par un balayage : plusieurs essais courts, chacun avec son taux, et on garde celui dont la perte de validation finit la plus basse.
+Pour le taux, la configuration le dit en commentaire : aucune source n'en donne pour un modèle de cette taille entraîné de zéro. Il a donc été cherché par un balayage : plusieurs essais courts, chacun avec son taux, et on garde celui dont la perte de validation finit la plus basse.
 
 <p class="a-mesurer" data-a-mesurer data-balayage-absent>{typographier('Les taux essayés et leurs pertes de validation : à relever, avec l’affinage complet.')}</p>
 
@@ -684,7 +702,7 @@ Comme au {LIENS.l15 ? <a href={LIENS.l15}>chapitre 1.5</a> : 'chapitre 1.5'}, l'
 
 <Etape numero={8} titre="Ce qu'elle sait faire maintenant">
 
-D'abord, ce qu'on peut en attendre. Un affinage apprend une forme et des habitudes : répondre, s'arrêter, suivre une consigne simple. Il n'apprend pas de connaissances. Chez <a href={DISCUSSION_NANOCHAT.url}>nanochat d20</a>, un modèle de {ATTENTES.parametres} millions de paramètres, proche de ton IA, l'affinage fait passer ARC-Challenge, des questions de sciences, de {ATTENTES.avant} à {ATTENTES.apres} : rien de gagné.
+D'abord, un point de comparaison. Chez <a href={DISCUSSION_NANOCHAT.url}>nanochat d20</a>, un modèle de {ATTENTES.parametres} millions de paramètres, proche de ton IA, l'affinage fait passer ARC-Challenge, des questions de sciences, de {ATTENTES.avant} à {ATTENTES.apres} : rien de gagné sur ce test-là.
 
 Forge fait passer à chaque version de ton IA les mêmes épreuves. Les consignes d'IFEval-FR : des demandes avec des consignes qu'un programme peut vérifier, comme écrire sans virgule ou rester sous un nombre de mots. La part des réponses qui finissent d'elles-mêmes. Et sa perte sur des conversations qu'elle n'a jamais lues, celles de la validation de son jeu d'affinage.
 
@@ -704,7 +722,7 @@ Forge fait passer à chaque version de ton IA les mêmes épreuves. Les consigne
 
 <TableauEtape versions={['1.5@1.7', '1.7@1.7', '1.7-court@1.7']} mesures={['ifeval_fr', 'tenue', 'perte_conversation']} legende="Ton IA avant et après l'affinage, sur les mêmes tests" />
 
-Ton IA 1.5 respecte toutes les consignes de {CONSIGNES.avant} des invites, sans jamais finir une réponse. Sans doute pas parce qu'elle les suit : certaines consignes, comme ne pas mettre de virgule, peuvent être respectées par un texte qui les ignore. Sa perte sur des conversations n'a pas encore été mesurée : son évaluation a eu lieu avant que le jeu d'affinage existe.
+Ton IA 1.5 respecte toutes les consignes de {CONSIGNES.avant} des invites, sans jamais finir une réponse. Son relevé vient de son évaluation du {CONSIGNES.releve}, faite pour une étape suivante, avant que le jeu d'affinage existe : sa perte sur des conversations n'y est pas, et sa part de réponses finies n'y compte que les {CONSIGNES.nIfeval} réponses d'IFEval-FR.
 
 Voici les réponses de ton IA 1.7 aux {OUVERTURE.n} questions fixes de forge, telles quelles :
 
@@ -749,9 +767,9 @@ Ton IA s'affine sur des conversations rassemblées par d'autres, sur une seule c
 
 <EncadreLabo sources={SOURCES_LABO_1_7}>
 
-InstructGPT, d'OpenAI, en 2022, commence par un affinage supervisé sur environ {LABO.iInvites} questions, chacune avec une réponse écrite par des étiqueteurs recrutés pour cela, lues {LABO.iEpoques} fois. L'affinage de son plus grand modèle, {LABO.iParametres} de paramètres, a demandé {LABO.iSft} pétaflops/s-jours de calcul : {LABO.iPart} des {LABO.iGpt3} du pré-entraînement de GPT-3, son point de départ.
+InstructGPT, d'OpenAI, en 2022, commence par un affinage supervisé sur environ {LABO.iInvites} questions, chacune avec une réponse écrite par des étiqueteurs recrutés pour cela, lues {LABO.iEpoques} fois. L'affinage de son plus grand modèle, {LABO.iParametres} de paramètres, a demandé {LABO.iSft} pétaflops/s-jours de calcul : {LABO.iPart} des {LABO.iGpt3} pétaflops/s-jours du pré-entraînement de GPT-3, son point de départ.
 
-Pour Llama 2, Meta a fait écrire {LABO.lAnnotations} exemples à la main, et mis de côté des millions d'exemples tirés d'autres jeux, de moins bonne qualité. Comme forge, il met bout à bout questions et réponses, dans des rangées de {LABO.lLongueur} jetons, et ne compte la perte que sur les réponses. Il lit son jeu {LABO.lEpoques} fois.
+Pour Llama 2, Meta a fait écrire {LABO.lAnnotations} exemples à la main, et mis de côté des millions d'exemples tirés d'autres jeux, de moins bonne qualité. Comme forge, il met plusieurs exemples dans une même rangée, de {LABO.lLongueur} jetons, et ne compte la perte que sur les réponses. Il lit son jeu {LABO.lEpoques} fois.
 
 Tülu 3, d'Ai2, en 2024, publie tout, données et code compris : {LABO.tInvites} questions. Son modèle de {LABO.tParametres} de paramètres s'affine sur {LABO.tCartes} cartes H100 pendant {LABO.tHeures} heures, soit {LABO.tHeuresDeCartes} heures de carte.
 
@@ -761,7 +779,7 @@ SmolLM3, de Hugging Face, en 2025, a {LABO.sParametres} de paramètres. Son jeu 
 
 <Fragment slot="note">
 
-Les heures de carte de Tülu 3 sont un calcul : {LABO.tCartes} cartes pendant {LABO.tHeures} heures. Un pétaflop/s-jour, c'est le calcul d'une machine qui fait un million de milliards d'opérations par seconde pendant un jour.
+Deux nombres de l'encadré sont des calculs faits ici, sur des chiffres publiés : la part d'InstructGPT, {LABO.iSft} pétaflops/s-jours sur {LABO.iGpt3}, et les heures de carte de Tülu 3, {LABO.tCartes} cartes pendant {LABO.tHeures} heures. Un pétaflop/s-jour, c'est le calcul d'une machine qui fait un million de milliards d'opérations par seconde pendant un jour.
 
 </Fragment>
 
@@ -798,6 +816,6 @@ Le projet complet, avec un notebook qui refait tout cela pas à pas, est sur Git
 
 ### À suivre
 
-Tu sais maintenant comment ton IA apprend le format d'une conversation ; ce qu'elle en fait, l'étape 8 le mesure. Un affinage supervisé lui apprend à répondre comme ses exemples, ce qu'ils ont de bon comme ce qu'ils ont de moins bon. Le chapitre 1.8, {SUITE.lien ? <a href={SUITE.lien}>{SUITE.titre}</a> : SUITE.titre}, à venir, lui apprendra à préférer les réponses qu'on juge meilleures.
+Tu sais maintenant comment ton IA apprend le format d'une conversation ; ce qu'elle en fait, l'étape 8 le mesure. Un affinage supervisé lui fait imiter ses exemples, sans jamais lui dire si une réponse vaut mieux qu'une autre. Le chapitre 1.8, {SUITE.lien ? <a href={SUITE.lien}>{SUITE.titre}</a> : SUITE.titre}, à venir, lui apprendra à préférer les réponses qu'on juge meilleures.
 
 </Etape>

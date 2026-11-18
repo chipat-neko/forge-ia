@@ -22,6 +22,7 @@ import {
   decoderLesIds,
   empaquetagesDeLaFigure,
   exigerSensDeLOubli,
+  faitsDeForge,
   faitsDuPariFin,
   faitsDuPariGabarit,
   faitsDuPariMasque,
@@ -36,6 +37,7 @@ import {
   reponseALInvite,
   sensDeLOubli,
   SEUIL_DE_FUITE,
+  SEUIL_UN_PEU_OUBLI,
   textesDesJetons,
   TOLERANCE_OUBLI,
   TRANCHES_CONSIGNES,
@@ -229,6 +231,20 @@ describe('les paris du chapitre 1.7', () => {
     expect(() => exigerSensDeLOubli('monte', monte)).not.toThrow();
     expect(() => exigerSensDeLOubli('monte', baisse)).toThrow(/Exemple devenu faux/);
     expect(phraseDeLOubli(depot())).toBeNull();
+    // « Un peu » seulement sous le seuil : une perte qui monte beaucoup n'est pas minimisée.
+    expect(SEUIL_UN_PEU_OUBLI).toBe(0.1);
+    expect(phraseDeLOubli(avantApres({ oubli: 2.35 }, { oubli: 2.4 }))).toMatch(/perdre un peu de ce/);
+    expect(phraseDeLOubli(avantApres({ oubli: 2.35 }, { oubli: 3.35 }))).toMatch(/perdre une part de ce/);
+    expect(phraseDeLOubli(avantApres({ oubli: 2.35 }, { oubli: 3.35 }))).not.toMatch(/un peu/);
+  });
+
+  it('ce que le chapitre dit du code et des réglages de forge se relit dans ses fichiers', () => {
+    expect(faitsDeForge(RACINE)).toStrictEqual({
+      finDeTexteEntreLesTextes: true,
+      poidsLies: true,
+      attentionCausaleOuMasquee: true,
+      tauxSansSourceParBalayage: true,
+    });
   });
 
   it('l’ouverture : la réponse de ton IA 1.5 à « Qui es-tu ? », telle quelle', () => {

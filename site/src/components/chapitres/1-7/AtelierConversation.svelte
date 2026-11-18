@@ -68,7 +68,7 @@
 
   let reglage = $state<ReglageDeLAtelier>(reglageDeReference(CONVERSATIONS, NOMS_DE_L_ATELIER[0]));
   const etat = $derived(etatDeLAtelier(CONVERSATIONS, reglage));
-  const reussi = $derived(defiReussi(etat));
+  const reussi = $derived(defiReussi(etat, reglage));
 
   /** Le texte d'un jeton : celui du tokenizer, lu à la construction. */
   const texteDe = (id: number): string => {
@@ -124,7 +124,7 @@
     const r = reussi;
     if (r === reussiAvant) return;
     reussiAvant = r;
-    annonceDefi = r ? untrack(() => texteDuDefi(etat)) : '';
+    annonceDefi = r ? untrack(() => texteDuDefi(etat, reglage)) : '';
   });
 </script>
 
@@ -205,8 +205,8 @@
 
   <div class="defi" class:reussi data-defi>
     <h3>Défi</h3>
-    <p>Compose une conversation dont plus de la moitié des jetons sont appris.</p>
-    <p class="etat" data-test="cv-defi">{texteDuDefi(etat)}</p>
+    <p>Avec un message système et un deuxième tour, trouve une conversation dont plus de la moitié des jetons sont appris.</p>
+    <p class="etat" data-test="cv-defi">{texteDuDefi(etat, reglage)}</p>
     <p class="vh" role="status">{annonceDefi}</p>
   </div>
 </div>
@@ -223,7 +223,7 @@
 
   .reglage .bascule-soleil {
     font: inherit;
-    padding: 0 3px;
+    padding: 0 1px; /* presque rien : la virgule qui suit reste collée au mot */
     min-height: 24px;
   }
 

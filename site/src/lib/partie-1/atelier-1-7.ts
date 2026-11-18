@@ -209,18 +209,21 @@ export function texteDuCompte(jetons: number, appris: number): string {
   return `${nombre(jetons)} ${jetons > 1 ? 'jetons' : 'jeton'}, dont ${nombre(appris)} appris.`;
 }
 
-/** Le défi : plus de la moitié des jetons de la conversation sont appris. */
-export function defiReussi(etat: EtatDeLAtelier): boolean {
-  return etat.erreur === null && 2 * etat.appris > etat.jetons;
+/**
+ * Le défi : avec un message système et un deuxième tour, plus de la moitié des jetons de la conversation sont
+ * appris. Les deux ajoutent des jetons lus : il faut une conversation où l'assistant parle beaucoup.
+ */
+export function defiReussi(etat: EtatDeLAtelier, reglage: ReglageDeLAtelier): boolean {
+  return etat.erreur === null && reglage.systeme && reglage.deuxieme && 2 * etat.appris > etat.jetons;
 }
 
-/** La ligne du défi sous l'atelier : la part apprise de la conversation montrée, et si le défi est réussi. */
-export function texteDuDefi(etat: EtatDeLAtelier): string {
+/** La ligne du défi sous l'atelier : la part apprise de la conversation montrée, et ce qu'il manque au défi. */
+export function texteDuDefi(etat: EtatDeLAtelier, reglage: ReglageDeLAtelier): string {
   if (etat.erreur !== null) return `Cette conversation n’a aucun jeton${FINE}: forge la refuse.`;
   const part = pourcent(etat.appris / etat.jetons, 0);
-  return defiReussi(etat)
-    ? `Défi réussi${FINE}: ${part} des jetons sont appris, plus de la moitié.`
-    : `Ici, ${part} des jetons sont appris${FINE}: pas encore la moitié.`;
+  if (defiReussi(etat, reglage)) return `Défi réussi${FINE}: ${part} des jetons sont appris.`;
+  if (!reglage.systeme || !reglage.deuxieme) return `Ici, ${part} sont appris${FINE}; le défi veut aussi les deux ajouts.`;
+  return `Ici, ${part} des jetons sont appris${FINE}: pas encore la moitié.`;
 }
 
 /** Un morceau du texte d'un jeton : les espaces se voient (« ␣ »), plus discrètement que les lettres. */
