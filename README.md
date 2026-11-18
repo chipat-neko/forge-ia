@@ -62,6 +62,7 @@ chapitre. La Partie 1 est en ligne en entier, de
 | `projets/1.4-transformer` | 1.4, Le transformer, pièce par pièce | refait chaque pièce du transformer de « ton IA » sur des tenseurs et vérifie qu'elle donne les mêmes nombres que forge |
 | `projets/1.5-pre-entrainement` | 1.5, Le pré-entraînement sur ton GPU | lit le journal d'un entraînement et fait un petit essai de pause et de reprise exacte |
 | `projets/1.6-evaluation` | 1.6, Évaluer son modèle | refait la perte, la perplexité et la notation d'un QCM à la main, lit le rapport d'évaluation et regarde dans le modèle |
+| `projets/1.7-conversation` | 1.7, Apprendre à converser | écrit une conversation en jetons avec son masque de perte, refait la perte masquée, mesure la fuite sans masque par document, fait un petit affinage et résume les mesures de ton IA 1.7 |
 
 Les autres :
 

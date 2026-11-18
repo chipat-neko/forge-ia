@@ -13,6 +13,7 @@
 export const FICHIERS_PARTIE_1: Readonly<Record<string, string>> = Object.freeze({
   ngrammes: 'projets/1.1-modele-de-langage/tests/attendus.json',
   nettoyeur: 'projets/1.2-donnees/tests/attendus.json',
+  conversation: 'projets/1.7-conversation/tests/attendus.json',
 });
 
 /**

@@ -27,6 +27,7 @@
 // ces fichiers par readFileSync, d'après FICHIERS_PARTIE_1.
 
 import fichierNettoyeur from '../../../../projets/1.2-donnees/tests/attendus.json';
+import fichierConversation from '../../../../projets/1.7-conversation/tests/attendus.json';
 import fichierNgrammes from '../../../../projets/1.1-modele-de-langage/tests/attendus.json';
 import type { Attendus } from '../mini-modele/parite';
 import {
@@ -54,6 +55,8 @@ import {
   trier,
   type Ligne,
 } from './nettoyeur';
+import { empaqueterLongueurs } from './bfd';
+import { assemblerConversation, NOMS_SPECIAUX, SPECIAUX_TON_IA, type Role } from './conversation';
 import type { NomSource } from './donnees';
 import { TEXTE_DU_SITE } from './texte-1-1';
 
@@ -221,8 +224,50 @@ export function attendusNettoyeur(): Promise<Attendus> {
   return refaireNettoyeur(fichierNettoyeur as unknown as EntreesNettoyeur);
 }
 
+/** Les entrées du fichier d'attendus du format de conversation : les textes déjà encodés, et les longueurs à ranger. */
+export interface EntreesConversation {
+  conversations: {
+    nom: string;
+    tours: { role: Role; texte: string; ids: number[]; pensee?: string; pensee_ids?: number[] }[];
+  }[];
+  empaquetages: { liste: string; longueurs: number[]; capacite: number }[];
+}
+
+/**
+ * Les sections du fichier du format de conversation, refaites à partir de ses seules entrées : les jetons
+ * spéciaux de ton IA, l'assemblage de chaque conversation (les ids, le masque de perte, ou l'erreur d'une
+ * conversation refusée) et le placement de l'empaquetage BFD de chaque liste de longueurs.
+ */
+export function refaireConversation(entrees: EntreesConversation): Attendus {
+  return {
+    speciaux: NOMS_SPECIAUX.map((nom) => [nom, SPECIAUX_TON_IA[nom]]),
+    conversations: entrees.conversations.map(({ nom, tours }) => {
+      try {
+        const { ids, appris } = assemblerConversation(
+          tours.map((t) => ({ role: t.role, ids: t.ids, ...(t.pensee_ids === undefined ? {} : { penseeIds: t.pensee_ids }) })),
+        );
+        return { nom, tours, ids, appris, erreur: null };
+      } catch (e) {
+        return { nom, tours, ids: null, appris: null, erreur: e instanceof Error ? e.message : String(e) };
+      }
+    }),
+    empaquetages: entrees.empaquetages.map(({ liste, longueurs, capacite }) => ({
+      liste,
+      longueurs,
+      capacite,
+      ...empaqueterLongueurs(longueurs, capacite),
+    })),
+  };
+}
+
+/** Les attendus du format de conversation (FICHIERS_PARTIE_1.conversation), refaits ici. */
+export function attendusConversation(): Attendus {
+  return refaireConversation(fichierConversation as unknown as EntreesConversation);
+}
+
 /** Chaque calcul de parité de la Partie 1, sous le nom de son fichier dans FICHIERS_PARTIE_1. */
 export const CALCULS_PARTIE_1: Record<string, () => unknown | Promise<unknown>> = {
   ngrammes: attendusNgrammes,
   nettoyeur: attendusNettoyeur,
+  conversation: attendusConversation,
 };

@@ -1,0 +1,8 @@
+# relevé le 2026-11-18
+La fuite entre deux conversations d’une même rangée, sur un modèle minuscule tiré de la graine 0
+  modèle : dim 32, 2 couches, 4 têtes, contexte 64 (1 069 216 paramètres, PyTorch 2.15.0)
+  rangée : conversation A (14 jetons), puis conversation B (15 jetons)
+  écart maximal des logits de B, dans la rangée, face à B lue seule :
+    avec le masque par document : 1,2e-07
+    sans le masque : 1,4e-01
+B voit A sans le masque : oui
