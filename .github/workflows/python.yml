@@ -99,13 +99,17 @@ jobs:
   # numpy, le noyau et pytest de Colab (outils/colab-sans-carte.txt). La carte de Colab,
   # elle, n'est pas testée. Les mêmes commandes se lancent en local : voir « Notebooks »
   # dans le README. Les tests d'outils/ (l'exécuteur des notebooks) tournent avant.
-  # Les notebooks 1.5 et 1.6 font écrire la version publiée de ton IA (la Release
-  # ton-ia-1.5, environ 830 Mo) : elle est téléchargée une fois, gardée en cache sous son
-  # étiquette, et donnée aux notebooks par FORGE_IA_MODELE (sans elle, ils s'arrêtent).
+  # Les notebooks font écrire une version publiée de ton IA (une Release, environ 830 Mo chacune) :
+  # 1.5 et 1.6 la Release ton-ia-1.5, les suivants celle de leur étape. Les Releases à prendre sont
+  # listées dans outils/versions-publiees.txt (une étiquette par ligne ; une étiquette y entre à la
+  # parution de son chapitre). Elles sont téléchargées une fois, gardées en cache sous la clé du fichier
+  # (une étiquette de plus, c'est un nouveau cache), et données aux notebooks par FORGE_IA_MODELES (le
+  # dossier qui les contient, une par sous-dossier) ; FORGE_IA_MODELE reste le dossier de ton-ia-1.5
+  # pour 1.5 et 1.6 (sans elles, les notebooks s'arrêtent).
   notebooks-colab:
     name: Notebooks comme sur Colab, sans carte
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
         with:
@@ -118,19 +122,30 @@ jobs:
           uv pip install --python .colab -r outils/colab-sans-carte.txt
       - name: Tests de l'exécuteur des notebooks
         run: .colab/bin/python -m pytest -q outils
-      # La clé porte l'étiquette de la Release : une autre version publiée aura son propre cache.
-      - name: Version publiée de ton IA, depuis le cache
-        id: cache-ton-ia
+      # La clé suit le contenu de la liste : une étiquette de plus donne un nouveau cache.
+      - name: Versions publiées de ton IA, depuis le cache
         uses: actions/cache@v6
         with:
-          path: ${{ runner.temp }}/ton-ia-1.5
-          key: release-ton-ia-1.5
-      - name: Téléchargement de la version publiée de ton IA (ton-ia-1.5)
-        if: steps.cache-ton-ia.outputs.cache-hit != 'true'
+          path: ${{ runner.temp }}/versions
+          key: versions-${{ hashFiles('outils/versions-publiees.txt') }}
+      # Chaque étiquette de la liste dont le dossier manque est téléchargée. Les lignes vides sont sautées.
+      - name: Téléchargement des versions publiées de ton IA qui manquent
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release download ton-ia-1.5 --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/ton-ia-1.5"
+        run: |
+          mkdir -p "$RUNNER_TEMP/versions"
+          while IFS= read -r etiquette || [ -n "$etiquette" ]; do
+            etiquette=${etiquette%$'\r'}
+            [ -n "$etiquette" ] || continue
+            if [ -n "$(ls -A "$RUNNER_TEMP/versions/$etiquette" 2>/dev/null)" ]; then
+              echo "$etiquette : déjà dans le cache."
+              continue
+            fi
+            gh release download "$etiquette" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/versions/$etiquette"
+          done < outils/versions-publiees.txt
       - name: Exécution des notebooks
         env:
-          FORGE_IA_MODELE: ${{ runner.temp }}/ton-ia-1.5
+          FORGE_IA_MODELES: ${{ runner.temp }}/versions
+          FORGE_IA_MODELE: ${{ runner.temp }}/versions/ton-ia-1.5
         run: .colab/bin/python outils/executer_notebooks.py

@@ -14,7 +14,7 @@ from forge.entrainement import ConfigEntrainement
 from forge.modele import ConfigModele, nombre_parametres
 
 from pre_entrainement import journal
-from pre_entrainement.journal import courbe, lire, resume, sessions
+from pre_entrainement.journal import courbe, lire, resume, serie, sessions
 
 DOSSIER = pathlib.Path(__file__).resolve().parent
 FACTICE = DOSSIER / "journal-factice.jsonl"
@@ -250,3 +250,45 @@ def test_le_releve_de_ton_ia_dit_ce_que_dit_le_document():
     octets = chemin.read_bytes()
     assert b"\r" not in octets and octets.endswith(b"}\n")
     assert octets.decode("utf-8") == json.dumps(releve, ensure_ascii=False, allow_nan=False, indent=1) + "\n"
+
+
+# --- serie : une grandeur quelconque, avec le découpage de la courbe -----------------------------
+
+
+def test_serie_de_la_perte_est_la_courbe_de_perte():
+    for chemin in (FACTICE, PLANTAGE):
+        for points in (600, 3, 2):
+            lignes = lire(chemin)
+            assert serie(lignes, "perte", points) == courbe(lignes, points)["pertes"]
+            assert serie(lignes, "perte", points, 100) == courbe(lignes, points, 100)["pertes"]
+
+
+def test_courbe_est_inchangee_par_serie():
+    # Sorties relevées avant que courbe n'appelle serie (journal-factice-plantage.jsonl, trois points).
+    assert courbe(lire(PLANTAGE), points=3) == {
+        "taille_paquet": 4,
+        "pertes": [[2.5, 10.150000000000002], [6.5, 9.155000000000001], [9.5, 8.649999999999999]],
+        "validations": [[5, 10.0], [10, 9.1]],
+        "hasard": math.log(32768),
+    }
+    assert courbe(lire(FACTICE), points=3)["pertes"] == [[2.5, 10.150000000000002], [6.5, 9.15], [9.5, 8.649999999999999]]
+
+
+def test_serie_d_une_autre_cle():
+    lignes = lignes_de_pas(7)
+    for ligne in lignes[1:]:
+        ligne["reward"] = ligne["pas"] * 2.0
+    assert serie(lignes, "reward", points=3) == [[2, 4.0], [5, 10.0], [7, 14.0]]
+    # Un pas sans la clé n'entre pas dans la série ; un pas refait garde sa dernière valeur.
+    lignes.append({"pas": 3, "perte": 0.0, "reward": 100.0})
+    sans = [ligne for ligne in lignes if ligne.get("pas") != 5 or "evenement" in ligne]
+    assert serie(sans, "reward", points=7) == [[1, 2.0], [2, 4.0], [3, 100.0], [4, 8.0], [5, 12.0], [6, 14.0]]
+    assert serie(lignes, "absente") == []
+
+
+def test_serie_ignore_les_valeurs_non_finies():
+    lignes = lignes_de_pas(4)
+    lignes[2]["reward"] = float("nan")
+    for i in (1, 3, 4):
+        lignes[i]["reward"] = float(i)
+    assert serie(lignes, "reward", points=2) == [[1.5, 1.0], [3.5, 3.5]]

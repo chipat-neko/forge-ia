@@ -138,3 +138,21 @@ export const EVALUATION_CARTES_TON_IA =
 /** Les dix jetons qu'elle juge les plus probables après le départ de l'atelier du chapitre 1.1, suivi de « le ». */
 export const EVALUATION_SUIVANTS_TON_IA =
   'uv run --extra cpu python -m evaluation_pas_a_pas suivants --modele D:\\forge-ia-donnees\\cache\\ton-ia-1.5 --phrase "Le forgeron frappe le" --appareil cpu --json sorties/ton-ia-suivants.json';
+
+// ---------- Vague 2 : les versions publiées de ton IA (1.7 à 1.10) ----------
+// Chaque chapitre de la vague 2 a sa Release (ton-ia-1.7, ton-ia-1.8…), téléchargée comme ton-ia-1.5 :
+// avec l'outil gh, dans le dossier du PC de l'auteur. Les commandes des chapitres (AFFINER_1_7,
+// AFFINER_1_7_COURT, REPRENDRE_1_7, DISCUTER_1_7, PREFERENCES_1_8, DPO_1_8, PROBLEMES_1_9, SFT_1_9,
+// GRPO_1_9, TRADUIRE_1_10, CODE_1_10) entrent ici avec la parution de leur chapitre, quand le README de
+// forge les contient : commandes.test.ts les cherche telles quelles dans projets/forge/README.md. Avant
+// cela, un brouillon dit la commande en prose, sans bloc.
+
+/** Télécharger tous les fichiers d'une version publiée de ton IA (« ton-ia-1.7 »…) dans son dossier du cache : la commande de TELECHARGER_TON_IA, pour une autre étiquette. */
+export function TELECHARGER_VERSION(etiquette: string): string {
+  if (!/^ton-ia-\d+\.\d+(-[a-z]+)?$|^donnees-ton-ia-\d+$/.test(etiquette)) {
+    throw new Error(
+      `« ${etiquette} » n’est pas l’étiquette d’une Release de ton IA : écris par exemple « ton-ia-1.7 » ou « donnees-ton-ia-2 ».`,
+    );
+  }
+  return `gh release download ${etiquette} --dir D:\\forge-ia-donnees\\cache\\${etiquette}`;
+}

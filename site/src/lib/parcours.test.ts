@@ -247,6 +247,40 @@ describe('textes des maquettes validées (accueil C et page de partie)', () => {
   });
 });
 
+// Le chapitre 1.10 face à 1.1 : un tri par chaîne le placerait avant 1.2, et un préfixe « 1-1 » le prendrait
+// pour 1.1. Il vient après 1.9, partout où le parcours est lu.
+describe('le chapitre 1.10', () => {
+  it('a pour adresse /forge-ia/partie-1/1-10/', () => {
+    expect(hrefChapitre('1.10')).toBe('/forge-ia/partie-1/1-10/');
+    expect(hrefChapitre('1.1')).toBe('/forge-ia/partie-1/1-1/');
+    expect(hrefChapitre('1.10')).not.toBe(hrefChapitre('1.1'));
+  });
+
+  it('vient juste après 1.9 dans l’ordre du parcours, et juste avant 1.11', () => {
+    expect(NUMEROS_DU_PARCOURS.indexOf('1.10')).toBe(NUMEROS_DU_PARCOURS.indexOf('1.9') + 1);
+    expect(NUMEROS_DU_PARCOURS.indexOf('1.11')).toBe(NUMEROS_DU_PARCOURS.indexOf('1.10') + 1);
+    expect(voisins('1.10').precedent?.numero).toBe('1.9');
+    expect(voisins('1.9').suivant?.numero).toBe('1.10');
+    expect(voisins('1.10').suivant?.numero).toBe('1.11');
+  });
+
+  it('la Partie 1 se lit de 1.1 à 1.21 en ordre numérique, pas alphabétique', () => {
+    const rangs = PARCOURS[1].chapitres.map((c) => Number(c.numero.split('.')[1]));
+    expect(rangs).toEqual(Array.from({ length: 21 }, (_, i) => i + 1));
+    // Le tri par chaîne des mêmes numéros n'est pas l'ordre du parcours : c'est ce que le site ne doit jamais utiliser.
+    const parChaine = PARCOURS[1].chapitres.map((c) => c.numero).sort();
+    expect(parChaine.indexOf('1.10')).toBeLessThan(parChaine.indexOf('1.2'));
+    expect(PARCOURS[1].chapitres.map((c) => c.numero)).not.toEqual(parChaine);
+  });
+
+  it('est dans le groupe « Le rendre utile », avec 1.7, 1.8 et 1.9', () => {
+    const groupe = PARCOURS[1].groupes![1];
+    expect(chapitresDuGroupe(PARCOURS[1], groupe).map((c) => c.numero)).toEqual(['1.7', '1.8', '1.9', '1.10']);
+    expect(trouverChapitre('1.10').rang).toBe(10);
+    expect(trouverChapitre('1.10').chapitre.titre).toBe('Le faire coder');
+  });
+});
+
 describe('hrefPartie', () => {
   it('construit le lien de la page de partie', () => {
     expect(hrefPartie(0)).toBe('/forge-ia/partie-0/');

@@ -65,7 +65,7 @@ export interface CourbeEntrainement {
 
 /** Le contenu d'un fichier de relevé d'entraînement. */
 export interface Entrainement {
-  /** « ton-ia-mini » ou « ton-ia-1.5 ». */
+  /** « ton-ia-mini », « ton-ia-1.5 », « sft-1.7 »… : le nom de l'entraînement relevé. */
   nom: string;
   /** AAAA-MM-JJ. */
   releve_le: string;
@@ -78,6 +78,13 @@ export interface Entrainement {
 export const FICHIERS_ENTRAINEMENT = Object.freeze({
   'ton-ia-mini': 'projets/1.5-pre-entrainement/mesures/ton-ia-mini.json',
   'ton-ia-1.5': 'projets/1.5-pre-entrainement/mesures/ton-ia-1.5.json',
+  // Les affinages de la vague 2 : la courbe et les sessions de chaque entraînement SFT, relevées par
+  // `python -m pre_entrainement courbe` depuis le projet du chapitre (1.7 pour sft-1.7 et sft-1.7-court,
+  // 1.9 pour sft-1.9, 1.10 pour sft-1.10). Les fichiers viennent avec les tâches de ces projets.
+  'sft-1.7': 'projets/1.7-conversation/mesures/entrainement-sft-1.7.json',
+  'sft-1.7-court': 'projets/1.7-conversation/mesures/entrainement-sft-1.7-court.json',
+  'sft-1.9': 'projets/1.9-raisonnement/mesures/entrainement-sft-1.9.json',
+  'sft-1.10': 'projets/1.10-code/mesures/entrainement-sft-1.10.json',
 } as const);
 
 export type NomEntrainement = keyof typeof FICHIERS_ENTRAINEMENT;

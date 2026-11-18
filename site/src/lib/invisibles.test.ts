@@ -120,24 +120,66 @@ const FICHIERS_SEULS = [
   'site/src/pages/[partie]/[chapitre].astro',
 ];
 
+// Les motifs des chapitres lus. Un chapitre s'écrit « 1-N » (fichiers du site) ou « 1.N- » (projets, notebooks) :
+// le numéro est suivi de sa fin (`$`, `-`, `.`), pour que « 1-1 » ne prenne pas « 1-10 » par préfixe, et
+// qu'« 1-10 » soit pris. Plan 5 : 1.1, 1.2, 1.4, 1.5 et 1.6 ; plan 8 : 1.7 à 1.10.
+const CHAPITRES = '(?:[12456789]|10)';
+/** Un fichier de contenu : « 1-10.mdx ». */
+const MOTIF_CONTENU = new RegExp(`^(0-[^/]*|1-${CHAPITRES})\\.mdx$`);
+/** Un dossier de composants : « 1-10 ». */
+const MOTIF_COMPOSANTS = new RegExp(`^(0-|1-${CHAPITRES}$)`);
+/** Un parcours de test : « chapitre-1-10.spec.ts ». */
+const MOTIF_PARCOURS = new RegExp(
+  `^(chapitre-0-[^/]*|chapitre-1-${CHAPITRES}|annexes|brouillons|parution|figures-0-2)\\.spec\\.ts$`,
+);
+/** Un dossier de projet : « 1.10-code ». */
+const MOTIF_PROJETS = new RegExp(`^(0\\.|1\\.${CHAPITRES}-)`);
+/** Un notebook : « 1.10-code.ipynb ». */
+const MOTIF_NOTEBOOKS = new RegExp(`^(0\\.|1\\.${CHAPITRES}-)[^/]*\\.ipynb$`);
+
 const A_LIRE = [
   ...sous('site/src/brouillons', /\.mdx$/),
-  ...sous('site/src/content/chapitres', /^(0-[^/]*|1-[12456])\.mdx$/),
+  ...sous('site/src/content/chapitres', MOTIF_CONTENU),
   ...sous('site/src/lib/partie-0'),
   ...sous('site/src/lib/partie-1'),
   ...sous('site/src/lib/annexes'),
-  ...dossiers('site/src/components/chapitres', /^(0-|1-[12456]$)/).flatMap((d) => sous(d)),
+  ...dossiers('site/src/components/chapitres', MOTIF_COMPOSANTS).flatMap((d) => sous(d)),
   ...sous('site/src/pages/annexes'),
-  ...sous('site/e2e', /^(chapitre-0-[^/]*|chapitre-1-[12456]|annexes|brouillons|parution|figures-0-2)\.spec\.ts$/),
-  ...dossiers('projets', /^(0\.|1\.[12456]-)/).flatMap((d) => sous(d, /\.py$|^pyproject\.toml$/)),
+  ...sous('site/e2e', MOTIF_PARCOURS),
+  ...dossiers('projets', MOTIF_PROJETS).flatMap((d) => sous(d, /\.py$|^pyproject\.toml$/)),
   ...sous('projets/forge/forge', /\.py$/),
   ...sous('projets/forge/tests', /\.py$/),
   ...sous('outils', /^[^/]*\.py$/),
-  ...sous('notebooks', /^(0\.|1\.[12456]-)[^/]*\.ipynb$/),
+  ...sous('notebooks', MOTIF_NOTEBOOKS),
   ...FICHIERS_SEULS.filter((f) => existsSync(join(RACINE, f))),
 ];
 
 describe('caractères invisibles', () => {
+  it('les motifs prennent les chapitres 1.7 à 1.10, 1.10 compris, sans que « 1-1 » prenne « 1-10 » par préfixe', () => {
+    for (const n of ['1', '2', '4', '5', '6', '7', '8', '9', '10']) {
+      expect(MOTIF_CONTENU.test(`1-${n}.mdx`), `1-${n}.mdx`).toBe(true);
+      expect(MOTIF_COMPOSANTS.test(`1-${n}`), `1-${n}`).toBe(true);
+      expect(MOTIF_PARCOURS.test(`chapitre-1-${n}.spec.ts`), `chapitre-1-${n}.spec.ts`).toBe(true);
+      expect(MOTIF_PROJETS.test(`1.${n}-code`), `1.${n}-code`).toBe(true);
+      expect(MOTIF_NOTEBOOKS.test(`1.${n}-code.ipynb`), `1.${n}-code.ipynb`).toBe(true);
+    }
+    // Un 1-1x qui n'existe pas n'est pas pris par préfixe : ni 1-11, ni 1-100, ni 1-1x.
+    for (const faux of ['1-11', '1-12', '1-100', '1-1x']) {
+      expect(MOTIF_CONTENU.test(`${faux}.mdx`), faux).toBe(false);
+      expect(MOTIF_COMPOSANTS.test(faux), faux).toBe(false);
+      expect(MOTIF_PARCOURS.test(`chapitre-${faux}.spec.ts`), faux).toBe(false);
+    }
+    for (const faux of ['1.11-code', '1.100-code', '1.1x-code', '1.1code']) {
+      expect(MOTIF_PROJETS.test(faux), faux).toBe(false);
+      expect(MOTIF_NOTEBOOKS.test(`${faux}.ipynb`), faux).toBe(false);
+    }
+    // Les chapitres 1.3 et 1.1x des autres plans ne sont pas lus par ces motifs (le motif du plan 5 ne les prenait pas).
+    expect(MOTIF_CONTENU.test('1-3.mdx')).toBe(false);
+    // Une série de fichiers qui lit « 1-10 » mais pas « 1-1 » par erreur : « 1-1 » seul est pris, et c'est le chapitre 1.1.
+    expect(MOTIF_CONTENU.test('1-1.mdx')).toBe(true);
+    expect(MOTIF_CONTENU.test('1-1.mdx.bak')).toBe(false);
+  });
+
   it('le contrôle nomme le fichier, la ligne et le caractère, et dit quoi écrire à la place', () => {
     expect(chercherInvisibles('a\nb\u202Fc', 'site/x.ts', 'site/x.ts')).toEqual([
       'site/x.ts, ligne 2 : caractère U+202F (espace fine insécable) ; écris \\u202F à la place.',

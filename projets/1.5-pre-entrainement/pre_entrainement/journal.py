@@ -86,42 +86,59 @@ def sessions(lignes: list[dict]) -> list[dict]:
 
 
 # region: courbe
-def courbe(lignes: list[dict], points: int = 600, pas_total: int | None = None) -> dict:
-    """La courbe de perte, réduite à `points` points au plus.
+def serie(lignes: list[dict], cle: str, points: int = 600, pas_total: int | None = None) -> list[list[float]]:
+    """Une grandeur du journal (la clé `cle` des lignes de pas), réduite à `points` points au plus.
 
-    `pertes` : `[pas, moyenne]` par paquets de pas, avec le découpage de `taillePaquet` et
+    `[pas, moyenne]` par paquets de pas, avec le découpage de `taillePaquet` et
     `moyennesParPaquets` (`site/src/lib/courbe.ts`) : la taille du paquet est le nombre total de
     pas divisé par `points`, arrondi au-dessus ; chaque point est posé au milieu de son paquet,
-    et le dernier paquet peut être incomplet. Une perte non finie est ignorée, et un paquet qui
+    et le dernier paquet peut être incomplet. Une valeur non finie est ignorée, et un paquet qui
     n'en a aucune de finie donne `None`. Le nombre total de pas est `pas_total` (celui de la
     configuration, pour que le lissage ne change pas pendant l'entraînement), sinon le nombre de
-    pas du journal.
-
-    `validations` : `[pas, perte]` pour chaque perte de validation. `hasard` : ln 32 768.
+    pas qui portent la clé.
 
     Un pas refait après un plantage apparaît deux fois dans le journal : on garde sa dernière
-    occurrence (les pas sont rangés dans l'ordre, la perte du pas p à l'indice p − 1).
+    occurrence (les pas sont rangés dans l'ordre, la valeur du pas p à l'indice p - 1).
     """
-    par_pas = {ligne["pas"]: float(ligne["perte"]) for ligne in lignes if _est_un_pas(ligne)}  # un pas refait : sa dernière perte
-    pertes = [par_pas[pas] for pas in sorted(par_pas)]
-    taille = max(1, math.ceil((len(pertes) if pas_total is None else pas_total) / points))
+    par_pas = {
+        ligne["pas"]: float(ligne[cle])
+        for ligne in lignes
+        if "evenement" not in ligne and isinstance(ligne.get("pas"), int) and _est_un_nombre(ligne.get(cle))
+    }  # un pas refait : sa dernière valeur
+    valeurs = [par_pas[pas] for pas in sorted(par_pas)]
+    taille = max(1, math.ceil((len(valeurs) if pas_total is None else pas_total) / points))
     paquets = []
-    for debut in range(0, len(pertes), taille):
-        fin = min(len(pertes), debut + taille)
+    for debut in range(0, len(valeurs), taille):
+        fin = min(len(valeurs), debut + taille)
         somme, nombre = 0.0, 0
-        for perte in pertes[debut:fin]:  # une boucle, pas sum() : la même somme que le TypeScript
-            if math.isfinite(perte):
-                somme += perte
+        for valeur in valeurs[debut:fin]:  # une boucle, pas sum() : la même somme que le TypeScript
+            if math.isfinite(valeur):
+                somme += valeur
                 nombre += 1
         milieu = (debut + 1 + fin) / 2
         paquets.append([int(milieu) if milieu == int(milieu) else milieu, somme / nombre if nombre else None])
+    return paquets
+
+
+def courbe(lignes: list[dict], points: int = 600, pas_total: int | None = None) -> dict:
+    """La courbe de perte, réduite à `points` points au plus.
+
+    `pertes` : `serie(lignes, "perte", points, pas_total)`, donc le découpage du site. Le nombre
+    total de pas est `pas_total` (celui de la configuration, pour que le lissage ne change pas
+    pendant l'entraînement), sinon le nombre de pas du journal.
+
+    `validations` : `[pas, perte]` pour chaque perte de validation. `hasard` : ln 32 768.
+    """
+    nombre_de_pas = len({ligne["pas"] for ligne in lignes if _est_un_pas(ligne)})
+    taille = max(1, math.ceil((nombre_de_pas if pas_total is None else pas_total) / points))
+    pertes = serie(lignes, "perte", points, pas_total)
     val_par_pas = {
         ligne["pas"]: ligne["perte_val"]
         for ligne in lignes
         if isinstance(ligne.get("pas"), int) and "evenement" not in ligne and _est_un_nombre(ligne.get("perte_val"))
     }
     validations = [[pas, val_par_pas[pas]] for pas in sorted(val_par_pas)]
-    return {"taille_paquet": taille, "pertes": paquets, "validations": validations, "hasard": HASARD}
+    return {"taille_paquet": taille, "pertes": pertes, "validations": validations, "hasard": HASARD}
 # fin: courbe
 
 

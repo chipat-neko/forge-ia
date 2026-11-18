@@ -62,6 +62,30 @@ test('page de partie', async ({ page }) => {
   await verifierSansDebordement(page);
 });
 
+// Le chapitre 1.10 face à 1.1 : un tri par chaîne l'aurait mis avant 1.2. Sur l'accueil et sur la page de la
+// Partie 1, construits avec les pages d'essai, ses cartes suivent celles de 1.9, dans l'ordre du document.
+test('accueil et page de partie : 1.10 suit 1.9 dans l’ordre du document', async ({ page }) => {
+  const partie1 = PARCOURS.find((p) => p.numero === 1)!.chapitres.map((c) => c.numero);
+  for (const adresse of ['/forge-ia/', '/forge-ia/partie-1/']) {
+    await page.goto(adresse);
+    const numeros = await page
+      .locator('[data-chapitre-carte]')
+      .evaluateAll((cartes) => cartes.map((c) => c.getAttribute('data-chapitre-carte') ?? ''));
+    // Les cartes de la Partie 1, dans l'ordre où le document les donne : celui du parcours, de 1.1 à 1.21.
+    const deLaPartie1 = numeros.filter((n) => n.startsWith('1.'));
+    expect(deLaPartie1, adresse).toEqual(partie1);
+    expect(deLaPartie1.indexOf('1.10'), adresse).toBe(deLaPartie1.indexOf('1.9') + 1);
+    expect(deLaPartie1.indexOf('1.11'), adresse).toBe(deLaPartie1.indexOf('1.10') + 1);
+    // 1.10 a sa propre carte, et son ancre n'est pas celle de 1.1.
+    await expect(page.locator('[data-chapitre-carte="1.10"]')).toHaveCount(1);
+    await expect(page.locator('[data-chapitre-carte="1.1"]')).toHaveCount(1);
+  }
+  // Sur la page de partie, 1.10 a son ancre « chapitre-1-10 », juste après celle de 1.9.
+  const ancres = await page.locator('li.chap').evaluateAll((lignes) => lignes.map((l) => l.id));
+  expect(ancres.indexOf('chapitre-1-10')).toBe(ancres.indexOf('chapitre-1-9') + 1);
+  expect(ancres).toContain('chapitre-1-1');
+});
+
 test('recherche', async ({ page }) => {
   await page.goto('/forge-ia/recherche/');
   await page.getByRole('searchbox').fill('fusions');

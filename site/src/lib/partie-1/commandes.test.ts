@@ -25,8 +25,13 @@ import { GRAINE_INITIALE, LONGUEUR_SUITE, N_INITIAL, TEMPERATURE_INITIALE } from
 // Vitest est lancé depuis site/ : le dépôt est un dossier plus haut.
 const RACINE = '..';
 // Une constante est une commande, ou une suite de commandes (ENTRAINER_COURT) dont chaque élément en est une.
+// Une fonction (TELECHARGER_VERSION) fabrique une commande : elle est vérifiée à part, plus bas.
 const TOUTES: [string, string][] = Object.entries(commandes).flatMap(([nom, valeur]) =>
-  typeof valeur === 'string' ? [[nom, valeur]] : (valeur as readonly string[]).map((c, i): [string, string] => [`${nom}[${i}]`, c]),
+  typeof valeur === 'function'
+    ? []
+    : typeof valeur === 'string'
+      ? [[nom, valeur]]
+      : (valeur as readonly string[]).map((c, i): [string, string] => [`${nom}[${i}]`, c]),
 );
 /** Le dossier que crée le clonage, et que vise la mise à jour : le dernier morceau de l'adresse. */
 const DOSSIER = CLONER_DEPOT.split('/').at(-1)!;
@@ -463,6 +468,57 @@ describe('commandes de ton IA, la vraie', () => {
       commandes.EVALUATION_SUIVANTS_TON_IA,
     ]) {
       expect(README, c).toContain(`${c}\n`);
+    }
+  });
+});
+
+// La vague 2 : les versions publiées de ton IA, et les commandes que leurs chapitres montrent.
+describe('commandes de la vague 2', () => {
+  const README_DE_FORGE = readFileSync(`${RACINE}/projets/forge/README.md`, 'utf8').replace(/\r\n?/g, '\n');
+  // Les commandes des chapitres 1.7 à 1.10 : chacune entre dans commandes.ts avec la parution de son chapitre.
+  const COMMANDES_DES_CHAPITRES = [
+    'AFFINER_1_7',
+    'AFFINER_1_7_COURT',
+    'REPRENDRE_1_7',
+    'DISCUTER_1_7',
+    'PREFERENCES_1_8',
+    'DPO_1_8',
+    'PROBLEMES_1_9',
+    'SFT_1_9',
+    'GRPO_1_9',
+    'TRADUIRE_1_10',
+    'CODE_1_10',
+  ];
+
+  it('TELECHARGER_VERSION est la commande de TELECHARGER_TON_IA, pour une autre étiquette', () => {
+    expect(commandes.TELECHARGER_VERSION('ton-ia-1.5')).toBe(commandes.TELECHARGER_TON_IA);
+    expect(commandes.TELECHARGER_VERSION('ton-ia-1.7')).toBe('gh release download ton-ia-1.7 --dir D:\\forge-ia-donnees\\cache\\ton-ia-1.7');
+    expect(commandes.TELECHARGER_VERSION('ton-ia-1.10')).toBe('gh release download ton-ia-1.10 --dir D:\\forge-ia-donnees\\cache\\ton-ia-1.10');
+    expect(commandes.TELECHARGER_VERSION('donnees-ton-ia-2')).toBe(
+      'gh release download donnees-ton-ia-2 --dir D:\\forge-ia-donnees\\cache\\donnees-ton-ia-2',
+    );
+    const commande = commandes.TELECHARGER_VERSION('ton-ia-1.9');
+    expect(commande).not.toMatch(/\n/);
+    expect(commande).toBe(commande.trim());
+  });
+
+  it('refuse une étiquette qui n’est pas celle d’une Release de ton IA', () => {
+    for (const mauvaise of ['', 'ton-ia', 'ton-ia-1.7 ; rm -r', 'v1.7', 'ton-ia-1.7\n']) {
+      expect(() => commandes.TELECHARGER_VERSION(mauvaise), mauvaise).toThrow(/n’est pas l’étiquette d’une Release de ton IA/);
+    }
+  });
+
+  it('chaque commande de chapitre qui existe se lit telle quelle dans le README de forge, sur une ligne', () => {
+    for (const nom of COMMANDES_DES_CHAPITRES) {
+      if (!(nom in commandes)) continue; // elle entre avec la parution de son chapitre (tâches 11 à 14)
+      const commande = (commandes as Record<string, unknown>)[nom];
+      expect(typeof commande, nom).toBe('string');
+      expect(README_DE_FORGE, nom).toContain(commande as string);
+    }
+    // Seules ces commandes sont attendues : un autre nom en AFFINER_, DPO_… serait une faute de frappe.
+    const attendues = new Set(COMMANDES_DES_CHAPITRES);
+    for (const nom of Object.keys(commandes)) {
+      if (/_1_(7|8|9|10)(_COURT)?$/.test(nom)) expect(attendues.has(nom), nom).toBe(true);
     }
   });
 });
