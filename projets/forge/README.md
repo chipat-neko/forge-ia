@@ -302,6 +302,32 @@ uv run --extra gpu python -m forge entrainer --config configs/mini.toml --arrete
 uv run --extra gpu python -m forge entrainer --config configs/mini.toml --reprendre
 ```
 
+### Ton IA 1.7 : apprendre à converser
+
+La version 1.7 est le premier vrai affinage : un SFT de `ton-ia-1.5` sur des conversations en
+français. Les données, puis les deux entraînements (complet et court), dans l'ordre, depuis
+`projets/forge` :
+
+```powershell
+uv run --extra gpu python -m forge publication --etiquette ton-ia-1.5
+uv run --extra gpu python -m forge conversations --source luth2_conversation
+uv run --extra gpu python -m forge conversations --source aya_fr
+uv run --extra gpu python -m forge conversations --source oasst2_fr
+uv run --extra gpu python -m forge conversations --source ifeval_fr
+uv run --extra gpu python -m forge conversations --source mgsm_rev2_fr
+uv run --extra gpu python -m forge conversations --source gsm8k_platinum_fr
+uv run --extra gpu python -m forge conversations --source humaneval
+uv run --extra gpu python -m forge preparer --recette sft-1.7
+uv run --extra gpu python -m forge entrainer --config configs/sft-1.7.toml
+uv run --extra gpu python -m forge entrainer --config configs/sft-1.7-court.toml
+```
+
+Les quatre jeux d'évaluation ne servent pas à l'entraînement : `preparer` les lit pour écarter les
+exemples qui leur ressemblent. `configs/sft-1.7.toml` lit deux fois les rangées d'entraînement
+(3 338 pas, environ 4 h 45 min sur la RTX 5070 Ti) ; `configs/sft-1.7-court.toml` garde les mêmes
+réglages pour une heure environ (739 pas). Les mesures (débit, mémoire, coût du masque par document,
+balayage du taux d'apprentissage) sont dans `docs/mesures/ton-ia-1.7.md`.
+
 ## Suivre un entraînement
 
 `suivi` lit le journal d'un entraînement et dit où il en est : état (en cours, en pause, fini,

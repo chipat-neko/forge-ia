@@ -1,0 +1,81 @@
+# Ton IA 1.7, version courte : le même affinage que configs/sft-1.7.toml, en une heure environ.
+# Seuls changent jetons_total (une heure au débit mesuré) et sortie.
+#
+# Lancer, depuis projets/forge (après « . .\outils\env-forge.ps1 » à la racine du dépôt) :
+#   uv run --extra gpu python -m forge entrainer --config configs/sft-1.7-court.toml
+# Ctrl+C met en pause (le pas en cours se termine, puis tout est sauvegardé) ; pour reprendre :
+#   uv run --extra gpu python -m forge entrainer --config configs/sft-1.7-court.toml --reprendre
+# Il faut avoir d'abord la version de départ et le jeu :
+#   uv run --extra gpu python -m forge publication --etiquette ton-ia-1.5
+#   uv run --extra gpu python -m forge preparer --recette sft-1.7
+#
+# Réglé le 18 novembre 2026 d'après l'essai chronométré et le balayage du taux de
+# docs/mesures/ton-ia-1.7.md (carte au repos, RTX 5070 Ti).
+
+# L'affinage supervisé : ton IA apprend des conversations, et la perte ne porte que sur les
+# réponses de l'assistant (et leur <|fin_tour|>), jamais sur les questions.
+methode = "sft"
+
+# La version publiée d'où l'on part : FORGE_DONNEES/publications/ton-ia-1.5, téléchargée par
+# « forge publication --etiquette ton-ia-1.5 » comme un lecteur la télécharge (poids bf16 passés
+# en float32).
+depart = "ton-ia-1.5"
+
+# Taille du modèle : celle de la version de départ, « tres_grand » = 433,6 millions de paramètres
+# (dim 1280, 20 couches, 20 têtes), contexte de 2 048 jetons.
+preset = "tres_grand"
+
+# Le jeu d'affinage de « forge preparer --recette sft-1.7 » (sous FORGE_DONNEES/affinage/) :
+# 135 471 conversations empaquetées en 53 401 rangées d'entraînement et 1 095 de validation.
+donnees = "sft-1.7"
+
+# Jetons lus en tout : une heure au débit mesuré sur la carte (13 444 jetons par seconde, médiane
+# des pas 2 à 10 de l'essai chronométré), 13 444 × 3 600 = 48 398 400, arrondis au pas entier
+# au-dessus : 739 pas de 65 536 jetons = 48 431 104 jetons, 0,44 époque des rangées d'entraînement.
+jetons_total = 48_431_104
+
+# Jetons vus par pas d'optimisation : 32 rangées de 2 048 positions (bourrage compris). Doit être
+# un multiple de micro_lot × 2 048.
+taille_lot_jetons = 65_536
+
+# La longueur des rangées du jeu (le contexte du modèle).
+longueur = 2048
+
+# Rangées que la carte traite d'un coup : 1, le plus grand micro-lot qui tient vraiment, et le plus
+# rapide (13 444 jetons par seconde, 12,8 Go de mémoire de la carte au plus) ; 2 remplit la carte à
+# 97 % et va 24 % moins vite, 4 déborde dans la mémoire partagée de Windows. Donc 32 micro-lots
+# accumulés par pas.
+micro_lot = 1
+
+# Taux d'apprentissage : montée de 0 à taux_max pendant les 50 premiers pas, puis descente en
+# cosinus jusqu'à taux_max ÷ 10 au dernier pas. Aucune source pour un modèle de cette taille
+# entraîné de zéro : choisi par le balayage de 1e-5, 3e-5 et 1e-4 (300 pas chacun). 1e-4 finit avec
+# la plus basse perte de validation (1,279, contre 1,398 et 1,526). C'est le plus grand taux essayé :
+# un taux plus grand n'a pas été mesuré.
+taux_max = 1e-4
+echauffement = 50
+
+# Réglages d'AdamW et écrêtage des gradients : ceux de principal.toml, sauf la décroissance des
+# poids, à 0 : on ne tire pas les poids vers 0, loin de ton IA d'avant.
+poids_decroissance = 0.0
+betas = [0.9, 0.95]
+ecretage = 1.0
+
+# Graine du hasard : l'ordre des rangées.
+graine = 1234
+
+# Perte de validation (sur 64 rangées de validation) tous les 100 pas.
+evaluation_tous_pas = 100
+
+# Sauvegarde au moins toutes les 30 minutes. Une sauvegarde d'étape pèse 4,8 Gio (12 octets par
+# paramètre). Ctrl+C sauvegarde tout de suite, quelle que soit cette valeur.
+sauvegarde_minutes = 30
+
+# « cuda » : la carte graphique (RTX 5070 Ti). « cpu » : le processeur, bien plus lent.
+appareil = "cuda"
+
+# « auto » : essayer torch.compile, et continuer sans s'il ne marche pas (triton manque sous Windows).
+compiler = "auto"
+
+# Dossier du journal et des sauvegardes (sous FORGE_DONNEES/entrainements/).
+sortie = "ton-ia-1.7-court"

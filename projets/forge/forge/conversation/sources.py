@@ -29,10 +29,18 @@ from forge.conversation.format import Tour, conversation_vers_json, verifier_con
 # Apache-2.0, sans clause sur l'usage des sorties. Gemma, Llama et GPT sont écartés.
 GENERATEURS_GARDES = ("Qwen/",)
 
-# Les sources amont de Luth-2 que l'on écarte (en minuscules, cherchées dans la colonne `source`) :
-# StackOverflow est en CC BY-SA ; Smol-Magpie viendrait de Llama (« données », §1.2, non relu).
-# La tâche 12 relit les fiches des autres sources amont et complète cette liste.
-SOURCES_AMONT_ECARTEES = ("stackoverflow", "smoltalk", "magpie")
+# Les sources amont de Luth-2 que l'on écarte (en minuscules, cherchées dans la colonne `source`, qui
+# donne le dépôt Hugging Face d'où vient l'invite). Fiches lues le 17/11/2026, jeu entier compté
+# (révision 47cd1af) ; le détail, source par source, est dans docs/donnees.md :
+# - « smoltalk » : HuggingFaceTB/smoltalk2, invites de Smol-Magpie-Ultra (écrites par Llama 3.1 405B)
+#   et de Tulu 3 Personas IF (GPT-4o) ;
+# - « dolci » : allenai/Dolci-Instruct-SFT, un mélange où Tulu 3 Personas (GPT-4o), Evol CodeAlpaca,
+#   CoCoNot, WildGuardMix et WildJailbreak (GPT-4) côtoient d'autres jeux, sans que Luth-2 dise duquel
+#   vient une ligne : tout est écarté ;
+# - « tulu » : les Tulu 3 Personas (invites écrites par GPT-4o).
+# « stackoverflow » et « magpie » ne trouvent aucune ligne : aucune valeur de `source` ne les contient.
+# Les lignes de Nemotron tirées de StackOverflow (CC BY-SA) ne se reconnaissent pas à leur source.
+SOURCES_AMONT_ECARTEES = ("stackoverflow", "smoltalk", "magpie", "dolci", "tulu")
 
 Usage = Literal["entrainement", "evaluation"]
 Sorte = Literal["conversation", "consignes", "probleme", "code_test", "humaneval"]

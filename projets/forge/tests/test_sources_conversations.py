@@ -53,7 +53,7 @@ def test_le_registre_a_les_neuf_sources_de_la_fiche():
     assert SOURCES_CONVERSATIONS["opc_educational"].configuration == "educational_instruct"
     assert SOURCES_CONVERSATIONS["humaneval"].sorte == "humaneval"
     assert GENERATEURS_GARDES == ("Qwen/",)
-    assert SOURCES_AMONT_ECARTEES == ("stackoverflow", "smoltalk", "magpie")
+    assert SOURCES_AMONT_ECARTEES == ("stackoverflow", "smoltalk", "magpie", "dolci", "tulu")
 
 
 def test_une_source_d_evaluation_ne_peut_pas_servir_a_l_entrainement():
@@ -125,6 +125,30 @@ def test_luth_ecarte_chaque_cas_avec_sa_raison():
     avec_role_outil["messages"].insert(1, {"role": "tool", "content": "résultat", "tool_calls": []})
     assert _raison("luth2_conversation", avec_role_outil) == "appel_d_outil"
     assert _raison("luth2_conversation", _luth(reponse="  ")) == "conversation_invalide"
+
+
+# Les valeurs de la colonne `source` de Luth-2, toutes lues sur le jeu entier (révision 47cd1af, 17/11/2026).
+SOURCES_AMONT_DE_LUTH = {
+    "nvidia/Nemotron-Post-Training-Dataset-v2": "gardee",
+    "allenai/Dolci-Instruct-SFT": "ecartee",
+    "allenai/Dolci-Instruct-SFT-Tool-Use": "ecartee",
+    "HuggingFaceTB/smoltalk2": "ecartee",
+    "allenai/tulu-3-sft-personas-instruction-following": "ecartee",
+    "allenai/tulu-3-sft-personas-math": "ecartee",
+}
+
+
+@pytest.mark.parametrize("source", sorted(SOURCES_AMONT_DE_LUTH))
+@pytest.mark.parametrize(
+    "nom,domaine", [("luth2_conversation", "knowledge"), ("luth2_conversation", "if"), ("luth2_code", "code")]
+)
+def test_chaque_source_amont_de_luth_est_gardee_ou_ecartee(source, nom, domaine):
+    # Même avec un générateur Qwen et un domaine gardé : seule la source amont décide ici.
+    ligne = _luth(source=source, domaine=domaine, reponse="Voici :\n```python\nprint('a')\n```")
+    if SOURCES_AMONT_DE_LUTH[source] == "ecartee":
+        assert _raison(nom, ligne) == "source_amont"
+    else:
+        assert _convertir(nom, ligne)
 
 
 def test_les_sources_amont_ecartees_se_lisent_en_minuscules_dans_la_source(monkeypatch):
@@ -288,8 +312,15 @@ TOTAL = FICHIERS * PAR_FICHIER
 PAR_FRAGMENT = 7
 
 
+AMONT_ECARTEES = sorted(s for s, choix in SOURCES_AMONT_DE_LUTH.items() if choix == "ecartee")
+
+
 def _lignes_luth() -> list[dict]:
-    """120 lignes : un quart écarté (outil, Gemma, StackOverflow, maths, à tour de rôle), le reste gardé."""
+    """120 lignes : la moitié écartée (outil, Gemma, source amont, maths, à tour de rôle), le reste gardé.
+
+    Les lignes d'une source amont écartée (rang 5 modulo 8) ont un générateur Qwen et le domaine `knowledge` :
+    seule leur source les écarte.
+    """
     lignes = []
     for i in range(TOTAL):
         genre = i % 8
@@ -298,7 +329,7 @@ def _lignes_luth() -> list[dict]:
         elif genre == 3:
             lignes.append(_luth(generateur="google/gemma-4", identifiant=f"l{i}"))
         elif genre == 5:
-            lignes.append(_luth(source="nvidia/Nemotron-StackOverflow", identifiant=f"l{i}"))
+            lignes.append(_luth(source=AMONT_ECARTEES[i % len(AMONT_ECARTEES)], identifiant=f"l{i}"))
         elif genre == 7:
             lignes.append(_luth(domaine="math", identifiant=f"l{i}"))
         else:
@@ -427,6 +458,8 @@ def test_le_telechargement_trie_et_compte_les_raisons(flux, tmp_path):
     elements = list(lire_elements(dossier, "conversations"))
     assert len(elements) == 60
     assert {e["domaine"] for e in elements} == {"knowledge"}
+    # Aucune ligne d'une source amont écartée n'entre dans le jeu téléchargé.
+    assert not [e["origine"] for e in elements if int(e["origine"][1:]) % 8 == 5]
     assert all(e["tours"][-1]["role"] == "assistant" for e in elements)
     assert len(_fragments(dossier)) == 9  # 60 éléments, 7 par fragment
 

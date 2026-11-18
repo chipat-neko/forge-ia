@@ -188,20 +188,73 @@ s'arrête après N éléments gardés (20 suffisent pour vérifier les colonnes)
 
 - **Dépôt :** [kurakurai/Luth-2-Post-Training-SFT](https://huggingface.co/datasets/kurakurai/Luth-2-Post-Training-SFT)
   (1 969 768 lignes, 20 fichiers parquet, sans formulaire d'accès). Les invites sont traduites en
-  français et les réponses régénérées par des modèles ouverts.
-- **Licence :** CC BY 4.0 ([texte](https://creativecommons.org/licenses/by/4.0/)). Les lignes
-  tirées de StackOverflow restent en CC BY-SA 4.0 : elles sont écartées.
+  français et les réponses régénérées par des modèles ouverts. La colonne `source` nomme le jeu d'où
+  vient l'invite, la colonne `generator` le modèle qui a écrit la réponse.
+- **Licence :** CC BY 4.0 ([texte](https://creativecommons.org/licenses/by/4.0/)). D'après la fiche, les
+  lignes que Nemotron a tirées de StackOverflow restent en CC BY-SA 4.0. La colonne `source` ne les
+  distingue pas : voir « Les sources amont » plus bas.
 - **Usage :** entraînement
 - **Ce qui est gardé (`luth2_conversation`) :** le domaine `knowledge` ou `if` ; un générateur dont
   le nom commence par `Qwen/` (Apache-2.0, sans clause sur l'usage des sorties) ; aucun appel d'outil
-  (`tool_calls`) ni rôle `tool` ; une colonne `source` sans `stackoverflow`, `smoltalk` ni `magpie`
-  (en minuscules). StackOverflow est en CC BY-SA ; Smol-Magpie viendrait de Llama. La liste des
-  sources amont écartées (`SOURCES_AMONT_ECARTEES`) sera complétée après la lecture des fiches des
-  autres sources amont.
+  (`tool_calls`) ni rôle `tool` ; une source amont qui n'est pas écartée : la colonne `source`, en
+  minuscules, ne contient aucune valeur de `SOURCES_AMONT_ECARTEES` (`stackoverflow`, `smoltalk`,
+  `magpie`, `dolci`, `tulu`).
 - **Ce qui est gardé (`luth2_code`) :** le domaine `code`, avec les mêmes filtres, et une réponse qui
   contient un bloc de code Python (balise `python`). Le jeu n'est pas filtré par langage de programmation.
 - **Raisons comptées :** `domaine`, `generateur`, `appel_d_outil`, `source_amont`, `pas_de_python`,
   `conversation_invalide`.
+- **Téléchargement du 17/11/2026 (`luth2_conversation`) :** 560 448 conversations gardées sur
+  1 969 768 lignes lues, en 8 min 46 s. Écartées : 1 162 639 pour le domaine, 78 578 pour le
+  générateur, 168 103 pour la source amont. Toutes les lignes gardées viennent de Nemotron.
+
+#### Les sources amont de Luth-2
+
+Fiches lues le 17/11/2026. Les lignes sont comptées sur le jeu entier (révision `47cd1af`), en lisant
+les colonnes `domain`, `source` et `generator` des 20 fichiers. On écarte toute source amont dont les
+invites ou les réponses viennent de Llama ou d'OpenAI.
+
+| Source amont | Lignes par domaine | Générateur des réponses | Décision |
+| --- | --- | --- | --- |
+| `nvidia/Nemotron-Post-Training-Dataset-v2` | knowledge 560 448, code 227 934, math 146 005 | `Qwen/Qwen3.6-35B-A3B` | gardée |
+| `allenai/Dolci-Instruct-SFT` | knowledge 34 739, if 112 747, code 320 498, math 234 586 | `Qwen/Qwen3-30B-A3B` | écartée (`dolci`) |
+| `allenai/Dolci-Instruct-SFT-Tool-Use` | tool_call 186 176 | `google/gemma-4-31B-it` | écartée (`dolci`, et par le domaine et le générateur) |
+| `HuggingFaceTB/smoltalk2` | if 50 396 (sans générateur) et 28 182 | aucun, et `google/gemma-4-26b-a4b-it` | écartée (`smoltalk`, et par le générateur) |
+| `allenai/tulu-3-sft-personas-instruction-following` | if 20 617 | `Qwen/Qwen3-32B` | écartée (`tulu`) |
+| `allenai/tulu-3-sft-personas-math` | math 47 440 | `Qwen/Qwen3-32B` | écartée (`tulu`, et par le domaine) |
+
+- **Nemotron, gardée.** Les réponses sont régénérées par Qwen (Apache-2.0). D'après sa fiche et
+  l'article de Nemotron Nano 2 (arXiv 2508.14444), les invites viennent de corpus publics
+  (LMSYS-Chat-1M, WildChat-1M, HelpSteer, problèmes de concours) ou sont générées. Deux réserves :
+  - le modèle qui a généré les invites synthétiques n'est nommé ni par la fiche ni par l'article [non vérifié] ;
+  - la fiche annonce « un petit sous-ensemble » d'invites tirées de StackOverflow, sous CC BY-SA 4.0.
+    Luth-2 ne garde pas la licence de chaque ligne, et le jeu d'origine est à accès restreint (non
+    ouvert ici) : ces lignes ne sont pas reconnues, elles restent dans le jeu.
+- **Dolci-Instruct-SFT, écartée.** Ce mélange de l'Allen Institute réunit une vingtaine de jeux. Parmi
+  eux, Tulu 3 Personas a des invites écrites par GPT-4o. Evol CodeAlpaca, CoCoNot, WildGuardMix et
+  WildJailbreak ont des invites écrites par GPT-4 [résumé]. Luth-2 ne dit pas de quel jeu vient
+  chaque ligne : on ne peut garder les autres jeux, tout est écarté.
+- **Dolci-Instruct-SFT-Tool-Use, écartée.** Ce sont des appels d'outils, aux réponses écrites par Gemma.
+- **SmolTalk2, écartée.** Ses lignes françaises traduisent les invites de Smol-Magpie-Ultra, écrites par
+  Llama 3.1 405B [résumé, « données », §1.2], et de Smol-Constraints. Ses conversations à plusieurs
+  tours partent des invites de Tulu 3 Personas IF. Les réponses sont de Gemma, ou sans générateur nommé.
+- **Tulu 3 Personas (consignes et maths), écartées.** Les invites sont générées avec des personas. La
+  fiche de Persona MATH dit que ses sorties viennent de GPT-4o et de Claude 3.5 Sonnet. Celle de
+  Persona IF ne nomme pas le modèle, mais la méthode est la même [non vérifié dans sa fiche].
+
+Ce que chaque valeur de `SOURCES_AMONT_ECARTEES` écarte, sur le jeu entier :
+
+| Valeur | Lignes dont la source la contient | Dont `knowledge`, `if` et `code` | Comptées `source_amont` par `luth2_conversation` |
+| --- | ---: | ---: | ---: |
+| `stackoverflow` | 0 | 0 | 0 |
+| `smoltalk` | 78 578 | 78 578 | 0 (déjà écartées pour le générateur) |
+| `magpie` | 0 | 0 | 0 |
+| `dolci` | 888 746 | 467 984 | 147 486 |
+| `tulu` | 68 057 | 20 617 | 20 617 |
+
+`stackoverflow` et `magpie` n'écartent rien : aucune valeur de `source` ne les contient. Ils restent
+dans la liste au cas où une révision de Luth-2 nommerait ces sources. Les 168 103 lignes comptées
+`source_amont` par le téléchargement sont exactement celles de Dolci et de Tulu Personas IF dans les
+domaines `knowledge` et `if`.
 
 ### Aya français (`aya_fr`)
 
