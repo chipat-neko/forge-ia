@@ -1,7 +1,7 @@
 """Point d'entrée en ligne de commande : `python -m forge <commande>`.
 
 Les commandes `donnees`, `tokenizer`, `compression`, `encoder`, `mesurer`,
-`entrainer`, `evaluer`, `exporter`, `publication`, `suivi`, `conversations`, `problemes`, `preparer`, `evaluer-etape` et `discuter` s'y branchent une par une, au fil des
+`entrainer`, `evaluer`, `exporter`, `publication`, `suivi`, `conversations`, `problemes`, `preparer`, `preferences`, `evaluer-etape` et `discuter` s'y branchent une par une, au fil des
 tâches du plan (chacune ajoute son sous-parseur dans `construire_parseur`). Toutes sont là.
 """
 
@@ -1162,6 +1162,118 @@ def _ajouter_preparer(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_preparer, parseur=commande)
 
 
+def _commande_preferences(choix: argparse.Namespace) -> int:
+    """`forge preferences` : deux réponses de ton IA par invite, classées par des contrôles programmés, en jeu dpo."""
+    # Imports ici : PyTorch est long à charger, les autres commandes n'en ont pas besoin.
+    import torch
+
+    from forge.chemins import PlaceInsuffisante
+    from forge.erreurs import DonneesManquantes
+    from forge.evaluation.rapport import pourcent
+    from forge.fichiers import ESPACE_FINE, entier
+    from forge.preferences import construction
+
+    fine = ESPACE_FINE
+    if choix.recette not in construction.RECETTES_PREFERENCES:
+        choix.parseur.error(
+            f"recette inconnue{fine}: {choix.recette!r}. Les recettes sont {', '.join(construction.RECETTES_PREFERENCES)}."
+        )
+    recette = construction.RECETTES_PREFERENCES[choix.recette]
+
+    def nombre(valeur: int) -> str:
+        return entier(valeur, milliers=fine)
+
+    def journal(message: str) -> None:
+        print(message, flush=True)
+
+    try:
+        index = construction.construire_paires(choix.modele, recette, choix.sortie, choix.appareil, journal=journal)
+    except construction.PairesEnPause as pause:
+        print(pause, file=sys.stderr)
+        return 130
+    except torch.cuda.OutOfMemoryError:
+        print(
+            f"Erreur{fine}: la carte graphique manque de mémoire pour écrire les réponses. Ferme les jeux ou logiciels 3D "
+            f"ouverts (et l'entraînement, s'il tourne), puis relance la même commande{fine}: elle reprend au dernier paquet validé.",
+            file=sys.stderr,
+        )
+        return 1
+    except (ValueError, DonneesManquantes, PlaceInsuffisante, FileNotFoundError, PermissionError, RuntimeError) as erreur:
+        # Relancer tel quel échouerait de nouveau : le message dit quoi faire, rien d'autre.
+        print(f"Erreur{fine}: {erreur}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print(
+            f"Interrompu pendant les paires de «{fine}{recette.nom}{fine}». Relance la même commande{fine}: les paquets "
+            "déjà validés sont gardés, la reprise repart du suivant.",
+            file=sys.stderr,
+        )
+        return 130
+    taux = index["taux_de_paires"]
+    libelles = {
+        "terminee": "réponse terminée",
+        "juste": "réponse juste",
+        "consignes": "consignes respectées",
+        "francais": "français",
+        "longueur": "longueur",
+    }
+    # Dans l'ordre des critères (l'index range ses clés par ordre alphabétique).
+    raisons = ", ".join(f"{libelle} {nombre(index['raisons'].get(nom, 0))}" for nom, libelle in libelles.items())
+    print(
+        f"Jeu «{fine}{recette.nom}{fine}»{fine}: {nombre(index['invites'])} invites, {nombre(index['paires'])} paires, "
+        f"{nombre(index['egalites'])} égalités. Départagées par{fine}: {raisons}."
+    )
+    print(f"Taux de paires{fine}: {pourcent(taux)} ({nombre(index['paires'])} paires sur {nombre(index['invites'])} invites).")
+    if taux < construction.SEUIL_DU_TAUX_DE_PAIRES:
+        print(
+            f"Attention{fine}: c'est sous le seuil de {pourcent(construction.SEUIL_DU_TAUX_DE_PAIRES)} prévu au plan. "
+            "Le dire avant de lancer la DPO."
+        )
+    rangees = index["rangees"]
+    print(
+        f"{nombre(rangees['train'])} rangées d'entraînement et {nombre(rangees['val'])} de validation "
+        f"(une paire, deux rangées), {nombre(index['jetons'])} jetons dont {nombre(index['jetons_appris'])} appris."
+    )
+    return 0
+
+
+def _ajouter_preferences(sous_parseurs) -> None:
+    commande = _nouvelle_commande(
+        sous_parseurs,
+        "preferences",
+        "Construit les paires de préférences de 1.8 : deux réponses de ton IA par invite (questions avec consignes, "
+        "problèmes de calcul), classées par des contrôles programmés (terminée, juste, consignes, français, longueur), "
+        "sans juge. Par paquets repris après une coupure, puis un jeu dpo sous FORGE_DONNEES/affinage/NOM.",
+    )
+    commande.add_argument(
+        "--modele",
+        required=True,
+        type=Path,
+        metavar="DOSSIER",
+        help="le dossier de la version publiée qui répond (ton-ia-1.7 pour 1.8)",
+    )
+    commande.add_argument(
+        "--recette",
+        required=True,
+        metavar="NOM",
+        help="la recette des paires : preferences-1.8 ou preferences-1.8-court",
+    )
+    commande.add_argument(
+        "--sortie",
+        default=None,
+        metavar="NOM",
+        help="le dossier du jeu, sous FORGE_DONNEES/affinage (par défaut, le nom de la recette)",
+    )
+    commande.add_argument(
+        "--appareil",
+        type=_appareil,
+        default=None,
+        metavar="cuda|cpu",
+        help="où calculer (la carte graphique si PyTorch la voit, sinon le processeur)",
+    )
+    commande.set_defaults(fonction=_commande_preferences, parseur=commande)
+
+
 def _entier_strictement_positif_ou_erreur(texte: str) -> int:
     try:
         valeur = int(texte)
@@ -1192,7 +1304,7 @@ def _commande_evaluer_etape(choix: argparse.Namespace) -> int:
     modele = Path(choix.modele)
     sortie = choix.sortie or sous_forge_donnees(f"{_version_du_dossier(modele)}-{choix.etape}", "evaluations")
     try:
-        rapport = evaluer_etape(modele, choix.etape, sortie, choix.reference, choix.appareil, choix.n_max)
+        rapport = evaluer_etape(modele, choix.etape, sortie, choix.reference, choix.appareil, choix.n_max, choix.invites)
     except (FileNotFoundError, PermissionError, PlaceInsuffisante, DonneesManquantes, ValueError) as erreur:
         print(f"Erreur{fine}: {erreur}", file=sys.stderr)
         return 1
@@ -1216,8 +1328,8 @@ def _ajouter_evaluer_etape(sous_parseurs) -> None:
         sous_parseurs,
         "evaluer-etape",
         "Évalue une version publiée de ton IA (ton-ia-1.5 ou une suivante) à une étape : IFEval-FR, problèmes "
-        "générés, MGSM, GSM8K-Platinum en français, langue et tenue des réponses. Les mêmes mesures d'une version "
-        "à l'autre, dans rapport.json et rapport.md.",
+        "générés, MGSM, GSM8K-Platinum en français, langue et tenue des réponses, victoire contre la référence (1.8). "
+        "Les mêmes mesures d'une version à l'autre, dans rapport.json et rapport.md.",
     )
     commande.add_argument(
         "--modele",
@@ -1226,7 +1338,7 @@ def _ajouter_evaluer_etape(sous_parseurs) -> None:
         metavar="DOSSIER",
         help="le dossier de la version publiée (poids .safetensors, config.json, tokenizer-ton-ia-v1.json)",
     )
-    commande.add_argument("--etape", required=True, metavar="ETAPE", help="l'étape : 1.7 ou 1.9")
+    commande.add_argument("--etape", required=True, metavar="ETAPE", help="l'étape : 1.7, 1.8 ou 1.9")
     commande.add_argument(
         "--reference",
         type=Path,
@@ -1254,6 +1366,13 @@ def _ajouter_evaluer_etape(sous_parseurs) -> None:
         default=None,
         metavar="N",
         help="au plus N exemples par mesure (tous par défaut) : pour un essai court",
+    )
+    commande.add_argument(
+        "--invites",
+        default=None,
+        metavar="NOM",
+        help="étape 1.8 : la victoire prend les invites de validation du jeu de paires NOM (sous FORGE_DONNEES/affinage), "
+        "au lieu des 500 invites du rapport, pour départager les essais d'un balayage",
     )
     commande.set_defaults(fonction=_commande_evaluer_etape, parseur=commande)
 
@@ -1366,6 +1485,7 @@ def construire_parseur() -> argparse.ArgumentParser:
     _ajouter_conversations(sous_parseurs)
     _ajouter_problemes(sous_parseurs)
     _ajouter_preparer(sous_parseurs)
+    _ajouter_preferences(sous_parseurs)
     _ajouter_evaluer_etape(sous_parseurs)
     _ajouter_discuter(sous_parseurs)
     return parseur

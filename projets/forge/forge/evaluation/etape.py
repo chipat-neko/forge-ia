@@ -15,7 +15,12 @@ Les mesures (`MESURES`) :
 - `oubli` : la perte et les bits par octet sur 64 morceaux de `jetons/principal/val` (la mesure du plan 6) ;
 - `echantillons` : dix invites fixes, en glouton, gardées telles quelles ;
 - `problemes` : 400 problèmes générés de la plage d'évaluation, en glouton et en 8 essais ;
-- `mgsm_fr` et `gsm8k_platinum_fr` : les problèmes de MGSM et de GSM8K-Platinum en français, en glouton.
+- `mgsm_fr` et `gsm8k_platinum_fr` : les problèmes de MGSM et de GSM8K-Platinum en français, en glouton ;
+- `victoire` : la version contre sa référence (`--reference`), sur 500 invites (questions de la validation de
+  `sft-1.7` et problèmes de `GRAINES_VICTOIRE`, avec consignes) ou, avec `--invites NOM`, sur les invites de
+  validation du jeu de paires `NOM`. Les réponses gloutonnes des deux versions sont notées par les contrôles
+  programmés de `forge.preferences.noter`, puis comparées invite par invite (`taux_de_victoire`). Chaque
+  version garde son taux contre l'autre : celui de la référence est le complément.
 
 Une mesure dont les données manquent rend `{"absente": "<raison>"}` : le rapport le dit, il n'échoue pas.
 
@@ -37,8 +42,10 @@ from forge.chemins import sous_forge_donnees
 from forge.conversation.format import Reponse, Tour, invite_de_reponse
 from forge.conversation.sources import SOURCES_CONVERSATIONS
 from forge.conversation.telechargement import PREFIXE, dossier_de_la_source
+from forge.donnees.nettoyage import empreinte
 from forge.entrainement.chargeur import ChargeurJetons
 from forge.entrainement.methodes import MORCEAUX_DE_VALIDATION, perte_sft_validation
+from forge.erreurs import DonneesManquantes
 from forge.evaluation.consignes import exactitudes, respecte
 from forge.evaluation.langue import langue, mots
 from forge.evaluation.perte import bits_par_octet, lire_octets_par_jeton, perte_sur_morceaux
@@ -53,9 +60,12 @@ from forge.evaluation.rapport import (
 from forge.evaluation.reponses import choisir_le_lot, repondre_lot
 from forge.fichiers import ESPACE_FINE, ecrire_texte
 from forge.fragments import lire_elements
+from forge.preferences.construction import invites_de_validation as invites_de_validation_des_paires
+from forge.preferences.invites import InvitePreference, invites_de_preference
+from forge.preferences.noter import Note, noter, taux_de_victoire
 from forge.processeur import fils_disponibles
 from forge.publication import charger_publication
-from forge.raisonnement.problemes import GRAINES_EVALUATION, generer_problemes
+from forge.raisonnement.problemes import GRAINES_EVALUATION, GRAINES_VICTOIRE, generer_problemes
 from forge.raisonnement.verification import est_juste
 from forge.tokenizer.bpe_octets import TokenizerOctets
 
@@ -89,6 +99,9 @@ ESSAIS = 8  # « réussite en 8 essais » : au moins une réponse juste sur 8 ti
 INVITES_DE_VALIDATION = 100
 MORCEAUX_D_OUBLI = 64
 MORCEAUX_PAR_LOT = 8
+INVITES_DE_VICTOIRE = 500
+JETONS_VICTOIRE = 384  # comme les réponses des paires de 1.8
+GRAINE_DE_LA_VICTOIRE = 0
 
 
 class DonneeAbsente(Exception):
@@ -101,7 +114,9 @@ class ContexteDEvaluation:
 
     - `n_max` : le nombre maximal d'exemples de chaque mesure (`None` : tous), pour les essais courts ;
     - `lot` : le nombre de conversations qui avancent ensemble (`None` : le plus grand que la mémoire permet) ;
-    - `memo` : les réponses déjà écrites (`tenue` relit celles d'IFEval-FR au lieu de les refaire).
+    - `memo` : les réponses déjà écrites (`tenue` relit celles d'IFEval-FR au lieu de les refaire) ;
+    - `avec_reference` : une autre version passe les mêmes mesures (la `victoire` n'a de sens qu'à deux) ;
+    - `jeu_de_paires` : le nom d'un jeu de paires dont la `victoire` prend les invites de validation.
     """
 
     modele: torch.nn.Module
@@ -110,6 +125,8 @@ class ContexteDEvaluation:
     n_max: int | None = None
     lot: int | None = None
     memo: dict = field(default_factory=dict)
+    avec_reference: bool = False
+    jeu_de_paires: str | None = None
 
     def limiter(self, n: int) -> int:
         return n if self.n_max is None else min(n, self.n_max)
@@ -360,6 +377,63 @@ def _mesure_de_problemes_traduits(source: str) -> Callable[[ContexteDEvaluation]
     return mesure
 
 
+def _invites_de_victoire(ctx: ContexteDEvaluation) -> list[InvitePreference]:
+    """Les invites de la victoire : celles du rapport (validation de sft-1.7 et `GRAINES_VICTOIRE`), ou celles de
+    la validation du jeu de paires `ctx.jeu_de_paires`. Les mêmes pour les deux versions comparées."""
+    n = ctx.limiter(INVITES_DE_VICTOIRE)
+    if ctx.jeu_de_paires is not None:
+        try:
+            return invites_de_validation_des_paires(sous_forge_donnees(ctx.jeu_de_paires, "affinage"), n)
+        except DonneesManquantes as raison:
+            raise DonneeAbsente(str(raison)) from None
+    questions = invites_de_validation(_jeu_d_affinage("sft-1.7"), ctx.tok, n)
+    base = [(empreinte(tours[-1].texte), tours) for tours in questions]
+    return invites_de_preference(n, GRAINE_DE_LA_VICTOIRE, base, set(), graines_problemes=GRAINES_VICTOIRE)
+
+
+@_absente_si_les_donnees_manquent
+def _victoire(ctx: ContexteDEvaluation) -> dict:
+    """Les notes des réponses gloutonnes aux invites de la victoire ; `evaluer_etape` les compare à celles de l'autre version."""
+    if not ctx.avec_reference:
+        raise DonneeAbsente(
+            "la victoire compare deux versions sur les mêmes invites : relance avec --reference DOSSIER "
+            "(la version de l'étape d'avant, par exemple ton-ia-1.7)."
+        )
+    invites = _invites_de_victoire(ctx)
+    if not invites:
+        raise DonneeAbsente("aucune invite de victoire : la validation de ce jeu est vide.")
+    reponses = ctx.repondre([list(invite.tours) for invite in invites], JETONS_VICTOIRE)
+    return {
+        "notes": [list(noter(reponse, invite)) for reponse, invite in zip(reponses, invites)],
+        "mots_moyens": sum(len(mots(r.texte)) for r in reponses) / len(reponses),
+        "n": len(invites),
+    }
+
+
+def _comparer_les_victoires(rapport: dict) -> None:
+    """Remplace les notes de la `victoire` de chaque version par son taux de victoire contre l'autre."""
+    if "victoire" not in rapport["mesures"]:
+        return
+    if "reference" not in rapport:
+        return  # la mesure est déjà absente : elle n'a pas de sens sans référence
+    a, b = rapport["mesures"]["victoire"], rapport["reference"]["mesures"]["victoire"]
+    if "absente" in a or "absente" in b:
+        absente = {"absente": a.get("absente") or b.get("absente")}
+        rapport["mesures"]["victoire"], rapport["reference"]["mesures"]["victoire"] = absente, dict(absente)
+        return
+    notes_a, notes_b = [Note(*n) for n in a["notes"]], [Note(*n) for n in b["notes"]]
+    for cote, (siennes, autres, mots_siens, mots_autres) in (
+        (rapport, (notes_a, notes_b, a["mots_moyens"], b["mots_moyens"])),
+        (rapport["reference"], (notes_b, notes_a, b["mots_moyens"], a["mots_moyens"])),
+    ):
+        cote["mesures"]["victoire"] = {
+            **taux_de_victoire(siennes, autres),
+            "mots_modele": mots_siens,
+            "mots_reference": mots_autres,
+            "n": len(siennes),
+        }
+
+
 MESURES: dict[str, Callable[[ContexteDEvaluation], dict]] = {
     "perte_conversation": _perte_conversation,
     "ifeval_fr": _ifeval_fr,
@@ -369,11 +443,14 @@ MESURES: dict[str, Callable[[ContexteDEvaluation], dict]] = {
     "problemes": _problemes,
     "mgsm_fr": _mesure_de_problemes_traduits("mgsm_rev2_fr"),
     "gsm8k_platinum_fr": _mesure_de_problemes_traduits("gsm8k_platinum_fr"),
+    "victoire": _victoire,
 }
 
-# Les tâches 13 et 21 ajoutent « 1.8 » et « 1.10 ».
+# La tâche 21 ajoute « 1.10 ».
+_MESURES_DE_1_7 = ("perte_conversation", "ifeval_fr", "tenue", "oubli", "echantillons")
 MESURES_PAR_ETAPE: dict[str, tuple[str, ...]] = {
-    "1.7": ("perte_conversation", "ifeval_fr", "tenue", "oubli", "echantillons"),
+    "1.7": _MESURES_DE_1_7,
+    "1.8": (*_MESURES_DE_1_7, "victoire"),
     "1.9": ("ifeval_fr", "tenue", "oubli", "problemes", "mgsm_fr", "gsm8k_platinum_fr", "echantillons"),
 }
 
@@ -381,13 +458,22 @@ MESURES_PAR_ETAPE: dict[str, tuple[str, ...]] = {
 # --- Le rapport -----------------------------------------------------------------------------------------------------
 
 
-def _mesurer_une_version(dossier: Path, etape: str, appareil: torch.device, n_max: int | None) -> dict:
+def _mesurer_une_version(
+    dossier: Path,
+    etape: str,
+    appareil: torch.device,
+    n_max: int | None,
+    avec_reference: bool = False,
+    jeu_de_paires: str | None = None,
+) -> dict:
     """Charge la version de `dossier`, lui fait passer les mesures de `etape` ; rend ce que le rapport en garde."""
     debut = time.perf_counter()
     publication = charger_publication(dossier, appareil.type)
     if appareil.type == "cpu":
         torch.set_num_threads(fils_disponibles())  # tous les fils que ce processus peut utiliser
-    ctx = ContexteDEvaluation(publication.modele, publication.tokenizer, appareil, n_max)
+    ctx = ContexteDEvaluation(
+        publication.modele, publication.tokenizer, appareil, n_max, avec_reference=avec_reference, jeu_de_paires=jeu_de_paires
+    )
     mesures = {nom: MESURES[nom](ctx) for nom in MESURES_PAR_ETAPE[etape]}
     return {
         "version": publication.version,
@@ -404,19 +490,23 @@ def evaluer_etape(
     reference: Path | None = None,
     appareil: str | None = None,
     n_max: int | None = None,
+    invites: str | None = None,
 ) -> dict:
     """Évalue la version publiée de `modele` à l'étape `etape` ; écrit `sortie/rapport.json` et `rapport.md` ; rend le rapport.
 
     - `modele` : le dossier d'une version publiée (poids, `config.json`, tokenizer) ;
-    - `etape` : « 1.7 » ou « 1.9 » (voir `MESURES_PAR_ETAPE`) ;
+    - `etape` : « 1.7 », « 1.8 » ou « 1.9 » (voir `MESURES_PAR_ETAPE`) ;
     - `reference` : le dossier d'une autre version (ton-ia-1.5, en général), qui passe les mêmes mesures ; le
-      rapport garde les siennes dans `reference` et le Markdown les met en regard ;
+      rapport garde les siennes dans `reference` et le Markdown les met en regard. La `victoire` (étape 1.8)
+      compare la version à cette référence, et en a besoin ;
     - `appareil` : « cuda » ou « cpu » (la carte si PyTorch la voit, par défaut) ;
-    - `n_max` : le nombre maximal d'exemples de chaque mesure (`None` : tous), pour un essai court.
+    - `n_max` : le nombre maximal d'exemples de chaque mesure (`None` : tous), pour un essai court ;
+    - `invites` : le nom d'un jeu de paires (sous `affinage/`) ; la `victoire` prend alors ses invites de
+      validation au lieu des 500 invites du rapport. C'est ce qui départage les essais d'un balayage.
 
     Le rapport : `version_du_rapport`, `version` du modèle, son `empreinte` (SHA-256 des poids), `etape`, `date`,
-    `mesures` (les clés de `MESURES`, rangées dans l'ordre de l'étape), `secondes`, et `reference` si elle est donnée.
-    Rien n'est écrit si l'étape est inconnue.
+    `mesures` (les clés de `MESURES`, rangées dans l'ordre de l'étape), `secondes`, `invites`, et `reference` si
+    elle est donnée. Rien n'est écrit si l'étape est inconnue.
     """
     if etape not in MESURES_PAR_ETAPE:
         raise ValueError(
@@ -425,17 +515,25 @@ def evaluer_etape(
         )
     if n_max is not None and n_max < 1:
         raise ValueError(f"n_max vaut {n_max} : il faut au moins un exemple par mesure, ou rien pour les passer tous.")
+    if invites is not None and "victoire" not in MESURES_PAR_ETAPE[etape]:
+        raise ValueError(
+            f"--invites ne sert qu'à la mesure victoire, qui n'est pas dans l'étape {etape} : "
+            "écris --etape 1.8, ou retire --invites."
+        )
     choisi = choisir_appareil(appareil)
+    avec_reference = reference is not None
     rapport = {
         "version_du_rapport": VERSION_DU_RAPPORT_D_ETAPE,
-        **_mesurer_une_version(Path(modele), etape, choisi, n_max),
+        **_mesurer_une_version(Path(modele), etape, choisi, n_max, avec_reference, invites),
         "etape": etape,
         "date": datetime.now().astimezone().isoformat(timespec="seconds"),
         "appareil": choisi.type,
         "n_max": n_max,
+        "invites": invites,
     }
     if reference is not None:
-        rapport["reference"] = _mesurer_une_version(Path(reference), etape, choisi, n_max)
+        rapport["reference"] = _mesurer_une_version(Path(reference), etape, choisi, n_max, avec_reference, invites)
+        _comparer_les_victoires(rapport)
     sortie = Path(sortie)
     sortie.mkdir(parents=True, exist_ok=True)
     ecrire_texte(
@@ -485,6 +583,16 @@ _LIGNES: dict[str, list[tuple[str, Callable[[dict], str]]]] = {
     "gsm8k_platinum_fr": [
         ("GSM8K-Platinum en français, exactitude", lambda m: f"{_pourcent(m['exactitude'])} ({_ex(m)})"),
         ("GSM8K-Platinum en français, réponses terminées", lambda m: _pourcent(m["terminee"])),
+    ],
+    "victoire": [
+        (
+            "Taux de victoire contre l'autre version (contrôles programmés)",
+            lambda m: (
+                f"{_pourcent(m['taux'])} ({_n(m['victoires'], 0)} victoires, {_n(m['egalites'], 0)} égalités, "
+                f"{_n(m['defaites'], 0)} défaites, sur {_n(m['n'], 0)} invites)"
+            ),
+        ),
+        ("Longueur moyenne d'une réponse aux invites de la victoire", lambda m: f"{_n(m['mots_modele'])} mots"),
     ],
 }
 
@@ -556,6 +664,19 @@ def rapport_markdown(rapport: dict) -> str:
         "fausse pour un problème, jugée sur son texte pour une consigne.",
         "",
     ]
+    victoire = rapport["mesures"].get("victoire")
+    if victoire and "absente" not in victoire:
+        origine = (
+            f"les invites de validation du jeu de paires `{rapport['invites']}`"
+            if rapport.get("invites")
+            else "des questions de la validation de sft-1.7 et des problèmes générés, avec des consignes"
+        )
+        lignes += [
+            f"Le taux de victoire compare, invite par invite, les réponses des deux versions sur {origine}{_FINE}: "
+            "réponse terminée, puis juste, consignes respectées, en français, de 3 à 300 mots, dans cet ordre. "
+            "Une égalité compte une demie, sans juge.",
+            "",
+        ]
     problemes = rapport["mesures"].get("problemes")
     if problemes and "absente" not in problemes:
         lignes += [

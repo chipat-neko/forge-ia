@@ -374,6 +374,12 @@ def _charger_l_evaluation(journal: Callable[[str], None]) -> _Decontamination:
     return decontamination
 
 
+# Les noms publics que `forge.preferences.construction` réutilise (les invites de 1.8 passent par la même
+# décontamination) : personne n'importe un nom privé d'un autre module.
+Decontamination = _Decontamination
+charger_l_evaluation = _charger_l_evaluation
+
+
 # --- Préparer -------------------------------------------------------------------------------------------
 
 
