@@ -7,11 +7,14 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
+  celluleDeMesure,
   estAbsente,
   FICHIERS_ETAPES,
+  LIGNES_DES_MESURES,
   lireRapportEtape,
   lireSeries,
   MESURES_DE_L_ETAPE,
+  nomDeVersion,
   verifierRapportEtape,
 } from './etapes';
 import type { Mesure, RapportEtape } from './etapes';
@@ -174,5 +177,46 @@ describe('lireRapportEtape et lireSeries', () => {
         /entrainement-dpo-1\.8\.json.*logps_choisie\[\d\] doit être \[pas, valeur\]/s,
       );
     }
+  });
+});
+
+// Ce que TableauEtape.astro montre de chaque mesure (chapitres 1.7 à 1.10) : un nombre lisible, et « à
+// mesurer » pour un rapport qui manque ou une mesure absente.
+describe('les lignes du tableau d’une étape', () => {
+  const FINE = '\u202F';
+  const r: RapportEtape = {
+    version: 'ton-ia-1.7',
+    etape: '1.7',
+    releve_le: '2026-11-20',
+    mesures: {
+      perte_conversation: { perte: 1.2345, n: 64 },
+      ifeval_fr: { invite_stricte: 0.2170212765957447, consigne_stricte: 0.3130434782608696, n: 235 },
+      tenue: { terminee: 0, fr: 0.9276595744680851, autre: 0, indetermine: 0.07, mots_moyens: 347.06, n: 235 },
+      oubli: { absente: 'pas de jetons de validation' },
+    },
+    echantillons: [],
+  };
+
+  it('chaque mesure de l’étape 1.7 a sa ligne : un libellé, une précision, et sa valeur mise en forme', () => {
+    for (const nom of MESURES_DE_L_ETAPE['1.7']) {
+      expect(LIGNES_DES_MESURES[nom], nom).toBeDefined();
+      expect(LIGNES_DES_MESURES[nom].libelle.length).toBeGreaterThan(3);
+    }
+    expect(celluleDeMesure(r, 'perte_conversation')).toStrictEqual({ valeur: '1,235', detail: `sur 64 rangées` });
+    expect(celluleDeMesure(r, 'ifeval_fr')).toStrictEqual({ valeur: `21,7${FINE}%`, detail: `consignes${FINE}: 31,3${FINE}%` });
+    expect(celluleDeMesure(r, 'tenue')).toStrictEqual({ valeur: `0,0${FINE}%`, detail: `sur 235 réponses` });
+  });
+
+  it('un rapport qui manque, ou une mesure absente : null, la page pose « à mesurer »', () => {
+    expect(celluleDeMesure(null, 'ifeval_fr')).toBeNull();
+    expect(celluleDeMesure(r, 'oubli')).toBeNull();
+    expect(() => celluleDeMesure(r, 'victoire')).toThrow(/victoire.*LIGNES_DES_MESURES/s);
+  });
+
+  it('le nom de chaque version, en tête de colonne', () => {
+    expect(nomDeVersion('1.5@1.7')).toBe('Ton IA 1.5');
+    expect(nomDeVersion('1.7@1.7')).toBe('Ton IA 1.7');
+    expect(nomDeVersion('1.7-court@1.7')).toBe('Version courte');
+    expect(nomDeVersion('1.10@1.10')).toBe('Ton IA 1.10');
   });
 });

@@ -139,6 +139,28 @@ export const EVALUATION_CARTES_TON_IA =
 export const EVALUATION_SUIVANTS_TON_IA =
   'uv run --extra cpu python -m evaluation_pas_a_pas suivants --modele D:\\forge-ia-donnees\\cache\\ton-ia-1.5 --phrase "Le forgeron frappe le" --appareil cpu --json sorties/ton-ia-suivants.json';
 
+// ---------- Chapitre 1.7 : la conversation pas à pas ----------
+// Les sous-commandes montrer, fuite et essai, et leurs options, sont celles de
+// projets/1.7-conversation/conversation_pas_a_pas/__main__.py ; ces commandes sont celles du README du
+// projet, et fuite et essai écrivent les fichiers de MESURES_PARTIE_1 : commandes.test.ts le vérifie. Le
+// projet utilise PyTorch : ses commandes prennent la version pour le processeur (--extra cpu), qui suffit à
+// tout ce qu'il calcule. Les commandes de forge qui affinent ton IA (AFFINER_1_7…) entrent plus bas, avec la
+// parution du chapitre.
+
+/** Entrer dans le projet du chapitre 1.7, depuis le dossier où le dépôt a été cloné. */
+export const ALLER_AU_PROJET_1_7 = 'cd forge-ia/projets/1.7-conversation';
+/** Une conversation écrite jeton par jeton, avec son masque de perte. */
+export const CONVERSATION_MONTRER =
+  'uv run --extra cpu python -m conversation_pas_a_pas montrer "Quelle est la capitale de la France ?" --reponse "Paris."';
+/** La fuite d'une conversation vers la suivante, avec et sans le masque par document : la commande qui a écrit la sortie montrée par le chapitre. */
+export const CONVERSATION_FUITE =
+  'uv run --extra cpu python -m conversation_pas_a_pas fuite --enregistrer sorties/fuite.txt --json mesures/fuite.json';
+/** Le tout petit affinage, sur le processeur : la commande qui a écrit la sortie montrée par le chapitre. */
+export const CONVERSATION_ESSAI =
+  'uv run --extra cpu python -m conversation_pas_a_pas essai --appareil cpu --enregistrer sorties/essai-processeur.txt --json mesures/essai-processeur.json';
+/** Lancer les tests du projet 1.7, avec la version de PyTorch pour le processeur. */
+export const CONVERSATION_TESTS = 'uv run --extra cpu pytest -q';
+
 // ---------- Vague 2 : les versions publiées de ton IA (1.7 à 1.10) ----------
 // Chaque chapitre de la vague 2 a sa Release (ton-ia-1.7, ton-ia-1.8…), téléchargée comme ton-ia-1.5 :
 // avec l'outil gh, dans le dossier du PC de l'auteur. Les commandes des chapitres (AFFINER_1_7,

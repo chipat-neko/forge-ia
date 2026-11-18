@@ -1,0 +1,803 @@
+---
+partie: 1
+numero: "1.7"
+titre: "Apprendre à converser"
+chapeau: "Ton IA prolonge un texte, mais ne te répond pas. Tu lui donnes le format d'une conversation, tu choisis, jeton par jeton, ce qu'elle doit apprendre, et tu ranges des milliers de conversations sans qu'elles se mélangent. Puis tu regardes ce que l'affinage change, et ce qu'il ne change pas."
+programme: "10 étapes, 4 paris, environ 40 minutes."
+acquis:
+  - cle: fin
+    texte: "Un modèle pré-entraîné ne sait pas finir sa réponse : il prolonge le texte jusqu'à ce qu'on l'arrête."
+    ou: "à l'étape 1"
+  - cle: gabarit
+    texte: "Une conversation s'écrit avec des jetons spéciaux, que forge pose lui-même : aucun texte tapé ne peut les imiter."
+    ou: "à l'étape 2"
+  - cle: masque
+    texte: "L'affinage n'apprend que ce que dit l'assistant, jusqu'à la fin de son tour : la question ne compte pas dans la perte."
+    ou: "à l'étape 3"
+  - cle: atelier
+    texte: "Plus l'assistant parle, plus une conversation a de jetons appris ; un message système n'en ajoute aucun."
+    ou: "à l'étape 3, dans l'atelier"
+  - cle: fuite
+    texte: "Plusieurs conversations partagent une rangée ; sans masque par document, chacune verrait la précédente."
+    ou: "à l'étape 4"
+---
+
+{/*
+  Brouillon du chapitre 1.7 (tâche 3 du plan 8), écrit pendant l'affinage de ton IA 1.7.
+
+  À la tâche 11, avec la Release ton-ia-1.7 et les relevés du projet (mesures/etape-ton-ia-1.7.json,
+  etape-ton-ia-1.7-court.json, longueurs-sft-1.7.json, entrainement-sft-1.7.json) :
+  - les paris « consignes » et « oubli » remplacent leurs « à mesurer » (étape 8), et leurs acquis entrent dans
+    le frontmatter (« consignes », « oubli » : le parcours en attend alors 7) ; le programme compte 6 paris ;
+  - les commandes AFFINER_1_7_COURT, REPRENDRE_1_7 et DISCUTER_1_7 entrent dans commandes.ts, et les étapes 7 et
+    10 les montrent dans des blocs au lieu de les dire ;
+  - le balayage du taux (étape 7) demande un relevé de ses essais dans le projet, ou se dit sans chiffres ;
+  - etape-ton-ia-1.5.json est relevé de nouveau, sur le rapport de l'étape 1.7 (avec la perte sur des
+    conversations). Celui d'aujourd'hui vient de l'évaluation de ton IA 1.5 du 17/11/2026 (plan 7, tâche 11, à
+    l'étape 1.9), réduite aux mesures de l'étape 1.7 : sa « tenue » ne compte que les 235 réponses d'IFEval-FR.
+*/}
+
+import { root } from 'astro:config/server';
+import AtelierConversation from '../../components/chapitres/1-7/AtelierConversation.svelte';
+import EchantillonsConversation from '../../components/chapitres/1-7/EchantillonsConversation.astro';
+import FigureEmpaquetage from '../../components/chapitres/1-7/FigureEmpaquetage.svelte';
+import OuvertureConversation from '../../components/chapitres/1-7/OuvertureConversation.astro';
+import TableauEtape from '../../components/chapitres/1-7/TableauEtape.astro';
+import CourbeEntrainement from '../../components/chapitres/1-5/CourbeEntrainement.astro';
+import TableauSessions from '../../components/chapitres/1-5/TableauSessions.astro';
+import BlocCommande from '../../components/gabarit/BlocCommande.astro';
+import RecupererProjet from '../../components/gabarit/RecupererProjet.astro';
+import SortieCommande from '../../components/gabarit/SortieCommande.astro';
+import { dixPuissance, formaterDate } from '../../lib/calculateur/formats';
+import { chapitresParus } from '../../lib/chapitres-parus';
+import { DEPOT } from '../../lib/depot';
+import { exigeur } from '../../lib/exiger';
+import { decimalesUtiles, formaterPerte, nombre, pourcent } from '../../lib/nombres';
+import { ANNEXES, hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
+import {
+  defiReussi,
+  etatDeLAtelier,
+  LIBELLES_DE_L_ATELIER,
+  LONGUEURS_DE_RANGEE,
+  LONGUEUR_DE_TON_IA,
+} from '../../lib/partie-1/atelier-1-7';
+import { CONVERSATION_ESSAI, CONVERSATION_FUITE, CONVERSATION_MONTRER, CONVERSATION_TESTS } from '../../lib/partie-1/commandes';
+import { NOMS_SPECIAUX, PREMIER_SPECIAL, SPECIAUX_TON_IA } from '../../lib/partie-1/conversation';
+import { lireRapportEtape } from '../../lib/partie-1/etapes';
+import { MESURES_PARTIE_1 } from '../../lib/partie-1/mesures';
+import {
+  choixConsignes,
+  choixFinDeTour,
+  choixFuite,
+  choixGabarit,
+  choixMasque,
+  choixOubli,
+  ECART_D_ARRONDI,
+  empaquetagesDeLaFigure,
+  faitsDeForge,
+  faitsDeLOubli,
+  faitsDuPariFin,
+  faitsDuPariGabarit,
+  faitsDuPariMasque,
+  INVITE_DE_L_OUVERTURE,
+  lireConversationsDeReference,
+  lireEssaiAffinage,
+  lireFuite,
+  lireReglagesDeLEssai,
+  lireReglagesSft,
+  phraseDeLOubli,
+  QUESTION_FIN,
+  reponseALInvite,
+  resumeDesLongueurs,
+  SEUIL_DE_FUITE,
+  textesDesJetons,
+  TOLERANCE_OUBLI,
+  tourneEnBoucle,
+} from '../../lib/partie-1/paris-1-7';
+import {
+  DONNEES_1_7,
+  FICHE_AYA,
+  FICHE_LUTH_2,
+  FICHE_OASST2,
+  INSTRUCTGPT,
+  LICENCE_LLAMA_33,
+  COPIE_CONDITIONS_OPENAI,
+  DISCUSSION_NANOCHAT,
+  LLAMA_2,
+  LU_LE_1_7,
+  NANOCHAT_D20,
+  SMOLLM3,
+  SOURCES_DONNEES_1_7,
+  SOURCES_LABO_1_7,
+  TULU_3,
+} from '../../lib/partie-1/sources-1-7';
+import { typographier } from '../../lib/typo';
+
+export const exiger = exigeur('le texte du chapitre 1.7 (1-7.mdx)');
+
+export const PARUS = await chapitresParus();
+
+export const LIENS = (() => {
+  // L'annuaire des données a sa page (ANNEXES) : l'étape 5 y mène.
+  const annuaire = ANNEXES.find((a) => a.titre === 'Annuaire des données')?.href ?? null;
+  exiger(annuaire !== null, 'l’annexe de l’annuaire des données n’a plus de page : l’étape 5 y mène');
+  return {
+    // Les chapitres 1.1 à 1.6 ont paru : un lien ne vise qu'un chapitre paru.
+    l11: PARUS.has('1.1') ? hrefChapitre('1.1') : null,
+    l13: PARUS.has('1.3') ? hrefChapitre('1.3') : null,
+    l14: PARUS.has('1.4') ? hrefChapitre('1.4') : null,
+    l15: PARUS.has('1.5') ? hrefChapitre('1.5') : null,
+    l16: PARUS.has('1.6') ? hrefChapitre('1.6') : null,
+    annuaire,
+    generees: `${DEPOT}/blob/main/projets/forge/forge/conversation/generees.py`,
+  };
+})();
+
+export const RACINE = new URL('../', root); // Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+
+export const reglage = (x) => /* un réglage écrit tel qu'il est réglé */ nombre(x, decimalesUtiles(Number(x.toPrecision(12))));
+
+export const ordreDeGrandeur = (x) => dixPuissance(Math.floor(Math.log10(x)));
+
+export const enLettres = (n) => ({ 2: 'deux', 3: 'trois', 4: 'quatre', 6: 'six', 8: 'huit', 10: 'dix' })[n] ?? nombre(n);
+
+
+export const TON_IA_15 = (() => {
+  // Ton IA 1.5, la ligne « avant » : le résumé de son évaluation (mesures/etape-ton-ia-1.5.json du projet 1.7).
+  const r = lireRapportEtape('1.5@1.7', RACINE);
+  exiger(r !== null, 'le relevé de ton IA 1.5 (mesures/etape-ton-ia-1.5.json du projet 1.7) manque');
+  return r;
+})();
+
+export const TON_IA_17 = lireRapportEtape('1.7@1.7', RACINE);
+
+export const OUVERTURE = (() => {
+  // « Elle répète ta question, puis enchaîne une phrase qui revient en boucle, jusqu'à ce que forge la coupe. »
+  const e = reponseALInvite(TON_IA_15, INVITE_DE_L_OUVERTURE);
+  exiger(e.texte.startsWith(INVITE_DE_L_OUVERTURE), 'la réponse de ton IA 1.5 à « Qui es-tu ? » ne commence plus par la question');
+  exiger(tourneEnBoucle(e.texte.slice(INVITE_DE_L_OUVERTURE.length)), 'la réponse de ton IA 1.5 à « Qui es-tu ? » ne tourne plus en boucle');
+  exiger(!e.terminee, 'la réponse de ton IA 1.5 à « Qui es-tu ? » finit maintenant d’elle-même');
+  // « Ses dix réponses fixes, plus bas, font toutes de même » (étape 8) : aucune ne finit.
+  exiger(TON_IA_15.echantillons.every((x) => !x.terminee), 'une des réponses fixes de ton IA 1.5 finit maintenant d’elle-même');
+  return { n: enLettres(TON_IA_15.echantillons.length) };
+})();
+
+export const FIN = (() => {
+  // Le pari « fin » : la part des réponses de ton IA 1.5 qui finissent leur tour.
+  const f = faitsDuPariFin(RACINE);
+  exiger(f !== null, 'la tenue de ton IA 1.5 manque dans son relevé');
+  // « Presque jamais … aucune : toutes vont jusqu'à la limite. »
+  exiger(f.terminee === 0, 'ton IA 1.5 finit maintenant certaines réponses : « aucune » est à revoir');
+  exiger(choixFinDeTour(RACINE).find((c) => c.juste)?.texte === 'Presque jamais', 'le juste du pari « fin » n’est plus « Presque jamais »');
+  // « Ses seuls repères étaient la fin d'un texte, <|fin_texte|> » : le pré-entraînement de forge sépare ses textes ainsi.
+  exiger(faitsDeForge(RACINE).finDeTexteEntreLesTextes, 'le pré-entraînement de forge ne sépare plus ses textes par <|fin_texte|>');
+  return { choix: choixFinDeTour(RACINE), n: nombre(f.n), part: pourcent(f.terminee, 1) };
+})();
+
+
+export const GABARIT = (() => {
+  const f = faitsDuPariGabarit(RACINE);
+  // « Une conversation a deux tours ici, et forge y pose deux <|fin_tour|> : un par tour. »
+  const c = lireConversationsDeReference(RACINE).find((x) => x.nom === 'faux-special');
+  exiger(f.finsDeTour === c.tours.length, 'la conversation « faux-special » n’a plus un <|fin_tour|> par tour');
+  exiger(choixGabarit(RACINE).find((x) => x.juste)?.texte.includes('ordinaires'), 'un texte qui imite <|fin_tour|> donne maintenant un jeton spécial');
+  // « Les poids liés du chapitre 1.4 » : le plongement d'entrée et la projection de sortie sont la même matrice.
+  exiger(faitsDeForge(RACINE).poidsLies, 'forge ne lie plus le plongement d’entrée et la projection de sortie');
+  const nom = (n) => ({ nom: n, id: nombre(SPECIAUX_TON_IA[n]) });
+  return {
+    choix: choixGabarit(RACINE),
+    question: f.question,
+    jetons: nombre(f.jetons),
+    finsDeTour: enLettres(f.finsDeTour),
+    nombreSpeciaux: nombre(NOMS_SPECIAUX.length),
+    premier: nombre(PREMIER_SPECIAL),
+    dernier: nombre(PREMIER_SPECIAL + NOMS_SPECIAUX.length - 1),
+    vocabulaire: nombre(PREMIER_SPECIAL + NOMS_SPECIAUX.length),
+    debut: nom('<|fin_texte|>'),
+    systeme: nom('<|systeme|>'),
+    utilisateur: nom('<|utilisateur|>'),
+    assistant: nom('<|assistant|>'),
+    finTour: nom('<|fin_tour|>'),
+    pensee: nom('<|pensee|>'),
+    finPensee: nom('<|fin_pensee|>'),
+  };
+})();
+
+
+export const CONVERSATIONS = lireConversationsDeReference(RACINE);
+
+export const TEXTES = /* le texte de chaque jeton, lu dans le tokenizer de ton IA */ textesDesJetons(
+  new Set(CONVERSATIONS.flatMap((c) => [...(c.ids ?? []), ...c.tours.flatMap((t) => [...t.ids, ...(t.pensee_ids ?? [])])]).concat(Object.values(SPECIAUX_TON_IA))),
+  RACINE,
+);
+
+export const MASQUE = (() => {
+  const f = faitsDuPariMasque(RACINE);
+  exiger(choixMasque(RACINE).find((c) => c.juste)?.texte === 'Ceux des réponses de l’assistant, fin de tour comprise', 'le juste du pari « masque » a changé');
+  // « Les {reponse} jetons de la réponse et son <|fin_tour|> » : tout ce qui est appris.
+  exiger(f.appris === f.reponse + 1, 'les jetons appris ne sont plus la réponse et son <|fin_tour|>');
+  return {
+    choix: choixMasque(RACINE),
+    question: f.question,
+    reponseTexte: f.reponseTexte,
+    jetons: nombre(f.jetons),
+    reponse: nombre(f.reponse),
+    appris: nombre(f.appris),
+  };
+})();
+
+export const DEFI = (() => {
+  // La réponse du défi : les réglages qui font plus de la moitié de jetons appris, calculés par le jumeau.
+  const etat = (nom, systeme, deuxieme) => etatDeLAtelier(CONVERSATIONS, { nom, systeme, deuxieme });
+  const bonjour = etat('sans-systeme', false, false);
+  const bonjourSysteme = etat('sans-systeme', true, false);
+  const pensee = etat('pensee', false, false);
+  const penseeSysteme = etat('pensee', true, true);
+  exiger(defiReussi(bonjour) && defiReussi(pensee) && defiReussi(penseeSysteme), 'le bonjour ou la pensée ne réussissent plus le défi');
+  exiger(!defiReussi(bonjourSysteme), 'avec un message système, le bonjour réussit maintenant le défi');
+  // « La réponse est plus longue que la question. »
+  const c = CONVERSATIONS.find((x) => x.nom === 'sans-systeme');
+  exiger(c.tours[1].ids.length > c.tours[0].ids.length, 'la réponse du bonjour n’est plus plus longue que sa question');
+  // « Un message système n'ajoute que des jetons lus » : la même conversation, même nombre de jetons appris.
+  exiger(bonjourSysteme.appris === bonjour.appris && bonjourSysteme.jetons > bonjour.jetons, 'un message système ajoute maintenant des jetons appris');
+  const part = (e) => pourcent(e.appris / e.jetons, 0);
+  return {
+    bonjour: typographier(`« ${LIBELLES_DE_L_ATELIER['sans-systeme']} »`),
+    pensee: typographier(`« ${LIBELLES_DE_L_ATELIER.pensee} »`),
+    appris: nombre(bonjour.appris),
+    jetons: nombre(bonjour.jetons),
+    partBonjour: part(bonjour),
+    partSysteme: part(bonjourSysteme),
+    partPensee: part(pensee),
+    partPenseeTout: part(penseeSysteme),
+  };
+})();
+
+
+export const SFT = lireReglagesSft('sft-1.7', RACINE);
+export const SFT_COURT = lireReglagesSft('sft-1.7-court', RACINE);
+
+export const FIGURE = (() => {
+  const f = empaquetagesDeLaFigure(RACINE);
+  const { exemples, plusLong } = resumeDesLongueurs(f.longueurs);
+  exiger(SFT.longueur === LONGUEUR_DE_TON_IA, 'les rangées de ton IA n’ont plus la longueur que la figure montre à l’arrivée');
+  // « Plus les rangées sont longues, moins il en écarte ; à partir de celles de ton IA, aucun. »
+  f.resultats.forEach((r, i) => i === 0 || exiger(r.ecartes <= f.resultats[i - 1].ecartes, `des rangées de ${r.longueur} jetons écartent plus que de plus courtes`));
+  exiger(f.resultats.filter((r) => r.longueur >= LONGUEUR_DE_TON_IA).every((r) => r.ecartes === 0), 'des rangées de 2 048 jetons écartent maintenant des exemples');
+  exiger(f.resultats[0].ecartes > 0, 'des rangées de 512 jetons n’écartent plus aucun exemple');
+  // « Dans tous les cas, BFD remplit presque toutes les places » : plus de 90 % (borne du texte).
+  exiger(f.resultats.every((r) => r.occupees > 0.9 * r.rangees * r.places), 'BFD ne remplit plus presque toutes les places');
+  return { ...f, exemples, plusLong, longueur: nombre(SFT.longueur), court: nombre(LONGUEURS_DE_RANGEE[0]) };
+})();
+
+export const FUITE = (() => {
+  const f = lireFuite(RACINE);
+  exiger(choixFuite(RACINE).find((c) => c.juste)?.texte === 'voit la première', 'sans masque, la deuxième conversation ne voit plus la première');
+  exiger(f.avec_masque <= ECART_D_ARRONDI && f.avec_masque > 0, 'avec le masque, l’écart n’est plus celui de l’arrondi des calculs');
+  return {
+    choix: choixFuite(RACINE),
+    a: nombre(f.jetons_a),
+    b: nombre(f.jetons_b),
+    sans: nombre(f.sans_masque, 2),
+    avec: ordreDeGrandeur(f.avec_masque),
+    seuil: ordreDeGrandeur(SEUIL_DE_FUITE),
+  };
+})();
+
+
+export const DONNEES = (() => {
+  const dates = [...new Set(SOURCES_DONNEES_1_7.map((s) => s.verifieLe))];
+  exiger(dates.length === 1 && dates[0] === LU_LE_1_7, 'les sources de l’étape 5 n’ont plus toutes la même date de lecture');
+  exiger(DONNEES_1_7.provenanceLuth2.valeur && DONNEES_1_7.ayaHumain.valeur, 'les fiches de Luth-2 ou d’Aya disent autre chose');
+  const [annee, mois, jour] = DONNEES_1_7.oasst2Collecte.valeur.split('-');
+  return {
+    luth: DONNEES_1_7.licenceLuth2.valeur,
+    aya: DONNEES_1_7.licenceAya.valeur,
+    oasst2: DONNEES_1_7.licenceOasst2.valeur,
+    oasst2Jusqua: `${Number(jour)}/${mois}/${annee}`,
+    stackoverflow: DONNEES_1_7.stackoverflowLuth2.valeur,
+    llama: DONNEES_1_7.llama.valeur,
+    openai: DONNEES_1_7.openai.valeur,
+    luLe: formaterDate(LU_LE_1_7),
+  };
+})();
+
+
+export const ESSAI = (() => {
+  const e = lireEssaiAffinage(RACINE);
+  const r = lireReglagesDeLEssai(RACINE);
+  exiger(e.appareil === 'cpu', 'l’essai montré n’est plus celui du processeur');
+  // « En moins d'une minute. »
+  exiger(e.secondes < 60, 'le petit affinage prend maintenant plus d’une minute sur le processeur');
+  // « Avant, aucune ne finit son tour ; après, toutes. »
+  exiger(e.fin_de_tour_avant === 0 && e.fin_de_tour_apres === 1, 'le petit affinage ne passe plus d’aucune réponse finie à toutes');
+  // « Ses réponses ne veulent rien dire : « . », « Une font font font ». »
+  const textes = e.reponses_apres.map((x) => x.texte);
+  exiger(textes.includes('.') && textes.includes('Une font font font'), 'les réponses du petit modèle affiné ne sont plus celles que cite l’étape 6');
+  // « {fois} fois celui de son pré-entraînement » : un rapport entier.
+  const fois = r.tauxAffinage / r.tauxPreEntrainement;
+  exiger(Math.abs(fois - Math.round(fois)) < 1e-9, 'le taux du petit affinage n’est plus un multiple entier de celui de son pré-entraînement');
+  return {
+    parametres: nombre(e.parametres),
+    exemples: nombre(e.exemples),
+    rangees: nombre(e.rangees),
+    jetons: nombre(e.jetons),
+    jetonsAppris: nombre(e.jetons_appris),
+    pas: nombre(e.pas),
+    pasPre: nombre(r.pasPreEntrainement),
+    invites: enLettres(e.reponses_apres.length),
+    premiere: formaterPerte(e.pertes[0]),
+    derniere: formaterPerte(e.pertes[e.pertes.length - 1]),
+    avant: pourcent(e.fin_de_tour_avant),
+    apres: pourcent(e.fin_de_tour_apres),
+    taux: reglage(r.tauxAffinage),
+    fois: enLettres(Math.round(fois)),
+  };
+})();
+
+
+export const AFFINAGE = (() => {
+  exiger(SFT.methode === 'sft' && SFT.depart === 'ton-ia-1.5', 'configs/sft-1.7.toml n’affine plus ton IA 1.5 par la méthode sft');
+  exiger(SFT_COURT.taux_max === SFT.taux_max && SFT_COURT.depart === SFT.depart, 'la version courte n’a plus les réglages de l’affinage complet');
+  const pas = (r) => r.jetons_total / r.taille_lot_jetons;
+  exiger(Number.isInteger(pas(SFT)) && Number.isInteger(pas(SFT_COURT)), 'les jetons d’un affinage ne sont plus un nombre entier de pas');
+  return {
+    pas: nombre(pas(SFT)),
+    pasCourt: nombre(pas(SFT_COURT)),
+    lot: nombre(SFT.taille_lot_jetons),
+    jetons: nombre(SFT.jetons_total),
+    echauffement: nombre(SFT.echauffement),
+    taux: reglage(SFT.taux_max),
+    tauxMin: reglage(SFT.ratio_min * SFT.taux_max),
+    longueur: nombre(SFT.longueur),
+  };
+})();
+
+
+export const ATTENTES = (() => {
+  // nanochat d20 : l'affinage ne change pas ARC-Challenge (« rien de gagné »), à moins d'un point.
+  const n = NANOCHAT_D20;
+  exiger(n.arcApres.valeur < n.arcAvant.valeur + 0.01, 'chez nanochat d20, l’affinage fait maintenant gagner un point sur ARC-Challenge');
+  return {
+    parametres: nombre(Math.round(n.parametres.valeur / 1e6)),
+    avant: pourcent(n.arcAvant.valeur, 2),
+    apres: pourcent(n.arcApres.valeur, 2),
+    minutes: nombre(n.minutesSft.valeur),
+  };
+})();
+
+export const CONSIGNES = (() => {
+  const choix = choixConsignes(RACINE);
+  const ifeval15 = TON_IA_15.mesures.ifeval_fr;
+  exiger(ifeval15 !== undefined && !('absente' in ifeval15), 'IFEval-FR manque dans le relevé de ton IA 1.5');
+  const avant = pourcent(ifeval15.invite_stricte, 1);
+  // « Sa perte sur des conversations n'a pas encore été mesurée : son évaluation a eu lieu avant que le jeu d'affinage existe. »
+  exiger('absente' in TON_IA_15.mesures.perte_conversation, 'la perte sur des conversations de ton IA 1.5 est maintenant mesurée : l’étape 8 dit le contraire');
+  if (choix === null) return { choix: null, avant, apres: null, juste: null };
+  return { choix, avant, apres: pourcent(TON_IA_17.mesures.ifeval_fr.invite_stricte, 1), juste: choix.find((c) => c.juste).texte };
+})();
+
+export const OUBLI = (() => {
+  const choix = choixOubli(RACINE);
+  const phrase = phraseDeLOubli(RACINE);
+  const f = faitsDeLOubli(RACINE);
+  return { choix, phrase: phrase === null ? null : typographier(phrase), tolerance: nombre(TOLERANCE_OUBLI, 2), avant: f === null ? null : formaterPerte(f.avant) };
+})();
+
+
+export const LABO = (() => {
+  const i = INSTRUCTGPT;
+  const t = TULU_3;
+  const s = SMOLLM3;
+  exiger(t.heuresDeCartes8B.valeur === t.cartes8B.valeur * t.heures8B.valeur, 'les heures de cartes de Tülu 3 ne sont plus 32 fois 6');
+  exiger(LLAMA_2.perteSurLesReponses.valeur && s.bfd.valeur && s.perteMasquee.valeur, 'Llama 2 ou SmolLM3 ne font plus ce que dit l’encadré');
+  // « Bien moins que ton IA » ou « bien plus » : SmolLM3 lit son jeu quatre fois, bien plus de jetons que ton IA 1.7.
+  exiger(s.jetonsSft.valeur * s.epoques.valeur > 10 * SFT.jetons_total, 'SmolLM3 ne lit plus dix fois plus de jetons d’affinage que ton IA');
+  const milliards = (x) => `${nombre(x / 1e9, decimalesUtiles(x / 1e9, 1))} ${x / 1e9 >= 2 ? 'milliards' : 'milliard'}`;
+  return {
+    iParametres: milliards(i.parametres.valeur),
+    iInvites: nombre(i.invitesSft.valeur),
+    iSft: nombre(i.petaflopsSft.valeur, 1),
+    iGpt3: nombre(i.petaflopsGpt3.valeur),
+    iPart: pourcent(i.petaflopsSft.valeur / i.petaflopsGpt3.valeur, 2),
+    iEpoques: nombre(i.epoques.valeur),
+    lAnnotations: nombre(LLAMA_2.annotationsSft.valeur),
+    lLongueur: nombre(LLAMA_2.longueur.valeur),
+    lEpoques: enLettres(LLAMA_2.epoques.valeur),
+    tInvites: nombre(t.invitesSft.valeur),
+    tParametres: milliards(t.parametres8B.valeur),
+    tCartes: nombre(t.cartes8B.valeur),
+    tHeures: nombre(t.heures8B.valeur),
+    tHeuresDeCartes: nombre(t.heuresDeCartes8B.valeur),
+    sParametres: milliards(s.parametres.valeur),
+    sJetons: milliards(s.jetonsSft.valeur),
+    sRaisonnement: milliards(s.jetonsRaisonnement.valeur),
+    sEpoques: enLettres(s.epoques.valeur),
+    tonIA: nombre(SFT.jetons_total),
+  };
+})();
+
+export const SUITE = (() => {
+  // L'« À suivre » : le chapitre 1.8, un lien s'il a paru.
+  const { chapitre } = trouverChapitre('1.8');
+  return { titre: typographier(`« ${titreCourt(chapitre.titre)} »`), lien: PARUS.has(chapitre.numero) ? hrefChapitre(chapitre.numero) : null };
+})();
+
+<Etape numero={1} titre="Ton IA ne sait pas répondre">
+
+<OuvertureConversation />
+
+Tu as posé une question à ton IA, celle du {LIENS.l15 ? <a href={LIENS.l15}>chapitre 1.5</a> : 'chapitre 1.5'}. Elle ne te répond pas. Elle répète ta question, puis enchaîne une phrase qui revient en boucle, jusqu'à ce que forge la coupe. Ce n'est pas un hasard de ce texte-là : ton IA n'a appris qu'à prolonger des textes, comme le {LIENS.l16 ? <a href={LIENS.l16}>chapitre 1.6</a> : 'chapitre 1.6'} l'a montré. Pour elle, une question est un début de texte comme un autre.
+
+<Pari
+  id="fin"
+  question={QUESTION_FIN}
+  precision={`Forge lui a fait écrire ${FIN.n} réponses, à des demandes en français, et a compté celles qui finissent d'elles-mêmes.`}
+  choix={FIN.choix}
+  acquis="fin"
+>
+
+Presque jamais : {FIN.part} de ses {FIN.n} réponses finissent d'elles-mêmes. Aucune, donc. Toutes vont jusqu'à la limite que forge leur fixe, et forge les coupe. Ton IA n'a jamais vu de jeton qui dise « j'ai fini de répondre » : ses textes d'entraînement n'en avaient pas. Son seul repère était la fin d'un texte, le jeton `<|fin_texte|>`, et une réponse n'est pas un texte entier.
+
+</Pari>
+
+Pour lui apprendre à répondre, on ne change ni son architecture, ni sa façon d'apprendre. On reprend ton IA telle quelle, et on continue de l'entraîner, avec la même perte : l'entropie croisée du jeton suivant. Seuls les textes changent : des conversations, écrites dans un format fixe, où quelqu'un pose une question et un assistant y répond. C'est l'affinage supervisé, souvent appelé SFT, de l'anglais *supervised fine-tuning*. « Supervisé », parce que chaque réponse est un exemple de ce qu'on attend d'elle.
+
+Ce chapitre le monte pièce par pièce : le format d'une conversation, ce que ton IA en apprend, le rangement des conversations, et d'où elles viennent. Puis l'affinage lui-même, en tout petit sur ton processeur, et en vrai sur la carte de l'auteur.
+
+</Etape>
+
+<Etape numero={2} titre="Le gabarit">
+
+Pour écrire une conversation en jetons, il faut des repères que du texte ordinaire ne contient jamais : où commence un tour de parole, qui parle, où il finit. Au {LIENS.l13 ? <a href={LIENS.l13}>chapitre 1.3</a> : 'chapitre 1.3'}, le tokenizer de ton IA a réservé les {GABARIT.nombreSpeciaux} derniers numéros de son vocabulaire, de {GABARIT.premier} à {GABARIT.dernier}, à des jetons spéciaux. Une conversation se sert de ceux-ci :
+
+- <code>{GABARIT.debut.nom}</code> ({GABARIT.debut.id}) ouvre la conversation, comme il marquait la fin de chaque texte du pré-entraînement ;
+- <code>{GABARIT.systeme.nom}</code> ({GABARIT.systeme.id}) ouvre le message système, les consignes générales, s'il y en a un ;
+- <code>{GABARIT.utilisateur.nom}</code> ({GABARIT.utilisateur.id}) ouvre ce qu'écrit la personne ;
+- <code>{GABARIT.assistant.nom}</code> ({GABARIT.assistant.id}) ouvre la réponse de ton IA ;
+- <code>{GABARIT.finTour.nom}</code> ({GABARIT.finTour.id}) ferme chaque tour de parole ;
+- <code>{GABARIT.pensee.nom}</code> ({GABARIT.pensee.id}) et <code>{GABARIT.finPensee.nom}</code> ({GABARIT.finPensee.id}) entourent un brouillon que l'assistant écrit avant sa réponse : le chapitre 1.9 s'en servira.
+
+Mais si ces jetons ont un nom qui s'écrit, quelqu'un peut l'écrire.
+
+<Pari
+  id="gabarit"
+  question="Quelqu'un tape `<|fin_tour|>` dans sa question. Ton IA y lit…"
+  precision={`Par exemple : « ${GABARIT.question} »`}
+  choix={GABARIT.choix}
+  acquis="gabarit"
+>
+
+Des jetons ordinaires. Le tokenizer ne produit jamais un jeton spécial en lisant du texte : il découpe `<|fin_tour|>` en morceaux, comme n'importe quel mot. Cette question fait {GABARIT.jetons} jetons, tous des numéros sous {GABARIT.premier}. Les jetons spéciaux, c'est forge qui les pose, d'après le rôle de chaque tour : la conversation entière n'a que {GABARIT.finsDeTour} `<|fin_tour|>`, un par tour. Personne ne peut fermer un tour, ni parler à la place de l'assistant, en tapant leur nom.
+
+</Pari>
+
+Voici comment forge écrit un tour :
+
+<CodeExplique fichier="projets/forge/forge/conversation/format.py" symbole="_jetons_du_tour">
+  <li data-lignes="1">`_jetons_du_tour` reçoit le tokenizer et un tour : son rôle, son texte, et une pensée éventuelle.</li>
+  <li data-lignes="2">Le jeton du rôle, `<|systeme|>`, `<|utilisateur|>` ou `<|assistant|>`, tiré de son nom et non du texte.</li>
+  <li data-lignes="3">`debut_appris` retient combien de jetons ouvrent le tour : l'étape suivante s'en sert.</li>
+  <li data-lignes="4-5">Une pensée de l'assistant, s'il en a une, entre `<|pensee|>` et `<|fin_pensee|>`.</li>
+  <li data-lignes="6">Le texte du tour, encodé par le tokenizer : des jetons ordinaires, quoi qu'il contienne.</li>
+  <li data-lignes="7-8">Et `<|fin_tour|>`, toujours, à la fin.</li>
+</CodeExplique>
+
+Puis la conversation entière :
+
+<CodeExplique fichier="projets/forge/forge/conversation/format.py" symbole="encoder_conversation">
+  <li data-lignes="1-2">`encoder_conversation` vérifie d'abord la conversation : les tours alternent, l'utilisateur commence, un message système vient en premier ou pas du tout, aucun texte n'est vide, et l'assistant parle en dernier.</li>
+  <li data-lignes="3-4">`<|fin_texte|>` ouvre la conversation. Le masque, `appris`, commence à faux : l'étape suivante l'explique.</li>
+  <li data-lignes="5-7">Les tours, l'un après l'autre, mis bout à bout.</li>
+  <li data-lignes="8">Le masque de chaque jeton du tour.</li>
+  <li data-lignes="9">Les jetons et leur masque, ensemble : un exemple prêt pour l'affinage.</li>
+</CodeExplique>
+
+Un détail compte pour la suite. Sauf `<|fin_texte|>`, ton IA n'a jamais lu ces jetons pendant son pré-entraînement : aucun de ses textes ne les contenait, puisque le tokenizer ne les produit jamais. Le vecteur qui représente chacun d'eux, son plongement, n'a donc jamais servi à les lire. Il n'a été corrigé que par la sortie, où les poids liés du {LIENS.l14 ? <a href={LIENS.l14}>chapitre 1.4</a> : 'chapitre 1.4'} le font aussi servir : à chaque pas, ton IA apprenait seulement à ne jamais prédire ces jetons. Ce qu'ils veulent dire quand elle les lit, personne ne le lui a appris. C'est une déduction, pas une mesure. Elle expliquerait en partie les réponses de l'étape 1 : ta question lui arrive entourée de jetons qui, pour elle, ne disent rien. L'affinage leur donnera un sens.
+
+<Fragment slot="note">
+
+Les numéros sont ceux du vocabulaire de ton IA : {GABARIT.vocabulaire} jetons en tout, dont les {GABARIT.nombreSpeciaux} derniers sont spéciaux. Le site les relit dans le code de forge.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={3} titre="Ce que ton IA apprend">
+
+Une conversation entière passe dans ton IA, comme un texte. Mais elle n'a pas à tout apprendre : la question, c'est l'utilisateur qui l'écrit. Ce qu'elle doit apprendre, c'est à répondre.
+
+<Pari
+  id="masque"
+  question="Sur quels jetons porte la perte de l'affinage ?"
+  precision={`Dans une conversation à ${MASQUE.jetons} jetons : un message système, la question « ${MASQUE.question} », et la réponse « ${MASQUE.reponseTexte} ».`}
+  choix={MASQUE.choix}
+  acquis="masque"
+  ouvre="atelier"
+>
+
+Ceux des réponses de l'assistant, fin de tour comprise : ici, {MASQUE.appris} jetons sur {MASQUE.jetons}, les {MASQUE.reponse} de la réponse et son `<|fin_tour|>`. Les autres, ton IA les lit sans être notée dessus : le message système, la question, et même `<|assistant|>`, que forge pose lui-même pour lui donner la parole. Apprendre `<|fin_tour|>`, en revanche, c'est apprendre à s'arrêter : c'est ce qui manquait à ton IA 1.5.
+
+</Pari>
+
+C'est le masque de perte : un oui ou un non par jeton, que forge calcule en même temps que les jetons, dans la boucle d'`encoder_conversation`, à l'étape 2. Dans l'atelier, choisis une conversation, ajoute ou retire un message système et un deuxième tour, et regarde ce que ton IA en apprend.
+
+<Verrou nom="atelier" message="Fais le pari juste au-dessus : l'atelier s'ouvre juste après.">
+  <AtelierConversation client:load conversations={CONVERSATIONS} textes={TEXTES} verrou="atelier" acquis="atelier" />
+</Verrou>
+
+<details class="reponse-defi">
+<summary><span class="bascule-soleil">La réponse du défi</span></summary>
+
+<p>{typographier(`La conversation ${DEFI.bonjour}, sans message système ni deuxième tour : ${DEFI.appris} de ses ${DEFI.jetons} jetons sont appris, ${DEFI.partBonjour}. La réponse y est plus longue que la question. ${DEFI.pensee} réussit aussi, avec ou sans le reste : l'assistant y écrit sa pensée, puis sa réponse, et tout cela est appris (${DEFI.partPensee}, et encore ${DEFI.partPenseeTout} avec un message système et un deuxième tour).`)}</p>
+
+Un message système, lui, n'ajoute que des jetons lus : avec le sien, le même bonjour tombe à {DEFI.partSysteme}. Une longue question et une réponse d'un mot, au contraire, n'apprennent presque rien. C'est pourquoi la perte de l'affinage divise par le nombre de jetons appris, pas par le nombre de jetons lus.
+
+</details>
+
+La perte de l'affinage ne compte donc que les jetons appris. Le projet du chapitre la refait à la main :
+
+<CodeExplique fichier="projets/1.7-conversation/conversation_pas_a_pas/gabarit.py" region="masque">
+  <li data-lignes="1">`perte_masquee_a_la_main` reçoit `logits`, les scores que le modèle donne à chaque jeton possible, à chaque position, et `cibles`, le vrai jeton suivant de chaque position.</li>
+  <li data-lignes="4-7">Une cible qui vaut −100 n'est pas apprise : forge la pose là où le masque dit non, et sur le bourrage.</li>
+  <li data-lignes="9-13">Les calculs se font en float64. On compte les cibles apprises ; s'il n'y en a aucune, il n'y a rien à moyenner.</li>
+  <li data-lignes="14-18">−ln p à chaque position, comme la perte du {LIENS.l16 ? <a href={LIENS.l16}>chapitre 1.6</a> : 'chapitre 1.6'} : le logarithme de la somme des exponentielles, moins le score du vrai jeton.</li>
+  <li data-lignes="19">On garde les pertes des cibles apprises, on les additionne, et on divise par leur nombre.</li>
+</CodeExplique>
+
+<Fragment slot="note">
+
+Chaque bouton de l'atelier se choisit d'un clic, ou au clavier : Tab, puis Entrée. Les textes et les numéros des jetons viennent du tokenizer de ton IA, par le projet du chapitre ; la page les assemble avec la même règle que forge, au jeton près.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={4} titre="Ranger les conversations">
+
+L'affinage, comme le pré-entraînement, lit des rangées de longueur fixe : {FIGURE.longueur} jetons pour ton IA, la longueur de son contexte. Une conversation est souvent bien plus courte. Une seule par rangée, et le reste serait du bourrage : des places perdues, et du calcul pour rien. Forge en range donc plusieurs par rangée, sans jamais en couper une : c'est l'empaquetage. Il suit BFD, de l'anglais *best-fit decreasing* : les plus longues d'abord, chacune dans la rangée où elle laisse le moins de place libre.
+
+<FigureEmpaquetage client:load resultats={FIGURE.resultats} source={FIGURE.source} exemples={FIGURE.exemples} plusLong={FIGURE.plusLong} />
+
+Avec des rangées assez longues pour les plus longues conversations, aucune n'est écartée, et BFD remplit presque toutes les places. Avec des rangées plus courtes, de {FIGURE.court} jetons par exemple, il faut écarter les conversations trop longues : forge n'en coupe jamais une, car sa fin serait perdue. Voici l'empaquetage de forge :
+
+<CodeExplique fichier="projets/forge/forge/affinage/empaquetage.py" symbole="empaqueter">
+  <li data-lignes="1-3">`empaqueter` reçoit les exemples, chacun ses jetons et son masque, la longueur d'une rangée et le jeton de bourrage.</li>
+  <li data-lignes="6">Une rangée a une place de plus que sa longueur : le modèle lit les jetons, et prédit chacun d'après ceux d'avant.</li>
+  <li data-lignes="9-18">Un exemple trop long pour une rangée, ou sans aucun jeton appris, est écarté, et compté.</li>
+  <li data-lignes="19">Les autres sont triés du plus long au plus court ; à longueur égale, dans leur ordre d'origine.</li>
+  <li data-lignes="25">Pour chaque place libre possible, la liste des rangées qui l'ont.</li>
+  <li data-lignes="26-28">Pour chaque exemple, la plus petite place libre où il entre.</li>
+  <li data-lignes="29-32">S'il n'entre nulle part, il ouvre une nouvelle rangée.</li>
+  <li data-lignes="33-37">Sinon, il va dans la première rangée ouverte qui a cette place, et sa place libre diminue d'autant.</li>
+  <li data-lignes="39">Les rangées, complétées de bourrage, et le nombre d'exemples écartés.</li>
+</CodeExplique>
+
+La figure range ses rangées avec ce même placement, refait par la page au chiffre près.
+
+Une rangée contient donc plusieurs conversations, l'une après l'autre. Or l'attention du {LIENS.l14 ? <a href={LIENS.l14}>chapitre 1.4</a> : 'chapitre 1.4'} laisse chaque jeton regarder tous ceux qui le précèdent.
+
+<Pari
+  id="fuite"
+  question="Sans masque par document, la deuxième conversation d'une rangée…"
+  precision="Une rangée : une conversation A, puis une conversation B. Chaque jeton regarde tous les jetons d'avant."
+  choix={FUITE.choix}
+  acquis="fuite"
+>
+
+Elle voit la première. Le projet le mesure sur un modèle minuscule, aux poids tirés au hasard : il lit B dans la rangée, après A, puis B seule, et compare les scores de sortie de B, ses logits. Sans masque, l'écart va jusqu'à {FUITE.sans} : B a regardé A. Avec le masque par document, il est de l'ordre de {FUITE.avec}, l'arrondi des calculs : B est calculée comme si elle était seule.
+
+</Pari>
+
+Voici la commande et ce qu'elle a affiché, sur le processeur :
+
+<SortieCommande
+  fichier={MESURES_PARTIE_1.sortieFuiteConversation}
+  commande={CONVERSATION_FUITE}
+  legende="La fuite de A vers B, sur un modèle minuscule"
+  absent="À mesurer : la fuite de A vers B sur le processeur."
+/>
+
+Le masque par document est un masque d'attention : un jeton ne regarde que les jetons qui le précèdent, et seulement ceux de sa conversation. Forge le construit à partir du numéro de conversation de chaque position :
+
+<CodeExplique fichier="projets/forge/forge/modele/transformer.py" symbole="masque_des_documents">
+  <li data-lignes="1">`masque_des_documents` reçoit, pour chaque position d'une rangée, le numéro de sa conversation, et −1 pour le bourrage.</li>
+  <li data-lignes="3">Le masque causal du chapitre 1.4 : chaque position voit celles d'avant, et elle-même.</li>
+  <li data-lignes="4">Vrai là où deux positions sont de la même conversation.</li>
+  <li data-lignes="5">Les deux à la fois : avant, et dans la même conversation.</li>
+</CodeExplique>
+
+Ce masque a un prix : la carte graphique ne peut plus prendre son chemin le plus rapide pour l'attention, et chaque pas d'affinage dure plus longtemps. Forge le garde quand même : sans lui, une conversation lirait la fin de la précédente.
+
+<Fragment slot="note">
+
+Tout ce qui est jaune se manipule. La longueur des rangées se fait glisser à la souris ou au doigt ; au clavier, atteins-la avec Tab, puis utilise les flèches.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={5} titre="Où trouver des conversations">
+
+Il faut des milliers de conversations en français, sous une licence qui permet d'entraîner ton IA et de la publier. Forge en prend dans trois jeux publiés sur Hugging Face :
+
+- <a href={FICHE_LUTH_2.url}>Luth-2</a>, sous licence {DONNEES.luth} : un mélange préparé pour affiner de petits modèles en français. Ses questions viennent d'autres jeux, traduites quand elles étaient en anglais, et ses réponses ont été réécrites par des modèles. Forge n'en garde que les réponses écrites par des modèles Qwen ;
+- <a href={FICHE_AYA.url}>Aya</a>, sous licence {DONNEES.aya} : des questions et des réponses écrites ou corrigées par des bénévoles, dans des dizaines de langues ; forge en garde le français ;
+- <a href={FICHE_OASST2.url}>OASST2</a>, sous licence {DONNEES.oasst2} : des conversations écrites sur le site du projet Open Assistant jusqu'au {DONNEES.oasst2Jusqua} ; forge garde celles qui sont en français de bout en bout.
+
+Forge écarte en revanche les réponses écrites par certains modèles. Celles des modèles Llama : leur <a href={LICENCE_LLAMA_33.url}>licence</a> demande que tout modèle entraîné sur leurs réponses porte un nom qui commence par « Llama ». Celles des modèles d'OpenAI : leurs <a href={COPIE_CONDITIONS_OPENAI.url}>conditions d'utilisation</a> interdisent d'utiliser leurs réponses pour développer des modèles qui leur font concurrence. Pour la même raison, forge écarte aussi les questions de Luth-2 qui viennent de jeux où ces modèles les avaient écrites.
+
+Une réserve, que forge ne peut pas lever : d'après sa fiche, les lignes de Luth-2 tirées de StackOverflow restent sous licence {DONNEES.stackoverflow}, qui demande de partager les adaptations sous la même licence. Rien, dans Luth-2, ne permet de les reconnaître : forge les garde, sans savoir combien il y en a.
+
+Deux autres parts s'écrivent par programme, dans le <a href={LIENS.generees}>code de forge</a>, sous la licence du dépôt. D'abord, des conversations avec un message système qui donne une consigne de forme, une longueur à ne pas dépasser par exemple, et une réponse prise dans Luth-2 ou Aya, transformée, puis gardée seulement si elle respecte vraiment la consigne. Ensuite, des conversations où ton IA se présente, en ne disant que des faits : son nom, le site qui l'a créée, sa taille, et qu'elle se trompe souvent.
+
+Les fiches de ces jeux, avec leur licence et leur taille, sont dans l’<a href={LIENS.annuaire}>annuaire des données</a>.
+
+<Fragment slot="note">
+
+<p>{typographier(`Sources de cette étape, lues le ${DONNEES.luLe} : `)}{SOURCES_DONNEES_1_7.map((x, i) => <span>{i > 0 ? ', ' : ''}<a href={x.url}>{typographier(x.titre)}</a></span>)}. La page d'OpenAI refuse les lecteurs automatiques : ses conditions ont été lues dans une copie.</p>
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={6} titre="Un petit affinage">
+
+Le projet du chapitre refait tout cela en tout petit, sur ton processeur, en moins d'une minute. Un modèle minuscule de {ESSAI.parametres} paramètres lit d'abord le texte de ce site, celui du {LIENS.l11 ? <a href={LIENS.l11}>chapitre 1.1</a> : 'chapitre 1.1'}, pendant {ESSAI.pasPre} pas : un pré-entraînement express. Puis forge l'affine, avec sa vraie boucle d'entraînement, sur {ESSAI.exemples} conversations écrites à la main dans le projet, chacune une question et une réponse courte. Avant et après, le projet lui pose {ESSAI.invites} questions qu'il n'a jamais vues, et compte les réponses qui finissent par `<|fin_tour|>`.
+
+<CodeExplique fichier="projets/1.7-conversation/conversation_pas_a_pas/petit_affinage.py" region="essai">
+  <li data-lignes="2">`essai_affinage` reçoit l'appareil, le nombre de pas d'affinage, et un dossier ; sans dossier, tout s'écrit dans un dossier temporaire, effacé à la fin.</li>
+  <li data-lignes="15-17">Le tokenizer de ton IA ; les jetons du texte du site ; les conversations, encodées avec leur masque et empaquetées par BFD, comme aux étapes 2 à 4.</li>
+  <li data-lignes="18-21">Le pré-entraînement express, par la boucle de forge, sans rien afficher.</li>
+  <li data-lignes="22-25">Le modèle de départ est publié par forge, comme une vraie version de ton IA, puis interrogé : la part de ses réponses qui finissent leur tour, avant l'affinage.</li>
+  <li data-lignes="26-28">L'affinage, par la même boucle, avec la méthode `sft` : la perte masquée de l'étape 3.</li>
+  <li data-lignes="30-33">Le modèle affiné est publié de même, puis interrogé.</li>
+  <li data-lignes="35-49">Ce que l'essai rend : ses pertes, ses réponses, avant et après, et ses chiffres.</li>
+</CodeExplique>
+
+<SortieCommande
+  fichier={MESURES_PARTIE_1.sortieEssaiAffinage}
+  commande={CONVERSATION_ESSAI}
+  legende="Le tout petit affinage, sur le processeur"
+  absent="À mesurer : le petit affinage sur le processeur."
+/>
+
+Sa perte passe de {ESSAI.premiere} à {ESSAI.derniere}, et ses réponses finissent leur tour : {ESSAI.avant} avant l'affinage, {ESSAI.apres} après. Il a appris à s'arrêter. Mais ce qu'il répond ne veut rien dire : « . », « Une font font font ». En {ESSAI.pas} pas, sur {ESSAI.exemples} conversations, un si petit modèle n'apprend que la forme. Son taux d'affinage, {ESSAI.taux}, {ESSAI.fois} fois celui de son pré-entraînement, a été choisi après quelques essais, en regardant ce qui se passait. L'essai mesure l'arrêt, pas la qualité des réponses.
+
+</Etape>
+
+<Etape numero={7} titre="L'affinage de ton IA">
+
+Ton IA, la vraie, s'affine de la même façon, sur la carte graphique de l'auteur. Elle part de sa version publiée, `ton-ia-1.5`, et lit le jeu d'affinage que forge a préparé à partir des sources de l'étape 5, en rangées de {AFFINAGE.longueur} jetons. Ses réglages sont dans `configs/sft-1.7.toml`, dans le dossier de forge : {AFFINAGE.pas} pas de {AFFINAGE.lot} jetons, bourrage compris, soit {AFFINAGE.jetons} jetons en tout. Le taux d'apprentissage monte en {AFFINAGE.echauffement} pas jusqu'à {AFFINAGE.taux}, puis redescend jusqu'à {AFFINAGE.tauxMin}, sur le planning du {LIENS.l15 ? <a href={LIENS.l15}>chapitre 1.5</a> : 'chapitre 1.5'}.
+
+Pour le taux, l'auteur n'a trouvé aucune source qui donne celui d'un affinage, pour un modèle de cette taille entraîné de zéro. Il l'a donc cherché par un balayage : plusieurs essais courts, chacun avec son taux, et on garde celui dont la perte de validation finit la plus basse.
+
+<p class="a-mesurer" data-a-mesurer data-balayage-absent>{typographier('Les taux essayés et leurs pertes de validation : à relever, avec l’affinage complet.')}</p>
+
+<CourbeEntrainement nom="sft-1.7" titre="La courbe de l'affinage de ton IA" />
+
+<TableauSessions nom="sft-1.7" titre="Les sessions de l'affinage de ton IA" />
+
+Comme au {LIENS.l15 ? <a href={LIENS.l15}>chapitre 1.5</a> : 'chapitre 1.5'}, l'affinage peut s'arrêter à tout moment, par Ctrl+C, et reprendre exactement là où il en était. Il existe aussi une version courte, en {AFFINAGE.pasCourt} pas au lieu de {AFFINAGE.pas}, avec les mêmes réglages : `configs/sft-1.7-court.toml`. Les deux se lancent avec la commande `entrainer` de forge, sur une carte graphique NVIDIA ; les commandes à copier viendront ici avec la version publiée de ton IA 1.7.
+
+</Etape>
+
+<Etape numero={8} titre="Ce qu'elle sait faire maintenant">
+
+D'abord, ce qu'on peut en attendre. Un affinage apprend une forme et des habitudes : répondre, s'arrêter, suivre une consigne simple. Il n'apprend pas de connaissances. Chez <a href={DISCUSSION_NANOCHAT.url}>nanochat d20</a>, un modèle de {ATTENTES.parametres} millions de paramètres, proche de ton IA, l'affinage fait passer ARC-Challenge, des questions de sciences, de {ATTENTES.avant} à {ATTENTES.apres} : rien de gagné.
+
+Forge fait passer à chaque version de ton IA les mêmes épreuves. Les consignes d'IFEval-FR : des demandes avec des consignes qu'un programme peut vérifier, comme écrire sans virgule ou rester sous un nombre de mots. La part des réponses qui finissent d'elles-mêmes. Et sa perte sur des conversations qu'elle n'a jamais lues, celles de la validation de son jeu d'affinage.
+
+{CONSIGNES.choix === null ? (
+  <p class="a-mesurer" data-a-mesurer data-pari-a-mesurer="consignes">{typographier('Le pari sur les consignes de ton IA 1.7 : à venir, avec ses mesures.')}</p>
+) : (
+  <Pari
+    id="consignes"
+    question="Sur IFEval-FR, quelle part des invites ton IA 1.7 respecte-t-elle en entier ?"
+    precision={`Ton IA 1.5 en respectait ${CONSIGNES.avant}.`}
+    choix={CONSIGNES.choix}
+    acquis="consignes"
+  >
+    <p>{typographier(`${CONSIGNES.juste} : ${CONSIGNES.apres} des invites, contre ${CONSIGNES.avant} pour ton IA 1.5.`)}</p>
+  </Pari>
+)}
+
+<TableauEtape versions={['1.5@1.7', '1.7@1.7', '1.7-court@1.7']} mesures={['ifeval_fr', 'tenue', 'perte_conversation']} legende="Ton IA avant et après l'affinage, sur les mêmes tests" />
+
+Ton IA 1.5 respecte toutes les consignes de {CONSIGNES.avant} des invites, sans jamais finir une réponse. Sans doute pas parce qu'elle les suit : certaines consignes, comme ne pas mettre de virgule, peuvent être respectées par un texte qui les ignore. Sa perte sur des conversations n'a pas encore été mesurée : son évaluation a eu lieu avant que le jeu d'affinage existe.
+
+Voici les réponses de ton IA 1.7 aux {OUVERTURE.n} questions fixes de forge, telles quelles :
+
+<EchantillonsConversation nom="1.7@1.7" />
+
+<details class="echantillons-avant" style="margin-bottom: 1.2em">
+<summary><span class="bascule-soleil">Les {OUVERTURE.n} réponses de ton IA 1.5, telles quelles</span></summary>
+
+<EchantillonsConversation nom="1.5@1.7" />
+
+</details>
+
+Un affinage peut aussi faire oublier : à force de lire des conversations, ton IA pourrait moins bien prédire le texte du web qu'elle a lu pendant son pré-entraînement. Forge le mesure par sa perte sur des textes de validation de son pré-entraînement, avant et après.
+
+{OUBLI.choix === null ? (
+  <p class="a-mesurer" data-a-mesurer data-pari-a-mesurer="oubli">{typographier('Le pari sur ce que ton IA 1.7 a oublié : à venir, avec ses mesures.')}</p>
+) : (
+  <Pari
+    id="oubli"
+    question="Après l'affinage, sa perte sur le texte du web…"
+    precision={`Celle de ton IA 1.5 : ${OUBLI.avant} nats par jeton. « Ne bouge pas » veut dire à ${OUBLI.tolerance} près.`}
+    choix={OUBLI.choix}
+    acquis="oubli"
+  >
+    <p>{OUBLI.phrase}</p>
+  </Pari>
+)}
+
+<TableauEtape versions={['1.5@1.7', '1.7@1.7']} mesures={['oubli']} legende="Ce qu'elle sait encore prédire du français brut" />
+
+{OUBLI.phrase === null ? (
+  <p class="a-mesurer" data-a-mesurer data-oubli-absent>{typographier('Ce que l’affinage lui a fait oublier : à mesurer, avec ton IA 1.7.')}</p>
+) : (
+  <p data-test="phrase-oubli">{OUBLI.phrase}</p>
+)}
+
+</Etape>
+
+<Etape numero={9} titre="Chez un grand labo">
+
+Ton IA s'affine sur des conversations rassemblées par d'autres, sur une seule carte. Les grands labos font écrire les leurs, ou les choisissent une à une, et les font lire à des milliers de cartes.
+
+<EncadreLabo sources={SOURCES_LABO_1_7}>
+
+InstructGPT, d'OpenAI, en 2022, commence par un affinage supervisé sur environ {LABO.iInvites} questions, chacune avec une réponse écrite par des étiqueteurs recrutés pour cela, lues {LABO.iEpoques} fois. L'affinage de son plus grand modèle, {LABO.iParametres} de paramètres, a demandé {LABO.iSft} pétaflops/s-jours de calcul : {LABO.iPart} des {LABO.iGpt3} du pré-entraînement de GPT-3, son point de départ.
+
+Pour Llama 2, Meta a fait écrire {LABO.lAnnotations} exemples à la main, et mis de côté des millions d'exemples tirés d'autres jeux, de moins bonne qualité. Comme forge, il met bout à bout questions et réponses, dans des rangées de {LABO.lLongueur} jetons, et ne compte la perte que sur les réponses. Il lit son jeu {LABO.lEpoques} fois.
+
+Tülu 3, d'Ai2, en 2024, publie tout, données et code compris : {LABO.tInvites} questions. Son modèle de {LABO.tParametres} de paramètres s'affine sur {LABO.tCartes} cartes H100 pendant {LABO.tHeures} heures, soit {LABO.tHeuresDeCartes} heures de carte.
+
+SmolLM3, de Hugging Face, en 2025, a {LABO.sParametres} de paramètres. Son jeu d'affinage compte {LABO.sJetons} de jetons, dont {LABO.sRaisonnement} de raisonnement, lus {LABO.sEpoques} fois. Il les range par BFD, et masque la perte des questions : les deux outils de ce chapitre. Ton IA, elle, lira {LABO.tonIA} jetons, bourrage compris.
+
+</EncadreLabo>
+
+<Fragment slot="note">
+
+Les heures de carte de Tülu 3 sont un calcul : {LABO.tCartes} cartes pendant {LABO.tHeures} heures. Un pétaflop/s-jour, c'est le calcul d'une machine qui fait un million de milliards d'opérations par seconde pendant un jour.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={10} titre="Le code et le projet">
+
+Le projet vérifie sa perte à la main contre celle de forge :
+
+<CodeExplique fichier="projets/1.7-conversation/tests/test_gabarit.py" region="test-perte">
+  <li data-lignes="3-5">Un petit jeu d'affinage, un modèle minuscule, et un lot lu par le chargeur de forge.</li>
+  <li data-lignes="6-8">Le modèle lit le lot, avec son masque par document. Le test s'assure que le lot a des cibles apprises, et d'autres non.</li>
+  <li data-lignes="10-14">La perte à la main égale celle de PyTorch, à 10⁻¹² près, en float64.</li>
+  <li data-lignes="16-25">Et celle d'un pas d'affinage de forge, avec un taux nul, sur le même lot. Forge calcule ses pertes en float32 : l'égalité tient à cette précision-là. Le pas compte aussi les mêmes jetons appris.</li>
+</CodeExplique>
+
+<RecupererProjet
+  projet="1.7-conversation"
+  intro="Le projet du chapitre est dans le dépôt du site : le gabarit et la perte masquée refaits à la main, la fuite sans masque, et le petit affinage."
+  suite="Puis, dans le dossier du projet, lance ses tests :"
+/>
+
+<BlocCommande commandes={[CONVERSATION_TESTS]} ou="un terminal, dans le dossier du projet" />
+
+Ils comparent la perte à la main à celle de forge, mesurent la fuite, et refont le petit affinage, sur le processeur. Le projet utilise PyTorch, comme ceux des chapitres 1.4 à 1.6 : `--extra cpu` prend sa version pour le processeur, qui suffit ici. Pour voir une conversation jeton par jeton, avec son masque :
+
+<BlocCommande commandes={[CONVERSATION_MONTRER]} ou="un terminal, dans le dossier du projet" />
+
+Pour parler à ton IA 1.7, forge a une commande, `discuter`, qui charge une version publiée et te laisse lui écrire, tour après tour. Elle viendra ici avec la version publiée de ton IA 1.7.
+
+Le projet complet, avec un notebook qui refait tout cela pas à pas, est sur GitHub :
+
+<LiensProjet projet="1.7-conversation" />
+
+### À suivre
+
+Tu sais maintenant comment ton IA apprend le format d'une conversation ; ce qu'elle en fait, l'étape 8 le mesure. Un affinage supervisé lui apprend à répondre comme ses exemples, ce qu'ils ont de bon comme ce qu'ils ont de moins bon. Le chapitre 1.8, {SUITE.lien ? <a href={SUITE.lien}>{SUITE.titre}</a> : SUITE.titre}, à venir, lui apprendra à préférer les réponses qu'on juge meilleures.
+
+</Etape>

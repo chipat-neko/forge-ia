@@ -1,0 +1,90 @@
+{
+ "version": "ton-ia-1.5",
+ "etape": "1.7",
+ "releve_le": "2026-11-17",
+ "mesures": {
+  "perte_conversation": {
+   "absente": "le jeu d'affinage sft-1.7 n'existait pas encore quand ton-ia-1.5 a été évaluée, le 17/11/2026 (évaluation de l'étape 1.9). Relève-la avec : python -m forge evaluer-etape --etape 1.7"
+  },
+  "ifeval_fr": {
+   "invite_stricte": 0.2170212765957447,
+   "consigne_stricte": 0.3130434782608696,
+   "n": 235
+  },
+  "tenue": {
+   "terminee": 0.0,
+   "fr": 0.9276595744680851,
+   "autre": 0.0,
+   "indetermine": 0.07234042553191489,
+   "mots_moyens": 347.06382978723406,
+   "n": 235
+  },
+  "oubli": {
+   "perte": 2.346851348876953,
+   "bits_par_octet": 0.7790234185378737,
+   "n": 64
+  }
+ },
+ "echantillons": [
+  {
+   "invite": "Quelle est la capitale de la France ?",
+   "texte": "AllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllahAllah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah Allah",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Pourquoi le ciel est-il bleu ?",
+   "texte": "Allah est le plus grand des cieux, le plus haut et le plus élevé des cieux, le plus haut et le plus élevé des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le ciel est le plus haut des cieux, le",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Explique en deux phrases comment fonctionne la photosynthèse.",
+   "texte": "Explique en deux phrases comment fonctionne la photosynthèse.Allah a dit: «Allah a créé le monde et la terre et les cieux et la mer et les eaux et la terre et les cieux et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et la terre et la mer et les eaux et",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Combien font 12 fois 7 ?",
+   "texte": "AllahAllahAllahAllah\nAllah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux. Allah le sait mieux.",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Donne-moi trois conseils pour bien dormir.",
+   "texte": "Donne-moi trois conseils pour bien dormir.Allah a dit: «Si vous ne dormez pas, Allah vous donnera un sommeil de meilleure qualité.»Allah a dit: «Si vous dormez, Allah vous donnera un sommeil de meilleure qualité.»Allah a dit: «Si vous dormez, Allah vous donnera un sommeil de meilleure qualité.»Allah a dit: «Si vous dormez, Allah vous donnera un sommeil de meilleure qualité.»Allah a dit: «Si vous dormez, Allah vous donnera un sommeil de meilleure qualité.»Allah a dit: «Si vous dormez, Allah vous donnera un sommeil de meilleure qualité.»Allah a dit: «Si vous dormez, Allah vous donnera un sommeil de meilleure qualité.»Allah a dit: «Si vous dormez, Allah vous donnera un sommeil de meilleure qualité.»Allah a dit: «Si vous dormez, Allah vous donnera un sommeil de meilleure qualité.»Allah a dit: «Si vous dorme",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Quelle est la différence entre un virus et une bactérie ?",
+   "texte": "Quelle est la différence entre un virus et une bactérie ?Allah a dit : « Allah a créé le monde et la terre et les cieux et la mer et la terre et les eaux et les montagnes et les vallées et les montagnes et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées et les vallées",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Écris un court texte sur l'automne en moins de 50 mots, tout en minuscules.",
+   "texte": "Écris un court texte sur l'automne en moins de 50 mots, tout en minuscules.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.Allah est le plus grand des messagers.",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Présente-toi en trois phrases, sans utiliser de virgule.",
+   "texte": "Présente-toi en trois phrases, sans utiliser de virgule.Allah est le plus grand et le plus grand des messagers.Allah est le plus grand et le plus grand des messagers.Allah est le plus grand et le plus grand des messagers.Allah est le plus grand et le plus grand des messagers.Allah est le plus grand et le plus grand des messagers.Allah est le plus grand et le plus grand des messagers.Allah est le plus grand et le plus grand des messagers.Allah est le plus grand et le plus grand des messagers.Allah est le plus grand et le plus grand des messagers.Allah est le plus grand et le plus grand des messagers.Allah est le plus grand et le plus grand des messagers.Allah est le plus grand et le plus grand des messagers.Allah est le plus grand et le plus grand des messagers.Allah est le plus grand et le plus grand des messagers.Allah est le plus",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Qui es-tu ?",
+   "texte": "Qui es-tu ?Allah a dit : « Allah a créé le monde pour que les hommes puissent vivre en paix et en harmonie avec la nature. »Allah a créé le monde pour que les hommes puissent vivre en paix et en harmonie avec la nature. Allah a créé le monde pour que les hommes puissent vivre en paix et en harmonie avec la nature. Allah a créé le monde pour que les hommes puissent vivre en paix et en harmonie avec la nature. Allah a créé le monde pour que les hommes puissent vivre en paix et en harmonie avec la nature. Allah a créé le monde pour que les hommes puissent vivre en paix et en harmonie avec la nature. Allah a créé le monde pour que les hommes puissent vivre en paix et en harmonie avec la nature. Allah a créé le monde pour que les hommes puissent vivre en paix et en harmonie avec la nature. Allah a créé le monde pour que les hommes puissent vivre en paix et en harmonie avec la nature. Allah a créé le monde pour que les hommes puissent",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Écris une fonction Python qui renvoie la somme des carrés d'une liste de nombres.",
+   "texte": "Écris une fonction Python qui renvoie la somme des carrés d'une liste de nombres.Allah a dit: «Allah a créé la terre et la mer, et le ciel et la terre, et la mer et la terre, et le ciel et la mer, et la terre et la mer, et le ciel et la terre, et la mer et la terre, et le ciel et la terre, et la terre et la mer, et le ciel et la terre, et la terre et la mer, et le ciel et la terre, et la terre et la mer, et le ciel et la terre, et la terre et la mer, et le ciel et la terre, et la terre et la mer, et le ciel et la terre, et le ciel et la terre, et le ciel et la terre, et le ciel et la terre, et le ciel et la terre, et le ciel et la terre, et le ciel et la terre, et le ciel et la terre, et",
+   "pensee": null,
+   "terminee": false
+  }
+ ]
+}

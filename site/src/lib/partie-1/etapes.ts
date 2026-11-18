@@ -19,6 +19,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { nombre, pourcent } from '../nombres';
 
 const FINE = '\u202F';
 
@@ -242,4 +243,73 @@ export function lireSeries(fichier: string, racineDepot: string | URL = '..'): R
     series[cle] = points as [number, number][];
   }
   return series;
+}
+
+// ---------- Ce que montre le tableau d'une étape (TableauEtape.astro) ----------
+// Une ligne par mesure : son libellé, ce qu'elle compte, et le nombre qu'on en lit, mis en forme. Le tableau
+// est commun aux chapitres 1.7 à 1.10 : une mesure qui n'a pas encore sa ligne arrête la construction, avec un
+// message qui dit où l'ajouter. Une valeur absente (rapport qui manque, ou mesure `{ absente }`) devient « à
+// mesurer » dans la page.
+
+/** Une ligne du tableau : le libellé, sa précision, et la valeur et le détail lus dans les nombres de la mesure. */
+export interface LigneDeMesure {
+  libelle: string;
+  precision: string;
+  valeur: (m: NombresDeMesure) => string;
+  detail: (m: NombresDeMesure) => string;
+}
+
+function lu(m: NombresDeMesure, cle: string): number {
+  const x = m[cle];
+  if (typeof x !== 'number') throw new Error(`La mesure n’a pas de nombre « ${cle} » : relève de nouveau le rapport d’étape.`);
+  return x;
+}
+
+/** Les lignes des mesures que les chapitres montrent. */
+export const LIGNES_DES_MESURES: Readonly<Record<string, LigneDeMesure>> = Object.freeze({
+  perte_conversation: {
+    libelle: 'Perte sur des conversations',
+    precision: 'en nats par jeton appris, sur la validation de sft-1.7',
+    valeur: (m) => nombre(lu(m, 'perte'), 3),
+    detail: (m) => `sur ${nombre(lu(m, 'n'))} rangées`,
+  },
+  ifeval_fr: {
+    libelle: 'Consignes d’IFEval-FR',
+    precision: 'part des invites dont toutes les consignes sont respectées',
+    valeur: (m) => pourcent(lu(m, 'invite_stricte'), 1),
+    detail: (m) => `consignes${FINE}: ${pourcent(lu(m, 'consigne_stricte'), 1)}`,
+  },
+  tenue: {
+    libelle: 'Réponses finies',
+    precision: 'part des réponses qui finissent par <|fin_tour|>',
+    valeur: (m) => pourcent(lu(m, 'terminee'), 1),
+    detail: (m) => `sur ${nombre(lu(m, 'n'))} réponses`,
+  },
+  oubli: {
+    libelle: 'Perte sur le texte du web',
+    precision: 'en nats par jeton, sur la validation de son pré-entraînement',
+    valeur: (m) => nombre(lu(m, 'perte'), 3),
+    detail: (m) => `sur ${nombre(lu(m, 'n'))} morceaux`,
+  },
+});
+
+/** La cellule d'une mesure dans un rapport : sa valeur et son détail ; null si le rapport manque ou si la mesure est absente. */
+export function celluleDeMesure(rapport: RapportEtape | null, nom: string): { valeur: string; detail: string } | null {
+  const ligne = LIGNES_DES_MESURES[nom];
+  if (ligne === undefined) {
+    throw new Error(
+      `La mesure « ${nom} » n’a pas de ligne de tableau : ajoute-la à LIGNES_DES_MESURES (src/lib/partie-1/etapes.ts), ` +
+        'avec son libellé, sa précision et le nombre à montrer.',
+    );
+  }
+  if (rapport === null) return null;
+  const m = rapport.mesures[nom];
+  if (m === undefined || estAbsente(m)) return null;
+  return { valeur: ligne.valeur(m), detail: ligne.detail(m) };
+}
+
+/** Le nom d'une version en tête de colonne : « Ton IA 1.5 », « Ton IA 1.7 », « Version courte ». */
+export function nomDeVersion(nom: NomRapportEtape): string {
+  const version = nom.slice(0, nom.indexOf('@'));
+  return version.endsWith('-court') ? 'Version courte' : `Ton IA ${version}`;
 }

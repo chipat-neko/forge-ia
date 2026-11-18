@@ -1,4 +1,4 @@
-// Les mesures et les sorties des projets 1.2, 1.4 et 1.5 que les chapitres lisent à la
+// Les mesures et les sorties des projets 1.2, 1.4, 1.5 et 1.7 que les chapitres lisent à la
 // construction : leurs fichiers, en chemins depuis la racine du dépôt.
 //
 // FICHIERS_PARTIE_1 (fichiers.ts) ne liste que les attendus de parité, ceux que la page
@@ -35,6 +35,14 @@ export const MESURES_PARTIE_1 = Object.freeze({
   sortieEssaiCarte: 'projets/1.5-pre-entrainement/sorties/essai-rtx-5070-ti.txt',
   /** 1.5 : le même essai sur la carte graphique de l'auteur, avec en plus les secondes de l'échauffement, hors chronomètre. */
   essaiCarte: 'projets/1.5-pre-entrainement/mesures/essai-rtx-5070-ti.json',
+  /** 1.7 : ce que la commande `fuite` affiche, la conversation B face à la même lue seule (la première ligne est « # relevé le AAAA-MM-JJ »). */
+  sortieFuiteConversation: 'projets/1.7-conversation/sorties/fuite.txt',
+  /** 1.7 : l'écart maximal des logits de B, avec et sans le masque par document. */
+  fuiteConversation: 'projets/1.7-conversation/mesures/fuite.json',
+  /** 1.7 : ce que la commande `essai --appareil cpu` affiche, le tout petit affinage sur le processeur (« # relevé le … » en tête). */
+  sortieEssaiAffinage: 'projets/1.7-conversation/sorties/essai-processeur.txt',
+  /** 1.7 : les pertes de ce petit affinage, la part des réponses qui finissent leur tour avant et après, ses réponses. */
+  essaiAffinage: 'projets/1.7-conversation/mesures/essai-processeur.json',
 } as const);
 
 export type NomMesuresPartie1 = keyof typeof MESURES_PARTIE_1;

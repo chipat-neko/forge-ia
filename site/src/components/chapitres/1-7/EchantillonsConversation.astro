@@ -1,0 +1,141 @@
+---
+// Les réponses d'une version de ton IA aux invites fixes de forge (INVITES_DE_CONVERSATION,
+// forge/evaluation/etape.py), lues à la construction dans le résumé de son rapport d'étape
+// (projets/1.N-*/mesures/etape-<version>.json, par lireRapportEtape). Toutes, ou celles dont on donne les
+// rangs, dans l'ordre du rapport, telles quelles : aucune n'est choisie pour sa qualité, aucune n'est
+// retouchée. Commun aux chapitres 1.7 à 1.10.
+//
+// Chaque réponse est en chasse fixe, précédée de sa question ; une pensée (chapitre 1.9) vient avant la
+// réponse. Dessous, une ligne dit, sans couleur, si la réponse a fini son tour (<|fin_tour|>) ou si elle a
+// été coupée à la limite de forge. Ces textes ne sont pas du texte du site : ils portent
+// data-pagefind-ignore, et les parcours ne leur appliquent pas la typographie.
+//
+// Si le rapport manque, le composant affiche « à mesurer », marqué data-a-mesurer.
+//
+//   <EchantillonsConversation nom="1.7@1.7" />
+//   <EchantillonsConversation nom="1.5@1.7" invites={[8]} />
+import { root } from 'astro:config/server';
+import { formaterDate } from '../../../lib/calculateur/formats';
+import { lireRapportEtape, nomDeVersion, type NomRapportEtape } from '../../../lib/partie-1/etapes';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  nom: NomRapportEtape;
+  /** Les rangs des invites à montrer, à partir de 0 ; toutes par défaut. */
+  invites?: readonly number[];
+}
+
+const { nom, invites } = Astro.props;
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const rapport = lireRapportEtape(nom, new URL('../', root));
+const qui = nomDeVersion(nom);
+const choisis = rapport === null ? [] : (invites ?? rapport.echantillons.map((_, i) => i)).map((i) => {
+  const e = rapport.echantillons[i];
+  if (e === undefined) throw new Error(`EchantillonsConversation : le rapport de ${rapport.version} n’a pas de réponse ${i}.`);
+  return e;
+});
+const absent = typographier(`Les réponses de ${qui.replace(/^Ton/, 'ton')} : à mesurer, avec le rapport de son étape.`);
+const legende =
+  rapport === null
+    ? ''
+    : typographier(
+        `Les réponses de ${qui.replace(/^Ton/, 'ton')} aux questions fixes de forge, telles quelles, relevées le ` +
+          `${formaterDate(rapport.releve_le)}. Chaque question est en gras ; la réponse est d’elle.`,
+      );
+const FIN = typographier('Finie par <|fin_tour|> : elle a rendu la parole.');
+const COUPEE = typographier('Coupée à la limite de forge : elle n’a pas fini son tour.');
+---
+
+{
+  rapport === null ? (
+    <p class="a-mesurer" data-a-mesurer data-echantillons-conversation={nom}>
+      {absent}
+    </p>
+  ) : (
+    <figure class="echantillons-conversation" data-echantillons-conversation={nom}>
+      <figcaption>{legende}</figcaption>
+      <ol>
+        {choisis.map((e) => (
+          <li>
+            <p class="question" data-pagefind-ignore>
+              {e.invite}
+            </p>
+            {e.pensee ? (
+              <div class="pensee" data-pagefind-ignore data-pensee-texte>
+                {e.pensee}
+              </div>
+            ) : null}
+            <div class="reponse" data-pagefind-ignore data-reponse-texte>{e.texte}</div>
+            <p class="etat">{e.terminee ? FIN : COUPEE}</p>
+          </li>
+        ))}
+      </ol>
+    </figure>
+  )
+}
+
+<style>
+  .echantillons-conversation {
+    margin: 1.4em 0 1.2em;
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--indigo-doux);
+    margin-bottom: 10px;
+  }
+
+  /* Une liste sous un trait d'encre, une question et sa réponse par ligne, séparées par des filets brume. */
+  ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 2px solid var(--indigo);
+  }
+
+  li {
+    margin: 0;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--brume);
+  }
+
+  .question {
+    margin: 0 0 6px;
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 17px;
+  }
+
+  /* La réponse telle quelle : ses retours à la ligne gardés, un mot trop long coupé plutôt que d'élargir la page. */
+  .reponse,
+  .pensee {
+    padding: 10px 14px;
+    background: var(--brume-claire);
+    border-radius: 10px;
+    font-family: var(--mono);
+    font-variant-ligatures: none; /* les caractères tels qu'elle les a écrits, sans flèches ni ligatures */
+    font-size: 14px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .pensee {
+    margin-bottom: 6px;
+    color: var(--indigo-doux);
+  }
+
+  .etat {
+    margin: 6px 0 0;
+    font-family: var(--titres);
+    font-size: 14px;
+    color: var(--indigo-doux);
+  }
+
+  .a-mesurer {
+    font-style: italic;
+    color: var(--indigo-doux);
+  }
+</style>

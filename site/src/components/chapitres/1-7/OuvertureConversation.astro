@@ -1,0 +1,133 @@
+---
+// L'ouverture du chapitre 1.7 : la même question, « Qui es-tu ? », posée à ton IA 1.5 et à ton IA 1.7, et leurs
+// réponses telles quelles. Elles viennent des échantillons des deux rapports d'étape
+// (projets/1.7-conversation/mesures/etape-ton-ia-1.5.json et etape-ton-ia-1.7.json, par lireRapportEtape),
+// où forge garde, sans tri, ses réponses à dix invites fixes.
+//
+// Ton IA 1.7 n'existe qu'avec sa Release : jusque-là, sa réponse est « à mesurer », marquée data-a-mesurer.
+// Les réponses ne sont pas du texte du site : data-pagefind-ignore, en chasse fixe, sans typographie. Une
+// ligne dit, sans couleur, si la réponse a fini son tour ou si forge l'a coupée.
+import { root } from 'astro:config/server';
+import { lireRapportEtape, type NomRapportEtape } from '../../../lib/partie-1/etapes';
+import { INVITE_DE_L_OUVERTURE, reponseALInvite } from '../../../lib/partie-1/paris-1-7';
+import { typographier } from '../../../lib/typo';
+
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const racine = new URL('../', root);
+const VERSIONS: [NomRapportEtape, string][] = [
+  ['1.5@1.7', 'Ton IA 1.5'],
+  ['1.7@1.7', 'Ton IA 1.7'],
+];
+const reponses = VERSIONS.map(([nom, qui]) => {
+  const rapport = lireRapportEtape(nom, racine);
+  return { nom, qui, reponse: rapport === null ? null : reponseALInvite(rapport, INVITE_DE_L_OUVERTURE) };
+});
+if (reponses[0].reponse === null) {
+  throw new Error(
+    'OuvertureConversation : le relevé de ton IA 1.5 (projets/1.7-conversation/mesures/etape-ton-ia-1.5.json) manque. ' +
+      'Il est versionné : récupère-le, ou relance « python -m conversation_pas_a_pas resumer » (README du projet 1.7).',
+  );
+}
+const FIN = typographier('Elle a fini son tour : <|fin_tour|>.');
+const COUPEE = typographier('Coupée par forge à la limite : elle n’avait pas fini.');
+const A_MESURER = typographier('À mesurer, quand ton IA 1.7 aura fini son affinage.');
+const legende = typographier(
+  'La même question, posée par forge aux deux versions de ton IA, sans rien d’autre. Leurs réponses, telles quelles.',
+);
+---
+
+<figure class="ouverture-conversation" data-test="ouverture">
+  <p class="tour question-posee">
+    <span class="qui">Toi</span>
+    <span class="question" data-pagefind-ignore>{INVITE_DE_L_OUVERTURE}</span>
+  </p>
+  {
+    reponses.map(({ nom, qui, reponse }) => (
+      <div class="tour">
+        <span class="qui">{qui}</span>
+        {reponse === null ? (
+          <p class="a-mesurer" data-a-mesurer data-reponse={nom}>
+            {A_MESURER}
+          </p>
+        ) : (
+          <>
+            <div class="reponse" data-reponse={nom} data-pagefind-ignore>{reponse.texte}</div>
+            <p class="etat">{reponse.terminee ? FIN : COUPEE}</p>
+          </>
+        )}
+      </div>
+    ))
+  }
+  <figcaption>{legende}</figcaption>
+</figure>
+
+<style>
+  .ouverture-conversation {
+    margin: 40px 0 1.2em;
+    border-top: 2px solid var(--indigo);
+    padding-top: 14px;
+  }
+
+  .tour {
+    margin: 0 0 18px;
+  }
+
+  /* Qui parle : un nom en Gabarito, au-dessus de ce qu'il dit, comme les rôles d'une pièce de théâtre. */
+  .qui {
+    display: block;
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--indigo-doux);
+    margin-bottom: 4px;
+  }
+
+  .question {
+    display: block;
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 40px;
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    color: var(--indigo);
+  }
+
+  /* La réponse telle quelle : en chasse fixe, ses retours à la ligne gardés, un mot trop long coupé. */
+  .reponse {
+    padding: 12px 16px;
+    background: var(--brume-claire);
+    border-radius: 10px;
+    font-family: var(--mono);
+    font-variant-ligatures: none; /* les caractères tels qu'elle les a écrits, sans flèches ni ligatures */
+    font-size: 14px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .etat {
+    margin: 6px 0 0;
+    font-family: var(--titres);
+    font-size: 14px;
+    color: var(--indigo-doux);
+  }
+
+  .a-mesurer {
+    margin: 0;
+    font-style: italic;
+    color: var(--indigo-doux);
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--indigo-doux);
+  }
+
+  @media (max-width: 720px) {
+    .question {
+      font-size: 32px;
+    }
+  }
+</style>

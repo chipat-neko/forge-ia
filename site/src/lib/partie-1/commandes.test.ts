@@ -517,8 +517,58 @@ describe('commandes de la vague 2', () => {
     }
     // Seules ces commandes sont attendues : un autre nom en AFFINER_, DPO_… serait une faute de frappe.
     const attendues = new Set(COMMANDES_DES_CHAPITRES);
+    // L'entrée dans le projet d'un chapitre (ALLER_AU_PROJET_1_7…) n'est pas une commande de forge.
     for (const nom of Object.keys(commandes)) {
-      if (/_1_(7|8|9|10)(_COURT)?$/.test(nom)) expect(attendues.has(nom), nom).toBe(true);
+      if (/_1_(7|8|9|10)(_COURT)?$/.test(nom) && !nom.startsWith('ALLER_AU_PROJET_')) expect(attendues.has(nom), nom).toBe(true);
     }
+  });
+});
+
+// Le chapitre 1.7 : le projet de la conversation pas à pas (montrer, fuite, essai), vérifié contre le
+// __main__.py et le README du projet, et contre les fichiers que lit le chapitre. Les commandes de forge
+// (AFFINER_1_7…) entrent avec la parution du chapitre : elles sont vérifiées plus bas, avec la vague 2.
+describe('commandes du chapitre 1.7', () => {
+  const PROJET = `${RACINE}/projets/1.7-conversation`;
+  const MAIN = readFileSync(`${PROJET}/conversation_pas_a_pas/__main__.py`, 'utf8').replace(/\r\n?/g, '\n');
+  const README = readFileSync(`${PROJET}/README.md`, 'utf8').replace(/\r\n?/g, '\n');
+
+  it('les commandes, à l’identique', () => {
+    expect(commandes.ALLER_AU_PROJET_1_7).toBe('cd forge-ia/projets/1.7-conversation');
+    expect(commandes.CONVERSATION_MONTRER).toBe(
+      'uv run --extra cpu python -m conversation_pas_a_pas montrer "Quelle est la capitale de la France ?" --reponse "Paris."',
+    );
+    expect(commandes.CONVERSATION_FUITE).toBe(
+      'uv run --extra cpu python -m conversation_pas_a_pas fuite --enregistrer sorties/fuite.txt --json mesures/fuite.json',
+    );
+    expect(commandes.CONVERSATION_ESSAI).toBe(
+      'uv run --extra cpu python -m conversation_pas_a_pas essai --appareil cpu --enregistrer sorties/essai-processeur.txt --json mesures/essai-processeur.json',
+    );
+    expect(commandes.CONVERSATION_TESTS).toBe('uv run --extra cpu pytest -q');
+  });
+
+  it('ce sont des commandes du script, avec leurs options, et celles du README du projet', () => {
+    for (const [sous, commande, options] of [
+      ['montrer', commandes.CONVERSATION_MONTRER, ['--reponse']],
+      ['fuite', commandes.CONVERSATION_FUITE, ['--enregistrer', '--json']],
+      ['essai', commandes.CONVERSATION_ESSAI, ['--appareil', '--enregistrer', '--json']],
+    ] as const) {
+      expect(MAIN).toContain(`add_parser("${sous}"`);
+      for (const option of options) {
+        expect(commande).toContain(`${option} `);
+        expect(MAIN, `${sous} ${option}`).toMatch(new RegExp(`\\w+\\.add_argument\\("${option}"`));
+      }
+    }
+    for (const c of [commandes.ALLER_AU_PROJET_1_7, commandes.CONVERSATION_MONTRER, commandes.CONVERSATION_FUITE, commandes.CONVERSATION_ESSAI, commandes.CONVERSATION_TESTS]) {
+      expect(README, c).toContain(`${c}\n`);
+    }
+  });
+
+  it('elles écrivent les sorties et les mesures que lit le chapitre', () => {
+    const projet = 'projets/1.7-conversation/';
+    const ecrit = (c: string, option: string) => `${projet}${new RegExp(`${option} (\\S+)`).exec(c)![1]}`;
+    expect(ecrit(commandes.CONVERSATION_FUITE, '--enregistrer')).toBe(MESURES_PARTIE_1.sortieFuiteConversation);
+    expect(ecrit(commandes.CONVERSATION_FUITE, '--json')).toBe(MESURES_PARTIE_1.fuiteConversation);
+    expect(ecrit(commandes.CONVERSATION_ESSAI, '--enregistrer')).toBe(MESURES_PARTIE_1.sortieEssaiAffinage);
+    expect(ecrit(commandes.CONVERSATION_ESSAI, '--json')).toBe(MESURES_PARTIE_1.essaiAffinage);
   });
 });

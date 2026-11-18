@@ -1,0 +1,217 @@
+---
+// Les mesures d'une étape de ton IA, version contre version : une colonne par version (« 1.5@1.7 »,
+// « 1.7@1.7 »…), une ligne par mesure, lues à la construction dans les résumés des rapports d'étape
+// (projets/1.N-*/mesures/etape-<version>.json, par lireRapportEtape). Les nombres viennent des rapports de
+// `forge evaluer-etape`, sans rien recalculer ; chaque mesure a sa mise en forme dans LIGNES_DES_MESURES
+// (etapes.ts). Commun aux chapitres 1.7 à 1.10.
+//
+// Une valeur qui manque (le rapport n'est pas encore relevé, ou forge n'a pas pu faire la mesure) devient
+// « à mesurer », marquée data-a-mesurer : la garde de parution (e2e/parution.spec.ts) refuse cette valeur
+// dans un chapitre paru. Un tableau typographié, sans cadre, comme ceux des autres chapitres.
+//
+//   <TableauEtape versions={['1.5@1.7', '1.7@1.7']} mesures={['ifeval_fr', 'tenue']} legende="…" />
+import { root } from 'astro:config/server';
+import { formaterDate } from '../../../lib/calculateur/formats';
+import { celluleDeMesure, LIGNES_DES_MESURES, lireRapportEtape, nomDeVersion, type NomRapportEtape } from '../../../lib/partie-1/etapes';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  /** Les versions, une par colonne, dans l'ordre. */
+  versions: readonly NomRapportEtape[];
+  /** Les mesures, une par ligne : des clés de LIGNES_DES_MESURES. */
+  mesures: readonly string[];
+  /** La légende, sans point final : ce que le tableau compare. */
+  legende: string;
+}
+
+const { versions, mesures, legende } = Astro.props;
+if (versions.length === 0 || mesures.length === 0) {
+  throw new Error('TableauEtape : donne au moins une version et une mesure (props versions et mesures).');
+}
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const racine = new URL('../', root);
+const rapports = versions.map((v) => lireRapportEtape(v, racine));
+const lignes = mesures.map((nom) => ({ nom, ligne: LIGNES_DES_MESURES[nom], cellules: rapports.map((r) => celluleDeMesure(r, nom)) }));
+const dates = [...new Set(rapports.filter((r) => r !== null).map((r) => r!.releve_le))];
+const id = `etape-${versions.join('-').replace(/[^a-z0-9]+/gi, '-')}-${mesures.join('-')}`;
+---
+
+<figure class="tableau-etape" data-tableau-etape={versions.join(' ')}>
+  <figcaption id={id}>
+    <span class="objet">{typographier(legende)}</span>
+    {
+      typographier(
+        'Mesuré par forge (evaluer-etape), sur les mêmes tests pour chaque version.' +
+          (dates.length > 0 ? ` Relevé le ${dates.map(formaterDate).join(' et le ')}.` : ''),
+      )
+    }
+  </figcaption>
+  {/* Si le tableau dépasse la colonne, il défile dans son cadre : le cadre prend alors le focus (WCAG 2.1.1). */}
+  <div class="defile" role="region" aria-labelledby={id} tabindex="0">
+    <table aria-labelledby={id}>
+      <thead>
+        <tr>
+          <th scope="col">Mesure</th>
+          {versions.map((v) => <th scope="col" class="nombre">{nomDeVersion(v)}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {
+          lignes.map(({ nom, ligne, cellules }) => (
+            <tr data-mesure={nom}>
+              <th scope="row">
+                {typographier(ligne.libelle)}
+                <small>{typographier(ligne.precision)}</small>
+              </th>
+              {cellules.map((c, i) => (
+                <td class="nombre" data-version={versions[i]} data-mesure={nom}>
+                  {c === null ? (
+                    <span class="a-mesurer" data-a-mesurer>
+                      à mesurer
+                    </span>
+                  ) : (
+                    <>
+                      <span class="valeur">{c.valeur}</span>
+                      <small>{c.detail}</small>
+                    </>
+                  )}
+                </td>
+              ))}
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+</figure>
+
+<style>
+  .tableau-etape {
+    margin: 1.4em 0 1.2em;
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--indigo-doux);
+    margin-bottom: 10px;
+  }
+
+  /* Pas de classe « titre » : la règle globale .titre du gabarit s'y appliquerait. */
+  figcaption .objet {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--indigo);
+    margin-bottom: 4px;
+  }
+
+  /* Trois colonnes de nombres tiennent à 390 px ; au-delà, le tableau défile dans son cadre, jamais la page. */
+  .defile {
+    overflow-x: auto;
+    padding-right: 3px; /* l'italique de « à mesurer » déborde un peu de sa boîte : le cadre ne le coupe pas */
+  }
+
+  /* Un tableau typographié, sans cadre : un trait d'encre en haut, des filets brume entre les lignes. */
+  /* Des colonnes fixes : la première, les mesures, garde un peu plus du tiers ; les versions se partagent le reste.
+     Le texte passe à la ligne dans sa colonne plutôt que d'élargir le tableau. */
+  table {
+    table-layout: fixed;
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 17px;
+    line-height: 1.35;
+    border-top: 2px solid var(--indigo);
+  }
+
+  thead th {
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--indigo-doux);
+    text-align: left;
+    vertical-align: bottom;
+    padding: 6px 0 4px 14px;
+    border-bottom: 2px solid var(--indigo);
+  }
+
+  thead th:first-child {
+    width: 38%;
+    padding-left: 0;
+  }
+
+  tbody th {
+    font-family: var(--titres);
+    font-weight: 600;
+    text-align: left;
+    vertical-align: baseline;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--brume);
+  }
+
+  td {
+    vertical-align: baseline;
+    padding: 7px 0 7px 14px;
+    border-bottom: 1px solid var(--brume);
+  }
+
+  small {
+    display: block;
+    font-family: var(--titres);
+    font-weight: 400;
+    font-size: 14px;
+    color: var(--indigo-doux);
+  }
+
+  thead th.nombre,
+  td.nombre {
+    text-align: right;
+  }
+
+  td.nombre {
+    font-family: var(--titres);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .valeur {
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  .a-mesurer {
+    font-style: italic;
+    color: var(--indigo-doux);
+    white-space: nowrap;
+  }
+
+  .defile:focus-visible {
+    outline: 3px solid var(--indigo);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 720px) {
+    table {
+      font-size: 15px;
+    }
+
+    thead th,
+    td {
+      padding-left: 6px;
+    }
+
+    thead th {
+      font-size: 13px;
+    }
+
+    small {
+      font-size: 13px;
+    }
+
+    /* Sur un téléphone, « à mesurer » passe sur deux lignes plutôt que d'élargir le tableau. */
+    .a-mesurer {
+      white-space: normal;
+      font-size: 14px;
+    }
+  }
+</style>
