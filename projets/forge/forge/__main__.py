@@ -1162,6 +1162,12 @@ def _ajouter_preparer(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_preparer, parseur=commande)
 
 
+# Le code de sortie de `forge preferences` quand le taux de paires est sous le seuil de l'utilisateur : ni 1 (une
+# erreur), ni 2 (argparse), ni 3 ou 4 (pris par travail-long.ps1 : « le même travail tourne déjà », « le script a
+# échoué »), ni 130 (une pause).
+CODE_SOUS_LE_SEUIL = 5
+
+
 def _commande_preferences(choix: argparse.Namespace) -> int:
     """`forge preferences` : deux réponses de ton IA par invite, classées par des contrôles programmés, en jeu dpo."""
     # Imports ici : PyTorch est long à charger, les autres commandes n'en ont pas besoin.
@@ -1169,7 +1175,7 @@ def _commande_preferences(choix: argparse.Namespace) -> int:
 
     from forge.chemins import PlaceInsuffisante
     from forge.erreurs import DonneesManquantes
-    from forge.evaluation.rapport import pourcent
+    from forge.evaluation.rapport import nombre_fr, pourcent
     from forge.fichiers import ESPACE_FINE, entier
     from forge.preferences import construction
 
@@ -1193,8 +1199,9 @@ def _commande_preferences(choix: argparse.Namespace) -> int:
         return 130
     except torch.cuda.OutOfMemoryError:
         print(
-            f"Erreur{fine}: la carte graphique manque de mémoire pour écrire les réponses. Ferme les jeux ou logiciels 3D "
-            f"ouverts (et l'entraînement, s'il tourne), puis relance la même commande{fine}: elle reprend au dernier paquet validé.",
+            f"Erreur{fine}: la carte graphique a manqué de mémoire pendant un paquet. Le lot n'est pas coupé en deux (les "
+            "paires ne seraient plus celles d'une traite) : ferme les jeux ou logiciels 3D ouverts (et l'entraînement, "
+            f"s'il tourne), puis relance la même commande{fine}: elle refait ce paquet, à partir du dernier validé.",
             file=sys.stderr,
         )
         return 1
@@ -1221,19 +1228,33 @@ def _commande_preferences(choix: argparse.Namespace) -> int:
     raisons = ", ".join(f"{libelle} {nombre(index['raisons'].get(nom, 0))}" for nom, libelle in libelles.items())
     print(
         f"Jeu «{fine}{recette.nom}{fine}»{fine}: {nombre(index['invites'])} invites, {nombre(index['paires'])} paires, "
-        f"{nombre(index['egalites'])} égalités. Départagées par{fine}: {raisons}."
+        f"{nombre(index['egalites'])} égalités, {nombre(index['aucune_bonne_reponse'])} sans bonne réponse (la meilleure "
+        f"est coupée ou fausse). Paires départagées par{fine}: {raisons}."
     )
-    print(f"Taux de paires{fine}: {pourcent(taux)} ({nombre(index['paires'])} paires sur {nombre(index['invites'])} invites).")
-    if taux < construction.SEUIL_DU_TAUX_DE_PAIRES:
+    longueurs = index["longueurs"]
+    if longueurs["jetons_choisies"] is not None:
         print(
-            f"Attention{fine}: c'est sous le seuil de {pourcent(construction.SEUIL_DU_TAUX_DE_PAIRES)} prévu au plan. "
-            "Le dire avant de lancer la DPO."
+            f"Longueur moyenne{fine}: {nombre_fr(longueurs['jetons_choisies'])} jetons pour les réponses choisies, "
+            f"{nombre_fr(longueurs['jetons_rejetees'])} pour les rejetées{fine}; la choisie est la plus courte dans "
+            f"{pourcent(longueurs['part_choisie_plus_courte'])} des paires."
         )
+    print(
+        f"Taux de paires utilisables{fine}: {pourcent(taux)} ({nombre(index['paires'])} paires sur "
+        f"{nombre(index['invites'])} invites)."
+    )
     rangees = index["rangees"]
     print(
         f"{nombre(rangees['train'])} rangées d'entraînement et {nombre(rangees['val'])} de validation "
         f"(une paire, deux rangées), {nombre(index['jetons'])} jetons dont {nombre(index['jetons_appris'])} appris."
     )
+    if taux < construction.SEUIL_DU_TAUX_DE_PAIRES:
+        print(
+            f"SEUIL NON ATTEINT{fine}: le taux de paires utilisables ({pourcent(taux)}) est sous le seuil de "
+            f"{pourcent(construction.SEUIL_DU_TAUX_DE_PAIRES)} fixé par l'utilisateur. Le jeu est écrit, mais ne lance "
+            f"pas la DPO{fine}: dis-le d'abord (code de sortie {CODE_SOUS_LE_SEUIL}).",
+            file=sys.stderr,
+        )
+        return CODE_SOUS_LE_SEUIL
     return 0
 
 
@@ -1243,7 +1264,8 @@ def _ajouter_preferences(sous_parseurs) -> None:
         "preferences",
         "Construit les paires de préférences de 1.8 : deux réponses de ton IA par invite (questions avec consignes, "
         "problèmes de calcul), classées par des contrôles programmés (terminée, juste, consignes, français, longueur), "
-        "sans juge. Par paquets repris après une coupure, puis un jeu dpo sous FORGE_DONNEES/affinage/NOM.",
+        "sans juge. Par paquets repris après une coupure, puis un jeu dpo sous FORGE_DONNEES/affinage/NOM. Rend le "
+        f"code {CODE_SOUS_LE_SEUIL} si le taux de paires utilisables est sous le seuil de 20 %.",
     )
     commande.add_argument(
         "--modele",

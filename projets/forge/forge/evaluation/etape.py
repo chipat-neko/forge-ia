@@ -20,7 +20,8 @@ Les mesures (`MESURES`) :
   `sft-1.7` et problèmes de `GRAINES_VICTOIRE`, avec consignes) ou, avec `--invites NOM`, sur les invites de
   validation du jeu de paires `NOM`. Les réponses gloutonnes des deux versions sont notées par les contrôles
   programmés de `forge.preferences.noter`, puis comparées invite par invite (`taux_de_victoire`). Chaque
-  version garde son taux contre l'autre : celui de la référence est le complément.
+  version garde son taux contre l'autre : celui de la référence est le complément. Ce sont les critères qui ont
+  choisi les paires de la DPO : un taux élevé de 1.8 est attendu par construction, ce n'est pas un juge de qualité.
 
 Une mesure dont les données manquent rend `{"absente": "<raison>"}` : le rapport le dit, il n'échoue pas.
 
@@ -674,7 +675,9 @@ def rapport_markdown(rapport: dict) -> str:
         lignes += [
             f"Le taux de victoire compare, invite par invite, les réponses des deux versions sur {origine}{_FINE}: "
             "réponse terminée, puis juste, consignes respectées, en français, de 3 à 300 mots, dans cet ordre. "
-            "Une égalité compte une demie, sans juge.",
+            "Une égalité compte une demie, sans juge. Ce sont les contrôles qui ont choisi les paires de la DPO de 1.8"
+            f"{_FINE}: un taux élevé est attendu par construction. Il dit que ces critères sont appris, pas que les "
+            "réponses sont meilleures en tout (une réponse courte et terminée y bat une réponse longue et coupée).",
             "",
         ]
     problemes = rapport["mesures"].get("problemes")

@@ -11,20 +11,32 @@
    écrite dans `<jeu>/paires/invites.jsonl.gz` au premier départ : une reprise la relit, sans dépendre des
    données (Luth-2, `sft-1.7`, jeux d'évaluation), qui ont pu changer entre-temps ;
 3. **les réponses**, par paquets de `INVITES_PAR_PAQUET` invites : `repondre_lot` (température, top-k et
-   graine `recette.graine + rang du paquet`), deux réponses par invite, `noter`, `choisir_paire`. Chaque
-   invite, ses réponses (texte, pensée, jetons, terminée), ses notes, sa paire et la raison qui l'a
-   départagée vont dans `<jeu>/paires/` (`SortieParFragments`, un fragment par paquet). Une relance reprend au
-   paquet suivant, avec le même lot de génération (choisi au premier départ, écrit dans l'état) : les paires
-   sont les mêmes qu'en une traite, sans doublon ni trou. Ctrl+C finit le paquet en cours, le valide, puis lève
-   `PairesEnPause` (la commande de reprise) ;
+   graine `recette.graine + rang du paquet`), deux réponses par invite, `noter`, puis `choisir_paire` avec le
+   plancher de `sans_paire` : une paire n'est gardée que si la choisie est terminée et, pour un problème, juste
+   (sinon « aucune bonne réponse », compté à part, comme les égalités). Chaque invite, ses réponses (texte,
+   pensée, jetons, terminée), ses notes, sa paire et la raison qui l'a départagée (ou pourquoi il n'y en a pas)
+   vont dans `<jeu>/paires/` (`SortieParFragments`, un fragment par paquet). Une relance reprend au paquet
+   suivant, sur le même appareil et avec le même lot de génération : les paires sont les mêmes qu'en une traite,
+   sans doublon ni trou. Ctrl+C finit le paquet en cours, le valide, puis lève `PairesEnPause` (la commande de
+   reprise) ;
 4. **le jeu** `dpo` (`ecrire_jeu`), dans `<jeu>/` : pour chaque paire, la rangée de la réponse choisie puis
    celle de la rejetée, chacune l'invite (jusqu'à `<|assistant|>`) suivie de la réponse telle que ton IA l'a
    écrite, et de son `<|fin_tour|>` si elle l'a écrit. La perte ne porte que sur la réponse. Les invites de la
    validation (`part_validation`, d'après l'empreinte de leur identifiant) vont dans `val/`. L'index dit les
-   invites, les paires, les égalités, le taux de paires et le critère qui a départagé chaque paire.
+   invites, les paires, les égalités, les invites sans bonne réponse, le taux de paires (après le plancher), le
+   critère qui a départagé chaque paire, et les longueurs (`longueurs` : jetons moyens des choisies et des
+   rejetées, part des paires où la choisie est la plus courte), de quoi voir un biais vers le court.
+
+**Le lot de génération** est choisi au premier départ d'après la mémoire libre (`choisir_le_lot`) et figé : à
+température 1, le tirage en dépend. Sous `LOT_MINIMUM`, la commande ne part pas (`MemoireInsuffisante` : libère la
+carte). À la reprise, il faut le même appareil et la mémoire du même lot ; un manque de mémoire en cours de route
+arrête le travail au lieu de couper le lot en deux, et le paquet en cours se refait à la relance.
 
 Le taux de paires est affiché : sous `SEUIL_DU_TAUX_DE_PAIRES`, l'utilisateur a demandé qu'on s'arrête et qu'on
-le lui dise avant la DPO. Le code ne décide rien : il compte et il affiche.
+le lui dise avant la DPO. Le code ne décide rien : il compte, il affiche, et la commande rend un code à part.
+
+Les deux recettes ont la même graine : les invites de `preferences-1.8-court` sont parmi celles de `preferences-1.8`
+(les premières questions du même mélange, avec les mêmes consignes, et les premiers problèmes), dans un autre ordre.
 """
 
 import gzip
@@ -54,9 +66,9 @@ from forge.fichiers import ESPACE_FINE, ecrire_atomique, entier
 from forge.fragments import NOM_DE_L_ETAT, SortieParFragments, lire_elements
 from forge.pause import Pause
 from forge.preferences.invites import InvitePreference, invites_de_preference, tours_de_la_question
-from forge.preferences.noter import Note, choisir_paire, noter, raison_de_la_paire
+from forge.preferences.noter import AUCUNE_BONNE_REPONSE, EGALITE, Note, choisir_paire, noter, raison_de_la_paire, sans_paire
 from forge.processeur import fils_disponibles
-from forge.publication import charger_publication
+from forge.publication import Publication, charger_publication
 from forge.tokenizer import TokenizerOctets
 
 INVITES_PAR_PAQUET = 512
@@ -66,6 +78,7 @@ FICHIER_DES_INVITES = "invites.jsonl.gz"
 SOURCE_DES_QUESTIONS = "luth2_conversation"
 JEU_DEJA_APPRIS = "sft-1.7"
 SEUIL_DU_TAUX_DE_PAIRES = 0.20  # sous ce taux, la tâche 15 s'arrête et le dit (décision de l'utilisateur)
+LOT_MINIMUM = 32  # en dessous, la carte est trop occupée : le travail ne part pas (le lot est figé jusqu'au bout)
 VERSION_DES_PAIRES = 1
 
 _FINE = ESPACE_FINE
@@ -131,6 +144,14 @@ RECETTES_PREFERENCES: dict[str, RecettePreferences] = {
 
 class PairesEnPause(Exception):
     """Ctrl+C : le paquet en cours est validé, le travail n'est pas fini. Le message dit comment reprendre."""
+
+
+# Le compte de l'état et de l'index où va une invite sans paire, selon sa cause.
+_COMPTE_DE_LA_CAUSE = {EGALITE: "egalites", AUCUNE_BONNE_REPONSE: "aucune_bonne_reponse"}
+
+
+class MemoireInsuffisante(RuntimeError):
+    """La carte n'a pas la mémoire libre du lot (au moins `LOT_MINIMUM` au départ, le lot figé à la reprise)."""
 
 
 # --- Les invites, en JSON et retour -------------------------------------------------------------------------
@@ -315,6 +336,20 @@ def _rangee(invite_ids: list[int], reponse: dict, largeur: int, fin_tour: int, b
     )
 
 
+def _longueurs(choisies: Sequence[int], rejetees: Sequence[int]) -> dict:
+    """Les jetons moyens des réponses choisies et rejetées, et la part des paires où la choisie est la plus courte.
+
+    De quoi voir un biais vers le court avant la DPO, qui sait l'exploiter. `None` partout s'il n'y a aucune paire.
+    """
+    if not choisies:
+        return {"jetons_choisies": None, "jetons_rejetees": None, "part_choisie_plus_courte": None}
+    return {
+        "jetons_choisies": sum(choisies) / len(choisies),
+        "jetons_rejetees": sum(rejetees) / len(rejetees),
+        "part_choisie_plus_courte": sum(1 for c, r in zip(choisies, rejetees) if c < r) / len(choisies),
+    }
+
+
 def _jeu_deja_ecrit(dossier: Path, reglages: dict) -> dict | None:
     if not (dossier / ".complet").is_file():
         return None
@@ -333,6 +368,8 @@ def _ecrire_le_jeu(
     largeur = recette.longueur + 1
     parties: dict[str, list[Rangee]] = {"train": [], "val": []}
     exemples = {"questions": 0, "problemes": 0}
+    jetons_choisies: list[int] = []
+    jetons_rejetees: list[int] = []
     for element in lire_elements(dossier / DOSSIER_DES_PAIRES, PREFIXE_DES_PAIRES):
         if element["paire"] is None:
             continue
@@ -340,6 +377,9 @@ def _ecrire_le_jeu(
         for rang in element["paire"]:  # la choisie, puis la rejetée
             parties[element["partie"]].append(_rangee(invite_ids, element["reponses"][rang], largeur, fin_tour, bourrage))
         exemples["problemes" if element["attendu"] is not None else "questions"] += 2
+        choisie, rejetee = (element["reponses"][rang] for rang in element["paire"])
+        jetons_choisies.append(len(choisie["ids"]) + choisie["terminee"])  # les jetons appris, <|fin_tour|> compris
+        jetons_rejetees.append(len(rejetee["ids"]) + rejetee["terminee"])
     source = SOURCES_CONVERSATIONS[SOURCE_DES_QUESTIONS]
     version = reglages["modele"]["version"]
     infos = {
@@ -360,8 +400,10 @@ def _ecrire_le_jeu(
         "invites": etat["invites"],
         "paires": etat["paires"],
         "egalites": etat["egalites"],
+        "aucune_bonne_reponse": etat["aucune_bonne_reponse"],
         "taux_de_paires": etat["paires"] / etat["invites"] if etat["invites"] else 0.0,
         "raisons": etat["raisons"],
+        "longueurs": _longueurs(jetons_choisies, jetons_rejetees),
         "base": etat["base"],
         "invites_ecartees": etat["invites_ecartees"],
         "decontamination": etat["decontamination"],
@@ -376,7 +418,9 @@ def _ecrire_le_jeu(
 
 
 def _element(invite: InvitePreference, partie: str, reponses: Sequence[Reponse], notes: Sequence[Note]) -> dict:
-    paire = choisir_paire(notes)
+    """L'invite, ses réponses et leurs notes ; la paire gardée et sa raison, ou pourquoi il n'y en a pas (`sans_paire`)."""
+    cause = sans_paire(notes)
+    paire = choisir_paire(notes) if cause is None else None
     return {
         **_invite_en_json(invite),
         "partie": partie,
@@ -384,7 +428,33 @@ def _element(invite: InvitePreference, partie: str, reponses: Sequence[Reponse],
         "notes": [list(note) for note in notes],
         "paire": list(paire) if paire is not None else None,
         "raison": raison_de_la_paire(notes[paire[0]], notes[paire[1]]) if paire is not None else None,
+        "sans_paire": cause,
     }
+
+
+def _lot_de_generation(publication: Publication, recette: RecettePreferences) -> int:
+    """Le plus grand lot que la mémoire libre permet, pour des invites et des réponses aussi longues que la recette le permet."""
+    return choisir_le_lot(publication.modele, recette.longueur, recette.jetons_max_invite)
+
+
+def _verifier_l_appareil_et_le_lot(
+    etat: dict, appareil: torch.device, publication: Publication, recette: RecettePreferences, dossier: Path
+) -> None:
+    """À la reprise : le même appareil, et assez de mémoire libre pour le lot figé au premier départ."""
+    lieux = {"cuda": "la carte graphique", "cpu": "le processeur"}
+    if etat["appareil"] != appareil.type:
+        raise ValueError(
+            f"Ces paires ont commencé sur {lieux[etat['appareil']]} : les reprendre sur {lieux[appareil.type]} changerait "
+            f"les tirages (autre lot, autres arrondis). Relance avec --appareil {etat['appareil']}, ou efface {dossier} "
+            "pour tout refaire."
+        )
+    possible = _lot_de_generation(publication, recette)
+    if possible < etat["lot"]:
+        raise MemoireInsuffisante(
+            f"La carte graphique n'a plus assez de mémoire libre pour le lot de {etat['lot']} réponses choisi au premier "
+            f"départ (seulement {possible} aujourd'hui). Le lot ne change pas en cours de route : les paires ne seraient "
+            "plus celles d'une traite. Libère la carte (jeu, entraînement, Ollama), puis relance la même commande."
+        )
 
 
 def construire_paires(
@@ -440,24 +510,33 @@ def construire_paires(
         paires = SortieParFragments(dossier_des_paires, PREFIXE_DES_PAIRES)
         _verifier_les_reglages(paires.etat, reglages, dossier_des_paires)
         etat = paires.etat
+        _verifier_l_appareil_et_le_lot(etat, choisi, publication, recette, dossier_des_paires)
         invites = _lire_les_invites(dossier_des_paires, etat["empreinte_des_invites"])
         ecrire(f"{recette.nom}{_FINE}: reprise après {_nombre(etat['paquets'])} paquets ({_nombre(paires.deja)} invites).")
     else:
+        # Le lot est figé au premier départ (à température non nulle, le tirage en dépend) : jamais un petit lot,
+        # qui ralentirait tout le travail. On le vérifie avant toute lecture.
+        lot = _lot_de_generation(publication, recette)
+        if lot < LOT_MINIMUM:
+            raise MemoireInsuffisante(
+                f"La carte graphique n'a pas assez de mémoire libre : seulement {lot} réponses à la fois, il en faut au "
+                f"moins {LOT_MINIMUM}. Le lot est figé pour tout le travail : un petit lot le ralentirait jusqu'au bout. "
+                "Libère la carte (jeu, entraînement, Ollama), puis relance la même commande."
+            )
         invites, infos_des_invites = _invites_de_la_recette(recette, tok, ecrire)
         _ecrire_les_invites(dossier_des_paires, invites)
         paires = SortieParFragments(dossier_des_paires, PREFIXE_DES_PAIRES)
-        longueur_invite_max = max((len(invite_de_reponse(tok, i.tours)) for i in invites), default=1)
         etat = {
             **reglages,
             **infos_des_invites,
             "empreinte_des_invites": _empreinte_des_invites(invites),
             "invites": len(invites),
             "invites_par_paquet": INVITES_PAR_PAQUET,
-            # Fixé au premier départ : à température non nulle, le tirage dépend du lot.
-            "lot": choisir_le_lot(publication.modele, longueur_invite_max + recette.n_nouveaux, longueur_invite_max),
+            "appareil": choisi.type,
+            "lot": lot,
             "paquets": 0,
             "paires": 0,
-            "egalites": 0,
+            **{compte: 0 for compte in _COMPTE_DE_LA_CAUSE.values()},
             "raisons": {champ: 0 for champ in Note._fields},
         }
         paires.valider(etat)
@@ -485,34 +564,35 @@ def construire_paires(
             # Graine du paquet : recette.graine + rang. `repondre_lot` y ajoute le rang de chaque lot : deux paquets
             # voisins partagent donc des graines de lots, pour des invites différentes. Les réponses d'une même
             # invite, elles, sont toujours tirées dans le même paquet, chacune de son côté.
+            # Sans coupure du lot en deux si la carte manque de mémoire : le tirage changerait. L'erreur remonte, le
+            # paquet n'est pas validé, et la relance le refait à l'identique.
             reponses = repondre_lot(
                 publication.modele, tok, conversations, recette.n_nouveaux, recette.temperature, recette.top_k,
-                recette.graine + rang, etat["lot"],
+                recette.graine + rang, etat["lot"], couper_si_manque_de_memoire=False,
             )
+            comptes = {"paires": etat["paires"], **{c: etat[c] for c in _COMPTE_DE_LA_CAUSE.values()}}
             raisons = dict(etat["raisons"])
-            paires_du_paquet = 0
             for numero, invite in enumerate(paquet):
                 les_reponses = reponses[numero * k : (numero + 1) * k]
                 element = _element(invite, _partie(invite, recette.part_validation), les_reponses,
                                    [noter(r, invite) for r in les_reponses])
                 paires.ajouter(element)
-                if element["raison"] is not None:
-                    paires_du_paquet += 1
+                if element["sans_paire"] is None:
+                    comptes["paires"] += 1
                     raisons[element["raison"]] += 1
+                else:
+                    comptes[_COMPTE_DE_LA_CAUSE[element["sans_paire"]]] += 1
             verifier_place(paires.octets_en_attente + MARGE_PLACE, dossier_des_paires)
-            etat = {
-                **etat,
-                "paquets": rang + 1,
-                "paires": etat["paires"] + paires_du_paquet,
-                "egalites": etat["egalites"] + len(paquet) - paires_du_paquet,
-                "raisons": raisons,
-            }
+            paires_du_paquet = comptes["paires"] - etat["paires"]
+            sans_bonne_reponse = comptes["aucune_bonne_reponse"] - etat["aucune_bonne_reponse"]
+            etat = {**etat, **comptes, "paquets": rang + 1, "raisons": raisons}
             paires.valider(etat)
             duree = max(time.perf_counter() - debut, 1e-9)
             jetons = sum(len(r.ids) + r.terminee for r in reponses)
             ligne = (
                 f"{recette.nom}{_FINE}: paquet {_nombre(rang + 1)} sur {_nombre(nombre_de_paquets)}, "
-                f"{_nombre(paires_du_paquet)} paires sur {_nombre(len(paquet))} invites ({pourcent(paires_du_paquet / len(paquet))})"
+                f"{_nombre(paires_du_paquet)} paires sur {_nombre(len(paquet))} invites ({pourcent(paires_du_paquet / len(paquet))}), "
+                f"{_nombre(sans_bonne_reponse)} sans bonne réponse"
                 f"{_FINE}; {nombre_fr(len(reponses) / duree)} réponses/s, {_nombre(jetons / duree)} jetons/s"
             )
             if choisi.type == "cuda":

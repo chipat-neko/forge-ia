@@ -12,6 +12,17 @@ Une réponse reçoit une `Note` de cinq critères, chacun un entier, du plus imp
 Deux notes se comparent dans cet ordre (l'ordre lexicographique d'un `NamedTuple`) : une réponse non terminée
 perd toujours ; à terminaison égale, une réponse fausse perd ; puis les consignes, le français, la longueur.
 `choisir_paire` prend la meilleure et la pire ; s'il n'y a aucune différence, il n'y a pas de paire.
+
+Un plancher s'ajoute (`peut_etre_choisie`) : la DPO prend la réponse choisie pour modèle, et son terme SFT
+l'apprend mot à mot. Une paire n'est donc gardée que si la meilleure est terminée et, pour un problème, juste ;
+sinon il n'y a « aucune bonne réponse » (`sans_paire`), même si les deux réponses diffèrent.
+
+La longueur : deux réponses également bonnes, l'une courte, l'autre longue, ont la même note (aucune paire).
+Rien ne préfère le court en soi : une réponse longue ne perd que si elle est coupée par la limite de jetons
+(`terminee`), si elle ne respecte pas une consigne de longueur que l'invite demande, ou si elle dépasse 300 mots,
+ce qu'une réponse finie dans les 384 jetons des paires de 1.8 n'atteint pas en pratique : le tokenizer de ton IA
+compte environ 1,7 jeton par mot sur les réponses de Luth-2 (médiane mesurée le 18/11/2026 sur 4 000 réponses), et
+aucune réponse de 384 jetons au plus n'y dépasse 294 mots.
 """
 
 from collections.abc import Sequence
@@ -71,6 +82,26 @@ def choisir_paire(notes: Sequence[Note]) -> tuple[int, int] | None:
     if notes[meilleure] == notes[pire]:
         return None
     return meilleure, pire
+
+
+EGALITE = "egalite"
+AUCUNE_BONNE_REPONSE = "aucune_bonne_reponse"
+
+
+def peut_etre_choisie(note: Note) -> bool:
+    """Vrai si une réponse peut être la choisie d'une paire : terminée et, quand elle se vérifie, juste."""
+    return note.terminee == 1 and note.juste == 1
+
+
+def sans_paire(notes: Sequence[Note]) -> str | None:
+    """Pourquoi ces réponses ne donnent pas de paire : `EGALITE` (notes toutes égales), `AUCUNE_BONNE_REPONSE`
+    (la meilleure est coupée ou fausse), ou `None` : la paire de `choisir_paire` est gardée."""
+    paire = choisir_paire(notes)
+    if paire is None:
+        return EGALITE
+    if not peut_etre_choisie(notes[paire[0]]):
+        return AUCUNE_BONNE_REPONSE
+    return None
 
 
 def raison_de_la_paire(meilleure: Note, pire: Note) -> str:

@@ -98,13 +98,17 @@ def repondre_lot(
     top_k: int = 50,
     graine: int = 0,
     lot: int = 32,
+    couper_si_manque_de_memoire: bool = True,
 ) -> list[Reponse]:
     """Fait répondre le modèle à chaque conversation (qui finit par un tour de l'utilisateur) ; une `Reponse` chacune, dans l'ordre.
 
     - `n_nouveaux` : le nombre maximal de jetons d'une réponse. Une réponse qui n'a pas écrit `<|fin_tour|>`
       avant la limite est rendue coupée (`terminee` faux) ;
     - `temperature` (0 : choix glouton), `top_k`, `graine` : comme `generer_lot`. Même appel, mêmes réponses ;
-    - `lot` : combien de conversations avancent ensemble.
+    - `lot` : combien de conversations avancent ensemble ;
+    - `couper_si_manque_de_memoire` : si la carte manque de mémoire, le lot est coupé en deux et le calcul
+      continue. À température non nulle, le tirage dépend du lot : un travail qui doit se refaire à l'identique
+      (les paires de 1.8) passe `False`, et le manque de mémoire remonte (`torch.cuda.OutOfMemoryError`).
 
     Les conversations sont rangées par longueur d'invite avant d'être découpées en lots (moins de bourrage),
     puis remises dans l'ordre : le lot d'une conversation dépend donc des autres longueurs, ce qui ne compte
@@ -135,7 +139,7 @@ def repondre_lot(
                 modele, [invites[i] for i in numeros], place, temperature, top_k, graine + rang, fin_tour, len(numeros)
             )
 
-        sorties = _generer_en_deux_si_manque_de_memoire(generer, groupe)
+        sorties = _generer_en_deux_si_manque_de_memoire(generer, groupe) if couper_si_manque_de_memoire else generer(groupe)
         for numero, ids in zip(groupe, sorties):
             reponses[numero] = lire_reponse(tok, ids)
     return reponses  # type: ignore[return-value]  # chaque case a reçu sa réponse

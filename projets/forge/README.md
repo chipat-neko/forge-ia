@@ -165,6 +165,30 @@ Deux préparations donnent le même jeu, à l'octet près. Rien n'est écrit ava
 `.complet` vient en dernier : après une coupure ou un Ctrl+C, on relance la même commande, qui refait
 le même jeu.
 
+## Construire les paires de préférences de 1.8
+
+`preferences` fait écrire à une version publiée (ton-ia-1.7) deux réponses par invite. Les invites sont des questions
+de Luth-2 que le SFT n'a pas apprises, avec une ou deux consignes vérifiables, et des problèmes de calcul de
+difficulté 1. Les réponses sont notées par des contrôles programmés, sans juge : réponse terminée, puis juste,
+consignes respectées, en français, de 3 à 300 mots. La meilleure et la pire forment une paire si la meilleure est
+terminée (et juste, pour un problème) ; sinon l'invite compte « sans bonne réponse », et une égalité ne donne rien.
+Les invites passent par la même décontamination que `preparer`.
+
+```powershell
+uv run --extra gpu python -m forge preferences --modele "$env:FORGE_DONNEES\publications\ton-ia-1.7" --recette preferences-1.8
+uv run --extra gpu python -m forge preferences --modele "$env:FORGE_DONNEES\publications\ton-ia-1.7" --recette preferences-1.8-court
+```
+
+Le travail avance par paquets de 512 invites, écrits dans `FORGE_DONNEES/affinage/<recette>/paires/`. Ctrl+C finit
+le paquet en cours, puis s'arrête : relance la même commande pour reprendre au paquet suivant, avec les mêmes paires
+qu'en une traite. Le lot de génération est choisi au premier départ et ne change plus : si la carte est trop
+occupée pour un lot de 32 réponses à la fois, la commande ne part pas et demande de libérer la carte ; à la
+reprise, il faut le même appareil et la même mémoire libre. À la fin, un jeu `dpo` (rangée choisie, rangée
+rejetée) est écrit à côté. Son `index.json` donne les invites, les paires, les égalités, les invites sans bonne
+réponse, le taux de paires utilisables, le critère qui a départagé chaque paire, et la longueur moyenne (en
+jetons) des réponses choisies et rejetées, avec la part des paires où la choisie est la plus courte. La commande
+affiche ces chiffres ; si le taux de paires utilisables est sous 20 %, elle le dit et rend le code 5.
+
 ## Le tokenizer de ton IA
 
 Le paquet `forge.tokenizer` contient le tokenizer de ton IA : un BPE sur les
@@ -454,8 +478,9 @@ Pour vérifier un fichier téléchargé, compare son empreinte à celle de la fi
 
 `evaluer-etape` fait passer à une version publiée les mesures de son étape, et à ton-ia-1.5 les mêmes :
 le plan 8 montre ainsi ton IA d'un chapitre à l'autre, sur les mêmes tests. L'étape dit quelles mesures
-(`1.7` : perte de conversation, IFEval-FR, tenue des réponses, oubli, échantillons ; `1.9` : IFEval-FR,
-tenue, oubli, problèmes générés, MGSM, GSM8K-Platinum en français, échantillons). La version est un dossier
+(`1.7` : perte de conversation, IFEval-FR, tenue des réponses, oubli, échantillons ; `1.8` : celles de 1.7, plus
+la victoire contre `--reference` ; `1.9` : IFEval-FR, tenue, oubli, problèmes générés, MGSM, GSM8K-Platinum en
+français, échantillons). La version est un dossier
 publié (`ton-ia-1.5.safetensors`, `config.json`, `tokenizer-ton-ia-v1.json`) ; `--reference` en donne un
 second, qui passe les mêmes mesures, mises en regard dans le tableau :
 
@@ -464,11 +489,21 @@ uv run --extra gpu python -m forge evaluer-etape --modele "$env:FORGE_DONNEES\pu
 uv run --extra gpu python -m forge evaluer-etape --modele "$env:FORGE_DONNEES\publications\ton-ia-1.7" --etape 1.7 --reference "$env:FORGE_DONNEES\publication\ton-ia-1.5" --n-max 20
 ```
 
+À l'étape `1.8`, la victoire fait répondre les deux versions (en glouton) aux mêmes invites : 500 par défaut, ou,
+avec `--invites NOM`, les invites de validation du jeu de paires `NOM`, celles qui départagent les essais d'un
+balayage. Elle les note comme les paires et donne le taux de victoire de la version, une égalité comptant une
+demie. Ce sont les critères des paires : un taux élevé est attendu après la DPO, ce n'est pas un juge.
+
+```powershell
+uv run --extra gpu python -m forge evaluer-etape --modele "$env:FORGE_DONNEES\publications\ton-ia-1.8" --etape 1.8 --reference "$env:FORGE_DONNEES\publications\ton-ia-1.7"
+uv run --extra gpu python -m forge evaluer-etape --modele "$env:FORGE_DONNEES\publications\ton-ia-1.8" --etape 1.8 --reference "$env:FORGE_DONNEES\publications\ton-ia-1.7" --invites preferences-1.8 --n-max 200
+```
+
 Le rapport (`rapport.json` pour les programmes, `rapport.md` pour la lecture) va dans
 `FORGE_DONNEES/evaluations/<version>-<étape>/` (ou `--sortie`). `--n-max N` limite chaque mesure à ses N
 premiers exemples, pour un essai court ; `--appareil cpu` force le processeur. Le JSON est stable (version
-du rapport 1) : `version`, `empreinte` (SHA-256 des poids), `etape`, `date`, `mesures`, `secondes`, et
-`reference` s'il y en a une. Chaque mesure est écrite ainsi :
+du rapport 1) : `version`, `empreinte` (SHA-256 des poids), `etape`, `date`, `mesures`, `secondes`, `invites` (le
+jeu de paires de `--invites`, ou `null`), et `reference` s'il y en a une. Chaque mesure est écrite ainsi :
 
 - `perte_conversation` : `{perte, n}`, la perte d'affinage sur la validation de `affinage/sft-1.7` ;
 - `ifeval_fr` : `{invite_stricte, consigne_stricte, n}`, IFEval-FR en glouton, 512 jetons ;
@@ -483,7 +518,10 @@ du rapport 1) : `version`, `empreinte` (SHA-256 des poids), `etape`, `date`, `me
   sur 8 », sans le glouton : elle peut être plus basse que `exactitude` ;
 - `mgsm_fr` et `gsm8k_platinum_fr` : `{exactitude, terminee, n}`, en glouton, 384 jetons. `terminee` (de 0 à 1) est la
   part de réponses finies avant la limite : un 0 % d'exactitude avec 0 % de réponses terminées veut dire « coupé »,
-  pas « faux ».
+  pas « faux » ;
+- `victoire` : `{victoires, egalites, defaites, taux, mots_modele, mots_reference, n}`, la version contre
+  `--reference` sur les mêmes invites, en glouton, 384 jetons ; la référence a les mêmes clés, vues de son côté
+  (son taux est le complément). Sans `--reference`, la mesure est absente.
 
 Une réponse vide ou coupée par la limite de jetons est comptée telle quelle (fausse pour un problème). Une
 mesure dont les données manquent rend `{"absente": "<raison>"}` et dit quelle commande lancer

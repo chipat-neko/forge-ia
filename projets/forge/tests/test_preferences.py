@@ -29,6 +29,7 @@ from forge.conversation.sources import SOURCES_CONVERSATIONS, UsageInterdit
 from forge.conversation.telechargement import PREFIXE, dossier_de_la_source
 from forge.donnees.nettoyage import empreinte
 from forge.evaluation import etape as module_etape
+from forge.evaluation import reponses as module_reponses
 from forge.evaluation.consignes import CONTRAINTES
 from forge.evaluation.etape import MESURES, MESURES_PAR_ETAPE, ContexteDEvaluation, evaluer_etape
 from forge.fragments import SortieParFragments, lire_elements
@@ -42,7 +43,7 @@ from forge.preferences.construction import (
     invites_de_validation,
 )
 from forge.preferences.invites import InvitePreference, invites_de_preference
-from forge.preferences.noter import Note, choisir_paire, noter, raison_de_la_paire, taux_de_victoire
+from forge.preferences.noter import Note, choisir_paire, noter, raison_de_la_paire, sans_paire, taux_de_victoire
 from forge.publication import Publication
 from forge.raisonnement.problemes import (
     GRAINES_EVALUATION,
@@ -193,9 +194,13 @@ def donnees(tmp_path, monkeypatch) -> Path:
 
 @pytest.fixture
 def faux_modele(monkeypatch):
-    """`construire_paires` charge `ModeleDe` au lieu d'une version publiée."""
+    """`construire_paires` charge `ModeleDe` au lieu d'une version publiée, et reste sur le processeur.
+
+    Sans `appareil`, `construire_paires` prend la carte si PyTorch la voit : les tests n'y touchent jamais, même là.
+    """
     publie = publication(ModeleDe(CONFIG))
     monkeypatch.setattr(construction, "charger_publication", lambda dossier, appareil="cpu": publie)
+    monkeypatch.setattr(construction, "choisir_appareil", lambda appareil=None: torch.device("cpu"))
     return publie
 
 
@@ -256,6 +261,33 @@ def test_une_egalite_ne_donne_aucune_paire():
 def test_avec_plus_de_deux_reponses_la_meilleure_et_la_pire():
     notes = [Note(1, 1, 0, 1, 1), Note(0, 1, 1, 1, 1), Note(1, 1, 1, 1, 1), Note(0, 1, 1, 1, 1)]
     assert choisir_paire(notes) == (2, 1)  # à égalité, la première rencontrée
+
+
+def test_deux_reponses_egalement_bonnes_de_longueurs_differentes_ne_donnent_aucune_paire():
+    """Rien ne préfère le court en soi : une réponse courte et une longue, toutes deux bonnes, ont la même note."""
+    question = invite([("sans_virgule", {})])
+    courte = reponse("Le chat dort dans la maison.")
+    longue = reponse(" ".join(["Le chat dort dans la maison et il ronronne près du feu."] * 20))  # 220 mots
+    notes = [noter(courte, question), noter(longue, question)]
+    assert notes[0] == notes[1] and choisir_paire(notes) is None and sans_paire(notes) == "egalite"
+    probleme = invite(attendu=12)
+    detaillee = reponse("Je compte d'abord les pommes de la boîte puis celles du sac. " * 5 + "La réponse est 12.")
+    notes = [noter(reponse("La réponse est 12."), probleme), noter(detaillee, probleme)]
+    assert notes[0] == notes[1] and sans_paire(notes) == "egalite"
+
+
+def test_deux_reponses_coupees_ne_donnent_aucune_paire():
+    notes = [noter(reponse("Le chat dort", terminee=False), invite()), noter(reponse("Le", terminee=False), invite())]
+    assert choisir_paire(notes) == (0, 1)  # elles diffèrent par la longueur…
+    assert sans_paire(notes) == "aucune_bonne_reponse"  # … mais la meilleure est coupée : pas un modèle
+
+
+def test_deux_problemes_faux_ne_donnent_aucune_paire():
+    probleme = invite(attendu=12)
+    notes = [noter(reponse("La réponse est 13."), probleme), noter(reponse("13"), probleme)]
+    assert notes[0] > notes[1] and sans_paire(notes) == "aucune_bonne_reponse"
+    juste = [notes[0], noter(reponse("La réponse est 12."), probleme)]
+    assert sans_paire(juste) is None and choisir_paire(juste) == (1, 0)
 
 
 def test_noter_sans_attendu_la_reponse_est_juste():
@@ -411,9 +443,12 @@ def test_construire_paires_ecrit_les_paires_et_un_jeu_dpo(donnees, faux_modele, 
     elements = elements_des_paires(dossier)
     paires = [e for e in elements if e["paire"] is not None]
     assert index["invites"] == len(elements) and index["paires"] == len(paires)
-    assert index["egalites"] == len(elements) - len(paires)
-    assert index["taux_de_paires"] == pytest.approx(len(paires) / len(elements))
+    assert index["egalites"] == sum(1 for e in elements if e["sans_paire"] == "egalite")
+    assert index["aucune_bonne_reponse"] == sum(1 for e in elements if e["sans_paire"] == "aucune_bonne_reponse")
+    assert index["paires"] + index["egalites"] + index["aucune_bonne_reponse"] == index["invites"]
+    assert index["taux_de_paires"] == pytest.approx(len(paires) / len(elements))  # après le plancher
     assert 0 < index["paires"] < index["invites"]  # le faux modèle donne des paires et des égalités
+    assert index["aucune_bonne_reponse"] > 0  # des problèmes aux deux réponses terminées, mais fausses
     assert set(index["raisons"]) == set(Note._fields) and sum(index["raisons"].values()) == index["paires"]
     assert index["rangees"]["train"] + index["rangees"]["val"] == 2 * index["paires"]
     for e in elements:
@@ -425,10 +460,21 @@ def test_construire_paires_ecrit_les_paires_et_un_jeu_dpo(donnees, faux_modele, 
             relue = Reponse(texte=r["texte"], pensee=r["pensee"], ids=r["ids"], terminee=r["terminee"])
             assert Note(*note) == noter(relue, invite_relue)
             assert len(r["ids"]) + r["terminee"] <= RECETTE.n_nouveaux
-        attendue = choisir_paire([Note(*n) for n in e["notes"]])
+        notes = [Note(*n) for n in e["notes"]]
+        assert e["sans_paire"] == sans_paire(notes)
+        attendue = choisir_paire(notes) if e["sans_paire"] is None else None
         assert (tuple(e["paire"]) if e["paire"] else None) == attendue
         if attendue:
-            assert e["raison"] == raison_de_la_paire(Note(*e["notes"][attendue[0]]), Note(*e["notes"][attendue[1]]))
+            choisie = notes[attendue[0]]
+            assert choisie.terminee == 1 and choisie.juste == 1  # le plancher : jamais une choisie coupée ou fausse
+            assert e["raison"] == raison_de_la_paire(choisie, notes[attendue[1]])
+    # Les longueurs des réponses gardées, en jetons appris (<|fin_tour|> compris).
+    jetons = [[len(e["reponses"][k]["ids"]) + e["reponses"][k]["terminee"] for k in e["paire"]] for e in paires]
+    assert index["longueurs"] == {
+        "jetons_choisies": pytest.approx(sum(c for c, _ in jetons) / len(jetons)),
+        "jetons_rejetees": pytest.approx(sum(r for _, r in jetons) / len(jetons)),
+        "part_choisie_plus_courte": pytest.approx(sum(1 for c, r in jetons if c < r) / len(jetons)),
+    }
     assert {e["partie"] for e in elements} == {"train", "val"}
     assert index["modele"] == {"version": "ton-ia-9.9", "empreinte": "a" * 64}
 
@@ -621,6 +667,92 @@ def test_une_liste_d_invites_abimee_n_est_pas_reprise(donnees, faux_modele, monk
         construire_paires(Path("modele"), RECETTE)
 
 
+def couper_au_paquet(monkeypatch, numero: int):
+    """`repondre_lot` lève une « coupure » à son appel `numero` : les paquets d'avant sont validés."""
+    vrai = construction.repondre_lot
+    appels = []
+
+    def coupe(*args, **kwargs):
+        appels.append(1)
+        if len(appels) == numero:
+            raise RuntimeError("coupure")
+        return vrai(*args, **kwargs)
+
+    monkeypatch.setattr(construction, "repondre_lot", coupe)
+
+
+def carte_simulee(monkeypatch, octets_libres: int) -> None:
+    """Le lot se choisit comme sur une carte qui aurait `octets_libres` octets libres (aucune carte n'est touchée)."""
+    monkeypatch.setattr(module_reponses, "_est_sur_la_carte", lambda appareil: True)
+    monkeypatch.setattr(module_reponses, "_memoire_libre", lambda appareil: octets_libres)
+
+
+def octets_pour_un_lot_de(lot: int) -> int:
+    """La mémoire libre où `choisir_le_lot` rend `lot` pour la recette d'essai (sa formule, à mi-chemin du lot suivant)."""
+    par_texte = 4 * CONFIG.couches * CONFIG.dim * RECETTE.longueur + 2 * CONFIG.taille_vocabulaire * RECETTE.jetons_max_invite
+    return int(1.5 * lot * par_texte / module_reponses.PART_DE_LA_MEMOIRE)
+
+
+@pytest.mark.parametrize(("lot", "accepte"), [(16, False), (32, True)])
+def test_au_premier_depart_un_lot_sous_32_refuse_de_partir(donnees, faux_modele, monkeypatch, lot, accepte):
+    carte_simulee(monkeypatch, octets_pour_un_lot_de(lot))
+    assert module_reponses.choisir_le_lot(faux_modele.modele, RECETTE.longueur, RECETTE.jetons_max_invite) == lot
+    if accepte:
+        construire_paires(Path("modele"), RECETTE)
+        etat = json.loads((donnees / "affinage" / "essai" / "paires" / "etat.json").read_text(encoding="utf-8"))
+        assert etat["etat"]["lot"] == lot
+        return
+    with pytest.raises(construction.MemoireInsuffisante, match="Libère la carte") as erreur:
+        construire_paires(Path("modele"), RECETTE)
+    assert "au moins 32" in str(erreur.value)
+    assert not (donnees / "affinage" / "essai").exists()  # rien n'est figé : la relance choisira de nouveau
+
+
+def test_a_la_reprise_le_lot_reste_fige_et_un_manque_de_memoire_arrete(donnees, faux_modele, monkeypatch):
+    carte_simulee(monkeypatch, octets_pour_un_lot_de(64))
+    with monkeypatch.context() as m:
+        couper_au_paquet(m, 2)
+        with pytest.raises(RuntimeError, match="coupure"):
+            construire_paires(Path("modele"), RECETTE)
+    carte_simulee(monkeypatch, octets_pour_un_lot_de(32))  # assez pour partir, pas pour le lot figé de 64
+    with pytest.raises(construction.MemoireInsuffisante, match="lot de 64") as erreur:
+        construire_paires(Path("modele"), RECETTE)
+    assert "Libère la carte" in str(erreur.value)
+    carte_simulee(monkeypatch, octets_pour_un_lot_de(128))  # plus de mémoire : le lot reste 64
+    construire_paires(Path("modele"), RECETTE)
+    etat = json.loads((donnees / "affinage" / "essai" / "paires" / "etat.json").read_text(encoding="utf-8"))
+    assert etat["etat"]["lot"] == 64
+
+
+def test_un_manque_de_memoire_en_cours_de_route_arrete_sans_couper_le_lot(donnees, faux_modele, monkeypatch):
+    appels = []
+
+    def sans_memoire(modele, invites, *args):
+        appels.append(len(invites))
+        raise torch.cuda.OutOfMemoryError("plus de mémoire (simulé)")
+
+    monkeypatch.setattr(module_reponses, "generer_lot", sans_memoire)
+    with pytest.raises(torch.cuda.OutOfMemoryError):
+        construire_paires(Path("modele"), RECETTE)
+    assert appels == [RECETTE.reponses_par_invite * PAQUET]  # un seul appel, tout le lot : jamais coupé en deux
+    etat = json.loads((donnees / "affinage" / "essai" / "paires" / "etat.json").read_text(encoding="utf-8"))
+    assert etat["etat"]["paquets"] == 0 and etat["elements"] == 0  # le paquet n'est pas validé : il se refera
+
+
+def test_une_reprise_sur_un_autre_appareil_est_refusee(donnees, faux_modele, monkeypatch):
+    with monkeypatch.context() as m:
+        couper_au_paquet(m, 2)
+        with pytest.raises(RuntimeError):
+            construire_paires(Path("modele"), RECETTE)
+    chemin = donnees / "affinage" / "essai" / "paires" / "etat.json"
+    etat = json.loads(chemin.read_text(encoding="utf-8"))
+    assert etat["etat"]["appareil"] == "cpu"
+    etat["etat"]["appareil"] = "cuda"  # comme des paires commencées sur la carte
+    chemin.write_text(json.dumps(etat), encoding="utf-8")
+    with pytest.raises(ValueError, match="--appareil cuda"):
+        construire_paires(Path("modele"), RECETTE)
+
+
 def test_invites_de_validation_relues_dans_les_fragments(donnees, faux_modele):
     construire_paires(Path("modele"), RECETTE)
     dossier = donnees / "affinage" / "essai"
@@ -638,12 +770,26 @@ def test_invites_de_validation_relues_dans_les_fragments(donnees, faux_modele):
 
 def test_la_commande_preferences(donnees, faux_modele, monkeypatch, capsys):
     monkeypatch.setitem(construction.RECETTES_PREFERENCES, "essai", RECETTE)
+    monkeypatch.setattr(construction, "SEUIL_DU_TAUX_DE_PAIRES", 0.0)
     code = principal.main(["preferences", "--modele", "modele", "--recette", "essai", "--appareil", "cpu"])
-    sortie = capsys.readouterr().out
-    assert code == 0
+    sortie = capsys.readouterr()
+    assert code == 0 and "SEUIL" not in sortie.err
     index = lire_index(donnees / "affinage" / "essai")
-    assert "Taux de paires" in sortie and "\u202f%" in sortie
-    assert f"{index['paires']} paires" in sortie
+    assert "Taux de paires utilisables" in sortie.out and "\u202f%" in sortie.out
+    assert f"{index['paires']} paires" in sortie.out
+    assert f"{index['aucune_bonne_reponse']} sans bonne r\u00e9ponse" in sortie.out
+    assert "Longueur moyenne" in sortie.out and "la choisie est la plus courte dans" in sortie.out
+
+
+def test_sous_le_seuil_de_20_pour_cent_la_commande_le_dit_et_rend_un_code_a_part(donnees, faux_modele, monkeypatch, capsys):
+    monkeypatch.setitem(construction.RECETTES_PREFERENCES, "essai", RECETTE)
+    monkeypatch.setattr(construction, "SEUIL_DU_TAUX_DE_PAIRES", 1.0)  # le taux du faux mod\u00e8le est forc\u00e9ment dessous
+    code = principal.main(["preferences", "--modele", "modele", "--recette", "essai", "--appareil", "cpu"])
+    assert code == principal.CODE_SOUS_LE_SEUIL == 5
+    assert code not in (0, 1, 2, 3, 4, 130)  # ni succ\u00e8s, ni erreur, ni argparse, ni travail-long.ps1, ni pause
+    erreur = capsys.readouterr().err
+    assert "SEUIL NON ATTEINT" in erreur and "fix\u00e9 par l'utilisateur" in erreur and "ne lance pas la DPO" in erreur
+    assert (donnees / "affinage" / "essai" / ".complet").is_file()  # le jeu est \u00e9crit quand m\u00eame
 
 
 def test_la_commande_preferences_refuse_une_recette_inconnue(capsys):
