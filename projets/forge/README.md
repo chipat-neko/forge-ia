@@ -348,9 +348,20 @@ uv run --extra gpu python -m forge entrainer --config configs/sft-1.7-court.toml
 
 Les quatre jeux d'évaluation ne servent pas à l'entraînement : `preparer` les lit pour écarter les
 exemples qui leur ressemblent. `configs/sft-1.7.toml` lit deux fois les rangées d'entraînement
-(3 338 pas, environ 4 h 45 min sur la RTX 5070 Ti) ; `configs/sft-1.7-court.toml` garde les mêmes
-réglages pour une heure environ (739 pas). Les mesures (débit, mémoire, coût du masque par document,
-balayage du taux d'apprentissage) sont dans `docs/mesures/ton-ia-1.7.md`.
+(3 338 pas, 4 h 44 min de calcul sur la RTX 5070 Ti) ; `configs/sft-1.7-court.toml` garde les mêmes
+réglages pour une heure environ (739 pas). Puis l'export de la meilleure sauvegarde de chacun, et
+l'évaluation de l'étape 1.7, avec ton-ia-1.5 en regard (deux minutes par version sur la carte) :
+
+```powershell
+uv run --extra gpu python -m forge exporter --sauvegarde "$env:FORGE_DONNEES\entrainements\sft-1.7\sauvegardes\meilleur.pt" --sortie "$env:FORGE_DONNEES\publications\ton-ia-1.7" --poids ton-ia-1.7.safetensors
+uv run --extra gpu python -m forge exporter --sauvegarde "$env:FORGE_DONNEES\entrainements\ton-ia-1.7-court\sauvegardes\meilleur.pt" --sortie "$env:FORGE_DONNEES\publications\ton-ia-1.7-court" --poids ton-ia-1.7-court.safetensors
+uv run --extra gpu python -m forge evaluer-etape --modele "$env:FORGE_DONNEES\publications\ton-ia-1.7" --etape 1.7 --reference "$env:FORGE_DONNEES\publications\ton-ia-1.5"
+uv run --extra gpu python -m forge evaluer-etape --modele "$env:FORGE_DONNEES\publications\ton-ia-1.7-court" --etape 1.7
+```
+
+Les mesures (débit, mémoire, coût du masque par document, balayage du taux d'apprentissage, sessions,
+courbe, évaluation et échantillons) sont dans `docs/mesures/ton-ia-1.7.md`, et la fiche de la version
+dans `docs/mesures/ton-ia-1.7-LISEZMOI.md`.
 
 ## Suivre un entraînement
 
