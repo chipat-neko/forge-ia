@@ -665,9 +665,10 @@ Ce qui est limité :
 
 - **le délai** (5 s par défaut) : au-delà, le programme est arrêté (`delai`) ;
 - **la mémoire** (512 Mio par défaut) : une allocation de trop lève `MemoryError` (`memoire`) ;
-- **les processus** : sous Windows, un objet Job n'en admet qu'un (le programme ne peut pas en lancer un
-  autre) et tue ce qu'il contient à la fin ; sous Linux, le programme ouvre sa propre session, et tout son
-  groupe de processus est tué à la fin ;
+- **les processus** : sous Windows, un objet Job n'en admet qu'un (le programme ne peut pas en créer un
+  autre lui-même) et tue ce qu'il contient à la fin, ou quand la forge meurt ; le programme ne démarre qu'une
+  fois rangé dans le Job. Sous Linux, le programme ouvre sa propre session, et tout son groupe de processus
+  est tué à la fin ;
 - **le dossier et la sortie** : le programme tourne dans un dossier jetable sous `TEMP`, effacé ensuite, avec
   l'interpréteur Python de base en mode isolé (`-I`, la bibliothèque standard seulement) et un environnement
   réduit ; sa sortie est tronquée à 10 000 caractères.
@@ -678,7 +679,14 @@ Ce qui n'est **pas** empêché, car ce n'est pas un vrai bac à sable :
 - **l'écriture dans tes dossiers**, hors du dossier jetable : tout ce que ton compte a le droit de modifier
   ou d'effacer ;
 - **la lecture de tes fichiers** : documents, clés, jetons de connexion, données de la forge ;
-- sous Linux, un processus que le programme lance et qui quitte son groupe (`setsid`) lui survit.
+- sous Windows, un processus qu'un service crée pour le programme (WMI, planificateur de tâches, COM) naît
+  hors du Job et lui survit ;
+- sous Linux, un processus que le programme lance et qui quitte son groupe (`setsid`) lui survit ; et si la
+  forge est tuée net (`kill -9`, noyau du notebook redémarré), le programme en cours va jusqu'à sa fin (la
+  limite de temps de calcul arrête une boucle, pas une attente).
+
+Un dossier jetable qui ne s'efface pas (un fichier tenu ouvert par un antivirus, par exemple) ne fait pas
+perdre le résultat : un avertissement donne son chemin, à effacer à la main.
 
 C'est fait pour le code de ton IA aux problèmes de HumanEval, sur ton PC : du code qui peut boucler, prendre
 trop de mémoire ou écrire des mégaoctets, mais qu'on ne soupçonne pas de nuire. Du code venu d'ailleurs, ou

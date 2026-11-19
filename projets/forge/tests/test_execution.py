@@ -6,9 +6,11 @@ Job qui refuse un second processus) est signalé dans le test.
 
 import ast
 import os
+import shutil
 import sys
 import textwrap
 import time
+import warnings
 from pathlib import Path
 
 import psutil
@@ -205,9 +207,117 @@ def test_un_interpreteur_introuvable_donne_erreur_systeme(monkeypatch):
     assert resultat.sortie
 
 
+def test_sans_interpreteur_de_base_un_environnement_virtuel_est_refuse(monkeypatch):
+    """Pas de repli silencieux sur le lanceur du `.venv` : il ferait tourner les programmes hors du Job."""
+    monkeypatch.setattr(sys, "_base_executable", str(Path("introuvable") / "python-absent"), raising=False)
+    monkeypatch.setattr(sys, "base_prefix", sys.prefix + "-base")  # un environnement virtuel
+    with pytest.raises(RuntimeError, match="interpréteur Python de base"):
+        executer("print(1)", delai=DELAI)
+    monkeypatch.setattr(sys, "base_prefix", sys.prefix)  # pas d'environnement virtuel : l'interpréteur lui-même
+    assert execution._interpreteur() == sys.executable
+
+
+@pytest.mark.parametrize("envoye", [b"", b"x"], ids=["tube-ferme-sans-octet", "mauvais-octet"])
+def test_sans_octet_de_depart_le_programme_n_est_jamais_execute(monkeypatch, tmp_path, envoye):
+    """Si la forge meurt avant le rangement dans le Job, l'amorce lit la fin du tube : elle n'exécute rien.
+
+    Le programme écrirait un fichier témoin hors du dossier jetable ; il ne doit pas exister.
+    """
+    temoin = tmp_path / "temoin.txt"
+    programme = f"open({str(temoin)!r}, 'w').write('exécuté')"
+    assert executer(programme, delai=DELAI).reussi  # avec le départ, le témoin est bien écrit
+    assert temoin.exists()
+    temoin.unlink()
+
+    def depart_manque(processus):
+        processus.stdin.write(envoye)
+        processus.stdin.close()
+
+    monkeypatch.setattr(execution, "_donner_le_depart", depart_manque)
+    resultat = executer(programme, delai=DELAI)
+    assert resultat.raison == "erreur_systeme"
+    assert not resultat.reussi
+    assert "départ" in resultat.sortie
+    assert not temoin.exists()
+
+
+def test_des_dossiers_sans_droit_d_ecriture_sont_effaces_quand_meme():
+    """Le cas de Linux : un dossier sans droit d'écriture, ou sans aucun droit, empêche d'effacer ce qu'il
+    contient. Sous Windows, `chmod` ne pose que l'attribut « lecture seule », et le test passe aussi."""
+    programme = textwrap.dedent(
+        """
+        import os
+        for nom, mode in (("sans-ecriture", 0o500), ("sans-droits", 0o000)):
+            os.mkdir(nom)
+            with open(os.path.join(nom, "fichier.txt"), "w") as f:
+                f.write("x")
+            os.chmod(nom, mode)
+        print(os.path.realpath(os.getcwd()))
+        """
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", execution.DossierJetableNonEfface)
+        resultat = executer(programme, delai=DELAI)
+    assert resultat.reussi, resultat.sortie
+    assert not Path(resultat.sortie.strip()).exists()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="sous Linux, un fichier ouvert n'empêche pas de l'effacer")
+def test_un_fichier_tenu_ouvert_ne_fait_pas_perdre_le_resultat(monkeypatch):
+    """Windows : un fichier du dossier jetable tenu ouvert (un antivirus, un indexeur) empêche de l'effacer
+    (WinError 32). Le résultat est rendu quand même, et un avertissement nomme le dossier resté."""
+    ouverts = []
+    lancer = execution._lancer
+
+    def lancer_puis_garder_ouvert(interpreteur, fichier, *reste):
+        resultat = lancer(interpreteur, fichier, *reste)
+        ouverts.append(open(fichier, "rb"))
+        return resultat
+
+    monkeypatch.setattr(execution, "_lancer", lancer_puis_garder_ouvert)
+    try:
+        with pytest.warns(execution.DossierJetableNonEfface) as avertissements:
+            resultat = executer("print(1)", delai=DELAI)
+    finally:
+        for ouvert in ouverts:
+            ouvert.close()
+            shutil.rmtree(Path(ouvert.name).parent, ignore_errors=True)
+    assert resultat.reussi and resultat.sortie == "1\n"
+    message = str(avertissements[0].message)
+    assert str(Path(ouverts[0].name).parent) in message
+    assert "WinError 32" in message
+
+
+def test_un_effacement_impossible_n_arrete_pas_executer_tous(monkeypatch):
+    """Sur tous les systèmes : l'effacement échoue à chaque fois. Chaque résultat est rendu, dans l'ordre, et un
+    avertissement nomme chaque dossier resté (effacé ensuite par le test)."""
+    effacer_pour_de_vrai = shutil.rmtree
+    restes: set[str] = set()
+
+    def rmtree_refuse(chemin, **options):
+        restes.add(str(chemin))
+        raise PermissionError(13, "effacement refusé (essai)", str(chemin))
+
+    monkeypatch.setattr(shutil, "rmtree", rmtree_refuse)
+    try:
+        with pytest.warns(execution.DossierJetableNonEfface) as avertissements:
+            resultats = executer_tous(["print(0)", "assert False", "print(2)"], processus=3, delai=DELAI)
+    finally:
+        monkeypatch.undo()
+        for dossier in restes:
+            effacer_pour_de_vrai(dossier, ignore_errors=True)
+    assert [r.raison for r in resultats] == ["reussi", "echec", "reussi"]
+    assert len(restes) == 3
+    messages = " ".join(str(a.message) for a in avertissements)
+    assert all(dossier in messages for dossier in restes)
+
+
 def test_des_reglages_impossibles_sont_refuses():
     with pytest.raises(ValueError, match="delai"):
         executer("print(1)", delai=0)
+    for delai in (float("inf"), float("nan")):
+        with pytest.raises(ValueError, match="delai"):
+            executer("print(1)", delai=delai)
     with pytest.raises(ValueError, match="memoire_mo"):
         executer("print(1)", memoire_mo=0)
     with pytest.raises(ValueError, match="sortie_max"):
