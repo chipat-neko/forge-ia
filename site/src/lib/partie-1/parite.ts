@@ -30,6 +30,7 @@ import fichierNettoyeur from '../../../../projets/1.2-donnees/tests/attendus.jso
 import fichierConversation from '../../../../projets/1.7-conversation/tests/attendus.json';
 import fichierNgrammes from '../../../../projets/1.1-modele-de-langage/tests/attendus.json';
 import fichierNotes from '../../../../projets/1.8-alignement/tests/attendus.json';
+import fichierRaisonnement from '../../../../projets/1.9-raisonnement/tests/attendus.json';
 import type { Attendus } from '../mini-modele/parite';
 import {
   alphabet,
@@ -56,9 +57,11 @@ import {
   trier,
   type Ligne,
 } from './nettoyeur';
+import { avantages, sansSignal } from './avantages';
 import { empaqueterLongueurs } from './bfd';
 import { assemblerConversation, NOMS_SPECIAUX, SPECIAUX_TON_IA, type Role } from './conversation';
 import { langue, mots, MOTS_MAXIMUM, MOTS_MINIMUM, noteSansJustesse, VERIFICATEURS_CONTRAINTES, type ReglagesConsigne } from './notes';
+import { ecrireFraction, estJuste, extraireNombre, genererProbleme } from './problemes';
 import type { NomSource } from './donnees';
 import { TEXTE_DU_SITE } from './texte-1-1';
 
@@ -306,10 +309,51 @@ export function attendusNotes(): Attendus {
   return refaireNotes(fichierNotes as unknown as EntreesNotes);
 }
 
+/** Les entrées du fichier d'attendus du raisonnement : des problèmes à générer, des textes à lire, des groupes et une grille. */
+export interface EntreesRaisonnement {
+  problemes: { famille: string; difficulte: number; graine: number }[];
+  problemes_reserves: { famille: string; difficulte: number; graine: number }[];
+  nombres: { texte: string; verdicts: { attendu: number; terminee: boolean }[] }[];
+  avantages: { recompenses: number[] }[];
+  sans_signal: { p: number; n: number }[];
+}
+
+/**
+ * Les sections du fichier du raisonnement, refaites à partir de ses seules entrées : chaque problème (énoncé, étapes,
+ * réponse) tiré de sa graine, le nombre lu dans chaque texte et le verdict de chaque réponse, l'avantage de chaque
+ * réponse de chaque groupe et la chance qu'un groupe n'apprenne rien. Tout est comparé à l'identique.
+ */
+export function refaireRaisonnement(entrees: EntreesRaisonnement): Attendus {
+  const probleme = ({ famille, difficulte, graine }: { famille: string; difficulte: number; graine: number }) => {
+    const p = genererProbleme(famille, difficulte, graine);
+    return { famille, difficulte, graine, enonce: p.enonce, etapes: p.etapes, reponse: p.reponse };
+  };
+  return {
+    problemes: entrees.problemes.map(probleme),
+    problemes_reserves: entrees.problemes_reserves.map(probleme),
+    nombres: entrees.nombres.map(({ texte, verdicts }) => {
+      const lu = extraireNombre(texte);
+      return {
+        texte,
+        lu: lu === null ? null : ecrireFraction(lu),
+        verdicts: verdicts.map(({ attendu, terminee }) => ({ attendu, terminee, juste: estJuste(texte, terminee, attendu) })),
+      };
+    }),
+    avantages: entrees.avantages.map(({ recompenses }) => ({ recompenses, avantages: avantages([recompenses])[0] })),
+    sans_signal: entrees.sans_signal.map(({ p, n }) => ({ p, n, chance: sansSignal(p, n) })),
+  };
+}
+
+/** Les attendus du raisonnement (FICHIERS_PARTIE_1.raisonnement), refaits ici. */
+export function attendusRaisonnement(): Attendus {
+  return refaireRaisonnement(fichierRaisonnement as unknown as EntreesRaisonnement);
+}
+
 /** Chaque calcul de parité de la Partie 1, sous le nom de son fichier dans FICHIERS_PARTIE_1. */
 export const CALCULS_PARTIE_1: Record<string, () => unknown | Promise<unknown>> = {
   ngrammes: attendusNgrammes,
   nettoyeur: attendusNettoyeur,
   conversation: attendusConversation,
   notes: attendusNotes,
+  raisonnement: attendusRaisonnement,
 };

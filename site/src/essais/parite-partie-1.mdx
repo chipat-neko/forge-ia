@@ -21,6 +21,8 @@ Pour 1.7, elle refait le format de conversation : les jetons spéciaux de ton IA
 
 Pour 1.8, elle refait la note d'une réponse : le nombre de mots, la langue, le verdict de chacune des huit consignes et de la longueur, et la note sans la justesse, sur quarante textes de référence (accent combinant, apostrophe courbe, emoji, texte vide, dix mille caractères). La perte DPO passe par exp et log1p : la page ne la refait pas, elle se compare à 10⁻¹² près dans les tests du site.
 
+Pour 1.9, elle refait les problèmes de calcul (soixante-dix problèmes tirés de leurs graines, plus vingt-huit aux graines de l'évaluation et de la validation, dont les prénoms ne sont pas ceux de l'entraînement), la lecture du dernier nombre d'une réponse (virgule, milliers séparés par une espace fine, signe moins, chiffres hors de 0 à 9) avec le verdict de chaque réponse, l'avantage de chaque réponse de dix groupes, et la chance qu'un groupe n'apprenne rien.
+
 <ControleParite client:load jeu="partie-1" />
 
 </Etape>

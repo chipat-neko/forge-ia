@@ -64,6 +64,7 @@ chapitre. La Partie 1 est en ligne en entier, de
 | `projets/1.6-evaluation` | 1.6, Évaluer son modèle | refait la perte, la perplexité et la notation d'un QCM à la main, lit le rapport d'évaluation et regarde dans le modèle |
 | `projets/1.7-conversation` | 1.7, Apprendre à converser | écrit une conversation en jetons avec son masque de perte, refait la perte masquée, mesure la fuite sans masque par document, fait un petit affinage et résume les mesures de ton IA 1.7 |
 | `projets/1.8-alignement` | 1.8, L'aligner : préférences et récompenses | note deux réponses par des contrôles programmés, refait la perte DPO à la main et regarde ce qu'elle pousse, et résume les mesures de ton IA 1.8 |
+| `projets/1.9-raisonnement` | 1.9, Le faire raisonner | montre un problème de calcul et sa trace, vérifie une réponse, refait l'avantage d'un groupe de réponses du GRPO, fait un petit GRPO sur un modèle minuscule et résume les mesures de ton IA 1.9 |
 
 Les autres :
 

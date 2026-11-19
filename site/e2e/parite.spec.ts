@@ -20,7 +20,8 @@
 // texte nettoyé, empreinte SHA-1 par crypto.subtle, verdicts du tri), puis le format de conversation de 1.7
 // (les jetons spéciaux de ton IA, l'assemblage des conversations avec leur masque de perte, le placement de
 // l'empaquetage BFD), puis les notes de 1.8 (la langue, les huit consignes et la longueur d'une réponse, sans la
-// perte DPO, qui passe par exp et log1p et se compare à 10⁻¹² près dans Vitest). Il tourne dans les projets Chrome (ordinateur,
+// perte DPO, qui passe par exp et log1p et se compare à 10⁻¹² près dans Vitest), puis les problèmes de 1.9 (générés
+// de leurs graines, la lecture du dernier nombre d'une réponse, les avantages d'un groupe, la chance d'un groupe sans signal). Il tourne dans les projets Chrome (ordinateur,
 // mobile) et, avec FORGE_TOUS_NAVIGATEURS=1, dans Firefox et WebKit (projets
 // parite-firefox et parite-webkit, voir playwright.config.ts) : c'est la seule
 // façon de voir qu'un moteur JavaScript s'écarte du Python.
@@ -151,8 +152,9 @@ test('Partie 1 : le navigateur refait les attendus des jumeaux du Python, à l�
     PAGES[2].fichiers.length === 1 ? 'le fichier d’attendus est refait' : 'fichiers d’attendus sont refaits',
   );
   // Les fichiers de 1.1 (n-grammes), de 1.2 (nettoyage, dont l'empreinte est asynchrone), de 1.7 (format de
-  // conversation et empaquetage) et de 1.8 (notes des réponses : langue, huit consignes, longueur) sont bien dans la liste.
-  expect(PAGES[2].fichiers.map(([nom]) => nom)).toEqual(['ngrammes', 'nettoyeur', 'conversation', 'notes']);
+  // conversation et empaquetage), de 1.8 (notes des réponses : langue, huit consignes, longueur) et de 1.9 (problèmes de calcul, lecture d'un nombre,
+  // avantages d'un groupe) sont bien dans la liste.
+  expect(PAGES[2].fichiers.map(([nom]) => nom)).toEqual(['ngrammes', 'nettoyeur', 'conversation', 'notes', 'raisonnement']);
   await comparerAuxFichiers(page, browserName, PAGES[2]);
 });
 

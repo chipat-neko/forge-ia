@@ -15,6 +15,7 @@ export const FICHIERS_PARTIE_1: Readonly<Record<string, string>> = Object.freeze
   nettoyeur: 'projets/1.2-donnees/tests/attendus.json',
   conversation: 'projets/1.7-conversation/tests/attendus.json',
   notes: 'projets/1.8-alignement/tests/attendus.json',
+  raisonnement: 'projets/1.9-raisonnement/tests/attendus.json',
 });
 
 /**

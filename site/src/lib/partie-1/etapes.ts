@@ -92,11 +92,12 @@ export function estAbsente(mesure: Mesure): mesure is MesureAbsente {
   return typeof (mesure as MesureAbsente).absente === 'string';
 }
 
-// Le paquet Python de chaque projet qui sait refaire ses relevés (`python -m <paquet> resumer`, etc.). Les projets
-// 1.9 et 1.10 n'y sont pas encore : leur message reste général jusqu'à leur tâche.
+// Le paquet Python de chaque projet qui sait refaire ses relevés (`python -m <paquet> resumer`, etc.). Le projet
+// 1.10 n'y est pas encore : son message reste général jusqu'à sa tâche.
 const PAQUETS_DES_PROJETS: Readonly<Record<string, string>> = Object.freeze({
   '1.7-conversation': 'conversation_pas_a_pas',
   '1.8-alignement': 'alignement_pas_a_pas',
+  '1.9-raisonnement': 'raisonnement_pas_a_pas',
 });
 
 // Le relevé de la version de référence de chaque projet : la référence du rapport de l'étape (`--reference` de
@@ -104,6 +105,7 @@ const PAQUETS_DES_PROJETS: Readonly<Record<string, string>> = Object.freeze({
 const REFERENCES_DES_PROJETS: Readonly<Record<string, string>> = Object.freeze({
   '1.7-conversation': 'etape-ton-ia-1.5.json',
   '1.8-alignement': 'etape-ton-ia-1.7.json',
+  '1.9-raisonnement': 'etape-ton-ia-1.5.json',
 });
 
 /**
@@ -121,7 +123,8 @@ export function refaire(fichier: string): string {
   if (paquet === undefined) return general;
   const commande = (arguments_: string): string =>
     `Relance le relevé, depuis projets/${dossier}, avec « uv run --extra cpu python -m ${paquet} ${arguments_} --json mesures/${nom} », ou corrige le fichier.`;
-  if (nom.startsWith('entrainement-dpo')) return commande('courbes --journal <journal.jsonl>');
+  if (nom.startsWith('entrainement-dpo') || nom.startsWith('entrainement-grpo')) return commande('courbes --journal <journal.jsonl>');
+  if (nom.startsWith('controle-')) return commande('controle --sortie <dossier de sortie du grpo>');
   if (nom === 'paires-exemples.json') return commande('paires --jeu <dossier du jeu de paires>');
   if (nom.startsWith('balayage')) return commande('balayage <dossier d’essai> <dossier d’essai>');
   if (nom === REFERENCES_DES_PROJETS[dossier]) return commande('resumer --rapport <rapport.json> --reference');
@@ -251,14 +254,42 @@ export function lireRapportEtape(nom: NomRapportEtape, racineDepot: string | URL
   return rapport;
 }
 
+/** Un point d'une série : [pas, valeur]. La valeur est null quand le paquet de pas n'avait aucune valeur finie. */
+export type PointDeSerie = [number, number | null];
+
+/** Les options de lireSeries : `absents` accepte les points sans valeur (`null`), que `serie()` rend quand un RL diverge. */
+export interface OptionsDeSeries {
+  absents?: boolean;
+}
+
 /**
  * Les séries d'un fichier de courbes de 1.8 (mesures/entrainement-dpo-1.8.json) ou de 1.9
  * (mesures/entrainement-grpo-1.9.json) : une clé par série, chacune une liste de [pas, valeur] qui vient de
- * `pre_entrainement.journal.serie`. `fichier` est un chemin depuis la racine du dépôt. Null si le fichier
- * manque. Les clés qui ne sont pas des séries (`lance: false` d'un RL non lancé) sont laissées de côté : un
- * fichier sans série rend `{}`.
+ * `pre_entrainement.journal.serie`. `fichier` est un chemin depuis la racine du dépôt. Null si le fichier manque.
+ *
+ * Les clés d'un fichier sont des séries (des listes), ou `lance`, un booléen : `lance: false` dit qu'un RL n'a pas été
+ * lancé (le contrôle de départ n'a trouvé aucune réponse juste), et le fichier n'a alors aucune série (`{}`). Toute
+ * autre clé est une erreur qui nomme le fichier : elle ne doit pas disparaître sans rien dire.
+ *
+ * Une valeur `null` (un paquet de pas sans aucune valeur finie) est refusée, sauf avec `{ absents: true }` : le point
+ * garde alors son pas et sa valeur est `null`, que la page montre comme absente. Les courbes de 1.9, qui peuvent
+ * diverger, demandent les absents ; celles de 1.8, que le Python refuse d'écrire avec un trou, non.
  */
-export function lireSeries(fichier: string, racineDepot: string | URL = '..'): Record<string, [number, number][]> | null {
+export function lireSeries(
+  fichier: string,
+  racineDepot?: string | URL,
+  options?: { absents?: false },
+): Record<string, [number, number][]> | null;
+export function lireSeries(
+  fichier: string,
+  racineDepot: string | URL | undefined,
+  options: { absents: true },
+): Record<string, PointDeSerie[]> | null;
+export function lireSeries(
+  fichier: string,
+  racineDepot: string | URL = '..',
+  options: OptionsDeSeries = {},
+): Record<string, PointDeSerie[]> | null {
   const racine = racineEnChemin(racineDepot);
   verifierRacine(racine, 'lireSeries');
   const chemin = join(racine, fichier);
@@ -266,16 +297,29 @@ export function lireSeries(fichier: string, racineDepot: string | URL = '..'): R
   const valeur = lireJson(chemin, fichier);
   const faute = (quoi: string): Error => new Error(`${fichier}${FINE}: ${quoi}. ${refaire(fichier)}`);
   if (!objet(valeur)) throw faute('ce n’est pas un objet JSON');
-  const series: Record<string, [number, number][]> = {};
+  const series: Record<string, PointDeSerie[]> = {};
   for (const [cle, points] of Object.entries(valeur)) {
-    if (!Array.isArray(points)) continue;
+    if (cle === 'lance') {
+      if (typeof points !== 'boolean') throw faute('« lance » doit être vrai ou faux');
+      continue;
+    }
+    if (!Array.isArray(points)) {
+      throw faute(`la clé « ${cle} » n’est ni une série de [pas, valeur] ni « lance »`);
+    }
     let avant = 0;
     points.forEach((p: unknown, i: number) => {
-      const bon = Array.isArray(p) && p.length === 2 && fini(p[0]) && p[0] > avant && fini(p[1]);
-      if (!bon) throw faute(`${cle}[${i}] doit être [pas, valeur], avec des pas croissants et des nombres finis`);
+      const vide = options.absents === true && Array.isArray(p) && p.length === 2 && p[1] === null;
+      const bon = Array.isArray(p) && p.length === 2 && fini(p[0]) && p[0] > avant && (vide || fini(p[1]));
+      if (!bon) {
+        const precision = options.absents === true ? ' ou null' : '';
+        throw faute(`${cle}[${i}] doit être [pas, valeur], avec des pas croissants et des nombres finis${precision}`);
+      }
       avant = (p as number[])[0];
     });
-    series[cle] = points as [number, number][];
+    series[cle] = points as PointDeSerie[];
+  }
+  if (valeur.lance === false && Object.keys(series).length > 0) {
+    throw faute('« lance » est faux, mais le fichier a des séries : un RL non lancé n’a aucune courbe');
   }
   return series;
 }

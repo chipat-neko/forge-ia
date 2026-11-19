@@ -1,0 +1,3692 @@
+{
+ "problemes": [
+  {
+   "famille": "addition",
+   "difficulte": 1,
+   "graine": 0,
+   "enonce": "Camille a 70 autocollants. Elle en reçoit 93 de plus. Combien d'autocollants Camille a-t-elle en tout ?",
+   "etapes": [
+    "70 + 93 = 163"
+   ],
+   "reponse": 163
+  },
+  {
+   "famille": "addition",
+   "difficulte": 1,
+   "graine": 1,
+   "enonce": "Léa a 49 fleurs. Elle en reçoit 94 de plus. Combien de fleurs Léa a-t-elle en tout ?",
+   "etapes": [
+    "49 + 94 = 143"
+   ],
+   "reponse": 143
+  },
+  {
+   "famille": "addition",
+   "difficulte": 1,
+   "graine": 2,
+   "enonce": "Camille met 90 abricots dans une boîte et 57 dans un sac. Combien y a-t-il d'abricots en tout ?",
+   "etapes": [
+    "90 + 57 = 147"
+   ],
+   "reponse": 147
+  },
+  {
+   "famille": "addition",
+   "difficulte": 1,
+   "graine": 3,
+   "enonce": "Adam met 60 autocollants dans une boîte et 73 dans un sac. Combien y a-t-il d'autocollants en tout ?",
+   "etapes": [
+    "60 + 73 = 133"
+   ],
+   "reponse": 133
+  },
+  {
+   "famille": "addition",
+   "difficulte": 1,
+   "graine": 4,
+   "enonce": "Enzo a 90 billes. Il en reçoit 33 de plus. Combien de billes Enzo a-t-il en tout ?",
+   "etapes": [
+    "90 + 33 = 123"
+   ],
+   "reponse": 123
+  },
+  {
+   "famille": "addition",
+   "difficulte": 2,
+   "graine": 0,
+   "enonce": "Camille met 70 autocollants dans une boîte, 93 dans un sac et 12 dans un panier. Combien y a-t-il d'autocollants en tout ?",
+   "etapes": [
+    "70 + 93 = 163",
+    "163 + 12 = 175"
+   ],
+   "reponse": 175
+  },
+  {
+   "famille": "addition",
+   "difficulte": 2,
+   "graine": 1,
+   "enonce": "Léa a 49 fleurs. Elle en reçoit 94, puis 62. Combien de fleurs Léa a-t-elle en tout ?",
+   "etapes": [
+    "49 + 94 = 143",
+    "143 + 62 = 205"
+   ],
+   "reponse": 205
+  },
+  {
+   "famille": "addition",
+   "difficulte": 2,
+   "graine": 2,
+   "enonce": "Camille met 90 abricots dans une boîte, 57 dans un sac et 75 dans un panier. Combien y a-t-il d'abricots en tout ?",
+   "etapes": [
+    "90 + 57 = 147",
+    "147 + 75 = 222"
+   ],
+   "reponse": 222
+  },
+  {
+   "famille": "addition",
+   "difficulte": 2,
+   "graine": 3,
+   "enonce": "Adam a 60 autocollants. Il en reçoit 73, puis 11. Combien d'autocollants Adam a-t-il en tout ?",
+   "etapes": [
+    "60 + 73 = 133",
+    "133 + 11 = 144"
+   ],
+   "reponse": 144
+  },
+  {
+   "famille": "addition",
+   "difficulte": 2,
+   "graine": 4,
+   "enonce": "Enzo met 90 billes dans une boîte, 33 dans un sac et 30 dans un panier. Combien y a-t-il de billes en tout ?",
+   "etapes": [
+    "90 + 33 = 123",
+    "123 + 30 = 153"
+   ],
+   "reponse": 153
+  },
+  {
+   "famille": "addition",
+   "difficulte": 3,
+   "graine": 0,
+   "enonce": "Camille met 70 autocollants dans une boîte, 93 dans un sac, 12 dans un panier et 71 dans un carton. Combien y a-t-il d'autocollants en tout ?",
+   "etapes": [
+    "70 + 93 = 163",
+    "163 + 12 = 175",
+    "175 + 71 = 246"
+   ],
+   "reponse": 246
+  },
+  {
+   "famille": "addition",
+   "difficulte": 3,
+   "graine": 1,
+   "enonce": "Léa met 49 fleurs dans une boîte, 94 dans un sac, 62 dans un panier et 80 dans un carton. Combien y a-t-il de fleurs en tout ?",
+   "etapes": [
+    "49 + 94 = 143",
+    "143 + 62 = 205",
+    "205 + 80 = 285"
+   ],
+   "reponse": 285
+  },
+  {
+   "famille": "addition",
+   "difficulte": 3,
+   "graine": 2,
+   "enonce": "Camille a 90 abricots. Elle en reçoit 57, puis 75, puis 23. Combien d'abricots Camille a-t-elle en tout ?",
+   "etapes": [
+    "90 + 57 = 147",
+    "147 + 75 = 222",
+    "222 + 23 = 245"
+   ],
+   "reponse": 245
+  },
+  {
+   "famille": "addition",
+   "difficulte": 3,
+   "graine": 3,
+   "enonce": "Adam a 60 autocollants. Il en reçoit 73, puis 11, puis 82. Combien d'autocollants Adam a-t-il en tout ?",
+   "etapes": [
+    "60 + 73 = 133",
+    "133 + 11 = 144",
+    "144 + 82 = 226"
+   ],
+   "reponse": 226
+  },
+  {
+   "famille": "addition",
+   "difficulte": 3,
+   "graine": 4,
+   "enonce": "Enzo a 90 billes. Il en reçoit 33, puis 30, puis 95. Combien de billes Enzo a-t-il en tout ?",
+   "etapes": [
+    "90 + 33 = 123",
+    "123 + 30 = 153",
+    "153 + 95 = 248"
+   ],
+   "reponse": 248
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 1,
+   "graine": 0,
+   "enonce": "Camille a 70 autocollants. Elle en donne 63. Combien d'autocollants Camille a-t-elle maintenant ?",
+   "etapes": [
+    "70 − 63 = 7"
+   ],
+   "reponse": 7
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 1,
+   "graine": 1,
+   "enonce": "Léa a 29 fleurs. Elle en donne 19. Combien de fleurs Léa a-t-elle maintenant ?",
+   "etapes": [
+    "29 − 19 = 10"
+   ],
+   "reponse": 10
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 1,
+   "graine": 2,
+   "enonce": "Dans une boîte, il y a 40 abricots. Camille en prend 27. Combien en reste-t-il dans la boîte ?",
+   "etapes": [
+    "40 − 27 = 13"
+   ],
+   "reponse": 13
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 1,
+   "graine": 3,
+   "enonce": "Dans une boîte, il y a 20 autocollants. Adam en prend 13. Combien en reste-t-il dans la boîte ?",
+   "etapes": [
+    "20 − 13 = 7"
+   ],
+   "reponse": 7
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 1,
+   "graine": 4,
+   "enonce": "Enzo a 60 billes. Il en donne 33. Combien de billes Enzo a-t-il maintenant ?",
+   "etapes": [
+    "60 − 33 = 27"
+   ],
+   "reponse": 27
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 2,
+   "graine": 0,
+   "enonce": "Dans une boîte, il y a 67 autocollants. Camille en prend 17, puis 38. Combien en reste-t-il dans la boîte ?",
+   "etapes": [
+    "67 − 17 = 50",
+    "50 − 38 = 12"
+   ],
+   "reponse": 12
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 2,
+   "graine": 1,
+   "enonce": "Léa a 114 fleurs. Elle en donne 34, puis 18. Combien de fleurs Léa a-t-elle maintenant ?",
+   "etapes": [
+    "114 − 34 = 80",
+    "80 − 18 = 62"
+   ],
+   "reponse": 62
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 2,
+   "graine": 2,
+   "enonce": "Dans une boîte, il y a 109 abricots. Camille en prend 24, puis 10. Combien en reste-t-il dans la boîte ?",
+   "etapes": [
+    "109 − 24 = 85",
+    "85 − 10 = 75"
+   ],
+   "reponse": 75
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 2,
+   "graine": 3,
+   "enonce": "Adam a 65 autocollants. Il en donne 37, puis 17. Combien d'autocollants Adam a-t-il maintenant ?",
+   "etapes": [
+    "65 − 37 = 28",
+    "28 − 17 = 11"
+   ],
+   "reponse": 11
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 2,
+   "graine": 4,
+   "enonce": "Dans une boîte, il y a 83 billes. Enzo en prend 14, puis 39. Combien en reste-t-il dans la boîte ?",
+   "etapes": [
+    "83 − 14 = 69",
+    "69 − 39 = 30"
+   ],
+   "reponse": 30
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 3,
+   "graine": 0,
+   "enonce": "Dans une boîte, il y a 171 autocollants. Camille en prend 17, puis 38, puis 45. Combien en reste-t-il dans la boîte ?",
+   "etapes": [
+    "171 − 17 = 154",
+    "154 − 38 = 116",
+    "116 − 45 = 71"
+   ],
+   "reponse": 71
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 3,
+   "graine": 1,
+   "enonce": "Dans une boîte, il y a 167 fleurs. Léa en prend 34, puis 18, puis 35. Combien en reste-t-il dans la boîte ?",
+   "etapes": [
+    "167 − 34 = 133",
+    "133 − 18 = 115",
+    "115 − 35 = 80"
+   ],
+   "reponse": 80
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 3,
+   "graine": 2,
+   "enonce": "Camille a 72 abricots. Elle en donne 24, puis 10, puis 15. Combien d'abricots Camille a-t-elle maintenant ?",
+   "etapes": [
+    "72 − 24 = 48",
+    "48 − 10 = 38",
+    "38 − 15 = 23"
+   ],
+   "reponse": 23
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 3,
+   "graine": 3,
+   "enonce": "Adam a 168 autocollants. Il en donne 37, puis 17, puis 32. Combien d'autocollants Adam a-t-il maintenant ?",
+   "etapes": [
+    "168 − 37 = 131",
+    "131 − 17 = 114",
+    "114 − 32 = 82"
+   ],
+   "reponse": 82
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 3,
+   "graine": 4,
+   "enonce": "Enzo a 174 billes. Il en donne 14, puis 39, puis 26. Combien de billes Enzo a-t-il maintenant ?",
+   "etapes": [
+    "174 − 14 = 160",
+    "160 − 39 = 121",
+    "121 − 26 = 95"
+   ],
+   "reponse": 95
+  },
+  {
+   "famille": "multiplication",
+   "difficulte": 1,
+   "graine": 0,
+   "enonce": "Camille a 4 boîtes de 93 autocollants chacune. Combien d'autocollants Camille a-t-elle en tout ?",
+   "etapes": [
+    "4 × 93 = 372"
+   ],
+   "reponse": 372
+  },
+  {
+   "famille": "multiplication",
+   "difficulte": 1,
+   "graine": 1,
+   "enonce": "Léa a 3 boîtes de 94 fleurs chacune. Combien de fleurs Léa a-t-elle en tout ?",
+   "etapes": [
+    "3 × 94 = 282"
+   ],
+   "reponse": 282
+  },
+  {
+   "famille": "multiplication",
+   "difficulte": 1,
+   "graine": 2,
+   "enonce": "Camille remplit 6 sacs avec 57 abricots dans chaque sac. Combien d'abricots Camille a-t-elle en tout ?",
+   "etapes": [
+    "6 × 57 = 342"
+   ],
+   "reponse": 342
+  },
+  {
+   "famille": "multiplication",
+   "difficulte": 1,
+   "graine": 3,
+   "enonce": "Adam remplit 2 sacs avec 73 autocollants dans chaque sac. Combien d'autocollants Adam a-t-il en tout ?",
+   "etapes": [
+    "2 × 73 = 146"
+   ],
+   "reponse": 146
+  },
+  {
+   "famille": "multiplication",
+   "difficulte": 1,
+   "graine": 4,
+   "enonce": "Enzo a 2 boîtes de 33 billes chacune. Combien de billes Enzo a-t-il en tout ?",
+   "etapes": [
+    "2 × 33 = 66"
+   ],
+   "reponse": 66
+  },
+  {
+   "famille": "multiplication",
+   "difficulte": 2,
+   "graine": 0,
+   "enonce": "Camille a 4 boîtes de 93 autocollants chacune. Elle en donne 97. Combien d'autocollants Camille a-t-elle maintenant ?",
+   "etapes": [
+    "4 × 93 = 372",
+    "372 − 97 = 275"
+   ],
+   "reponse": 275
+  },
+  {
+   "famille": "multiplication",
+   "difficulte": 2,
+   "graine": 1,
+   "enonce": "Léa a 3 boîtes de 94 fleurs chacune. Elle en ajoute encore 99. Combien de fleurs Léa a-t-elle maintenant ?",
+   "etapes": [
+    "3 × 94 = 282",
+    "282 + 99 = 381"
+   ],
+   "reponse": 381
+  },
+  {
+   "famille": "multiplication",
+   "difficulte": 2,
+   "graine": 2,
+   "enonce": "Camille remplit 6 sacs avec 57 abricots dans chaque sac. Elle en donne 98. Combien d'abricots Camille a-t-elle maintenant ?",
+   "etapes": [
+    "6 × 57 = 342",
+    "342 − 98 = 244"
+   ],
+   "reponse": 244
+  },
+  {
+   "famille": "multiplication",
+   "difficulte": 2,
+   "graine": 3,
+   "enonce": "Adam remplit 2 sacs avec 73 autocollants dans chaque sac. Il en ajoute encore 44. Combien d'autocollants Adam a-t-il maintenant ?",
+   "etapes": [
+    "2 × 73 = 146",
+    "146 + 44 = 190"
+   ],
+   "reponse": 190
+  },
+  {
+   "famille": "multiplication",
+   "difficulte": 2,
+   "graine": 4,
+   "enonce": "Enzo a 2 boîtes de 33 billes chacune. Il en donne 42. Combien de billes Enzo a-t-il maintenant ?",
+   "etapes": [
+    "2 × 33 = 66",
+    "66 − 42 = 24"
+   ],
+   "reponse": 24
+  },
+  {
+   "famille": "partage",
+   "difficulte": 1,
+   "graine": 0,
+   "enonce": "Camille a 76 autocollants. Elle les partage en parts égales entre 4 amis. Combien d'autocollants reçoit chaque ami ?",
+   "etapes": [
+    "76 ÷ 4 = 19"
+   ],
+   "reponse": 19
+  },
+  {
+   "famille": "partage",
+   "difficulte": 1,
+   "graine": 1,
+   "enonce": "Léa a 6 fleurs. Elle les partage en parts égales entre 3 amis. Combien de fleurs reçoit chaque ami ?",
+   "etapes": [
+    "6 ÷ 3 = 2"
+   ],
+   "reponse": 2
+  },
+  {
+   "famille": "partage",
+   "difficulte": 1,
+   "graine": 2,
+   "enonce": "Camille range 42 abricots dans 6 boîtes, avec autant d'abricots dans chaque boîte. Combien d'abricots y a-t-il dans chaque boîte ?",
+   "etapes": [
+    "42 ÷ 6 = 7"
+   ],
+   "reponse": 7
+  },
+  {
+   "famille": "partage",
+   "difficulte": 1,
+   "graine": 3,
+   "enonce": "Adam range 10 autocollants dans 2 boîtes, avec autant d'autocollants dans chaque boîte. Combien d'autocollants y a-t-il dans chaque boîte ?",
+   "etapes": [
+    "10 ÷ 2 = 5"
+   ],
+   "reponse": 5
+  },
+  {
+   "famille": "partage",
+   "difficulte": 1,
+   "graine": 4,
+   "enonce": "Enzo a 50 billes. Il les partage en parts égales entre 2 amis. Combien de billes reçoit chaque ami ?",
+   "etapes": [
+    "50 ÷ 2 = 25"
+   ],
+   "reponse": 25
+  },
+  {
+   "famille": "partage",
+   "difficulte": 2,
+   "graine": 0,
+   "enonce": "Camille range 73 autocollants dans une boîte et 23 dans une autre. Elle répartit ensuite le tout dans 4 sacs, avec autant d'autocollants dans chaque sac. Combien d'autocollants y a-t-il dans chaque sac ?",
+   "etapes": [
+    "73 + 23 = 96",
+    "96 ÷ 4 = 24"
+   ],
+   "reponse": 24
+  },
+  {
+   "famille": "partage",
+   "difficulte": 2,
+   "graine": 1,
+   "enonce": "Léa a 1 fleur. Elle en reçoit 44 de plus, puis elle partage le tout en parts égales entre 3 amis. Combien de fleurs reçoit chaque ami ?",
+   "etapes": [
+    "1 + 44 = 45",
+    "45 ÷ 3 = 15"
+   ],
+   "reponse": 15
+  },
+  {
+   "famille": "partage",
+   "difficulte": 2,
+   "graine": 2,
+   "enonce": "Camille range 6 abricots dans une boîte et 18 dans une autre. Elle répartit ensuite le tout dans 6 sacs, avec autant d'abricots dans chaque sac. Combien d'abricots y a-t-il dans chaque sac ?",
+   "etapes": [
+    "6 + 18 = 24",
+    "24 ÷ 6 = 4"
+   ],
+   "reponse": 4
+  },
+  {
+   "famille": "partage",
+   "difficulte": 2,
+   "graine": 3,
+   "enonce": "Adam a 34 autocollants. Il en reçoit 26 de plus, puis il partage le tout en parts égales entre 2 amis. Combien d'autocollants reçoit chaque ami ?",
+   "etapes": [
+    "34 + 26 = 60",
+    "60 ÷ 2 = 30"
+   ],
+   "reponse": 30
+  },
+  {
+   "famille": "partage",
+   "difficulte": 2,
+   "graine": 4,
+   "enonce": "Enzo range 21 billes dans une boîte et 7 dans une autre. Il répartit ensuite le tout dans 2 sacs, avec autant de billes dans chaque sac. Combien de billes y a-t-il dans chaque sac ?",
+   "etapes": [
+    "21 + 7 = 28",
+    "28 ÷ 2 = 14"
+   ],
+   "reponse": 14
+  },
+  {
+   "famille": "achats",
+   "difficulte": 2,
+   "graine": 0,
+   "enonce": "Camille achète 3 autocollants à 3 euros pièce. Elle paie avec un billet de 10 euros. Combien d'euros Camille reçoit-elle en monnaie ?",
+   "etapes": [
+    "3 × 3 = 9",
+    "10 − 9 = 1"
+   ],
+   "reponse": 1
+  },
+  {
+   "famille": "achats",
+   "difficulte": 2,
+   "graine": 1,
+   "enonce": "Léa achète 2 fleurs à 3 euros pièce et un stylo à 3 euros. Combien Léa paie-t-elle en tout ?",
+   "etapes": [
+    "2 × 3 = 6",
+    "6 + 3 = 9"
+   ],
+   "reponse": 9
+  },
+  {
+   "famille": "achats",
+   "difficulte": 2,
+   "graine": 2,
+   "enonce": "Camille achète 7 abricots à 3 euros pièce. Elle paie avec un billet de 50 euros. Combien d'euros Camille reçoit-elle en monnaie ?",
+   "etapes": [
+    "7 × 3 = 21",
+    "50 − 21 = 29"
+   ],
+   "reponse": 29
+  },
+  {
+   "famille": "achats",
+   "difficulte": 2,
+   "graine": 3,
+   "enonce": "Adam achète 5 autocollants à 2 euros pièce et une pomme à 2 euros. Combien Adam paie-t-il en tout ?",
+   "etapes": [
+    "5 × 2 = 10",
+    "10 + 2 = 12"
+   ],
+   "reponse": 12
+  },
+  {
+   "famille": "achats",
+   "difficulte": 2,
+   "graine": 4,
+   "enonce": "Enzo achète 9 billes à 1 euro pièce. Il paie avec un billet de 10 euros. Combien d'euros Enzo reçoit-il en monnaie ?",
+   "etapes": [
+    "9 × 1 = 9",
+    "10 − 9 = 1"
+   ],
+   "reponse": 1
+  },
+  {
+   "famille": "achats",
+   "difficulte": 3,
+   "graine": 0,
+   "enonce": "Camille achète 3 autocollants à 3 euros pièce et 3 chaussettes à 6 euros pièce. Combien Camille paie-t-elle en tout ?",
+   "etapes": [
+    "3 × 3 = 9",
+    "3 × 6 = 18",
+    "9 + 18 = 27"
+   ],
+   "reponse": 27
+  },
+  {
+   "famille": "achats",
+   "difficulte": 3,
+   "graine": 1,
+   "enonce": "Léa achète 2 fleurs à 3 euros pièce et 2 stylos à 3 euros pièce. Combien Léa paie-t-elle en tout ?",
+   "etapes": [
+    "2 × 3 = 6",
+    "2 × 3 = 6",
+    "6 + 6 = 12"
+   ],
+   "reponse": 12
+  },
+  {
+   "famille": "achats",
+   "difficulte": 3,
+   "graine": 2,
+   "enonce": "Camille achète 7 abricots à 3 euros pièce et 5 chaussettes à 7 euros pièce. Combien Camille paie-t-elle en tout ?",
+   "etapes": [
+    "7 × 3 = 21",
+    "5 × 7 = 35",
+    "21 + 35 = 56"
+   ],
+   "reponse": 56
+  },
+  {
+   "famille": "achats",
+   "difficulte": 3,
+   "graine": 3,
+   "enonce": "Adam achète 5 autocollants à 2 euros pièce et 8 pommes à 2 euros pièce. Combien Adam paie-t-il en tout ?",
+   "etapes": [
+    "5 × 2 = 10",
+    "8 × 2 = 16",
+    "10 + 16 = 26"
+   ],
+   "reponse": 26
+  },
+  {
+   "famille": "achats",
+   "difficulte": 3,
+   "graine": 4,
+   "enonce": "Enzo achète 9 billes à 1 euro pièce et 3 gommes à 3 euros pièce. Combien Enzo paie-t-il en tout ?",
+   "etapes": [
+    "9 × 1 = 9",
+    "3 × 3 = 9",
+    "9 + 9 = 18"
+   ],
+   "reponse": 18
+  },
+  {
+   "famille": "ages",
+   "difficulte": 2,
+   "graine": 0,
+   "enonce": "Camille a 49 ans. Emma a 3 ans de moins que Camille. Quel âge avait Emma il y a 6 ans ?",
+   "etapes": [
+    "49 − 3 = 46",
+    "46 − 6 = 40"
+   ],
+   "reponse": 40
+  },
+  {
+   "famille": "ages",
+   "difficulte": 2,
+   "graine": 1,
+   "enonce": "Léa a 42 ans. Arthur a 8 ans de plus que Léa. Quel âge aura Arthur dans 10 ans ?",
+   "etapes": [
+    "42 + 8 = 50",
+    "50 + 10 = 60"
+   ],
+   "reponse": 60
+  },
+  {
+   "famille": "ages",
+   "difficulte": 2,
+   "graine": 2,
+   "enonce": "Camille a 21 ans. Adam a 3 ans de moins que Camille. Quel âge avait Adam il y a 9 ans ?",
+   "etapes": [
+    "21 − 3 = 18",
+    "18 − 9 = 9"
+   ],
+   "reponse": 9
+  },
+  {
+   "famille": "ages",
+   "difficulte": 2,
+   "graine": 3,
+   "enonce": "Adam a 59 ans. Hugo a 2 ans de moins qu'Adam. Quel âge aura Hugo dans 5 ans ?",
+   "etapes": [
+    "59 − 2 = 57",
+    "57 + 5 = 62"
+   ],
+   "reponse": 62
+  },
+  {
+   "famille": "ages",
+   "difficulte": 2,
+   "graine": 4,
+   "enonce": "Enzo a 19 ans. Sarah a 3 ans de moins qu'Enzo. Quel âge avait Sarah il y a 1 an ?",
+   "etapes": [
+    "19 − 3 = 16",
+    "16 − 1 = 15"
+   ],
+   "reponse": 15
+  },
+  {
+   "famille": "ages",
+   "difficulte": 3,
+   "graine": 0,
+   "enonce": "Camille a 24 ans. Emma a 3 ans de plus que Camille, et Nathan a 8 ans de moins qu'Emma. Quel âge avait Nathan il y a 9 ans ?",
+   "etapes": [
+    "24 + 3 = 27",
+    "27 − 8 = 19",
+    "19 − 9 = 10"
+   ],
+   "reponse": 10
+  },
+  {
+   "famille": "ages",
+   "difficulte": 3,
+   "graine": 1,
+   "enonce": "Léa a 23 ans. Arthur a 8 ans de plus que Léa, et Chloé a 8 ans de moins qu'Arthur. Quel âge avait Chloé il y a 8 ans ?",
+   "etapes": [
+    "23 + 8 = 31",
+    "31 − 8 = 23",
+    "23 − 8 = 15"
+   ],
+   "reponse": 15
+  },
+  {
+   "famille": "ages",
+   "difficulte": 3,
+   "graine": 2,
+   "enonce": "Camille a 30 ans. Adam a 3 ans de plus que Camille, et Inès a 5 ans de moins qu'Adam. Quel âge aura Inès dans 8 ans ?",
+   "etapes": [
+    "30 + 3 = 33",
+    "33 − 5 = 28",
+    "28 + 8 = 36"
+   ],
+   "reponse": 36
+  },
+  {
+   "famille": "ages",
+   "difficulte": 3,
+   "graine": 3,
+   "enonce": "Adam a 34 ans. Hugo a 2 ans de plus qu'Adam, et Jules a 1 an de moins qu'Hugo. Quel âge aura Jules dans 5 ans ?",
+   "etapes": [
+    "34 + 2 = 36",
+    "36 − 1 = 35",
+    "35 + 5 = 40"
+   ],
+   "reponse": 40
+  },
+  {
+   "famille": "ages",
+   "difficulte": 3,
+   "graine": 4,
+   "enonce": "Enzo a 48 ans. Sarah a 3 ans de plus qu'Enzo, et Inès a 5 ans de moins que Sarah. Quel âge aura Inès dans 2 ans ?",
+   "etapes": [
+    "48 + 3 = 51",
+    "51 − 5 = 46",
+    "46 + 2 = 48"
+   ],
+   "reponse": 48
+  }
+ ],
+ "problemes_reserves": [
+  {
+   "famille": "addition",
+   "difficulte": 1,
+   "graine": 1000000,
+   "enonce": "Océane a 13 jouets. Elle en reçoit 90 de plus. Combien de jouets Océane a-t-elle en tout ?",
+   "etapes": [
+    "13 + 90 = 103"
+   ],
+   "reponse": 103
+  },
+  {
+   "famille": "addition",
+   "difficulte": 1,
+   "graine": 5000000,
+   "enonce": "Zoé met 49 bougies dans une boîte et 14 dans un sac. Combien y a-t-il de bougies en tout ?",
+   "etapes": [
+    "49 + 14 = 63"
+   ],
+   "reponse": 63
+  },
+  {
+   "famille": "addition",
+   "difficulte": 2,
+   "graine": 1000000,
+   "enonce": "Océane a 13 jouets. Elle en reçoit 90, puis 60. Combien de jouets Océane a-t-elle en tout ?",
+   "etapes": [
+    "13 + 90 = 103",
+    "103 + 60 = 163"
+   ],
+   "reponse": 163
+  },
+  {
+   "famille": "addition",
+   "difficulte": 2,
+   "graine": 5000000,
+   "enonce": "Zoé a 49 bougies. Elle en reçoit 14, puis 39. Combien de bougies Zoé a-t-elle en tout ?",
+   "etapes": [
+    "49 + 14 = 63",
+    "63 + 39 = 102"
+   ],
+   "reponse": 102
+  },
+  {
+   "famille": "addition",
+   "difficulte": 3,
+   "graine": 1000000,
+   "enonce": "Océane met 13 jouets dans une boîte, 90 dans un sac, 60 dans un panier et 64 dans un carton. Combien y a-t-il de jouets en tout ?",
+   "etapes": [
+    "13 + 90 = 103",
+    "103 + 60 = 163",
+    "163 + 64 = 227"
+   ],
+   "reponse": 227
+  },
+  {
+   "famille": "addition",
+   "difficulte": 3,
+   "graine": 5000000,
+   "enonce": "Zoé a 49 bougies. Elle en reçoit 14, puis 39, puis 56. Combien de bougies Zoé a-t-elle en tout ?",
+   "etapes": [
+    "49 + 14 = 63",
+    "63 + 39 = 102",
+    "102 + 56 = 158"
+   ],
+   "reponse": 158
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 1,
+   "graine": 1000000,
+   "enonce": "Océane a 83 jouets. Elle en donne 49. Combien de jouets Océane a-t-elle maintenant ?",
+   "etapes": [
+    "83 − 49 = 34"
+   ],
+   "reponse": 34
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 1,
+   "graine": 5000000,
+   "enonce": "Dans une boîte, il y a 99 bougies. Zoé en prend 62. Combien en reste-t-il dans la boîte ?",
+   "etapes": [
+    "99 − 62 = 37"
+   ],
+   "reponse": 37
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 2,
+   "graine": 1000000,
+   "enonce": "Océane a 108 jouets. Elle en donne 32, puis 16. Combien de jouets Océane a-t-elle maintenant ?",
+   "etapes": [
+    "108 − 32 = 76",
+    "76 − 16 = 60"
+   ],
+   "reponse": 60
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 2,
+   "graine": 5000000,
+   "enonce": "Zoé a 112 bougies. Elle en donne 33, puis 40. Combien de bougies Zoé a-t-elle maintenant ?",
+   "etapes": [
+    "112 − 33 = 79",
+    "79 − 40 = 39"
+   ],
+   "reponse": 39
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 3,
+   "graine": 1000000,
+   "enonce": "Dans une boîte, il y a 160 jouets. Océane en prend 32, puis 16, puis 48. Combien en reste-t-il dans la boîte ?",
+   "etapes": [
+    "160 − 32 = 128",
+    "128 − 16 = 112",
+    "112 − 48 = 64"
+   ],
+   "reponse": 64
+  },
+  {
+   "famille": "soustraction",
+   "difficulte": 3,
+   "graine": 5000000,
+   "enonce": "Zoé a 162 bougies. Elle en donne 33, puis 40, puis 33. Combien de bougies Zoé a-t-elle maintenant ?",
+   "etapes": [
+    "162 − 33 = 129",
+    "129 − 40 = 89",
+    "89 − 33 = 56"
+   ],
+   "reponse": 56
+  },
+  {
+   "famille": "multiplication",
+   "difficulte": 1,
+   "graine": 1000000,
+   "enonce": "Océane a 9 boîtes de 90 jouets chacune. Combien de jouets Océane a-t-elle en tout ?",
+   "etapes": [
+    "9 × 90 = 810"
+   ],
+   "reponse": 810
+  },
+  {
+   "famille": "multiplication",
+   "difficulte": 1,
+   "graine": 5000000,
+   "enonce": "Zoé remplit 9 sacs avec 14 bougies dans chaque sac. Combien de bougies Zoé a-t-elle en tout ?",
+   "etapes": [
+    "9 × 14 = 126"
+   ],
+   "reponse": 126
+  },
+  {
+   "famille": "multiplication",
+   "difficulte": 2,
+   "graine": 1000000,
+   "enonce": "Océane a 9 boîtes de 90 jouets chacune. Elle en ajoute encore 11. Combien de jouets Océane a-t-elle maintenant ?",
+   "etapes": [
+    "9 × 90 = 810",
+    "810 + 11 = 821"
+   ],
+   "reponse": 821
+  },
+  {
+   "famille": "multiplication",
+   "difficulte": 2,
+   "graine": 5000000,
+   "enonce": "Zoé remplit 9 sacs avec 14 bougies dans chaque sac. Elle en ajoute encore 22. Combien de bougies Zoé a-t-elle maintenant ?",
+   "etapes": [
+    "9 × 14 = 126",
+    "126 + 22 = 148"
+   ],
+   "reponse": 148
+  },
+  {
+   "famille": "partage",
+   "difficulte": 1,
+   "graine": 1000000,
+   "enonce": "Océane a 36 jouets. Elle les partage en parts égales entre 9 amis. Combien de jouets reçoit chaque ami ?",
+   "etapes": [
+    "36 ÷ 9 = 4"
+   ],
+   "reponse": 4
+  },
+  {
+   "famille": "partage",
+   "difficulte": 1,
+   "graine": 5000000,
+   "enonce": "Zoé range 54 bougies dans 9 boîtes, avec autant de bougies dans chaque boîte. Combien de bougies y a-t-il dans chaque boîte ?",
+   "etapes": [
+    "54 ÷ 9 = 6"
+   ],
+   "reponse": 6
+  },
+  {
+   "famille": "partage",
+   "difficulte": 2,
+   "graine": 1000000,
+   "enonce": "Océane a 139 jouets. Elle en reçoit 14 de plus, puis elle partage le tout en parts égales entre 9 amis. Combien de jouets reçoit chaque ami ?",
+   "etapes": [
+    "139 + 14 = 153",
+    "153 ÷ 9 = 17"
+   ],
+   "reponse": 17
+  },
+  {
+   "famille": "partage",
+   "difficulte": 2,
+   "graine": 5000000,
+   "enonce": "Zoé a 38 bougies. Elle en reçoit 25 de plus, puis elle partage le tout en parts égales entre 9 amis. Combien de bougies reçoit chaque ami ?",
+   "etapes": [
+    "38 + 25 = 63",
+    "63 ÷ 9 = 7"
+   ],
+   "reponse": 7
+  },
+  {
+   "famille": "achats",
+   "difficulte": 2,
+   "graine": 1000000,
+   "enonce": "Océane achète 4 jouets à 19 euros pièce et un cahier à 3 euros. Combien Océane paie-t-elle en tout ?",
+   "etapes": [
+    "4 × 19 = 76",
+    "76 + 3 = 79"
+   ],
+   "reponse": 79
+  },
+  {
+   "famille": "achats",
+   "difficulte": 2,
+   "graine": 5000000,
+   "enonce": "Zoé achète 6 bougies à 6 euros pièce et un autocollant à 1 euro. Combien Zoé paie-t-elle en tout ?",
+   "etapes": [
+    "6 × 6 = 36",
+    "36 + 1 = 37"
+   ],
+   "reponse": 37
+  },
+  {
+   "famille": "achats",
+   "difficulte": 3,
+   "graine": 1000000,
+   "enonce": "Océane achète 4 jouets à 19 euros pièce et 6 cahiers à 3 euros pièce. Combien Océane paie-t-elle en tout ?",
+   "etapes": [
+    "4 × 19 = 76",
+    "6 × 3 = 18",
+    "76 + 18 = 94"
+   ],
+   "reponse": 94
+  },
+  {
+   "famille": "achats",
+   "difficulte": 3,
+   "graine": 5000000,
+   "enonce": "Zoé achète 6 bougies à 6 euros pièce et 8 autocollants à 1 euro pièce. Combien Zoé paie-t-elle en tout ?",
+   "etapes": [
+    "6 × 6 = 36",
+    "8 × 1 = 8",
+    "36 + 8 = 44"
+   ],
+   "reponse": 44
+  },
+  {
+   "famille": "ages",
+   "difficulte": 2,
+   "graine": 1000000,
+   "enonce": "Océane a 40 ans. Éva a 6 ans de plus qu'Océane. Quel âge aura Éva dans 2 ans ?",
+   "etapes": [
+    "40 + 6 = 46",
+    "46 + 2 = 48"
+   ],
+   "reponse": 48
+  },
+  {
+   "famille": "ages",
+   "difficulte": 2,
+   "graine": 5000000,
+   "enonce": "Zoé a 36 ans. Paul a 3 ans de plus que Zoé. Quel âge aura Paul dans 3 ans ?",
+   "etapes": [
+    "36 + 3 = 39",
+    "39 + 3 = 42"
+   ],
+   "reponse": 42
+  },
+  {
+   "famille": "ages",
+   "difficulte": 3,
+   "graine": 1000000,
+   "enonce": "Océane a 55 ans. Éva a 6 ans de plus qu'Océane, et Gabriel a 1 an de moins qu'Éva. Quel âge avait Gabriel il y a 10 ans ?",
+   "etapes": [
+    "55 + 6 = 61",
+    "61 − 1 = 60",
+    "60 − 10 = 50"
+   ],
+   "reponse": 50
+  },
+  {
+   "famille": "ages",
+   "difficulte": 3,
+   "graine": 5000000,
+   "enonce": "Zoé a 25 ans. Paul a 3 ans de plus que Zoé, et Louise a 2 ans de moins que Paul. Quel âge aura Louise dans 2 ans ?",
+   "etapes": [
+    "25 + 3 = 28",
+    "28 − 2 = 26",
+    "26 + 2 = 28"
+   ],
+   "reponse": 28
+  }
+ ],
+ "nombres": [
+  {
+   "texte": "",
+   "lu": null,
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "rien",
+   "lu": null,
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "La réponse est 84.",
+   "lu": "84",
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "La réponse est 84",
+   "lu": "84",
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "3 puis 7",
+   "lu": "7",
+   "verdicts": [
+    {
+     "attendu": 7,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 7,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "12 fois 7 font 84, donc 84.",
+   "lu": "84",
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "x = 1 234 567",
+   "lu": "1234567",
+   "verdicts": [
+    {
+     "attendu": 1234567,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 1234567,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "1 234 567",
+   "lu": "1234567",
+   "verdicts": [
+    {
+     "attendu": 1234567,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 1234567,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "1 234",
+   "lu": "1234",
+   "verdicts": [
+    {
+     "attendu": 1234,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 1234,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "12 3456",
+   "lu": "3456",
+   "verdicts": [
+    {
+     "attendu": 3456,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3456,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "12 345",
+   "lu": "12345",
+   "verdicts": [
+    {
+     "attendu": 12345,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 12345,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "1 2 3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "1 234 56",
+   "lu": "56",
+   "verdicts": [
+    {
+     "attendu": 56,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 56,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "1 2345",
+   "lu": "2345",
+   "verdicts": [
+    {
+     "attendu": 2345,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 2345,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "12,5",
+   "lu": "25/2",
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "12,50",
+   "lu": "25/2",
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "3.5",
+   "lu": "7/2",
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "1.234",
+   "lu": "617/500",
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "0,125",
+   "lu": "1/8",
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "3, puis 4",
+   "lu": "4",
+   "verdicts": [
+    {
+     "attendu": 4,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 4,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "3,",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "4.",
+   "lu": "4",
+   "verdicts": [
+    {
+     "attendu": 4,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 4,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "-3",
+   "lu": "-3",
+   "verdicts": [
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "−3",
+   "lu": "-3",
+   "verdicts": [
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "x = -4",
+   "lu": "-4",
+   "verdicts": [
+    {
+     "attendu": -4,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": -4,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "5-3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "5 - 3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "5 − 3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "a-3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "a−3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "é-3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "_-3",
+   "lu": "-3",
+   "verdicts": [
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "_3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "3-",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "-0",
+   "lu": "0",
+   "verdicts": [
+    {
+     "attendu": 0,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 0,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "-0,0",
+   "lu": "0",
+   "verdicts": [
+    {
+     "attendu": 0,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 0,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "--3",
+   "lu": "-3",
+   "verdicts": [
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "-−3",
+   "lu": "-3",
+   "verdicts": [
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "7−3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "(-3)",
+   "lu": "-3",
+   "verdicts": [
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "−3,5",
+   "lu": "-7/2",
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "trois",
+   "lu": null,
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "La réponse est 1 000 000 000 000 000 000 000 000 000 001.",
+   "lu": "1000000000000000000000000000001",
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "007",
+   "lu": "7",
+   "verdicts": [
+    {
+     "attendu": 7,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 7,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "0 1",
+   "lu": "1",
+   "verdicts": [
+    {
+     "attendu": 1,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 1,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "٣",
+   "lu": null,
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "12٣",
+   "lu": "12",
+   "verdicts": [
+    {
+     "attendu": 12,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 12,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "３4",
+   "lu": "4",
+   "verdicts": [
+    {
+     "attendu": 4,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 4,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "5３",
+   "lu": "5",
+   "verdicts": [
+    {
+     "attendu": 5,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 5,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "𝒜-3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "𝒜-3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "3²-3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "Ⅷ-3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "á-3",
+   "lu": "-3",
+   "verdicts": [
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "-́3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "1,2,3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "1.2.3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "1,2.3",
+   "lu": "3",
+   "verdicts": [
+    {
+     "attendu": 3,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 3,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "12 345,67",
+   "lu": "1234567/100",
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "12 345.67 euros",
+   "lu": "1234567/100",
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "Il y a 3 pommes et 4 poires, soit 7 fruits.",
+   "lu": "7",
+   "verdicts": [
+    {
+     "attendu": 7,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 7,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "7\n8",
+   "lu": "8",
+   "verdicts": [
+    {
+     "attendu": 8,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 8,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "\n  42  \n",
+   "lu": "42",
+   "verdicts": [
+    {
+     "attendu": 42,
+     "terminee": true,
+     "juste": true
+    },
+    {
+     "attendu": 42,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  },
+  {
+   "texte": "a9999999999999999999999999999999999999999",
+   "lu": "9999999999999999999999999999999999999999",
+   "verdicts": [
+    {
+     "attendu": 84,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": 84,
+     "terminee": false,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": true,
+     "juste": false
+    },
+    {
+     "attendu": -3,
+     "terminee": false,
+     "juste": false
+    }
+   ]
+  }
+ ],
+ "avantages": [
+  {
+   "recompenses": [
+    1.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "avantages": [
+    0.5,
+    -0.5,
+    -0.5,
+    0.5
+   ]
+  },
+  {
+   "recompenses": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "avantages": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "recompenses": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "avantages": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "recompenses": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "avantages": [
+    0.875,
+    -0.125,
+    -0.125,
+    -0.125,
+    -0.125,
+    -0.125,
+    -0.125,
+    -0.125
+   ]
+  },
+  {
+   "recompenses": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    0.0
+   ],
+   "avantages": [
+    0.125,
+    0.125,
+    0.125,
+    0.125,
+    0.125,
+    0.125,
+    0.125,
+    -0.875
+   ]
+  },
+  {
+   "recompenses": [
+    0.0,
+    1.0
+   ],
+   "avantages": [
+    -0.5,
+    0.5
+   ]
+  },
+  {
+   "recompenses": [
+    0.5,
+    0.25,
+    0.75
+   ],
+   "avantages": [
+    0.0,
+    -0.25,
+    0.25
+   ]
+  },
+  {
+   "recompenses": [
+    0.1,
+    0.2,
+    0.3,
+    0.4
+   ],
+   "avantages": [
+    -0.15,
+    -0.04999999999999999,
+    0.04999999999999999,
+    0.15000000000000002
+   ]
+  },
+  {
+   "recompenses": [
+    1.0
+   ],
+   "avantages": [
+    0.0
+   ]
+  },
+  {
+   "recompenses": [
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "avantages": [
+    -0.375,
+    0.625,
+    -0.375,
+    0.625,
+    0.625,
+    -0.375,
+    -0.375,
+    0.625,
+    -0.375,
+    -0.375,
+    0.625,
+    -0.375,
+    -0.375,
+    -0.375,
+    -0.375,
+    0.625
+   ]
+  }
+ ],
+ "sans_signal": [
+  {
+   "p": 0.0,
+   "n": 1,
+   "chance": 1.0
+  },
+  {
+   "p": 0.0,
+   "n": 2,
+   "chance": 1.0
+  },
+  {
+   "p": 0.0,
+   "n": 4,
+   "chance": 1.0
+  },
+  {
+   "p": 0.0,
+   "n": 8,
+   "chance": 1.0
+  },
+  {
+   "p": 0.0,
+   "n": 16,
+   "chance": 1.0
+  },
+  {
+   "p": 0.0,
+   "n": 32,
+   "chance": 1.0
+  },
+  {
+   "p": 0.05,
+   "n": 1,
+   "chance": 1.0
+  },
+  {
+   "p": 0.05,
+   "n": 2,
+   "chance": 0.9049999999999999
+  },
+  {
+   "p": 0.05,
+   "n": 4,
+   "chance": 0.8145124999999999
+  },
+  {
+   "p": 0.05,
+   "n": 8,
+   "chance": 0.6634204313281248
+  },
+  {
+   "p": 0.05,
+   "n": 16,
+   "chance": 0.44012666865176525
+  },
+  {
+   "p": 0.05,
+   "n": 32,
+   "chance": 0.1937114844585008
+  },
+  {
+   "p": 0.1,
+   "n": 1,
+   "chance": 1.0
+  },
+  {
+   "p": 0.1,
+   "n": 2,
+   "chance": 0.8200000000000001
+  },
+  {
+   "p": 0.1,
+   "n": 4,
+   "chance": 0.6562000000000001
+  },
+  {
+   "p": 0.1,
+   "n": 8,
+   "chance": 0.43046722000000015
+  },
+  {
+   "p": 0.1,
+   "n": 16,
+   "chance": 0.1853020188851843
+  },
+  {
+   "p": 0.1,
+   "n": 32,
+   "chance": 0.03433683820292516
+  },
+  {
+   "p": 0.25,
+   "n": 1,
+   "chance": 1.0
+  },
+  {
+   "p": 0.25,
+   "n": 2,
+   "chance": 0.625
+  },
+  {
+   "p": 0.25,
+   "n": 4,
+   "chance": 0.3203125
+  },
+  {
+   "p": 0.25,
+   "n": 8,
+   "chance": 0.100128173828125
+  },
+  {
+   "p": 0.25,
+   "n": 16,
+   "chance": 0.01002259599044919
+  },
+  {
+   "p": 0.25,
+   "n": 32,
+   "chance": 0.00010045242572063334
+  },
+  {
+   "p": 0.5,
+   "n": 1,
+   "chance": 1.0
+  },
+  {
+   "p": 0.5,
+   "n": 2,
+   "chance": 0.5
+  },
+  {
+   "p": 0.5,
+   "n": 4,
+   "chance": 0.125
+  },
+  {
+   "p": 0.5,
+   "n": 8,
+   "chance": 0.0078125
+  },
+  {
+   "p": 0.5,
+   "n": 16,
+   "chance": 3.0517578125e-05
+  },
+  {
+   "p": 0.5,
+   "n": 32,
+   "chance": 4.656612873077393e-10
+  },
+  {
+   "p": 0.75,
+   "n": 1,
+   "chance": 1.0
+  },
+  {
+   "p": 0.75,
+   "n": 2,
+   "chance": 0.625
+  },
+  {
+   "p": 0.75,
+   "n": 4,
+   "chance": 0.3203125
+  },
+  {
+   "p": 0.75,
+   "n": 8,
+   "chance": 0.100128173828125
+  },
+  {
+   "p": 0.75,
+   "n": 16,
+   "chance": 0.01002259599044919
+  },
+  {
+   "p": 0.75,
+   "n": 32,
+   "chance": 0.00010045242572063334
+  },
+  {
+   "p": 0.9,
+   "n": 1,
+   "chance": 1.0
+  },
+  {
+   "p": 0.9,
+   "n": 2,
+   "chance": 0.8200000000000001
+  },
+  {
+   "p": 0.9,
+   "n": 4,
+   "chance": 0.6562000000000001
+  },
+  {
+   "p": 0.9,
+   "n": 8,
+   "chance": 0.43046722000000015
+  },
+  {
+   "p": 0.9,
+   "n": 16,
+   "chance": 0.1853020188851843
+  },
+  {
+   "p": 0.9,
+   "n": 32,
+   "chance": 0.03433683820292516
+  },
+  {
+   "p": 0.95,
+   "n": 1,
+   "chance": 1.0
+  },
+  {
+   "p": 0.95,
+   "n": 2,
+   "chance": 0.905
+  },
+  {
+   "p": 0.95,
+   "n": 4,
+   "chance": 0.8145124999999999
+  },
+  {
+   "p": 0.95,
+   "n": 8,
+   "chance": 0.6634204313281248
+  },
+  {
+   "p": 0.95,
+   "n": 16,
+   "chance": 0.44012666865176525
+  },
+  {
+   "p": 0.95,
+   "n": 32,
+   "chance": 0.1937114844585008
+  },
+  {
+   "p": 1.0,
+   "n": 1,
+   "chance": 1.0
+  },
+  {
+   "p": 1.0,
+   "n": 2,
+   "chance": 1.0
+  },
+  {
+   "p": 1.0,
+   "n": 4,
+   "chance": 1.0
+  },
+  {
+   "p": 1.0,
+   "n": 8,
+   "chance": 1.0
+  },
+  {
+   "p": 1.0,
+   "n": 16,
+   "chance": 1.0
+  },
+  {
+   "p": 1.0,
+   "n": 32,
+   "chance": 1.0
+  }
+ ]
+}

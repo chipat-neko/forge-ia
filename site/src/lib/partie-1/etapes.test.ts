@@ -127,6 +127,18 @@ describe('refaire : la commande du projet qui écrit le relevé', () => {
     expect(refaire(FICHIERS_ETAPES['1.8@1.8'])).not.toContain('--reference');
   });
 
+  it('cite le paquet de 1.9 pour ses relevés : rapport, référence, contrôle de départ et courbes du GRPO', () => {
+    expect(refaire(FICHIERS_ETAPES['1.9@1.9'])).toBe(
+      'Relance le relevé, depuis projets/1.9-raisonnement, avec « uv run --extra cpu python -m raisonnement_pas_a_pas resumer --rapport <rapport.json> --json mesures/etape-ton-ia-1.9.json », ou corrige le fichier.',
+    );
+    expect(refaire(FICHIERS_ETAPES['1.5@1.9'])).toContain('resumer --rapport <rapport.json> --reference --json mesures/etape-ton-ia-1.5.json');
+    expect(refaire('projets/1.9-raisonnement/mesures/controle-1.9.json')).toBe(
+      'Relance le relevé, depuis projets/1.9-raisonnement, avec « uv run --extra cpu python -m raisonnement_pas_a_pas controle --sortie <dossier de sortie du grpo> --json mesures/controle-1.9.json », ou corrige le fichier.',
+    );
+    expect(refaire('projets/1.9-raisonnement/mesures/entrainement-grpo-1.9.json')).toContain('raisonnement_pas_a_pas courbes --journal <journal.jsonl>');
+    expect(refaire('projets/1.9-raisonnement/mesures/controle-1.9.json')).not.toContain('alignement_pas_a_pas');
+  });
+
   it('dit « courbes », « paires » ou « balayage » pour les autres relevés de 1.8', () => {
     expect(refaire('projets/1.8-alignement/mesures/entrainement-dpo-1.8.json')).toContain('alignement_pas_a_pas courbes --journal <journal.jsonl> --json mesures/entrainement-dpo-1.8.json');
     expect(refaire('projets/1.8-alignement/mesures/paires-exemples.json')).toContain('alignement_pas_a_pas paires --jeu');
@@ -134,7 +146,7 @@ describe('refaire : la commande du projet qui écrit le relevé', () => {
   });
 
   it('garde le message général pour un projet qui n’a pas encore son paquet', () => {
-    expect(refaire(FICHIERS_ETAPES['1.9@1.9'])).toContain('python -m <paquet du projet> resumer');
+    expect(refaire(FICHIERS_ETAPES['1.10@1.10'])).toContain('python -m <paquet du projet> resumer');
     expect(refaire('projets/essai.json')).toContain('python -m <paquet du projet> resumer');
   });
 
@@ -250,6 +262,46 @@ describe('lireRapportEtape et lireSeries', () => {
         /entrainement-dpo-1\.8\.json.*logps_choisie\[\d\] doit être \[pas, valeur\]/s,
       );
     }
+  });
+
+  it('accepte les points sans valeur quand on les demande : le point garde son pas, sa valeur est null', () => {
+    const fichier = 'projets/1.9-raisonnement/mesures/entrainement-grpo-1.9.json';
+    // Un RL qui diverge : serie() rend un paquet sans aucune valeur finie, que le Python écrit « null ».
+    const contenu = JSON.stringify({
+      recompense_moyenne: [[1.5, 0.25], [3.5, null]],
+      groupes_sans_signal: [[1.5, 0.5], [3.5, 0.5]],
+      reussite_val: [],
+    });
+    expect(lireSeries(fichier, depot({ [fichier]: contenu }), { absents: true })).toStrictEqual({
+      recompense_moyenne: [[1.5, 0.25], [3.5, null]],
+      groupes_sans_signal: [[1.5, 0.5], [3.5, 0.5]],
+      reussite_val: [],
+    });
+    // Sans le demander, un null reste refusé (les courbes de 1.8 n'en ont jamais), et le message dit comment l'accepter.
+    expect(() => lireSeries(fichier, depot({ [fichier]: contenu }))).toThrow(/entrainement-grpo-1\.9\.json.*recompense_moyenne\[1\] doit être \[pas, valeur\]/s);
+    expect(() => lireSeries(fichier, depot({ [fichier]: contenu }), { absents: false })).toThrow(/recompense_moyenne\[1\]/);
+    // Même avec les absents, un pas manquant, des pas qui ne croissent pas ou un texte à la place de la valeur sont refusés.
+    for (const mauvais of [[[null, 1]], [[2, 1], [1, 1]], [[1, 'x']], [[1]], [[1, 2, 3]]]) {
+      expect(() => lireSeries(fichier, depot({ [fichier]: JSON.stringify({ reussite_val: mauvais }) }), { absents: true })).toThrow(
+        /reussite_val\[\d\] doit être \[pas, valeur\].*ou null/s,
+      );
+    }
+  });
+
+  it('signale une clé inattendue au lieu de la laisser de côté', () => {
+    const fichier = 'projets/1.9-raisonnement/mesures/entrainement-grpo-1.9.json';
+    const serie = [[1, 0.5]];
+    expect(() => lireSeries(fichier, depot({ [fichier]: JSON.stringify({ recompense_moyenne: serie, version: 2 }) }))).toThrow(
+      /entrainement-grpo-1\.9\.json.*la clé « version » n’est ni une série de \[pas, valeur\] ni « lance »/s,
+    );
+    expect(() => lireSeries(fichier, depot({ [fichier]: '{"recompense": {"a": 1}}' }), { absents: true })).toThrow(/« recompense »/);
+    expect(() => lireSeries(fichier, depot({ [fichier]: '{"lance": "non"}' }))).toThrow(/« lance » doit être vrai ou faux/);
+    // « lance » est faux : aucune courbe ne l'accompagne.
+    expect(() => lireSeries(fichier, depot({ [fichier]: JSON.stringify({ lance: false, recompense_moyenne: serie }) }))).toThrow(
+      /« lance » est faux, mais le fichier a des séries/,
+    );
+    // Le message dit quel relevé refaire, avec la commande du projet 1.9.
+    expect(() => lireSeries(fichier, depot({ [fichier]: '{"x": 1}' }))).toThrow(/raisonnement_pas_a_pas courbes --journal <journal\.jsonl> --json mesures\/entrainement-grpo-1\.9\.json/);
   });
 });
 
