@@ -85,6 +85,10 @@ def test_notebook_s_execute_de_bout_en_bout_avec_la_correction():
     assert "Le petit GRPO a tourné sur cpu, 20 pas" in sorties
     assert re.search(r"Réglages : modèle de 2 couches et de vecteurs de 32 nombres, affiné \d+ pas ; à chaque pas 8 chiffres × 8 réponses de 4 jetons au plus", sorties)
     assert len(re.findall(r"Elle a monté : (oui|non)\.", sorties)) == 1 and len(re.findall(r"Elle a baissé : (oui|non)\.", sorties)) == 1
+    verdict = re.search(r"La réussite en glouton a (monté|baissé|pas bougé) \(de (\d+) % à (\d+) %\)\.", sorties)
+    assert verdict, "le verdict sur la réussite en glouton manque"
+    avant, apres = int(verdict[2]), int(verdict[3])
+    assert verdict[1] == ("monté" if apres > avant else "baissé" if apres < avant else "pas bougé")
     assert re.search(r"Pas où aucun groupe n’avait de signal .*: \d+ sur 20\.", sorties)
     # La page du site retrouve les mêmes résultats.
     assert re.search(r"\d+ problèmes, \d+ textes, 10 groupes et 54 points de la grille comparés\.", sorties)
@@ -164,3 +168,10 @@ def test_les_reglages_du_petit_grpo_sont_lus_dans_le_code_pas_retapes_dans_le_ca
     prose = "\n".join("".join(c["source"]) for c in brut["cells"] if c["cell_type"] == "markdown")
     assert "pas_de_grpo = 20" in code and "essai_grpo(appareil, pas=pas_de_grpo)" in code and 'resultat["reglages"]' in code
     assert not re.search(r"(?i)\b(huit|vingt|seize)\b|\d+ couches|\d+ nombres", prose)
+
+
+def test_la_prose_distingue_recompense_tiree_et_reussite_en_glouton_et_ne_promet_pas_les_memes_nombres():
+    brut = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+    prose = "\n".join("".join(c["source"]) for c in brut["cells"] if c["cell_type"] == "markdown")
+    assert "température 1" in prose and "la plus probable" in prose and "à mi-chemin" in prose
+    assert "partout les mêmes nombres" not in json.dumps(brut)

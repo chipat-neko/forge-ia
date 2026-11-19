@@ -7,11 +7,10 @@ arrive, un groupe sans signal n'apprend rien. Tout tourne sur le processeur.
 
 import dataclasses
 import math
-from types import SimpleNamespace
 
 import pytest
 import torch
-from forge.entrainement.boucle import ReglagesGRPO
+from forge.entrainement.boucle import ConfigEntrainement, ReglagesGRPO
 from forge.entrainement.methodes import pas_grpo
 from forge.raisonnement import grpo
 from forge.tokenizer import TokenizerOctets
@@ -76,7 +75,10 @@ def test_un_pas_sans_aucun_signal_ne_bouge_pas_les_poids():
     modele = modele_minuscule(graine=3)
     avant = [p.detach().clone() for p in modele.parameters()]
     reglages = ReglagesGRPO(pas=1, **REGLAGES)
-    config = SimpleNamespace(grpo=reglages, graine=0, micro_lot=16, ecretage=1.0)
+    config = ConfigEntrainement(
+        methode="grpo", depart="essai", preset=modele.config, donnees="essai", sortie="essai", micro_lot=16, taux_max=1e-2,
+        echauffement=0, evaluation_tous_pas=1000, appareil="cpu", compiler="non", graine=0, grpo=reglages,
+    )
     optimiseur = torch.optim.AdamW(modele.parameters(), lr=1e-2, weight_decay=0.0)
     mesures = pas_grpo(modele, optimiseur, ChargeurDeChiffres(8), config, 1e-2, CPU, {"tokenizer": TOK}, numero=1)
     assert mesures["recompense_moyenne"] == 0.0 and mesures["groupes_sans_signal"] == 1.0

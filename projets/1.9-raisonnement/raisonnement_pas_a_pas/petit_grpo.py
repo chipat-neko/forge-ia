@@ -16,13 +16,11 @@ Rien n'est réécrit ici que ce que forge n'a pas pour cette tâche : le petit a
 """
 
 import time
-from types import SimpleNamespace
-
 import torch
 import torch.nn.functional as F
 from forge.affinage.jeu import IGNORE
 from forge.conversation.format import Tour, encoder_conversation
-from forge.entrainement.boucle import ReglagesGRPO
+from forge.entrainement.boucle import ConfigEntrainement, ReglagesGRPO
 from forge.entrainement.methodes import pas_grpo
 from forge.modele import ConfigModele, Transformer
 from forge.raisonnement import grpo
@@ -33,7 +31,10 @@ from raisonnement_pas_a_pas.problemes import TOKENIZER
 
 CHIFFRES = tuple(range(10))
 CONTEXTE = 32  # l'invite fait une douzaine de jetons, la réponse en a quatre au plus
-PAS_D_AFFINAGE = 220  # le modèle apprend à copier le chiffre d'un coup, entre 150 et 300 pas : 220 le laisse à mi-chemin
+# Le modèle apprend à copier le chiffre d'un coup, entre 150 et 300 pas. Mesuré (réponses tirées à température 1) :
+# 160 pas, 10 % de réussite ; 220 pas, 28 % ; 300 pas, 88 %. On s'arrête exprès à 220, à mi-chemin : avec 88 %,
+# presque tous les groupes seraient justes (sans signal), avec 10 % presque tous faux.
+PAS_D_AFFINAGE = 220
 TAUX_D_AFFINAGE = 3e-3
 TAUX_DU_GRPO = 3e-3
 REGLAGES = dict(
@@ -124,7 +125,11 @@ def essai_grpo(appareil: str, pas: int = 20) -> dict:
     problemes = [probleme_de_chiffre(c) for c in CHIFFRES]
     reglages = ReglagesGRPO(pas=pas, **REGLAGES)
     reussite_avant = grpo.reussite(modele, tok, problemes, reglages)
-    config = SimpleNamespace(grpo=reglages, graine=0, micro_lot=16, ecretage=1.0)
+    # La vraie configuration de forge, que `pas_grpo` lit : la version de départ n'est pas lue ici (le modèle est déjà en mémoire).
+    config = ConfigEntrainement(
+        methode="grpo", depart="essai", preset=modele.config, donnees="essai", sortie="essai", micro_lot=16, taux_max=TAUX_DU_GRPO,
+        echauffement=0, evaluation_tous_pas=1000, appareil=cible.type, compiler="non", graine=0, grpo=reglages,
+    )
     optimiseur = torch.optim.AdamW(modele.parameters(), lr=TAUX_DU_GRPO, weight_decay=0.0)
     chargeur = ChargeurDeChiffres(reglages.invites_par_pas)
     recompenses, sans_signal = [], []

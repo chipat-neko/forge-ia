@@ -106,7 +106,7 @@ def commande_avantages(options: argparse.Namespace) -> int:
         sans = all(a == 0 for a in avantages)
         print(f"  récompenses {groupe} → avantages {[round(a, 4) for a in avantages]}{' (sans signal)' if sans else ''}")
     if len({len(g) for g in groupes}) > 1:
-        print("Groupes de tailles différentes : la comparaison à forge, qui prend un tableau, est sautée.")
+        print("Groupes de tailles différentes\u202f: la comparaison à forge, qui prend un tableau, est sautée.")
         return 0
     de_forge = grpo.avantages(torch.tensor(groupes, dtype=torch.float64)).tolist()
     egal = all(abs(a - b) <= 1e-12 for groupe, ligne in zip(a_la_main, de_forge, strict=True) for a, b in zip(groupe, ligne, strict=True))
@@ -172,7 +172,7 @@ def commande_controle(options: argparse.Namespace) -> int:
         f"Contrôle de départ{FINE}: {nombre(releve['justes'])} réponses justes sur {nombre(releve['reponses'])} "
         f"({nombre(100 * releve['taux'], 1)}{FINE}%), {nombre(releve['invites'])} problèmes."
     )
-    print("Le RL a un signal : il peut se lancer." if releve["lance"] else "Aucune réponse juste : le RL n'aurait aucun signal, forge ne le lance pas (code de sortie 6).")
+    print("Le RL a un signal\u202f: il peut se lancer." if releve["lance"] else "Aucune réponse juste\u202f: le RL n'aurait aucun signal, forge ne le lance pas (code de sortie 6).")
     if options.json:
         ecrire_json(Path(options.json), releve)
     return 0
@@ -206,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
     probleme = commandes.add_parser("probleme", help="un problème généré, sa trace et sa conversation en jetons")
     probleme.add_argument("famille", help="addition, soustraction, multiplication, partage, achats ou ages")
     probleme.add_argument("difficulte", type=int, help="le nombre d'étapes de calcul (chaque famille a les siennes)")
-    probleme.add_argument("graine", type=int, help="la graine : la même graine, le même problème")
+    probleme.add_argument("graine", type=int, help="la graine\u202f: la même graine, le même problème")
     probleme.add_argument("--json", metavar="FICHIER", help="écrit aussi le problème dans FICHIER (JSON)")
     probleme.set_defaults(fonction=commande_probleme)
     verifie = commandes.add_parser("verifier", help="une réponse est-elle juste ? (le dernier nombre du texte)")
@@ -215,7 +215,7 @@ def main(argv: list[str] | None = None) -> int:
     verifie.add_argument("--coupee", action="store_true", help="la réponse a été coupée par la limite de jetons (jamais juste)")
     verifie.set_defaults(fonction=commande_verifier)
     avantage = commandes.add_parser("avantages", help="l'avantage de chaque réponse de chaque groupe, à la main et dans forge")
-    avantage.add_argument("groupes", nargs="+", metavar="GROUPE", help="les récompenses d'un groupe, séparées par des virgules : 1,0,0,1")
+    avantage.add_argument("groupes", nargs="+", metavar="GROUPE", help="les récompenses d'un groupe, séparées par des virgules\u202f: 1,0,0,1")
     avantage.set_defaults(fonction=commande_avantages)
     signal = commandes.add_parser("signal", help="la chance qu'un groupe de réponses n'apprenne rien")
     signal.add_argument("--p", type=float, required=True, help="la chance qu'une réponse soit juste, de 0 à 1")
