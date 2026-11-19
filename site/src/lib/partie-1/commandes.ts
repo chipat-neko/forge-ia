@@ -144,8 +144,8 @@ export const EVALUATION_SUIVANTS_TON_IA =
 // projets/1.7-conversation/conversation_pas_a_pas/__main__.py ; ces commandes sont celles du README du
 // projet, et fuite et essai écrivent les fichiers de MESURES_PARTIE_1 : commandes.test.ts le vérifie. Le
 // projet utilise PyTorch : ses commandes prennent la version pour le processeur (--extra cpu), qui suffit à
-// tout ce qu'il calcule. Les commandes de forge qui affinent ton IA (AFFINER_1_7…) entrent plus bas, avec la
-// parution du chapitre.
+// tout ce qu'il calcule. Les commandes de forge qui affinent ton IA et la font parler (AFFINER_1_7, AFFINER_1_7_COURT,
+// DISCUTER_1_7) sont plus bas, avec la vague 2.
 
 /** Entrer dans le projet du chapitre 1.7, depuis le dossier où le dépôt a été cloné. */
 export const ALLER_AU_PROJET_1_7 = 'cd forge-ia/projets/1.7-conversation';
@@ -186,6 +186,14 @@ export const ALIGNEMENT_TESTS = 'uv run --extra cpu pytest -q';
 // GRPO_1_9, TRADUIRE_1_10, CODE_1_10) entrent ici avec la parution de leur chapitre, quand le README de
 // forge les contient : commandes.test.ts les cherche telles quelles dans projets/forge/README.md. Avant
 // cela, un brouillon dit la commande en prose, sans bloc.
+
+/** Affiner ton IA 1.5 en ton IA 1.7 (chapitre 1.7, étape 7), sur une carte NVIDIA, depuis projets/forge : le README de forge la donne. */
+export const AFFINER_1_7 = 'uv run --extra gpu python -m forge entrainer --config configs/sft-1.7.toml';
+/** La version courte du même affinage, en une heure environ. */
+export const AFFINER_1_7_COURT = 'uv run --extra gpu python -m forge entrainer --config configs/sft-1.7-court.toml';
+/** Parler à ton IA 1.7, publiée, dans le terminal (chapitre 1.7, étape 10), telle que le README de forge la donne. */
+export const DISCUTER_1_7 =
+  'uv run --extra gpu python -m forge discuter --modele "$env:FORGE_DONNEES\\publications\\ton-ia-1.7" --temperature 0.7';
 
 /**
  * Construire les paires de préférences de ton IA 1.8 : ton IA 1.7 écrit deux réponses par invite, que forge note

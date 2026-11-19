@@ -62,9 +62,14 @@ describe('FICHIERS_ETAPES', () => {
     // L'étape 1.10 est dans le projet 1.10, pas dans le projet 1.1 : « 1.10 » n'est pas pris pour « 1.1 » plus un zéro.
     expect(FICHIERS_ETAPES['1.10@1.10']).toBe('projets/1.10-code/mesures/etape-ton-ia-1.10.json');
     expect(FICHIERS_ETAPES['1.5@1.10']).toBe('projets/1.10-code/mesures/etape-ton-ia-1.5.json');
+    // Les versions de ton IA 1.7 au taux 3e-4, gardées pour comparer (chapitre 1.7, étape 7) : leur taux est dans leur nom.
+    expect(FICHIERS_ETAPES['1.7-3e-4@1.7']).toBe('projets/1.7-conversation/mesures/etape-ton-ia-1.7-3e-4.json');
+    expect(FICHIERS_ETAPES['1.7-court-3e-4@1.7']).toBe('projets/1.7-conversation/mesures/etape-ton-ia-1.7-court-3e-4.json');
     for (const [nom, fichier] of Object.entries(FICHIERS_ETAPES)) {
       const etape = nom.slice(nom.indexOf('@') + 1);
-      expect(fichier, nom).toMatch(new RegExp(`^projets/${etape.replace('.', '\\.')}-[a-z-]+/mesures/etape-ton-ia-[0-9.]+(-court)?\\.json$`));
+      const version = nom.slice(0, nom.indexOf('@'));
+      expect(fichier, nom).toMatch(new RegExp(`^projets/${etape.replace('.', '\\.')}-[a-z-]+/mesures/etape-ton-ia-[0-9.]+(-court)?(-\\de-\\d)?\\.json$`));
+      expect(fichier, nom).toContain(`/etape-ton-ia-${version}.json`);
     }
   });
 
@@ -356,5 +361,8 @@ describe('les lignes du tableau d’une étape', () => {
     expect(nomDeVersion('1.7@1.7')).toBe('Ton IA 1.7');
     expect(nomDeVersion('1.7-court@1.7')).toBe('Version courte');
     expect(nomDeVersion('1.10@1.10')).toBe('Ton IA 1.10');
+    // Un taux dans le nom : il s'écrit en décimales, comme dans le texte des chapitres.
+    expect(nomDeVersion('1.7-3e-4@1.7')).toBe('Ton IA 1.7 à 0,0003');
+    expect(nomDeVersion('1.7-court-3e-4@1.7')).toBe('Version courte à 0,0003');
   });
 });

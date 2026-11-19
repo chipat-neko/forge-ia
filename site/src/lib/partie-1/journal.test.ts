@@ -199,3 +199,31 @@ describe('le relevé de la version d’une heure (ton-ia-mini)', () => {
     expect(c.hasard).toBe(Math.log(32768));
   });
 });
+
+// Les affinages de ton IA 1.7, relevés par `pre_entrainement courbe` dans le projet 1.7 : la version publiée (au taux
+// 1e-4), sa version courte, et l'affinage complet au taux 3e-4, celui où la pause et la reprise ont été faites pour de vrai.
+describe('les relevés des affinages de ton IA 1.7', () => {
+  it('existent, passent la vérification, et disent ce que dit docs/mesures/ton-ia-1.7.md', () => {
+    const publie = lireEntrainement('sft-1.7', RACINE)!;
+    const court = lireEntrainement('sft-1.7-court', RACINE)!;
+    const fort = lireEntrainement('sft-1.7-3e-4', RACINE)!;
+    expect(FICHIERS_ENTRAINEMENT['sft-1.7-3e-4']).toBe('projets/1.7-conversation/mesures/entrainement-sft-1.7-3e-4.json');
+    // 3 338 pas, en une session, 17 091 s de calcul ; perte 2,208 puis 0,798, validation 0,988.
+    expect([publie.resume.pas_faits, publie.resume.pauses, publie.sessions.length]).toStrictEqual([3338, 0, 1]);
+    expect(Math.round(publie.resume.secondes_de_calcul)).toBe(17091);
+    expect([publie.resume.perte_premier_pas, publie.resume.perte_dernier_pas, publie.resume.validation_finale].map((x) => x.toFixed(3))).toStrictEqual([
+      '2.208',
+      '0.798',
+      '0.988',
+    ]);
+    // La courte : 739 pas, d'une traite ; validation 1,160.
+    expect([court.resume.pas_faits, court.sessions.length, court.resume.validation_finale.toFixed(3)]).toStrictEqual([739, 1, '1.160']);
+    // À 3e-4 : trois sessions, deux pauses, aux pas 372 et 1 027 ; validation 0,941.
+    expect(fort.sessions.map((s) => [s.premier_pas, s.dernier_pas, s.fin])).toStrictEqual([
+      [1, 372, 'pause'],
+      [373, 1027, 'pause'],
+      [1028, 3338, 'fin'],
+    ]);
+    expect(fort.resume.validation_finale.toFixed(3)).toBe('0.941');
+  });
+});

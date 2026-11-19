@@ -10,6 +10,8 @@
 //   conversation de référence « avec-systeme » ;
 // - « fuite » : l'écart des logits relevé par le projet sans le masque par document (mesures/fuite.json) ;
 // - « consignes » et « oubli » : les rapports de ton IA 1.7 et de ton IA 1.5 (« 1.7@1.7 », « 1.5@1.7 »).
+// Le balayage du taux d'apprentissage (étape 7) se lit dans mesures/balayage-sft-1.7.json, relevé par le projet dans
+// les journaux des quatre essais.
 // Les paris dont le rapport manque rendent null : la page pose alors data-a-mesurer à leur place. Une phrase
 // du chapitre qui deviendrait fausse arrête la construction (« Exemple devenu faux : … »).
 //
@@ -265,12 +267,76 @@ export function decoderLesIds(ids: readonly number[], racineDepot: string | URL 
   return new TextDecoder('utf-8').decode(tout);
 }
 
+// ---------- Le balayage du taux d'apprentissage ----------
+
+/** Le relevé du balayage du taux de ton IA 1.7, écrit par `balayage` dans le projet 1.7, à partir des journaux des essais. */
+export const FICHIER_BALAYAGE_SFT_17 = 'projets/1.7-conversation/mesures/balayage-sft-1.7.json';
+
+/** Un essai du balayage : son dossier, son taux maximal, son dernier pas, et ses pertes de validation [pas, perte]. */
+export interface EssaiDuBalayage {
+  essai: string;
+  taux_max: number;
+  pas: number;
+  validations: [number, number][];
+}
+
+/** Les essais du balayage, rangés par taux croissant. */
+export interface BalayageDuTaux {
+  releve_le: string;
+  essais: EssaiDuBalayage[];
+}
+
+/** Le relevé du balayage, ou null tant qu'il n'est pas fait. Un relevé au mauvais format arrête la construction. */
+export function lireBalayage(racineDepot: string | URL = '..'): BalayageDuTaux | null {
+  const fichier = FICHIER_BALAYAGE_SFT_17;
+  if (!existsSync(join(enChemin(racineDepot), fichier))) return null;
+  const refaire =
+    'Relance-le, depuis projets/1.7-conversation : uv run --extra cpu python -m conversation_pas_a_pas balayage <dossier d’essai> <dossier d’essai> … --json mesures/balayage-sft-1.7.json.';
+  const b = lireJson(racineDepot, fichier, refaire);
+  const essais = objet(b) ? b.essais : undefined;
+  const bonEssai = (e: unknown) =>
+    objet(e) &&
+    typeof e.essai === 'string' &&
+    fini(e.taux_max) &&
+    e.taux_max > 0 &&
+    Number.isInteger(e.pas) &&
+    Array.isArray(e.validations) &&
+    e.validations.length > 0 &&
+    e.validations.every((v: unknown) => Array.isArray(v) && v.length === 2 && Number.isInteger(v[0]) && fini(v[1]));
+  const valides = Array.isArray(essais) && essais.length > 0 && essais.every(bonEssai);
+  const croissants = valides && (essais as EssaiDuBalayage[]).every((e, i, tous) => i === 0 || tous[i - 1].taux_max < e.taux_max);
+  if (!objet(b) || typeof b.releve_le !== 'string' || !valides || !croissants) {
+    throw new Error(`${fichier}${FINE}: il faut releve_le et des essais (essai, taux_max, pas, validations), par taux croissant. ${refaire}`);
+  }
+  return b as unknown as BalayageDuTaux;
+}
+
+/** L'écart sous lequel deux dernières pertes de validation sont égales : la règle du balayage (docs/mesures/ton-ia-1.7.md). */
+export const EGALITE_DU_BALAYAGE = 0.005;
+
+/**
+ * L'essai que retient la règle du balayage, fixée avant les essais : celui dont la dernière perte de validation est la
+ * plus basse ; en cas d'égalité à 0,005 près, celui du plus petit taux. Rend son rang dans `essais` (par taux croissant).
+ */
+export function retenuDuBalayage(essais: readonly EssaiDuBalayage[]): number {
+  exiger(essais.length > 0, 'le balayage n’a aucun essai');
+  const derniere = (e: EssaiDuBalayage) => e.validations[e.validations.length - 1][1];
+  const meilleure = Math.min(...essais.map(derniere));
+  // Les essais sont par taux croissant : le premier qui égale la meilleure, à 0,005 près, a le plus petit taux.
+  return essais.findIndex((e) => derniere(e) - meilleure <= EGALITE_DU_BALAYAGE);
+}
+
 // ---------- Les réglages des affinages ----------
 
-/** Les deux configurations de l'affinage de ton IA 1.7, dans forge. */
+/**
+ * Les configurations de l'affinage de ton IA 1.7, dans forge : la version publiée et sa version courte, au taux 1e-4,
+ * puis les deux premières, au taux 3e-4, gardées pour comparer.
+ */
 export const FICHIERS_REGLAGES_SFT = Object.freeze({
   'sft-1.7': 'projets/forge/configs/sft-1.7.toml',
   'sft-1.7-court': 'projets/forge/configs/sft-1.7-court.toml',
+  'sft-1.7-3e-4': 'projets/forge/configs/sft-1.7-3e-4.toml',
+  'sft-1.7-court-3e-4': 'projets/forge/configs/sft-1.7-court-3e-4.toml',
 } as const);
 
 /** Les réglages d'un affinage : ceux d'un entraînement, plus sa méthode, sa version de départ et la longueur des rangées. */
@@ -517,19 +583,64 @@ export function choixFuite(racineDepot: string | URL = '..'): Choix[] {
   return TEXTES_FUITE.map((texte, i) => ({ texte, juste: voit ? i === 1 : i === 0 }));
 }
 
-// ---------- Étape 8 : les paris « consignes » et « oubli » ----------
+// ---------- Les paris « consignes » (étape 8) et « oubli » (étape 7) ----------
 
-/** Les tranches du pari « consignes », en part des invites d'IFEval-FR dont toutes les consignes sont respectées. */
-export const TRANCHES_CONSIGNES: readonly Tranche[] = Object.freeze([
-  Object.freeze({ texte: `Moins de 25${FINE}%`, jusqua: 0.25 }),
-  Object.freeze({ texte: `De 25 à 40${FINE}%`, jusqua: 0.4 }),
-  Object.freeze({ texte: `40${FINE}% ou plus`, jusqua: Infinity }),
-]);
+/**
+ * L'écart, en invites d'IFEval-FR, sous lequel deux versions respectent « à peu près autant » de consignes : le même que
+ * SEUIL_IFEVAL_EN_INVITES du chapitre 1.8. Le même modèle, mesuré deux fois, peut changer d'une ou deux invites.
+ */
+export const SEUIL_CONSIGNES_EN_INVITES = 3;
 
-/** Le pari « consignes » : trois tranches de ifeval_fr.invite_stricte de ton IA 1.7. Null sans son rapport. */
+export type SensDesConsignes = 'plus' | 'autant' | 'moins';
+
+/** Les choix du pari « consignes », dans l'ordre. */
+export const TEXTES_CONSIGNES: Readonly<Record<SensDesConsignes, string>> = Object.freeze({
+  plus: 'Plus d’invites que ton IA 1.5',
+  autant: `À peu près autant, à ${SEUIL_CONSIGNES_EN_INVITES - 1} invites près`,
+  moins: 'Moins d’invites que ton IA 1.5',
+});
+
+/** Le nombre d'invites d'IFEval-FR dont toutes les consignes sont respectées : la part du rapport, fois n, arrondie. */
+export function invitesRespectees(ifeval: NombresDeMesure): number {
+  return Math.round(nombreDe(ifeval, 'invite_stricte') * nombreDe(ifeval, 'n'));
+}
+
+/** Les faits du pari « consignes » : IFEval-FR de ton IA 1.5 et de ton IA 1.7, en parts et en invites. Null sans les deux rapports. */
+export function faitsDesConsignes(racineDepot: string | URL = '..'): {
+  avant: number;
+  apres: number;
+  consignesAvant: number;
+  consignesApres: number;
+  invitesAvant: number;
+  invitesApres: number;
+  n: number;
+  sens: SensDesConsignes;
+} | null {
+  const avant = mesure(lireRapportEtape('1.5@1.7', racineDepot), 'ifeval_fr');
+  const apres = mesure(lireRapportEtape('1.7@1.7', racineDepot), 'ifeval_fr');
+  if (avant === null || apres === null) return null;
+  const n = nombreDe(apres, 'n');
+  exiger(nombreDe(avant, 'n') === n, 'ton IA 1.5 et ton IA 1.7 n’ont pas passé IFEval-FR sur le même nombre d’invites');
+  const invitesAvant = invitesRespectees(avant);
+  const invitesApres = invitesRespectees(apres);
+  const ecart = invitesApres - invitesAvant;
+  return {
+    avant: nombreDe(avant, 'invite_stricte'),
+    apres: nombreDe(apres, 'invite_stricte'),
+    consignesAvant: nombreDe(avant, 'consigne_stricte'),
+    consignesApres: nombreDe(apres, 'consigne_stricte'),
+    invitesAvant,
+    invitesApres,
+    n,
+    sens: ecart >= SEUIL_CONSIGNES_EN_INVITES ? 'plus' : ecart <= -SEUIL_CONSIGNES_EN_INVITES ? 'moins' : 'autant',
+  };
+}
+
+/** Le pari « consignes » : ton IA 1.7 respecte-t-elle toutes les consignes de plus d'invites que ton IA 1.5 ? Null sans les deux rapports. */
 export function choixConsignes(racineDepot: string | URL = '..'): Choix[] | null {
-  const ifeval = mesure(lireRapportEtape('1.7@1.7', racineDepot), 'ifeval_fr');
-  return ifeval === null ? null : choixDesTranches(TRANCHES_CONSIGNES, nombreDe(ifeval, 'invite_stricte'));
+  const f = faitsDesConsignes(racineDepot);
+  if (f === null) return null;
+  return (Object.keys(TEXTES_CONSIGNES) as SensDesConsignes[]).map((s) => ({ texte: TEXTES_CONSIGNES[s], juste: s === f.sens }));
 }
 
 /** L'écart des pertes sur le texte du web en deçà duquel elle « ne bouge pas ». */

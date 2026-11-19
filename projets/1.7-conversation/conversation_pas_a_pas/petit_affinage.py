@@ -52,7 +52,11 @@ LOT_DE_JETONS = 1024
 MICRO_LOT = 8
 LOT_D_AFFINAGE = 4  # rangées par pas d'affinage
 TAUX_DU_PRE_ENTRAINEMENT = 1e-3
+# Le taux de l'affinage : trois fois celui du pré-entraînement. Choisi par des essais du 18/11/2026 : à 1e-3, après
+# 80 pas, la perte restait à 4,7 et aucune réponse ne finissait son tour ; à 1e-2, la perte tombait à 1,46, mais les
+# réponses devenaient du bruit. L'essai ne mesure que l'arrêt, pas ce que disent les réponses.
 TAUX_D_AFFINAGE = 3e-3
+RAISON_DU_TAUX = "au taux du pré-entraînement, 80 pas ne lui apprenaient pas à finir son tour"
 JETONS_DE_REPONSE = 48  # au plus : une réponse qui n'a pas fini son tour avant est « coupée »
 MODELE = ConfigModele(dim=64, couches=2, tetes=4, longueur_contexte=CONTEXTE)
 

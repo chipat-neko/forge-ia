@@ -1,23 +1,25 @@
 {
  "version": "ton-ia-1.5",
  "etape": "1.7",
- "releve_le": "2026-11-17",
+ "releve_le": "2026-11-19",
+ "empreinte": "0e89f94133ea47a65e2cd19c111beb24f3ae210c9e332f92c6538a2e22b0d6ea",
  "mesures": {
   "perte_conversation": {
-   "absente": "le jeu d'affinage sft-1.7 n'existait pas encore quand ton-ia-1.5 a été évaluée, le 17/11/2026 (évaluation de l'étape 1.9). Relève-la avec : python -m forge evaluer-etape --etape 1.7"
+   "perte": 2.299964189529419,
+   "n": 64
   },
   "ifeval_fr": {
    "invite_stricte": 0.2170212765957447,
-   "consigne_stricte": 0.3130434782608696,
+   "consigne_stricte": 0.3188405797101449,
    "n": 235
   },
   "tenue": {
    "terminee": 0.0,
-   "fr": 0.9276595744680851,
-   "autre": 0.0,
-   "indetermine": 0.07234042553191489,
-   "mots_moyens": 347.06382978723406,
-   "n": 235
+   "fr": 0.8716417910447761,
+   "autre": 0.0029850746268656717,
+   "indetermine": 0.1253731343283582,
+   "mots_moyens": 320.6925373134328,
+   "n": 335
   },
   "oubli": {
    "perte": 2.346851348876953,

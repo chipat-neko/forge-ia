@@ -1,5 +1,5 @@
 {
- "releve_le": "2026-11-18",
+ "releve_le": "2026-11-19",
  "appareil": "cpu",
  "pas": 80,
  "pertes": [
@@ -175,5 +175,5 @@
  "jetons": 455,
  "jetons_appris": 207,
  "parametres": 2203968,
- "secondes": 39.97
+ "secondes": 44.32
 }

@@ -83,6 +83,9 @@ export const FICHIERS_ENTRAINEMENT = Object.freeze({
   // 1.9 pour sft-1.9, 1.10 pour sft-1.10). Les fichiers viennent avec les tâches de ces projets.
   'sft-1.7': 'projets/1.7-conversation/mesures/entrainement-sft-1.7.json',
   'sft-1.7-court': 'projets/1.7-conversation/mesures/entrainement-sft-1.7-court.json',
+  // Le premier affinage complet de ton IA 1.7, au taux 3e-4, gardé pour comparer : la pause et la reprise y ont été
+  // faites pour de vrai (la version publiée, à 1e-4, a tourné d'une traite).
+  'sft-1.7-3e-4': 'projets/1.7-conversation/mesures/entrainement-sft-1.7-3e-4.json',
   'sft-1.9': 'projets/1.9-raisonnement/mesures/entrainement-sft-1.9.json',
   'sft-1.10': 'projets/1.10-code/mesures/entrainement-sft-1.10.json',
 } as const);

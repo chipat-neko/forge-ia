@@ -22,6 +22,8 @@ import {
   decoderLesIds,
   empaquetagesDeLaFigure,
   exigerSensDeLOubli,
+  faitsDesConsignes,
+  FICHIER_BALAYAGE_SFT_17,
   faitsDeForge,
   faitsDuPariFin,
   faitsDuPariGabarit,
@@ -31,22 +33,25 @@ import {
   lireConversationsDeReference,
   lireEssaiAffinage,
   lireFuite,
+  lireBalayage,
   lireLongueurs,
   lireReglagesSft,
   phraseDeLOubli,
   reponseALInvite,
+  retenuDuBalayage,
   sensDeLOubli,
+  SEUIL_CONSIGNES_EN_INVITES,
   SEUIL_DE_FUITE,
   SEUIL_UN_PEU_OUBLI,
   textesDesJetons,
+  TEXTES_CONSIGNES,
   TOLERANCE_OUBLI,
-  TRANCHES_CONSIGNES,
   TRANCHES_FIN,
 } from './paris-1-7';
+import { SEUIL_IFEVAL_EN_INVITES } from './paris-1-8';
 
 // Vitest est lancé depuis site/ : le dépôt est un dossier plus haut.
 const RACINE = '..';
-const FINE = '\u202F';
 
 const dossiers: string[] = [];
 afterAll(() => dossiers.forEach((d) => rmSync(d, { recursive: true, force: true })));
@@ -147,6 +152,33 @@ describe('les fichiers du projet 1.7', () => {
     expect(court.taux_max).toBe(complet.taux_max);
     expect(court.jetons_total).toBeLessThan(complet.jetons_total);
     expect(Number.isInteger(complet.jetons_total / complet.taille_lot_jetons)).toBe(true);
+    // Les réglages à 3e-4, gardés pour comparer : les mêmes, sauf le taux.
+    const fort = lireReglagesSft('sft-1.7-3e-4', RACINE);
+    const fortCourt = lireReglagesSft('sft-1.7-court-3e-4', RACINE);
+    expect([complet.taux_max, fort.taux_max, fortCourt.taux_max]).toStrictEqual([1e-4, 3e-4, 3e-4]);
+    expect([fort.jetons_total, fortCourt.jetons_total]).toStrictEqual([complet.jetons_total, court.jetons_total]);
+  });
+
+  it('le balayage du taux : null tant qu’il n’est pas relevé ; les essais, rangés par taux', () => {
+    expect(lireBalayage(depot())).toBeNull();
+    const essai = (taux: number, derniere: number) => ({ essai: `e-${taux}`, taux_max: taux, pas: 300, validations: [[100, 2], [300, derniere]] });
+    const racine = depot({ [FICHIER_BALAYAGE_SFT_17]: { releve_le: '2026-11-19', essais: [essai(1e-5, 1.5), essai(1e-4, 1.3)] } });
+    expect(lireBalayage(racine)!.essais.map((e) => e.taux_max)).toStrictEqual([1e-5, 1e-4]);
+    expect(() => lireBalayage(depot({ [FICHIER_BALAYAGE_SFT_17]: { releve_le: '2026-11-19', essais: [{ essai: 'x' }] } }))).toThrow(
+      /balayage-sft-1\.7\.json.*conversation_pas_a_pas balayage/s,
+    );
+    // Le vrai relevé : quatre taux, trois validations chacun.
+    const vrai = lireBalayage(RACINE)!;
+    expect(vrai.essais.map((e) => e.taux_max)).toStrictEqual([1e-5, 3e-5, 1e-4, 3e-4]);
+    expect(vrai.essais.every((e) => e.validations.map(([pas]) => pas).join() === '100,200,300')).toBe(true);
+  });
+
+  it('la règle du balayage : la dernière validation la plus basse ; à 0,005 près, le plus petit taux', () => {
+    const essai = (taux: number, derniere: number) => ({ essai: `e-${taux}`, taux_max: taux, pas: 300, validations: [[300, derniere]] as [number, number][] });
+    expect(retenuDuBalayage([essai(1e-5, 1.5), essai(1e-4, 1.28), essai(3e-4, 1.214)])).toBe(2);
+    expect(retenuDuBalayage([essai(1e-5, 1.5), essai(1e-4, 1.217), essai(3e-4, 1.214)])).toBe(1); // égalité à 0,005 près
+    expect(retenuDuBalayage([essai(1e-5, 1.2), essai(1e-4, 1.28)])).toBe(0);
+    expect(retenuDuBalayage(lireBalayage(RACINE)!.essais)).toBe(3); // 3e-4, comme le dit docs/mesures/ton-ia-1.7.md
   });
 });
 
@@ -196,14 +228,27 @@ describe('les paris du chapitre 1.7', () => {
     expect(juste(choixFuite(sansFuite))).toStrictEqual(['est calculée comme si elle était seule']);
   });
 
-  it('« consignes » : trois tranches de la part des invites respectées par ton IA 1.7, null sans son rapport', () => {
+  it('« consignes » : plus, autant (à 3 invites près) ou moins d’invites respectées que ton IA 1.5 ; null sans les deux rapports', () => {
     expect(choixConsignes(depot())).toBeNull();
-    for (const [part, rang] of [[0.2, 0], [0.3, 1], [0.45, 2]] as const) {
-      const choix = choixConsignes(avantApres({}, { invite: part }));
-      expect(choix!.map((c) => c.texte)).toStrictEqual(TRANCHES_CONSIGNES.map((t) => t.texte));
-      expect(juste(choix), String(part)).toStrictEqual([TRANCHES_CONSIGNES[rang].texte]);
+    expect(choixConsignes(depot({ [FICHIERS_ETAPES['1.7@1.7']]: rapport17('ton-ia-1.7', {}) }))).toBeNull();
+    // Le même seuil que celui du chapitre 1.8 : moins de trois invites d'écart, sur 235, ne départagent personne.
+    expect(SEUIL_CONSIGNES_EN_INVITES).toBe(SEUIL_IFEVAL_EN_INVITES);
+    // Sur 235 invites : ton IA 1.5 en respecte 70 ; ton IA 1.7, de 67 (trois de moins) à 73 (trois de plus).
+    for (const [apres, sens] of [[67, 'moins'], [68, 'autant'], [70, 'autant'], [72, 'autant'], [73, 'plus']] as const) {
+      const racine = avantApres({ invite: 70 / 235 }, { invite: apres / 235 });
+      const choix = choixConsignes(racine);
+      expect(choix!.map((c) => c.texte)).toStrictEqual(Object.values(TEXTES_CONSIGNES));
+      expect(juste(choix), String(apres)).toStrictEqual([TEXTES_CONSIGNES[sens]]);
+      expect(faitsDesConsignes(racine)!.sens).toBe(sens);
     }
-    expect(TRANCHES_CONSIGNES[0].texte).toBe(`Moins de 25${FINE}%`);
+    const f = faitsDesConsignes(avantApres({ invite: 70 / 235 }, { invite: 60 / 235 }))!;
+    expect([f.invitesAvant, f.invitesApres, f.n]).toStrictEqual([70, 60, 235]);
+    // Deux rapports sur des nombres d'invites différents ne se comparent pas en invites.
+    const autreN = depot({
+      [FICHIERS_ETAPES['1.5@1.7']]: rapport17('ton-ia-1.5', {}),
+      [FICHIERS_ETAPES['1.7@1.7']]: { ...rapport17('ton-ia-1.7', {}), mesures: { ...rapport17('ton-ia-1.7', {}).mesures, ifeval_fr: { invite_stricte: 0.3, consigne_stricte: 0.4, n: 200 } } },
+    });
+    expect(() => faitsDesConsignes(autreN)).toThrow(/Exemple devenu faux/);
   });
 
   it('« oubli » : monte, baisse ou ne bouge pas, à 0,01 près ; null sans les deux rapports', () => {

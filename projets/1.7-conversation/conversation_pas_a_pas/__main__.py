@@ -5,15 +5,18 @@
     uv run --extra cpu python -m conversation_pas_a_pas essai --appareil cpu --enregistrer sorties/essai-processeur.txt --json mesures/essai-processeur.json
     uv run --extra cpu python -m conversation_pas_a_pas resumer --rapport <rapport.json> --json mesures/etape-ton-ia-1.7.json
     uv run --extra cpu python -m conversation_pas_a_pas resumer --rapport <rapport.json> --reference --json mesures/etape-ton-ia-1.5.json
+    uv run --extra cpu python -m conversation_pas_a_pas resumer --rapport <rapport.json> --nom ton-ia-1.7-3e-4 --json mesures/etape-ton-ia-1.7-3e-4.json
     uv run --extra cpu python -m conversation_pas_a_pas longueurs --jeu <affinage/sft-1.7> --json mesures/longueurs-sft-1.7.json
+    uv run --extra cpu python -m conversation_pas_a_pas balayage <essai> <essai> … --json mesures/balayage-sft-1.7.json
 
 `montrer` écrit une conversation jeton par jeton : l'identifiant, le texte, le rôle de celui qui parle, et
 si le jeton est une cible apprise (`*`). `fuite` mesure ce que deux conversations d'une même rangée se
 voient quand on ne les sépare pas. `essai` pré-entraîne un modèle minuscule puis l'affine 80 pas sur 24
 conversations. `resumer` tire du `rapport.json` de `python -m forge evaluer-etape` le relevé que le site lit (avec
-`--reference`, celui de la version de référence du rapport), et `longueurs` compte les longueurs des exemples
-d'un jeu d'affinage, en le lisant seulement. Sans carte graphique, `--appareil cuda` dit quoi faire, sans
-trace Python, et rend le code 2\u202f; de même sans PyTorch.
+`--reference`, celui de la version de référence du rapport ; avec `--nom`, sous un autre nom que celui du
+rapport), `longueurs` compte les longueurs des exemples d'un jeu d'affinage, en le lisant seulement, et
+`balayage` relève les pertes de validation des essais du balayage du taux, dans leurs journaux. Sans carte
+graphique, `--appareil cuda` dit quoi faire, sans trace Python, et rend le code 2\u202f; de même sans PyTorch.
 """
 
 import argparse
@@ -32,8 +35,17 @@ try:
     from conversation_pas_a_pas.fuite import CONFIG as CONFIG_DE_LA_FUITE
     from conversation_pas_a_pas.fuite import ecarts_de_fuite
     from conversation_pas_a_pas.gabarit import TOKENIZER, montrer
-    from conversation_pas_a_pas.petit_affinage import CONTEXTE, INVITES, LOT_D_AFFINAGE, MODELE, essai_affinage
-    from conversation_pas_a_pas.resumer import longueurs, resumer_etape
+    from conversation_pas_a_pas.petit_affinage import (
+        CONTEXTE,
+        INVITES,
+        LOT_D_AFFINAGE,
+        MODELE,
+        RAISON_DU_TAUX,
+        TAUX_D_AFFINAGE,
+        TAUX_DU_PRE_ENTRAINEMENT,
+        essai_affinage,
+    )
+    from conversation_pas_a_pas.resumer import balayage, longueurs, resumer_etape
 except ImportError as erreur:  # PyTorch (ou forge) manque : main() le dit, sans trace
     MANQUE: ImportError | None = erreur
 else:
@@ -160,6 +172,8 @@ def lignes_d_essai(r: dict, materiel: str) -> list[str]:
         f"({nombre(r['parametres'])} paramètres, PyTorch {torch.__version__.split('+')[0]})",
         f"  jeu{FINE}: {r['exemples']} conversations en {r['rangees']} rangées, {nombre(r['jetons'])} jetons dont {nombre(r['jetons_appris'])} appris",
         f"  {r['pas']} pas de {LOT_D_AFFINAGE} rangées{FINE}: perte {nombre(r['pertes'][0], 3)} au pas 1, {nombre(r['pertes'][-1], 3)} au pas {r['pas']}",
+        f"  taux d’affinage{FINE}: {taux_en_francais(TAUX_D_AFFINAGE)}, {nombre(TAUX_D_AFFINAGE / TAUX_DU_PRE_ENTRAINEMENT)} fois celui du "
+        f"pré-entraînement ({taux_en_francais(TAUX_DU_PRE_ENTRAINEMENT)}){FINE}; {RAISON_DU_TAUX}",
         f"  réponses aux {len(INVITES)} questions neuves qui finissent par <|fin_tour|>{FINE}: {pourcent(r['fin_de_tour_avant'])} avant, {pourcent(r['fin_de_tour_apres'])} après",
         "  trois réponses, après l'affinage" + FINE + ":",
         *reponses,
@@ -197,13 +211,14 @@ def commande_essai(options: argparse.Namespace) -> int:
 
 def commande_resumer(options: argparse.Namespace) -> int:
     try:
-        releve = resumer_etape(Path(options.rapport), options.reference)
+        releve = resumer_etape(Path(options.rapport), options.reference, options.nom)
     except (FileNotFoundError, ValueError) as erreur:
         print(erreur, file=sys.stderr)
         return 2
     absentes = [nom for nom, m in releve["mesures"].items() if "absente" in m]
+    ancien = f", nommée {releve['nom_au_rapport']} dans le rapport" if "nom_au_rapport" in releve else ""
     print(
-        f"Rapport d’étape de {releve['version']} (étape {releve['etape']}), relevé le {releve['releve_le']}{FINE}: "
+        f"Rapport d’étape de {releve['version']} (étape {releve['etape']}{ancien}), relevé le {releve['releve_le']}{FINE}: "
         f"{len(releve['mesures'])} mesures dont {len(absentes)} absente{'s' if len(absentes) > 1 else ''}, "
         f"{len(releve['echantillons'])} échantillons"
     )
@@ -233,6 +248,26 @@ def commande_longueurs(options: argparse.Namespace) -> int:
     return 0
 
 
+def taux_en_francais(x: float) -> str:
+    """Un taux d'apprentissage écrit en décimales, à la française : 3e-4 donne « 0,0003 »."""
+    return f"{x:.12f}".rstrip("0").replace(".", ",")
+
+
+def commande_balayage(options: argparse.Namespace) -> int:
+    try:
+        releve = balayage([Path(d) for d in options.essais])
+    except (FileNotFoundError, ValueError) as erreur:
+        print(erreur, file=sys.stderr)
+        return 2
+    print(f"Balayage du taux d’apprentissage, {len(releve['essais'])} essais (la perte de validation, en nats par jeton appris){FINE}:")
+    for e in releve["essais"]:
+        mesures = ", ".join(f"{nombre(perte, 3)} au pas {nombre(pas)}" for pas, perte in e["validations"])
+        print(f"  taux {taux_en_francais(e['taux_max'])}{FINE}: validation {mesures}")
+    if options.json:
+        ecrire_json(Path(options.json), releve)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     # Avant argparse, qui écrit lui-même ses messages d'erreur.
     ecrire_en_utf8()
@@ -240,7 +275,7 @@ def main(argv: list[str] | None = None) -> int:
         prog="python -m conversation_pas_a_pas",
         description="Montre une conversation en jetons, mesure la fuite sans masque, fait un petit affinage et résume les mesures du plan 7.",
     )
-    commandes = lecteur.add_subparsers(dest="nom_commande", required=True, metavar="{montrer,fuite,essai,resumer,longueurs}")
+    commandes = lecteur.add_subparsers(dest="nom_commande", required=True, metavar="{montrer,fuite,essai,resumer,longueurs,balayage}")
     montre = commandes.add_parser("montrer", help="une conversation écrite jeton par jeton, avec son masque de perte")
     montre.add_argument("texte", metavar="TEXTE", help="ce que dit l'utilisateur")
     montre.add_argument("--reponse", default="Voilà.", help="la réponse de l'assistant (« Voilà. » par défaut)")
@@ -260,12 +295,17 @@ def main(argv: list[str] | None = None) -> int:
     resume = commandes.add_parser("resumer", help="le relevé du rapport d'étape de forge (evaluer-etape)")
     resume.add_argument("--rapport", required=True, metavar="RAPPORT", help="le rapport.json écrit par `python -m forge evaluer-etape`")
     resume.add_argument("--reference", action="store_true", help="résume la version de référence du rapport (ton-ia-1.5), pas la version évaluée")
+    resume.add_argument("--nom", metavar="VERSION", help="le nom de la version, si le rapport (une archive) en garde un ancien")
     resume.add_argument("--json", metavar="FICHIER", help="écrit aussi le relevé dans FICHIER (JSON)")
     resume.set_defaults(fonction=commande_resumer)
     longueur = commandes.add_parser("longueurs", help="les longueurs des exemples d'un jeu d'affinage, lues dans train/documents.bin")
     longueur.add_argument("--jeu", required=True, metavar="DOSSIER", help="le dossier du jeu (affinage/sft-1.7), lu seulement")
     longueur.add_argument("--json", metavar="FICHIER", help="écrit aussi le relevé dans FICHIER (JSON)")
     longueur.set_defaults(fonction=commande_longueurs)
+    balaie = commandes.add_parser("balayage", help="les pertes de validation des essais du balayage du taux, lues dans leurs journaux")
+    balaie.add_argument("essais", nargs="+", metavar="ESSAI", help="le dossier de sortie d'un essai (entrainements/sft-1.7-balayage-<taux>), lu seulement")
+    balaie.add_argument("--json", metavar="FICHIER", help="écrit aussi le relevé dans FICHIER (JSON)")
+    balaie.set_defaults(fonction=commande_balayage)
     options = lecteur.parse_args(argv)
     if MANQUE is not None:
         print(

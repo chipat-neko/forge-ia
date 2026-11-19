@@ -6,15 +6,15 @@
 // commandes (commandes.ts), des sources (sources-1-7.ts) et du code montré, relu dans les fichiers tels
 // qu'ils sont aujourd'hui. Un parcours, chargé par Node sans Vite, n'importe ni ?raw, ni .json, ni astro:*.
 //
-// Ton IA 1.7 s'entraîne encore : tant que sa Release et ses relevés n'existent pas, ce qui la mesure est « à
-// mesurer » (data-a-mesurer). Ton IA 1.5, la ligne « avant », est mesurée (mesures/etape-ton-ia-1.5.json) :
-// elle se montre déjà.
+// Ton IA 1.7 est publiée (Release ton-ia-1.7) : ses relevés sont dans le projet 1.7 (rapports d'étape des versions
+// 1.5 et 1.7, et des versions courtes et à 3e-4 ; balayage du taux ; courbes des affinages). La page n'a plus aucune
+// valeur « à mesurer » (data-a-mesurer).
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test, expect, type Page } from '@playwright/test';
 import { formaterDate } from '../src/lib/calculateur/formats';
-import { nombre, pourcent } from '../src/lib/nombres';
+import { formaterPerte, nombre, pourcent } from '../src/lib/nombres';
 import { trouverChapitre } from '../src/lib/parcours';
 import { CLONER_DEPOT, METTRE_A_JOUR_DEPOT } from '../src/lib/partie-0/commandes';
 import * as commandes from '../src/lib/partie-1/commandes';
@@ -29,7 +29,8 @@ import {
   texteDuCompte,
   toursDeLAtelier,
 } from '../src/lib/partie-1/atelier-1-7';
-import { celluleDeMesure, FICHIERS_ETAPES, lireRapportEtape } from '../src/lib/partie-1/etapes';
+import { celluleDeMesure, FICHIERS_ETAPES, lireRapportEtape, type NomRapportEtape } from '../src/lib/partie-1/etapes';
+import { lireEntrainement } from '../src/lib/partie-1/journal';
 import { MESURES_PARTIE_1 } from '../src/lib/partie-1/mesures';
 import {
   choixConsignes,
@@ -40,8 +41,10 @@ import {
   choixOubli,
   empaquetagesDeLaFigure,
   exigerSensDeLOubli,
+  lireBalayage,
   lireConversationsDeReference,
   phraseDeLOubli,
+  retenuDuBalayage,
   sensDeLOubli,
 } from '../src/lib/partie-1/paris-1-7';
 import { INSTRUCTGPT, LLAMA_2, LU_LE_1_7, SMOLLM3, SOURCES_DONNEES_1_7, SOURCES_LABO_1_7, TULU_3 } from '../src/lib/partie-1/sources-1-7';
@@ -117,19 +120,19 @@ test('chapitre 1.7 complet, en brouillon : paris, atelier, récapitulatif', asyn
   const nParis = await page.locator('.pari[data-pari]').count();
   expect(etapes).toBe(10);
   expect(await page.locator('.programme').textContent()).toContain(`${etapes} étapes, ${nParis} paris`);
-  // Ton IA 1.7 n'est pas encore mesurée : au moins une valeur « à mesurer ».
-  expect(await page.locator('[data-a-mesurer]').count()).toBeGreaterThanOrEqual(1);
-  // Les paris de ton IA 1.7 attendent ses relevés ; ceux qui sont mesurés sont là.
-  const parisPresents = ['fin', 'gabarit', 'masque', 'fuite', ...(TON_IA_17 ? ['consignes', 'oubli'] : [])];
-  await expect(page.locator('.pari[data-pari]')).toHaveCount(parisPresents.length);
-  for (const id of ['fin', 'gabarit', 'masque', 'fuite']) await page.locator(`[data-pari="${id}"] [data-juste]`).click();
+  // Ton IA 1.7 est mesurée : plus aucune valeur « à mesurer ».
+  await expect(page.locator('[data-a-mesurer]')).toHaveCount(0);
+  // Les six paris, dont ceux de ton IA 1.7.
+  const parisPresents = ['fin', 'gabarit', 'masque', 'fuite', 'oubli', 'consignes'];
+  expect(await page.locator('.pari[data-pari]').evaluateAll((p) => p.map((x) => x.getAttribute('data-pari')))).toStrictEqual(parisPresents);
+  for (const id of parisPresents) await page.locator(`[data-pari="${id}"] [data-juste]`).click();
   // L'atelier s'ouvre au pari « masque » ; son acquis se gagne au premier réglage.
   await expect(page.locator('[data-verrou="atelier"]')).not.toHaveAttribute('inert', '');
   await expect(page.locator('#recap [data-acquis="atelier"]')).toHaveAttribute('data-gagne', 'non');
   await regler(page, 'pensee', false, false);
   await expect(page.locator('#recap [data-acquis="atelier"]')).toHaveAttribute('data-gagne', 'oui');
   const acquis = await page.locator('#recap li[data-acquis]').count();
-  expect(acquis).toBe(TON_IA_17 ? 7 : 5);
+  expect(acquis).toBe(7);
   await expect(page.locator('#recap [data-total]')).toContainText(`${acquis} sur ${acquis}`);
   // Le pied : 1.6 a paru, 1.8 est « à venir » tant qu'il n'a pas paru.
   await verifierVoisin(page, 'precedent', '1-6.mdx', '/forge-ia/partie-1/1-6/');
@@ -139,7 +142,8 @@ test('chapitre 1.7 complet, en brouillon : paris, atelier, récapitulatif', asyn
   await verifierAxe(page);
   await verifierSansDebordement(page);
   await verifierTypographieHorsCode(page.locator('main'), BRUT);
-  expect(await texteHorsCode(page.locator('main'))).not.toMatch(/[{}]/);
+  // Des accolades oubliées du MDX, hors des réponses de ton IA, montrées telles quelles (BRUT) : celle de 1.7 en écrit.
+  expect(await texteHorsCode(page.locator('main'), BRUT)).not.toMatch(/[{}]/);
   expect(await page.locator('main').innerText()).not.toMatch(/NaN|Infinity|undefined|\de\+/);
   const { longueur, ligne } = await plusLongueLigne(page);
   expect(longueur, `ligne la plus longue : « ${ligne} »`).toBeLessThanOrEqual(80);
@@ -211,8 +215,9 @@ test('la figure de l’empaquetage : quatre longueurs, jamais NaN, chaque recalc
   const rang = (longueur: number) => LONGUEURS_DE_RANGEE.indexOf(longueur);
   await expect(nombreJaune).toHaveText(nombre(2048));
   await expect(phrase).toHaveText(phraseDeLEmpaquetage(FIGURE.resultats[rang(2048)]));
-  // Avant le relevé du jeu de ton IA, la figure le dit.
-  if (FIGURE.source === 'reference') await expect(figure).toContainText('liste de référence');
+  // Les longueurs rangées sont celles du jeu de ton IA, relevées par le projet.
+  expect(FIGURE.source).toBe('jeu');
+  await expect(figure).not.toContainText('liste de référence');
   await nombreJaune.focus();
   await page.keyboard.press('Home');
   for (const [i, resultat] of FIGURE.resultats.entries()) {
@@ -235,50 +240,76 @@ test('les choix des paris viennent des fichiers du projet et des rapports', asyn
   await ouvrir(page);
   const lus = async (id: string) => page.locator(`[data-pari="${id}"] [data-choix]`).allTextContents();
   const juste = async (id: string) => page.locator(`[data-pari="${id}"] [data-juste]`).textContent();
-  const attendus = { fin: choixFinDeTour()!, gabarit: choixGabarit(), masque: choixMasque(), fuite: choixFuite() };
+  const attendus = {
+    fin: choixFinDeTour()!,
+    gabarit: choixGabarit(),
+    masque: choixMasque(),
+    fuite: choixFuite(),
+    oubli: choixOubli()!,
+    consignes: choixConsignes()!,
+  };
   for (const [id, choix] of Object.entries(attendus)) {
-    expect((await lus(id)).map((t) => t.replace(/\s+/g, ' ').trim()), id).toStrictEqual(choix.map((c) => c.texte));
-    expect(await juste(id), id).toBe(choix.find((c) => c.juste)!.texte);
+    expect((await lus(id)).map((t) => t.replace(/\s+/g, ' ').trim()), id).toStrictEqual(choix.map((c) => c.texte.replace(/\s+/g, ' ')));
+    expect((await juste(id))?.replace(/\s+/g, ' '), id).toBe(choix.find((c) => c.juste)!.texte.replace(/\s+/g, ' '));
   }
-  // Les paris de ton IA 1.7 : null sans son rapport, et la page pose « à mesurer » à leur place.
-  for (const [id, choix] of [['consignes', choixConsignes()], ['oubli', choixOubli()]] as const) {
-    if (choix === null) {
-      await expect(page.locator(`[data-pari="${id}"]`)).toHaveCount(0);
-      await expect(page.locator(`[data-pari-a-mesurer="${id}"][data-a-mesurer]`)).toHaveCount(1);
-    } else {
-      expect(await juste(id)).toBe(choix.find((c) => c.juste)!.texte);
-    }
-  }
+  // Ton IA 1.7, publiée : sa perte sur le texte du web monte, et elle respecte moins de consignes que ton IA 1.5.
+  expect(sensDeLOubli()).toBe('monte');
+  expect(choixConsignes()!.find((c) => c.juste)!.texte).toMatch(/^Moins/);
+  const phrase = page.locator('[data-pari="oubli"] [data-test="phrase-oubli"]');
+  await expect(phrase).toContainText('monte');
+  for (const r of [TON_IA_15!, TON_IA_17!]) await expect(phrase).toContainText(formaterPerte((r.mesures.oubli as { perte: number }).perte));
+  expect(phraseDeLOubli()).toMatch(/monte/);
 });
 
-test('ton IA 1.5 se montre déjà ; ton IA 1.7 est « à mesurer » tant que ses relevés n’existent pas', async ({ page }) => {
+test('ton IA 1.5 et ton IA 1.7 : les réponses et les tableaux viennent des relevés du projet', async ({ page }) => {
   await ouvrir(page);
   expect(TON_IA_15).not.toBeNull();
-  // L'ouverture : la question, et la réponse de ton IA 1.5, telle quelle.
+  expect(TON_IA_17).not.toBeNull();
+  // L'ouverture : la question, et les réponses de ton IA 1.5 et de ton IA 1.7, telles quelles.
   const ouverture = page.locator('[data-test="ouverture"]');
-  const reponse15 = TON_IA_15!.echantillons.find((e) => e.invite === 'Qui es-tu ?')!;
-  await expect(ouverture.locator('[data-reponse="1.5@1.7"]')).toHaveText(reponse15.texte);
-  // Le tableau de l'étape 8 : la colonne de ton IA 1.5 a ses nombres ; celles de 1.7, « à mesurer ».
-  const tableau = page.locator('[data-tableau-etape]').first();
-  for (const mesure of ['ifeval_fr', 'tenue', 'perte_conversation']) {
-    const cellule = tableau.locator(`td[data-version="1.5@1.7"][data-mesure="${mesure}"]`);
-    const attendu = celluleDeMesure(TON_IA_15, mesure);
-    if (attendu === null) await expect(cellule.locator('[data-a-mesurer]')).toHaveText('à mesurer');
-    else await expect(cellule.locator('.valeur')).toHaveText(attendu.valeur);
-    for (const version of ['1.7@1.7', '1.7-court@1.7'] as const) {
-      if (lireRapportEtape(version) === null) {
-        await expect(tableau.locator(`td[data-version="${version}"][data-mesure="${mesure}"] [data-a-mesurer]`)).toHaveText('à mesurer');
+  for (const [nom, r] of [['1.5@1.7', TON_IA_15!], ['1.7@1.7', TON_IA_17!]] as const) {
+    await expect(ouverture.locator(`[data-reponse="${nom}"]`)).toHaveText(r.echantillons.find((e) => e.invite === 'Qui es-tu ?')!.texte);
+  }
+  // Les deux tableaux d'étape : celui des versions courtes (étape 7), puis ton IA 1.5 face à ton IA 1.7 (étape 8).
+  const tableaux: [string, NomRapportEtape[], string[]][] = [
+    ['#etape-7', ['1.5@1.7', '1.7-court-3e-4@1.7', '1.7-court@1.7'], ['oubli', 'perte_conversation', 'tenue', 'ifeval_fr']],
+    ['#etape-8', ['1.5@1.7', '1.7@1.7'], ['ifeval_fr', 'tenue', 'perte_conversation', 'oubli']],
+  ];
+  for (const [etape, versions, mesures] of tableaux) {
+    const tableau = page.locator(`${etape} [data-tableau-etape]`);
+    await expect(tableau).toHaveCount(1);
+    for (const version of versions) {
+      const rapport = lireRapportEtape(version);
+      expect(rapport, version).not.toBeNull();
+      for (const mesure of mesures) {
+        await expect(tableau.locator(`td[data-version="${version}"][data-mesure="${mesure}"] .valeur`)).toHaveText(celluleDeMesure(rapport, mesure)!.valeur);
       }
     }
   }
-  if (TON_IA_17 === null) {
-    await expect(ouverture.locator('[data-reponse="1.7@1.7"][data-a-mesurer]')).toHaveCount(1);
-    await expect(page.locator('[data-echantillons-conversation="1.7@1.7"][data-a-mesurer]')).toHaveCount(1);
-    await expect(page.locator('[data-courbe-absente="sft-1.7"], [data-courbe="sft-1.7"]')).toHaveCount(1);
+  // Deux versions courtes : leurs colonnes disent leur taux.
+  await expect(page.locator('#etape-7 [data-tableau-etape] th[data-version="1.7-court-3e-4@1.7"]')).toContainText('0,0003');
+  await expect(page.locator('#etape-7 [data-tableau-etape] th[data-version="1.7-court@1.7"]')).toContainText('0,0001');
+  // Le balayage : un essai par ligne, ses pertes de validation, et le trait sur celui que retient la règle.
+  const balayage = lireBalayage()!;
+  const lignes = page.locator('[data-tableau-balayage="1.7"] tbody tr');
+  await expect(lignes).toHaveCount(balayage.essais.length);
+  for (const [i, e] of balayage.essais.entries()) {
+    expect(await lignes.nth(i).locator('td').allTextContents()).toStrictEqual(e.validations.map(([, v]) => formaterPerte(v)));
   }
-  // Les dix réponses de ton IA 1.5, telles quelles, dans l'ordre du rapport.
-  const echantillons15 = page.locator('[data-echantillons-conversation="1.5@1.7"] [data-reponse-texte]');
-  expect(await echantillons15.allTextContents()).toStrictEqual(TON_IA_15!.echantillons.map((e) => e.texte));
+  await expect(page.locator('[data-tableau-balayage="1.7"] tr[data-retenu="oui"]')).toHaveAttribute('data-essai', balayage.essais[retenuDuBalayage(balayage.essais)].essai);
+  // La courbe de l'affinage publié : à son échelle, sans le hasard, que la légende dit hors du cadre.
+  const courbe = page.locator('[data-courbe="sft-1.7"]');
+  await expect(courbe.locator('line.hasard')).toHaveCount(0);
+  await expect(courbe.locator('[data-test="hasard-hors-cadre"]')).toHaveCount(1);
+  await expect(courbe.locator('[data-test="courbe-tableau"] tbody tr')).not.toHaveCount(0);
+  // Les sessions de l'affinage à 3e-4 : ses deux pauses.
+  const sessions = lireEntrainement('sft-1.7-3e-4')!;
+  await expect(page.locator('[data-sessions="sft-1.7-3e-4"] tbody tr')).toHaveCount(sessions.sessions.length);
+  // Les dix réponses de ton IA 1.7, puis celles de ton IA 1.5, telles quelles, dans l'ordre du rapport.
+  for (const [nom, r] of [['1.7@1.7', TON_IA_17!], ['1.5@1.7', TON_IA_15!]] as const) {
+    const echantillons = page.locator(`[data-echantillons-conversation="${nom}"] [data-reponse-texte]`);
+    expect(await echantillons.allTextContents()).toStrictEqual(r.echantillons.map((e) => e.texte));
+  }
 });
 
 test('l’oubli : avec deux jeux de rapports fabriqués, la phrase de l’étape 8 change de sens, et exiger refuse le faux', () => {
@@ -342,10 +373,12 @@ test('les commandes affichées sont celles de commandes.ts, et les sorties celle
   await page.goto(PAGE);
   const blocs = await page.locator('.bloc-commande pre code').evaluateAll((codes) => codes.map((c) => (c.textContent ?? '').split('\n')));
   expect(blocs).toEqual([
+    [commandes.AFFINER_1_7, commandes.AFFINER_1_7_COURT],
     [METTRE_A_JOUR_DEPOT, commandes.ALLER_AU_PROJET_1_7],
     [CLONER_DEPOT, commandes.ALLER_AU_PROJET_1_7],
     [commandes.CONVERSATION_TESTS],
     [commandes.CONVERSATION_MONTRER],
+    [commandes.DISCUTER_1_7],
   ]);
   // Les sorties montrées : la commande qui les a écrites, et le texte du fichier, sans sa ligne de date.
   for (const [fichier, commande] of [
@@ -386,7 +419,7 @@ test('sans JavaScript, tout se lit : les explications des paris, l’atelier à 
   const ctx = await browser.newContext({ javaScriptEnabled: false, baseURL });
   const page = await ctx.newPage();
   await page.goto(PAGE);
-  for (const id of ['fin', 'gabarit', 'masque', 'fuite']) await expect(page.locator(`[data-pari="${id}"] .verdict`)).toBeVisible();
+  for (const id of ['fin', 'gabarit', 'masque', 'fuite', 'oubli', 'consignes']) await expect(page.locator(`[data-pari="${id}"] .verdict`)).toBeVisible();
   await expect(page.locator('[data-verrou="atelier"]')).not.toHaveAttribute('inert', '');
   const depart = etatDeLAtelier(CONVERSATIONS, reglageDeReference(CONVERSATIONS, 'avec-systeme'));
   await expect(page.locator('[data-test="cv-compte"]')).toHaveText(texteDuCompte(depart.jetons, depart.appris));

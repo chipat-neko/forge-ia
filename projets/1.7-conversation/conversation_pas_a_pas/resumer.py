@@ -2,13 +2,17 @@
 
 - `resumer_etape(rapport)` lit le `rapport.json` de `python -m forge evaluer-etape` (voir
   `forge.evaluation.etape`) et en tire le relevé que le site lit, `mesures/etape-<version>.json` :
-  `{version, etape, releve_le, mesures, echantillons}`. Les `mesures` sont celles du rapport, telles quelles
-  (une mesure dont les données manquaient reste `{"absente": "<raison>"}`), sans `echantillons`, que le
-  relevé range à part. Avec `reference=True`, c'est la version de référence du rapport (ton-ia-1.5, qui
-  passe les mêmes mesures) qui est résumée, au lieu de la version évaluée ;
+  `{version, etape, releve_le, empreinte, mesures, echantillons}`. Les `mesures` sont celles du rapport, telles
+  quelles (une mesure dont les données manquaient reste `{"absente": "<raison>"}`), sans `echantillons`, que le
+  relevé range à part ; `empreinte` est le SHA-256 des poids mesurés. Avec `reference=True`, c'est la version de
+  référence du rapport (ton-ia-1.5, qui passe les mêmes mesures) qui est résumée, au lieu de la version évaluée.
+  Avec `nom`, le relevé prend ce nom de version, et garde celui du rapport (`nom_au_rapport`) : c'est le cas des
+  versions renommées après leur évaluation, dont le rapport, une archive, garde l'ancien nom ;
 - `longueurs(jeu)` lit `train/documents.bin` d'un jeu d'affinage (en lecture seule) et compte les longueurs des
   exemples : `mesures/longueurs-sft-1.7.json`. Les longueurs sont un histogramme `[longueur, nombre]` : deux
-  exemples de même longueur se rangent pareil dans `empaqueter`, la liste complète n'ajoute rien.
+  exemples de même longueur se rangent pareil dans `empaqueter`, la liste complète n'ajoute rien ;
+- `balayage(dossiers)` lit le journal de chaque essai du balayage du taux d'apprentissage (en lecture seule) :
+  son taux maximal et ses pertes de validation, `mesures/balayage-sft-1.7.json`.
 
 La courbe d'entraînement et ses sessions ne passent pas par ce module : `pre_entrainement courbe` les relève
 (voir le README).
@@ -16,11 +20,14 @@ La courbe d'entraînement et ses sessions ne passent pas par ce module : `pre_en
 
 import datetime
 import json
+import math
+import re
 from collections import Counter
 from pathlib import Path
 
 import numpy as np
 from forge.evaluation.etape import VERSION_DU_RAPPORT_D_ETAPE
+from forge.suivi import lire_journal
 
 CLES_DU_RAPPORT = ("version_du_rapport", "version", "etape", "date", "mesures")
 LONGUEUR_DES_POSITIONS = np.dtype("<i2")  # documents.bin : un int16 par position, -1 pour le bourrage
@@ -39,12 +46,14 @@ def _lire_json(chemin: Path, quoi: str, refaire: str) -> dict:
 
 
 # region: resumer
-def resumer_etape(rapport: Path, reference: bool = False) -> dict:
-    """Le relevé d'un rapport d'étape de forge : `{version, etape, releve_le, mesures, echantillons}`.
+def resumer_etape(rapport: Path, reference: bool = False, nom: str | None = None) -> dict:
+    """Le relevé d'un rapport d'étape de forge : `{version, etape, releve_le, empreinte, mesures, echantillons}`.
 
     `version` est celle de la Release mesurée (« ton-ia-1.7 »), `etape` celle du chapitre (« 1.7 »),
-    `releve_le` la date du rapport (AAAA-MM-JJ). Rien n'est recalculé : les mesures et les échantillons
-    sont ceux du rapport, avec ses noms de clés. `reference=True` résume la version de référence du rapport.
+    `releve_le` la date du rapport (AAAA-MM-JJ), `empreinte` le SHA-256 des poids mesurés. Rien n'est
+    recalculé : les mesures et les échantillons sont ceux du rapport, avec ses noms de clés.
+    `reference=True` résume la version de référence du rapport. `nom` remplace le nom de la version, et le
+    relevé garde alors celui du rapport sous `nom_au_rapport` (s'il est différent).
     """
     refaire = "Relance `python -m forge evaluer-etape` avec la Release et l'étape voulues."
     rapport = Path(rapport)
@@ -70,11 +79,20 @@ def resumer_etape(rapport: Path, reference: bool = False) -> dict:
         raise ValueError(f"Les mesures de {source.get('version', rapport)} dans {rapport} n'ont pas d'« echantillons ». {refaire}")
     if not isinstance(donnees["date"], str) or len(donnees["date"]) < 10:
         raise ValueError(f"La date de {rapport} ({donnees['date']!r}) n'est pas une date ISO. {refaire}")
+    empreinte = source.get("empreinte")
+    if not isinstance(empreinte, str) or re.fullmatch(r"[0-9a-f]{64}", empreinte) is None:
+        raise ValueError(
+            f"Les mesures de {source.get('version', rapport)} dans {rapport} n'ont pas l'empreinte SHA-256 de leurs poids. {refaire}"
+        )
+    releve = {"version": source["version"] if nom is None else nom}
+    if nom is not None and nom != source["version"]:
+        releve["nom_au_rapport"] = source["version"]
     return {
-        "version": source["version"],
+        **releve,
         "etape": donnees["etape"],
         "releve_le": donnees["date"][:10],
-        "mesures": {nom: valeur for nom, valeur in mesures.items() if nom != "echantillons"},
+        "empreinte": empreinte,
+        "mesures": {cle: valeur for cle, valeur in mesures.items() if cle != "echantillons"},
         "echantillons": mesures["echantillons"],
     }
 # fin: resumer
@@ -131,3 +149,42 @@ def longueurs(jeu: Path) -> dict:
 def developper(histogramme: list[list[int]]) -> list[int]:
     """La liste croissante des longueurs d'un histogramme `[[longueur, nombre], …]`."""
     return [longueur for longueur, nombre in histogramme for _ in range(nombre)]
+
+
+# region: balayage
+def balayage(dossiers: list[Path]) -> dict:
+    """Les essais du balayage du taux d'apprentissage, lus dans leurs journaux : `{releve_le, essais}`.
+
+    Chaque dossier est la sortie d'un essai de `forge entrainer` (`entrainements/sft-1.7-balayage-<taux>`), dont
+    seul `journal.jsonl` est lu. Un essai : `essai` (le nom du dossier), `taux_max` (le plus haut taux du journal,
+    atteint à la fin de l'échauffement, sans ses restes d'arrondi), `pas` (le dernier pas) et `validations`, les
+    `[pas, perte de validation]` du journal, telles quelles. Les essais sont rangés par taux croissant.
+    """
+    if not dossiers:
+        raise ValueError("Il faut au moins un dossier d'essai à résumer.")
+    essais = []
+    for dossier in map(Path, dossiers):
+        journal = dossier / "journal.jsonl"
+        # Un pas refait (après une reprise) : sa dernière ligne.
+        pas = {ligne["pas"]: ligne for ligne in lire_journal(journal) if "evenement" not in ligne and isinstance(ligne.get("pas"), int)}
+        if not pas:
+            raise FileNotFoundError(
+                f"Le journal {journal} n'existe pas ou n'a aucun pas : donne le dossier de sortie d'un essai de `forge entrainer`."
+            )
+        taux = [float(ligne["taux"]) for ligne in pas.values() if isinstance(ligne.get("taux"), int | float) and math.isfinite(ligne["taux"])]
+        validations = [
+            [numero, float(ligne["perte_val"])]
+            for numero, ligne in sorted(pas.items())
+            if isinstance(ligne.get("perte_val"), int | float) and math.isfinite(ligne["perte_val"])
+        ]
+        if not taux or not validations:
+            raise ValueError(f"Le journal {journal} n'a aucune perte de validation, ou aucun taux : ce n'est pas celui d'un essai du balayage.")
+        essais.append({"essai": dossier.name, "taux_max": float(f"{max(taux):.12g}"), "pas": max(pas), "validations": validations})
+    essais.sort(key=lambda e: e["taux_max"])
+    for avant, apres in zip(essais, essais[1:]):
+        if avant["taux_max"] == apres["taux_max"]:
+            raise ValueError(
+                f"Les essais {avant['essai']} et {apres['essai']} ont le même taux ({avant['taux_max']}) : un balayage essaie des taux différents."
+            )
+    return {"releve_le": datetime.date.today().isoformat(), "essais": essais}
+# fin: balayage

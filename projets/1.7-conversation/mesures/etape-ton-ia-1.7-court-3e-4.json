@@ -1,0 +1,93 @@
+{
+ "version": "ton-ia-1.7-court-3e-4",
+ "nom_au_rapport": "ton-ia-1.7-court",
+ "etape": "1.7",
+ "releve_le": "2026-11-19",
+ "empreinte": "22473f1a872f8a95d73ab54194bc6a634f5fc17f357f19b6ea498ee857661aaf",
+ "mesures": {
+  "perte_conversation": {
+   "perte": 1.0804191827774048,
+   "n": 64
+  },
+  "ifeval_fr": {
+   "invite_stricte": 0.1574468085106383,
+   "consigne_stricte": 0.263768115942029,
+   "n": 235
+  },
+  "tenue": {
+   "terminee": 0.5402985074626866,
+   "fr": 0.9970149253731343,
+   "autre": 0.0,
+   "indetermine": 0.0029850746268656717,
+   "mots_moyens": 222.51044776119403,
+   "n": 335
+  },
+  "oubli": {
+   "perte": 2.9976882934570312,
+   "bits_par_octet": 0.9950648911774347,
+   "n": 64
+  }
+ },
+ "echantillons": [
+  {
+   "invite": "Quelle est la capitale de la France ?",
+   "texte": "La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris.",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Pourquoi le ciel est-il bleu ?",
+   "texte": "Le ciel est bleu, mais il est aussi bleu que les nuages. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est aussi bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les nuages sont blancs. Il est donc bleu que les",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Explique en deux phrases comment fonctionne la photosynthèse.",
+   "texte": "La photosynthèse est le processus par lequel les plantes, les algues et les algues utilisent l'énergie lumineuse pour produire de l'énergie chimique. Ce processus est appelé **photosynthèse**.\n\nVoici comment fonctionne la photosynthèse :\n\n1.  **Production d'énergie lumineuse** : Les plantes utilisent l'énergie lumineuse pour fixer le dioxyde de carbone ($CO_2$) et produire de l'énergie chimique ($H_2O$). Cette énergie est ensuite utilisée par les plantes pour synthétiser des composés organiques (comme le glucose et l'acide acétique) et produire des composés organiques (comme le glucose et l'acide acétique).\n2.  **Production de matière organique** : Les plantes utilisent l'énergie chimique pour produire de la matière organique (comme le glucose et l'acide acétique) et produire des composés organiques (comme le glucose et l'acide acétique). Cette énergie est ensuite utilisée par les plantes pour synthétiser des composés organiques",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Combien font 12 fois 7 ?",
+   "texte": "Il y a 12 fois 7 personnes qui ne sont pas des utilisateurs de ce site.",
+   "pensee": null,
+   "terminee": true
+  },
+  {
+   "invite": "Donne-moi trois conseils pour bien dormir.",
+   "texte": "Voici trois conseils pour bien dormir, classés par ordre d'importance :\n\n1. **Le sommeil réparateur** : Le sommeil est essentiel pour la santé physique et mentale. Il permet de récupérer après une journée stressante. Il est essentiel pour la régulation émotionnelle et la régulation du système nerveux central.",
+   "pensee": null,
+   "terminee": true
+  },
+  {
+   "invite": "Quelle est la différence entre un virus et une bactérie ?",
+   "texte": "Un virus est un organisme vivant qui se trouve dans un environnement clos et dépourvu de tout contact avec l'extérieur. Il ne peut pas se déplacer librement dans l'air. Il ne peut pas se déplacer librement dans l'eau. Il ne peut pas se déplacer dans les fluides corporels. Il ne peut pas se déplacer dans les fluides corporels. Il ne peut pas se déplacer dans les fluides corporels. Il ne peut pas se déplacer dans les fluides corporels. Il ne peut pas se déplacer dans les fluides corporels. Il ne peut pas se déplacer dans les fluides corporels. Il ne peut pas se déplacer dans les fluides corporels. Il ne peut pas se déplacer dans les fluides corporels. Il ne peut pas se déplacer dans les fluides corporels. Il ne peut pas se déplacer dans les fluides corporels. Il ne peut pas se déplacer dans les fluides corporels. Il ne peut pas se déplacer dans les fluides corporels. Il ne peut pas se déplacer dans les fluides corporels",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Écris un court texte sur l'automne en moins de 50 mots, tout en minuscules.",
+   "texte": "l'automne est un moment de renouveau et de renouveau. voici quelques idées pour vous aider à préparer votre liste de lecture, à la rendre plus lisible et à la rendre plus facile à lire. voici quelques exemples de textes à préparer pour vous aider à préparer votre liste de lecture. voici quelques exemples de textes à préparer pour vous aider à préparer votre liste de lecture. voici quelques exemples de textes à préparer pour vous aider à préparer votre liste de lecture. voici quelques exemples de textes à préparer pour vous aider à préparer votre liste de lecture. voici quelques exemples de textes à préparer pour vous aider à préparer votre liste de lecture. voici quelques exemples de textes à préparer pour vous aider à préparer votre liste de lecture. voici quelques exemples de textes à préparer pour vous aider à préparer votre liste de lecture. voici quelques exemples de textes à préparer pour vous aider à préparer votre liste de lecture. voici quelques exemples de textes à préparer pour vous aider à préparer votre liste de lecture. voici quelques exemples de textes à préparer pour vous",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Présente-toi en trois phrases, sans utiliser de virgule.",
+   "texte": "Voici quelques phrases en trois phrases, sans utiliser de virgule.",
+   "pensee": null,
+   "terminee": true
+  },
+  {
+   "invite": "Qui es-tu ?",
+   "texte": "Je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans, je suis un jeune homme de 20 ans,",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Écris une fonction Python qui renvoie la somme des carrés d'une liste de nombres.",
+   "texte": "la fonction `sum(a)` calcule la somme des carrés des nombres entiers de la liste `a` tels que :\n$$ a = a^2 + b $$\n\noù :\n*   $a$ est la liste de nombres entiers.\n*   $b$ est la liste de nombres entiers.\n\n### étape 1 : calculer la somme des carrés des nombres entiers\n\nla somme des carrés des nombres entiers est la somme des carrés des nombres entiers de la liste `a` tels que :\n$$ a^2 = a^2 + b^2 $$\n\n### étape 2 : calculer la somme des carrés des nombres entiers\n\nla somme des carrés des nombres entiers est la somme des carrés des nombres entiers de la liste `a` tels que :\n$$ a^2 = a^2 + b^2 $$\n\n### étape 3 : calculer la somme des carrés des nombres entiers\n\nla somme des carrés des nombres entiers est la somme des carrés des nombres entiers de la liste",
+   "pensee": null,
+   "terminee": false
+  }
+ ]
+}

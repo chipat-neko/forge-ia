@@ -20,7 +20,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { nombre, pourcent } from '../nombres';
+import { decimalesUtiles, nombre, pourcent } from '../nombres';
 
 const FINE = '\u202F';
 
@@ -29,6 +29,10 @@ export const FICHIERS_ETAPES = Object.freeze({
   '1.5@1.7': 'projets/1.7-conversation/mesures/etape-ton-ia-1.5.json',
   '1.7@1.7': 'projets/1.7-conversation/mesures/etape-ton-ia-1.7.json',
   '1.7-court@1.7': 'projets/1.7-conversation/mesures/etape-ton-ia-1.7-court.json',
+  // Ton IA 1.7 a d'abord été affinée au taux 3e-4 (complète et courte), puis refaite à 1e-4, la version publiée : les
+  // versions à 3e-4 ne sont pas publiées, mais leurs rapports, gardés pour comparer, montrent l'oubli (chapitre 1.7, étape 7).
+  '1.7-3e-4@1.7': 'projets/1.7-conversation/mesures/etape-ton-ia-1.7-3e-4.json',
+  '1.7-court-3e-4@1.7': 'projets/1.7-conversation/mesures/etape-ton-ia-1.7-court-3e-4.json',
   '1.7@1.8': 'projets/1.8-alignement/mesures/etape-ton-ia-1.7.json',
   '1.8@1.8': 'projets/1.8-alignement/mesures/etape-ton-ia-1.8.json',
   '1.8-court@1.8': 'projets/1.8-alignement/mesures/etape-ton-ia-1.8-court.json',
@@ -394,8 +398,17 @@ export function celluleDeMesure(rapport: RapportEtape | null, nom: string): { va
   return { valeur: ligne.valeur(m), detail: ligne.detail(m) };
 }
 
-/** Le nom d'une version en tête de colonne : « Ton IA 1.5 », « Ton IA 1.7 », « Version courte ». */
+/**
+ * Le nom d'une version en tête de colonne : « Ton IA 1.5 », « Ton IA 1.7 », « Version courte ». Un taux d'apprentissage
+ * dans le nom (« 1.7-3e-4 ») s'écrit en décimales, comme dans le texte des chapitres : « Ton IA 1.7 à 0,0003 ».
+ */
 export function nomDeVersion(nom: NomRapportEtape): string {
   const version = nom.slice(0, nom.indexOf('@'));
-  return version.endsWith('-court') ? 'Version courte' : `Ton IA ${version}`;
+  const m = /^(\d+\.\d+)(-court)?(?:-(\d)e-(\d))?$/.exec(version);
+  if (m === null) throw new Error(`nomDeVersion : « ${nom} » n’est pas un nom de FICHIERS_ETAPES (« 1.7@1.7 », « 1.7-court-3e-4@1.7 »).`);
+  const [, numero, court, mantisse, exposant] = m;
+  const qui = court === undefined ? `Ton IA ${numero}` : 'Version courte';
+  if (mantisse === undefined) return qui;
+  const taux = Number(`${mantisse}e-${exposant}`);
+  return `${qui} à ${nombre(taux, decimalesUtiles(taux, Number(exposant)))}`;
 }

@@ -571,6 +571,26 @@ describe('commandes du chapitre 1.7', () => {
     expect(ecrit(commandes.CONVERSATION_ESSAI, '--enregistrer')).toBe(MESURES_PARTIE_1.sortieEssaiAffinage);
     expect(ecrit(commandes.CONVERSATION_ESSAI, '--json')).toBe(MESURES_PARTIE_1.essaiAffinage);
   });
+
+  it('AFFINER_1_7, AFFINER_1_7_COURT et DISCUTER_1_7 : les commandes de forge du README de forge, chacune sur sa ligne', () => {
+    const readme = readFileSync(`${RACINE}/projets/forge/README.md`, 'utf8').replace(/\r\n?/g, '\n');
+    const mainDeForge = readFileSync(`${RACINE}/projets/forge/forge/__main__.py`, 'utf8');
+    expect(commandes.AFFINER_1_7).toBe('uv run --extra gpu python -m forge entrainer --config configs/sft-1.7.toml');
+    expect(commandes.AFFINER_1_7_COURT).toBe('uv run --extra gpu python -m forge entrainer --config configs/sft-1.7-court.toml');
+    expect(commandes.DISCUTER_1_7).toBe(
+      'uv run --extra gpu python -m forge discuter --modele "$env:FORGE_DONNEES\\publications\\ton-ia-1.7" --temperature 0.7',
+    );
+    for (const c of [commandes.AFFINER_1_7, commandes.AFFINER_1_7_COURT, commandes.DISCUTER_1_7]) {
+      expect(readme.split('\n'), c).toContain(c);
+      for (const [, option] of c.matchAll(/ (--[a-z-]+)/g)) {
+        if (option !== '--extra') expect(mainDeForge, `${option} (${c})`).toContain(`"${option}"`);
+      }
+    }
+    // Les configurations qu'elles lancent existent : la version publiée et sa version courte.
+    for (const c of [commandes.AFFINER_1_7, commandes.AFFINER_1_7_COURT]) {
+      expect(existsSync(`${RACINE}/projets/forge/${/--config (\S+)/.exec(c)![1]}`), c).toBe(true);
+    }
+  });
 });
 
 // Le chapitre 1.8 : le projet de l'alignement pas à pas (noter, dpo, pousser), vérifié contre le __main__.py et le

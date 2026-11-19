@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   cheminCourbe,
   echelleCourbe,
+  echelleEntrainement,
   graduations,
   moyennesParPaquets,
   reduirePoints,
@@ -24,6 +25,33 @@ describe('echelleCourbe', () => {
     expect(() => echelleCourbe(3000, 0)).toThrow(/perteHasard/);
     expect(() => echelleCourbe(3000, NaN)).toThrow(/perteHasard/);
     expect(() => echelleCourbe(3000, 3.7, 0)).toThrow(/largeur/);
+  });
+});
+
+describe('echelleEntrainement', () => {
+  const HASARD = Math.log(32768);
+
+  it('un pré-entraînement, qui part du hasard : l’échelle du hasard, inchangée', () => {
+    expect(echelleEntrainement(6370, HASARD, 10.477)).toEqual(echelleCourbe(6370, HASARD));
+    expect(echelleEntrainement(6370, HASARD, 5.3)).toEqual(echelleCourbe(6370, HASARD));
+  });
+
+  it('un affinage, loin sous le hasard : de 0 à 1,25 fois sa plus haute perte, et la courbe n’est plus écrasée', () => {
+    // L'affinage de ton IA 1.7 : de 2,2 à 0,8 environ, quand le hasard vaut 10,4.
+    const e = echelleEntrainement(3338, HASARD, 2.2);
+    expect(e).toEqual({ largeur: 640, hauteur: 280, xMax: 3338, yMin: 0, yMax: 1.25 * 2.2 });
+    expect(HASARD).toBeGreaterThan(e.yMax); // le hasard sort du cadre
+    // À l'échelle du hasard, de 0,8 à 2,2 ne prenait que 11 % de la hauteur ; ici, plus de la moitié.
+    const part = (x: { yMax: number; yMin: number }) => (2.2 - 0.8) / (x.yMax - x.yMin);
+    expect(part(echelleCourbe(3338, HASARD))).toBeLessThan(0.12);
+    expect(part(e)).toBeGreaterThan(0.5);
+    // Rien ne sort par le haut.
+    expect(cheminCourbe([{ pas: 1, perte: 2.2 }, { pas: 3338, perte: 0.8 }], e).horsEchelle).toBe(false);
+  });
+
+  it('sans perte finie, ou une perte nulle : l’échelle du hasard', () => {
+    expect(echelleEntrainement(100, HASARD, Number.NaN)).toEqual(echelleCourbe(100, HASARD));
+    expect(echelleEntrainement(100, HASARD, 0)).toEqual(echelleCourbe(100, HASARD));
   });
 });
 

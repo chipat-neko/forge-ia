@@ -1,0 +1,93 @@
+{
+ "version": "ton-ia-1.7-court",
+ "nom_au_rapport": "ton-ia-1.7-court-1e-4",
+ "etape": "1.7",
+ "releve_le": "2026-11-19",
+ "empreinte": "2a598395efef1a1bfc2b4cf3376603baea723d4e8f98de34e8d715e98d5c3a92",
+ "mesures": {
+  "perte_conversation": {
+   "perte": 1.139987826347351,
+   "n": 64
+  },
+  "ifeval_fr": {
+   "invite_stricte": 0.14893617021276595,
+   "consigne_stricte": 0.24057971014492754,
+   "n": 235
+  },
+  "tenue": {
+   "terminee": 0.4746268656716418,
+   "fr": 0.991044776119403,
+   "autre": 0.005970149253731343,
+   "indetermine": 0.0029850746268656717,
+   "mots_moyens": 241.28955223880598,
+   "n": 335
+  },
+  "oubli": {
+   "perte": 2.6146295070648193,
+   "bits_par_octet": 0.8679107936590597,
+   "n": 64
+  }
+ },
+ "echantillons": [
+  {
+   "invite": "Quelle est la capitale de la France ?",
+   "texte": "La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris. La capitale de la France est Paris.",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Pourquoi le ciel est-il bleu ?",
+   "texte": "Le ciel est bleu, mais il est bleu. Il est bleu parce que le soleil se couche à 21 heures et que la lune se couche à 21 heures et que la Terre se couche à 21 heures et que la Lune se couche à 21 heures et que la Terre se couche à 21 heures et que la Lune se couche à 21 heures et que la Terre se couche à 21 heures et que la Lune se couche à 21 heures et que la Terre se couche à 21 heures et que la Lune se couche à 21 heures et que la Terre se couche à 21 heures et que la Lune se couche à 21 heures et que la Terre se couche à 21 heures et que la Lune se couche à 21 heures et que la Terre se couche à 21 heures et que la Lune se couche à 21 heures et que la Terre se couche à 21 heures et que la Lune se couche à 21 heures et que la Terre se couche à",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Explique en deux phrases comment fonctionne la photosynthèse.",
+   "texte": "La photosynthèse est un processus biologique qui se produit lorsque les plantes et les animaux (y compris les humains) produisent de l'énergie chimique à partir de l'énergie lumineuse. Ce processus est appelé **photosynthèse**.\n\nVoici l'explication détaillée :\n\n1.  **Principe de base** : La photosynthèse est un processus de **production d'énergie chimique à partir de l'énergie lumineuse**. Elle se produit lorsque les plantes et les animaux produisent de l'énergie chimique à partir de l'énergie lumineuse.\n2.  **Rôle des plantes** : Les plantes produisent de l'énergie chimique à partir de l'énergie lumineuse. Elles ne produisent pas d'énergie chimique à partir de l'énergie lumineuse.\n3.  **Rôle des animaux** : Les animaux produisent de l'énergie chimique à partir de l'énergie lumineuse. Ils ne produisent pas d'énergie chimique à partir de l'énergie lumineuse.\n\n**Pourquoi les autres options sont incorrectes :**\n*   **A** : La photosyn",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Combien font 12 fois 7 ?",
+   "texte": "Pour déterminer combien font 12 fois 7 ?",
+   "pensee": null,
+   "terminee": true
+  },
+  {
+   "invite": "Donne-moi trois conseils pour bien dormir.",
+   "texte": "Voici trois conseils pour bien dormir, en commençant par la bonne pratique :\n\n1. **Éviter les écrans** : Éviter les écrans au moins 1 heure avant de dormir est une mauvaise habitude. Cela peut entraîner une fatigue visuelle, une fatigue oculaire et une désynchronisation des cycles veille-sommeil.\n2. **Éviter les écrans en même temps** : Éviter les écrans en même temps est une mauvaise habitude. Cela peut entraîner une fatigue visuelle, une fatigue oculaire et une désynchronisation des cycles veille-sommeil.\n3. **Éviter les écrans en même temps** : Éviter les écrans en même temps est une mauvaise habitude. Cela peut entraîner une fatigue visuelle, une fatigue oculaire et une désynchronisation des cycles veille-sommeil.\n\n**Pourquoi les autres options sont incorrectes :**\n\n*   **A :** La lumière bleue est nocive pour la santé visuelle. Elle augmente la fatigue visuelle et la fatigue oculaire,",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Quelle est la différence entre un virus et une bactérie ?",
+   "texte": "Un virus est un organisme vivant qui possède une **bactérie**.",
+   "pensee": null,
+   "terminee": true
+  },
+  {
+   "invite": "Écris un court texte sur l'automne en moins de 50 mots, tout en minuscules.",
+   "texte": "l'automne est une saison très populaire en français. Voici une brève explication des termes utilisés :\n\n*   **automne** : c'est la saison des couleurs, des couleurs vives et des couleurs vives. les feuilles sont vertes, les couleurs sont vives et les couleurs sont vives.\n*   **négatif** : c'est la saison des pluies, des inondations et des orages. les feuilles sont vertes, les couleurs sont vives et les couleurs sont vives.\n*   **positif** : c'est la saison des couleurs, des couleurs vives et des couleurs orangées. les feuilles sont vertes, les couleurs sont vives et les couleurs sont vives.\n\n**explication détaillée :**\n\nl'automne est une saison très populaire en français. Voici les termes utilisés :\n\n*   **automne** : c'est la saison des couleurs, des couleurs vives et des couleurs orangées. les feuilles sont vertes, les couleurs sont vives et les couleurs sont vives.\n*   **négatif** : c'est la",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Présente-toi en trois phrases, sans utiliser de virgule.",
+   "texte": "En français, on dit souvent que le français est un dialecte de l'anglais.",
+   "pensee": null,
+   "terminee": true
+  },
+  {
+   "invite": "Qui es-tu ?",
+   "texte": "Je suis un jeune homme de 24 ans, je suis un homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je suis un jeune homme de 24 ans, je",
+   "pensee": null,
+   "terminee": false
+  },
+  {
+   "invite": "Écris une fonction Python qui renvoie la somme des carrés d'une liste de nombres.",
+   "texte": "pour résoudre ce problème, nous devons utiliser la définition de la fonction **somme des carrés**.\n\n### 1. définition de la fonction somme des carrés\n\nla fonction somme des carrés est définie comme la somme des carrés des entiers de la liste de nombres. elle est définie comme la somme des carrés des entiers de la liste de nombres.\n\nla fonction somme des carrés est définie comme la somme des carrés des entiers de la liste de nombres.\n\n### 2. calcul de la somme des carrés\n\nla somme des carrés est définie comme la somme des carrés des entiers de la liste de nombres.\n\nla fonction somme des carrés est définie comme la somme des carrés des entiers de la liste de nombres.\n\nla fonction somme des carrés est définie comme la somme des carrés des entiers de la liste de nombres.\n\n### 3. calcul de la somme des carrés\n\nla somme des carrés est définie comme la somme des carrés des entiers de la liste de nombres.\n\nla fonction somme des carrés est définie comme la somme des carrés",
+   "pensee": null,
+   "terminee": false
+  }
+ ]
+}

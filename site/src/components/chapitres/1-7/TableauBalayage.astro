@@ -1,0 +1,160 @@
+---
+// Le balayage du taux d'apprentissage de ton IA 1.7 : un essai court par taux, et sa perte de validation sur des
+// conversations jamais lues, à chaque mesure. Lu à la construction dans le relevé du projet 1.7
+// (mesures/balayage-sft-1.7.json, écrit par `balayage` à partir des journaux des essais), par lireBalayage
+// (paris-1-7.ts) : rien n'est recalculé. L'essai que la règle retient (retenuDuBalayage : la dernière perte la plus
+// basse) est signalé par un trait indigo dans la marge, et dit aux lecteurs d'écran.
+//
+// Tant que le relevé manque, le composant affiche « à mesurer », marqué data-a-mesurer. Un tableau typographié, sans
+// cadre, comme TableauEtape ; les taux s'écrivent en décimales, comme dans le texte du chapitre.
+import { root } from 'astro:config/server';
+import { decimalesUtiles, formaterPerte, nombre } from '../../../lib/nombres';
+import { lireBalayage, retenuDuBalayage } from '../../../lib/partie-1/paris-1-7';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  /** La légende, sans point final. */
+  legende: string;
+}
+
+const { legende } = Astro.props;
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const b = lireBalayage(new URL('../', root));
+const retenu = b === null ? null : retenuDuBalayage(b.essais);
+const pas = b === null ? [] : b.essais[0].validations.map(([p]) => p);
+if (b !== null && !b.essais.every((e) => e.validations.map(([p]) => p).join() === pas.join())) {
+  throw new Error('TableauBalayage : les essais du balayage n’ont pas mesuré leur validation aux mêmes pas. Vérifie mesures/balayage-sft-1.7.json.');
+}
+const taux = (x: number) => nombre(x, decimalesUtiles(x, 8));
+const id = 'tableau-balayage-1-7';
+const absent = typographier(`${legende} : à mesurer, avec le balayage de ton IA 1.7.`);
+---
+
+{
+  b === null ? (
+    <p class="a-mesurer" data-a-mesurer data-balayage-absent>
+      {absent}
+    </p>
+  ) : (
+    <figure class="tableau-balayage" data-tableau-balayage="1.7">
+      <figcaption id={id}>
+        <span class="objet">{typographier(legende)}</span>
+        {typographier(
+          'La perte de validation, en nats par jeton appris, relevée dans le journal de chaque essai. ' +
+            'Le trait dans la marge marque le taux que la règle retient.',
+        )}
+      </figcaption>
+      <div class="defile" role="region" aria-labelledby={id} tabindex="0">
+        <table aria-labelledby={id}>
+          <thead>
+            <tr>
+              <th scope="col">Taux</th>
+              {pas.map((p) => (
+                <th scope="col" class="nombre">
+                  {`Pas ${nombre(p)}`}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {b.essais.map((e, i) => (
+              <tr class:list={[{ retenu: i === retenu }]} data-essai={e.essai} data-retenu={i === retenu ? 'oui' : undefined}>
+                <th scope="row" class="nombre">
+                  {taux(e.taux_max)}
+                  {i === retenu && <span class="vh"> (retenu)</span>}
+                </th>
+                {e.validations.map(([, v]) => (
+                  <td class="nombre">{formaterPerte(v)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </figure>
+  )
+}
+
+<style>
+  .tableau-balayage {
+    margin: 1.4em 0 1.2em;
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--indigo-doux);
+    margin-bottom: 10px;
+  }
+
+  /* Pas de classe « titre » : la règle globale .titre du gabarit s'y appliquerait. */
+  figcaption .objet {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--indigo);
+    margin-bottom: 4px;
+  }
+
+  /* Quatre colonnes tiennent à 390 px ; au-delà, le tableau défile dans son cadre, jamais la page. */
+  .defile {
+    overflow-x: auto;
+    padding-left: 6px; /* la place du trait de l'essai retenu */
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    border-top: 2px solid var(--indigo);
+    font-family: var(--titres);
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  th,
+  td {
+    padding: 7px 0 7px 14px;
+    border-bottom: 1px solid var(--brume);
+    white-space: nowrap;
+  }
+
+  thead th {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--indigo-doux);
+    text-align: left;
+    border-bottom: 2px solid var(--indigo);
+  }
+
+  tbody th {
+    font-weight: 600;
+    text-align: left;
+  }
+
+  .nombre {
+    text-align: right;
+  }
+
+  thead th:first-child,
+  tbody th {
+    text-align: left;
+    padding-left: 8px;
+  }
+
+  /* L'essai retenu : un trait indigo dans la marge, sans couleur criarde. */
+  tr.retenu th {
+    box-shadow: inset 3px 0 0 var(--indigo);
+    font-weight: 700;
+  }
+
+  .defile:focus-visible {
+    outline: 3px solid var(--indigo);
+    outline-offset: 2px;
+  }
+
+  .a-mesurer {
+    font-style: italic;
+    color: var(--indigo-doux);
+  }
+</style>

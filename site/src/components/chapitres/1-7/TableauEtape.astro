@@ -10,6 +10,8 @@
 // dans un chapitre paru. Un tableau typographié, sans cadre, comme ceux des autres chapitres.
 //
 //   <TableauEtape versions={['1.5@1.7', '1.7@1.7']} mesures={['ifeval_fr', 'tenue']} legende="…" />
+//
+// `noms` remplace les têtes de colonnes de nomDeVersion, quand deux versions s'y confondraient (deux versions courtes).
 import { root } from 'astro:config/server';
 import { formaterDate } from '../../../lib/calculateur/formats';
 import { celluleDeMesure, LIGNES_DES_MESURES, lireRapportEtape, nomDeVersion, type NomRapportEtape } from '../../../lib/partie-1/etapes';
@@ -22,12 +24,18 @@ interface Props {
   mesures: readonly string[];
   /** La légende, sans point final : ce que le tableau compare. */
   legende: string;
+  /** Les têtes de colonnes, une par version, à la place de celles de nomDeVersion. */
+  noms?: readonly string[];
 }
 
-const { versions, mesures, legende } = Astro.props;
+const { versions, mesures, legende, noms } = Astro.props;
 if (versions.length === 0 || mesures.length === 0) {
   throw new Error('TableauEtape : donne au moins une version et une mesure (props versions et mesures).');
 }
+if (noms !== undefined && noms.length !== versions.length) {
+  throw new Error(`TableauEtape : ${noms.length} noms pour ${versions.length} versions. Donne un nom par version, ou aucun.`);
+}
+const tetes = noms ?? versions.map((v) => nomDeVersion(v));
 // Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
 const racine = new URL('../', root);
 const rapports = versions.map((v) => lireRapportEtape(v, racine));
@@ -52,7 +60,7 @@ const id = `etape-${versions.join('-').replace(/[^a-z0-9]+/gi, '-')}-${mesures.j
       <thead>
         <tr>
           <th scope="col">Mesure</th>
-          {versions.map((v) => <th scope="col" class="nombre">{nomDeVersion(v)}</th>)}
+          {versions.map((v, i) => <th scope="col" class="nombre" data-version={v}>{typographier(tetes[i])}</th>)}
         </tr>
       </thead>
       <tbody>

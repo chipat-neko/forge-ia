@@ -5,11 +5,13 @@ reste sans sorties) dans le noyau « python3 » de l'environnement uv, avec FORG
 le notebook prend le code du projet et de forge, sans rien télécharger ni installer. Il tourne sur le
 processeur : la carte graphique est cachée.
 
-Le notebook ne parle pas encore à ton-ia-1.7, qui n'est pas publiée : sa section vient avec la parution du
-chapitre. FORGE_IA_MODELES est pourtant déjà posée sur un dossier qui a la forme de celui du dépôt
-(`<dossier>/ton-ia-1.7/…`, un petit modèle publié par forge.exporter) : la section n'aura qu'à s'en servir.
+L'étape 6 parle à ton-ia-1.7, la version publiée. À sa place, FORGE_IA_MODELES donne au notebook un dossier qui a
+la forme de celui de l'intégration continue (`<dossier>/ton-ia-1.7/…`) : un petit modèle publié par forge.exporter.
+Sans FORGE_IA_MODELES, la cellule télécharge les trois fichiers de la Release ; une coupure du réseau, simulée, se
+reprend en relançant la cellule, sans retélécharger les fichiers déjà complets (point à surveiller 4 du plan 8).
 """
 
+import copy
 import json
 import pathlib
 import re
@@ -18,6 +20,7 @@ import nbformat
 import pytest
 from modele_factice import ETIQUETTE, exporter_comme_la_release, petit_modele
 from nbclient import NotebookClient
+from nbclient.exceptions import CellExecutionError
 
 PROJET = pathlib.Path(__file__).resolve().parents[1]
 RACINE = pathlib.Path(__file__).resolve().parents[3]
@@ -90,6 +93,12 @@ def test_notebook_s_execute_de_bout_en_bout_avec_la_correction():
     # 4. Un tout petit affinage : avant, aucune réponse ne finit son tour ; après, la plupart.
     assert "Réponses qui finissent par <|fin_tour|> : 0 % avant," in sorties
     assert "Perte d’affinage : " in sorties and "Les réponses du modèle affiné :" in sorties
+    # 6. Ton IA 1.7, prise dans FORGE_IA_MODELES (ici, le petit modèle publié comme elle), répond à trois questions.
+    assert "Ton IA 1.7 est dans le dossier" in sorties and f"Version {ETIQUETTE}, " in sorties
+    assert sorties.count("Toi : ") == 3 and sorties.count("Ton IA 1.7 : ") == 3
+    assert "Toi : Quelle est la capitale de la France ?" in sorties
+    assert sorties.count("(Elle a fini son tour.)") + sorties.count("(Coupée à 128 jetons : elle n’avait pas fini.)") == 3
+    assert "s pour les trois réponses, sur le processeur." in sorties
     # La page du site retrouve les mêmes résultats.
     assert "6 conversations et 20 placements comparés." in sorties
     assert "Même résultat que la page du site : oui" in sorties
@@ -128,6 +137,81 @@ def test_notebook_n_installe_ni_torch_ni_forge_et_ne_force_pas_la_carte():
     assert re.findall(r"!pip install.*", code) == ["!pip install --quiet regex"]
     # Il calcule sur le processeur, toujours (le modèle de l'essai est minuscule).
     assert 'appareil = "cpu"' in code and 'essai_affinage(appareil, pas=80)' in code
+
+
+def cellule_de_ton_ia(nb):
+    codes = [c for c in nb.cells if c.cell_type == "code"]
+    return codes[0], next(c for c in codes if "telecharger_publication(" in c.source)
+
+
+def test_la_section_de_ton_ia_1_7_telecharge_la_release_et_repond_sur_le_processeur():
+    brut = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+    code = "\n".join("".join(c["source"]) for c in brut["cells"] if c["cell_type"] == "code")
+    assert 'telecharger_publication("ton-ia-1.7"' in code and "charger_publication(dossier_17, appareil)" in code
+    assert "repondre_lot(" in code and "n_nouveaux=128" in code
+    # L'étape 6 est annoncée dans le programme du notebook.
+    assert "6. télécharger « ton IA 1.7 »" in "".join(brut["cells"][0]["source"]).replace("\u202f", " ")
+
+
+def test_lance_par_les_tests_sans_forge_ia_modeles_il_ne_telecharge_rien(monkeypatch):
+    # Avec FORGE_IA_LOCAL et sans FORGE_IA_MODELES, l'étape 6 s'arrête et dit quoi faire, au lieu de télécharger les
+    # poids de ton IA pendant les tests.
+    monkeypatch.delenv("FORGE_IA_MODELES")
+    nb = nbformat.read(NOTEBOOK, as_version=4)
+    nb.cells = list(cellule_de_ton_ia(nb))
+    with pytest.raises(CellExecutionError) as erreur:
+        executer(nb)
+    assert "FORGE_IA_MODELES" in str(erreur.value) and "gh release download ton-ia-1.7" in str(erreur.value)
+    assert "Ton IA 1.7 est dans le dossier" not in sorties_de(nb)
+
+
+def test_une_coupure_du_telechargement_se_reprend_en_relancant_la_cellule(monkeypatch, tmp_path, modeles_factices):
+    # Point à surveiller 4 : sur Colab (sans FORGE_IA_LOCAL ni FORGE_IA_MODELES), la cellule télécharge les trois fichiers
+    # de la Release. Le réseau est simulé par une cellule ajoutée : urlretrieve de forge.publication copie les fichiers
+    # du petit modèle, et coupe le dernier (le tokenizer) au milieu, la première fois. La cellule de l'étape 6 tourne deux
+    # fois : la première échoue et dit de la relancer ; la deuxième ne télécharge que ce qui manque.
+    monkeypatch.delenv("FORGE_IA_MODELES")
+    source = modeles_factices / ETIQUETTE
+    nb = nbformat.read(NOTEBOOK, as_version=4)
+    premiere, ton_ia = cellule_de_ton_ia(nb)
+    reseau = nbformat.v4.new_code_cell(
+        "import shutil\n"
+        "import urllib.error\n"
+        "import forge.publication as publication\n"
+        f"os.chdir({str(tmp_path)!r})\n"
+        "depot_local = None  # le carnet se croit sur Colab : il télécharge\n"
+        "appels = []\n"
+        "def copie(adresse, destination):\n"
+        "    nom = adresse.rsplit('/', 1)[1]\n"
+        "    appels.append(nom)\n"
+        f"    origine = Path({str(source)!r}) / nom\n"
+        "    if nom.startswith('tokenizer') and appels.count(nom) == 1:\n"
+        "        Path(destination).write_bytes(origine.read_bytes()[:1000])  # la moitié d'un fichier, puis la coupure\n"
+        "        raise urllib.error.URLError('connexion coupée')\n"
+        "    shutil.copyfile(origine, destination)\n"
+        "publication.urlretrieve = copie\n"
+        "def sans_api(*arguments, **options):\n"
+        "    raise OSError('pas d’accès à l’API de GitHub')\n"
+        "publication.urlopen = sans_api\n"
+    )
+    relance = copy.deepcopy(ton_ia)
+    relance.id = "relance-de-la-cellule"
+    bilan = nbformat.v4.new_code_cell("print('Appels :', appels)\nprint('Fichiers :', sorted(f.name for f in Path('ton-ia-1.7').iterdir()))")
+    nb.cells = [premiere, reseau, ton_ia, relance, bilan]
+    NotebookClient(nb, timeout=900, kernel_name="python3", allow_errors=True).execute()
+    erreurs = [o for o in nb.cells[2].outputs if o.output_type == "error"]
+    assert len(erreurs) == 1 and erreurs[0].ename == "ConnectionError"
+    assert "Relance cette cellule\u202f: les fichiers déjà complets ne se retéléchargent pas." in erreurs[0].evalue
+    # La relance : plus d'erreur, et ton IA répond.
+    assert not [o for o in nb.cells[3].outputs if o.output_type == "error"]
+    relancee = "".join(o.get("text", "") for o in nb.cells[3].outputs).replace("\u202f", " ")
+    assert "Ton IA 1.7 est dans le dossier" in relancee and relancee.count("Ton IA 1.7 : ") == 3
+    # Les poids et la configuration, complets, ne sont téléchargés qu'une fois ; seul le tokenizer coupé l'est deux fois.
+    texte_du_bilan = "".join(o.get("text", "") for o in nb.cells[4].outputs)
+    poids, config, tokenizer = f"{ETIQUETTE}.safetensors", "config.json", "tokenizer-ton-ia-v1.json"
+    assert f"Appels : {[poids, config, tokenizer, tokenizer]!r}" in texte_du_bilan
+    # Aucun fichier à moitié écrit ne reste.
+    assert f"Fichiers : {sorted([poids, config, tokenizer])!r}" in texte_du_bilan
 
 
 def test_les_fichiers_que_le_notebook_lit_existent():

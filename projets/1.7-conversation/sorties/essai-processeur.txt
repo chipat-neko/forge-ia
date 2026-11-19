@@ -1,12 +1,13 @@
-# relevé le 2026-11-18
+# relevé le 2026-11-19
 Un tout petit affinage, sur le processeur (16 cœurs logiques)
   modèle : dim 64, 2 couches, 4 têtes, contexte 128 (2 203 968 paramètres, PyTorch 2.15.0)
   jeu : 24 conversations en 5 rangées, 455 jetons dont 207 appris
   80 pas de 4 rangées : perte 9,345 au pas 1, 2,096 au pas 80
+  taux d’affinage : 0,003, 3 fois celui du pré-entraînement (0,001) ; au taux du pré-entraînement, 80 pas ne lui apprenaient pas à finir son tour
   réponses aux 8 questions neuves qui finissent par <|fin_tour|> : 0 % avant, 100 % après
   trois réponses, après l'affinage :
     "Quelle est la capitale de l'Allemagne ?" → '.'
     'Combien font 2 fois 6 ?' → 'Une font font font'
     'De quelle couleur est la neige ?' → '.'
-  40,0 s pour le pré-entraînement, l'affinage et les deux mesures
+  44,3 s pour le pré-entraînement, l'affinage et les deux mesures
 le modèle a appris à finir son tour : oui

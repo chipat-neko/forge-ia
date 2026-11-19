@@ -6,7 +6,7 @@ import pytest
 import torch
 
 from conversation_pas_a_pas import __main__ as cli
-from test_resumer import un_jeu, un_rapport
+from test_resumer import un_essai, un_jeu, un_rapport
 
 
 def lancer(capsys, *arguments) -> tuple[int, str, str]:
@@ -62,6 +62,8 @@ def test_essai_ecrit_la_sortie_et_les_mesures(capsys, tmp_path, monkeypatch):
     assert code == 0
     assert "Un tout petit affinage, sur le processeur" in sortie
     assert "0\u202f% avant, 88\u202f% après" in sortie and "le modèle a appris à finir son tour\u202f: oui" in sortie
+    # Le taux de l'affinage, et pourquoi il n'est pas celui du pré-entraînement.
+    assert "taux d’affinage\u202f: 0,003, 3 fois celui du pré-entraînement (0,001)\u202f; au taux du pré-entraînement, 80 pas ne lui apprenaient pas" in sortie
     assert texte.read_text(encoding="utf-8").startswith("# relevé le 20")
     assert json.loads(mesures.read_text(encoding="utf-8"))["fin_de_tour_apres"] == 0.875
 
@@ -132,3 +134,31 @@ def test_une_commande_inconnue_est_refusee_par_argparse(capsys):
         cli.main(["dessiner"])
     assert sortie.value.code == 2
     assert "invalid choice" in capsys.readouterr().err
+
+
+def test_resumer_d_un_rapport_archive_prend_le_nom_donne(capsys, tmp_path):
+    rapport = tmp_path / "rapport.json"
+    rapport.write_text(json.dumps(un_rapport()), encoding="utf-8")
+    sortie_json = tmp_path / "etape-ton-ia-1.7-3e-4.json"
+    code, sortie, _ = lancer(capsys, "resumer", "--rapport", str(rapport), "--nom", "ton-ia-1.7-3e-4", "--json", str(sortie_json))
+    assert code == 0 and "Rapport d’étape de ton-ia-1.7-3e-4 (étape 1.7, nommée ton-ia-1.7 dans le rapport)" in sortie
+    releve = json.loads(sortie_json.read_text(encoding="utf-8"))
+    assert (releve["version"], releve["nom_au_rapport"]) == ("ton-ia-1.7-3e-4", "ton-ia-1.7")
+
+
+def test_balayage_ecrit_le_releve(capsys, tmp_path):
+    dossiers = [
+        un_essai(tmp_path / "sft-1.7-balayage-1e-4", 1e-4, {100: 1.422, 200: 1.317, 300: 1.279}),
+        un_essai(tmp_path / "sft-1.7-balayage-3e-4", 3e-4, {100: 1.418, 200: 1.283, 300: 1.214}),
+    ]
+    sortie_json = tmp_path / "balayage-sft-1.7.json"
+    code, sortie, _ = lancer(capsys, "balayage", *map(str, dossiers), "--json", str(sortie_json))
+    assert code == 0 and "Balayage du taux d’apprentissage, 2 essais" in sortie
+    assert "taux 0,0003 : validation 1,418 au pas 100, 1,283 au pas 200, 1,214 au pas 300" in sortie.replace("\u202f", " ")
+    assert [e["taux_max"] for e in json.loads(sortie_json.read_text(encoding="utf-8"))["essais"]] == [1e-4, 3e-4]
+
+
+def test_balayage_sans_journal_dit_quoi_faire(capsys, tmp_path):
+    (tmp_path / "vide").mkdir()
+    code, sortie, erreur = lancer(capsys, "balayage", str(tmp_path / "vide"))
+    assert code == 2 and sortie == "" and "journal.jsonl" in erreur and "Traceback" not in erreur

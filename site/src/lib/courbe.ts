@@ -47,6 +47,18 @@ export function echelleCourbe(pasTotal: number, perteHasard: number, largeur = 6
 }
 
 /**
+ * L'échelle de la courbe d'un entraînement de ton IA (CourbeEntrainement), qui en connaît la plus haute perte.
+ * Un pré-entraînement part du hasard : c'est echelleCourbe. Un affinage part d'un modèle déjà entraîné, et toute
+ * sa courbe reste loin sous le hasard (sous sa moitié) : à l'échelle du hasard, elle serait écrasée au bas du cadre
+ * (de 2,2 à 0,8 pour ton IA 1.7, quand le hasard vaut 10,4). L'échelle va alors de 0 à 1,25 fois sa plus haute
+ * perte, et le hasard sort du cadre, par le haut. Une plus haute perte non finie ou nulle garde l'échelle du hasard.
+ */
+export function echelleEntrainement(pasTotal: number, perteHasard: number, plusHaute: number, largeur = 640, hauteur = 280): Echelle {
+  const e = echelleCourbe(pasTotal, perteHasard, largeur, hauteur);
+  return Number.isFinite(plusHaute) && plusHaute > 0 && plusHaute < perteHasard / 2 ? { ...e, yMax: 1.25 * plusHaute } : e;
+}
+
+/**
  * La taille des paquets qui ramène nbPas pas à maxPoints points au plus.
  * Calculée sur le nombre total de pas, elle ne change pas pendant
  * l'entraînement : la courbe garde le même lissage du début à la fin.

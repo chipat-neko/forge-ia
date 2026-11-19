@@ -3,7 +3,7 @@ partie: 1
 numero: "1.7"
 titre: "Apprendre à converser"
 chapeau: "Ton IA prolonge un texte, mais ne te répond pas. Tu lui donnes le format d'une conversation, tu choisis, jeton par jeton, ce qu'elle doit apprendre, et tu ranges des milliers de conversations sans qu'elles se mélangent. Puis tu regardes ce que l'affinage change, et ce qu'il ne change pas."
-programme: "10 étapes, 4 paris, environ 40 minutes."
+programme: "10 étapes, 6 paris, environ 45 minutes."
 acquis:
   - cle: fin
     texte: "Ton IA 1.5, seulement pré-entraînée, ne finit pas ses réponses : elle prolonge le texte jusqu'à ce que forge l'arrête."
@@ -20,21 +20,23 @@ acquis:
   - cle: fuite
     texte: "Plusieurs conversations partagent une rangée ; sans masque par document, chacune verrait la précédente."
     ou: "à l'étape 4"
+  - cle: oubli
+    texte: "Un affinage fait oublier une part du pré-entraînement ; plus son taux d'apprentissage est grand, plus il fait oublier."
+    ou: "à l'étape 7"
+  - cle: consignes
+    texte: "Affinée, ton IA finit environ une réponse sur deux, mais respecte moins souvent toutes les consignes d'IFEval-FR que ton IA 1.5."
+    ou: "à l'étape 8"
 ---
 
 {/*
-  Brouillon du chapitre 1.7 (tâche 3 du plan 8), écrit pendant l'affinage de ton IA 1.7.
+  Brouillon du chapitre 1.7 (tâches 3 et 11 du plan 8), avec les vraies mesures de ton IA 1.7 (Release ton-ia-1.7).
 
-  À la tâche 11, avec la Release ton-ia-1.7 et les relevés du projet (mesures/etape-ton-ia-1.7.json,
-  etape-ton-ia-1.7-court.json, longueurs-sft-1.7.json, entrainement-sft-1.7.json) :
-  - les paris « consignes » et « oubli » remplacent leurs « à mesurer » (étape 8), et leurs acquis entrent dans
-    le frontmatter (« consignes », « oubli » : le parcours en attend alors 7) ; le programme compte 6 paris ;
-  - les commandes AFFINER_1_7_COURT, REPRENDRE_1_7 et DISCUTER_1_7 entrent dans commandes.ts, et les étapes 7 et
-    10 les montrent dans des blocs au lieu de les dire ;
-  - le balayage du taux (étape 7) demande un relevé de ses essais dans le projet, ou se dit sans chiffres ;
-  - etape-ton-ia-1.5.json est relevé de nouveau, sur le rapport de l'étape 1.7 (avec la perte sur des
-    conversations). Celui d'aujourd'hui vient de l'évaluation de ton IA 1.5 du 17/11/2026 (plan 7, tâche 11, à
-    l'étape 1.9), réduite aux mesures de l'étape 1.7 : sa « tenue » ne compte que les 235 réponses d'IFEval-FR.
+  Les nombres de ton IA viennent des relevés du projet 1.7 (projets/1.7-conversation/mesures/) : les rapports
+  d'étape de ton IA 1.5 et des quatre versions affinées (etape-ton-ia-*.json), le balayage du taux
+  (balayage-sft-1.7.json), les longueurs du jeu (longueurs-sft-1.7.json) et les courbes des affinages
+  (entrainement-sft-1.7*.json). Ton IA 1.7 a été affinée deux fois : à 3e-4, le taux que retient le balayage, puis
+  à 1e-4, la version publiée, qui oublie moins (docs/mesures/ton-ia-1.7.md). Chaque phrase sur ces versions est
+  gardée par exiger.
 */}
 
 import { root } from 'astro:config/server';
@@ -42,6 +44,7 @@ import AtelierConversation from '../../components/chapitres/1-7/AtelierConversat
 import EchantillonsConversation from '../../components/chapitres/1-7/EchantillonsConversation.astro';
 import FigureEmpaquetage from '../../components/chapitres/1-7/FigureEmpaquetage.svelte';
 import OuvertureConversation from '../../components/chapitres/1-7/OuvertureConversation.astro';
+import TableauBalayage from '../../components/chapitres/1-7/TableauBalayage.astro';
 import TableauEtape from '../../components/chapitres/1-7/TableauEtape.astro';
 import CourbeEntrainement from '../../components/chapitres/1-5/CourbeEntrainement.astro';
 import TableauSessions from '../../components/chapitres/1-5/TableauSessions.astro';
@@ -61,10 +64,20 @@ import {
   LONGUEURS_DE_RANGEE,
   LONGUEUR_DE_TON_IA,
 } from '../../lib/partie-1/atelier-1-7';
-import { CONVERSATION_ESSAI, CONVERSATION_FUITE, CONVERSATION_MONTRER, CONVERSATION_TESTS } from '../../lib/partie-1/commandes';
+import {
+  AFFINER_1_7,
+  AFFINER_1_7_COURT,
+  CONVERSATION_ESSAI,
+  CONVERSATION_FUITE,
+  CONVERSATION_MONTRER,
+  CONVERSATION_TESTS,
+  DISCUTER_1_7,
+} from '../../lib/partie-1/commandes';
 import { NOMS_SPECIAUX, PREMIER_SPECIAL, SPECIAUX_TON_IA } from '../../lib/partie-1/conversation';
 import { lireRapportEtape } from '../../lib/partie-1/etapes';
+import { lireEntrainement } from '../../lib/partie-1/journal';
 import { MESURES_PARTIE_1 } from '../../lib/partie-1/mesures';
+import { dureeDeCalcul } from '../../lib/partie-1/paris-1-5';
 import {
   choixConsignes,
   choixFinDeTour,
@@ -76,20 +89,27 @@ import {
   empaquetagesDeLaFigure,
   faitsDeForge,
   faitsDeLOubli,
+  faitsDesConsignes,
   faitsDuPariFin,
   faitsDuPariGabarit,
   faitsDuPariMasque,
   INVITE_DE_L_OUVERTURE,
+  invitesRespectees,
+  lireBalayage,
   lireConversationsDeReference,
   lireEssaiAffinage,
   lireFuite,
+  lireLongueurs,
   lireReglagesDeLEssai,
   lireReglagesSft,
   phraseDeLOubli,
   QUESTION_FIN,
   reponseALInvite,
   resumeDesLongueurs,
+  retenuDuBalayage,
+  SEUIL_CONSIGNES_EN_INVITES,
   SEUIL_DE_FUITE,
+  SEUIL_UN_PEU_OUBLI,
   textesDesJetons,
   TOLERANCE_OUBLI,
   tourneEnBoucle,
@@ -149,7 +169,24 @@ export const TON_IA_15 = (() => {
   return r;
 })();
 
-export const TON_IA_17 = lireRapportEtape('1.7@1.7', RACINE);
+export const VERSIONS = (() => {
+  // Ton IA 1.7, publiée (1e-4), sa version courte, et les deux versions au taux 3e-4, gardées pour comparer.
+  const lire = (nom) => {
+    const r = lireRapportEtape(nom, RACINE);
+    exiger(r !== null, `le relevé « ${nom} » du projet 1.7 manque`);
+    return r;
+  };
+  return { v17: lire('1.7@1.7'), court: lire('1.7-court@1.7'), fort: lire('1.7-3e-4@1.7'), fortCourt: lire('1.7-court-3e-4@1.7') };
+})();
+
+export const TON_IA_17 = VERSIONS.v17;
+
+export const m = (rapport, mesure, cle) => {
+  // Un nombre d'une mesure d'un relevé : m(rapport, 'oubli', 'perte').
+  const x = rapport.mesures[mesure]?.[cle];
+  exiger(typeof x === 'number', `le relevé de ${rapport.version} n’a pas de « ${mesure}.${cle} »`);
+  return x;
+};
 
 export const OUVERTURE = (() => {
   // « Elle répète ta question, puis enchaîne une phrase qui revient en boucle, jusqu'à ce que forge la coupe. »
@@ -160,6 +197,10 @@ export const OUVERTURE = (() => {
   // « Ses dix réponses aux questions fixes de forge tournent toutes en boucle, et aucune ne finit » (étapes 1 et 8).
   exiger(TON_IA_15.echantillons.every((x) => !x.terminee), 'une des réponses fixes de ton IA 1.5 finit maintenant d’elle-même');
   exiger(TON_IA_15.echantillons.every((x) => tourneEnBoucle(x.texte)), 'une des réponses fixes de ton IA 1.5 ne tourne plus en boucle');
+  // « Ton IA 1.7 répond sans répéter la question, et rend la parole, mais se répète encore. »
+  const r17 = reponseALInvite(TON_IA_17, INVITE_DE_L_OUVERTURE);
+  exiger(!r17.texte.startsWith(INVITE_DE_L_OUVERTURE) && r17.terminee, 'la réponse de ton IA 1.7 à « Qui es-tu ? » répète la question, ou ne finit plus son tour');
+  exiger(tourneEnBoucle(r17.texte), 'la réponse de ton IA 1.7 à « Qui es-tu ? » ne se répète plus');
   return { n: enLettres(TON_IA_15.echantillons.length) };
 })();
 
@@ -264,6 +305,8 @@ export const DEFI = (() => {
 
 export const SFT = lireReglagesSft('sft-1.7', RACINE);
 export const SFT_COURT = lireReglagesSft('sft-1.7-court', RACINE);
+export const SFT_FORT = lireReglagesSft('sft-1.7-3e-4', RACINE);
+export const SFT_FORT_COURT = lireReglagesSft('sft-1.7-court-3e-4', RACINE);
 
 export const FIGURE = (() => {
   const f = empaquetagesDeLaFigure(RACINE);
@@ -273,9 +316,18 @@ export const FIGURE = (() => {
   f.resultats.forEach((r, i) => i === 0 || exiger(r.ecartes <= f.resultats[i - 1].ecartes, `des rangées de ${r.longueur} jetons écartent plus que de plus courtes`));
   exiger(f.resultats.filter((r) => r.longueur >= LONGUEUR_DE_TON_IA).every((r) => r.ecartes === 0), 'des rangées de 2 048 jetons écartent maintenant des exemples');
   exiger(f.resultats[0].ecartes > 0, 'des rangées de 512 jetons n’écartent plus aucun exemple');
-  // « Dans tous les cas, BFD remplit presque toutes les places » : plus de 90 % (borne du texte).
-  exiger(f.resultats.every((r) => r.occupees > 0.9 * r.rangees * r.places), 'BFD ne remplit plus presque toutes les places');
-  return { ...f, exemples, plusLong, longueur: nombre(SFT.longueur), court: nombre(LONGUEURS_DE_RANGEE[0]) };
+  // « Avec les rangées de ton IA, BFD remplit presque toutes les places, {part} » (plus de 99 %, borne du texte) ;
+  // « avec des rangées plus courtes, … les places se remplissent moins bien ».
+  const part = (r) => r.occupees / (r.rangees * r.places);
+  const sienne = f.resultats.find((r) => r.longueur === LONGUEUR_DE_TON_IA);
+  exiger(part(sienne) > 0.99, 'avec les rangées de ton IA, BFD ne remplit plus presque toutes les places');
+  exiger(f.resultats.filter((r) => r.longueur < LONGUEUR_DE_TON_IA).every((r) => part(r) < part(sienne)), 'des rangées plus courtes se remplissent maintenant aussi bien que celles de ton IA');
+  // « Dans le jeu de ton IA, la moitié des conversations font au plus {mediane} jetons » : moins de la moitié d'une rangée.
+  exiger(f.source === 'jeu', 'la figure ne range plus les longueurs du jeu de ton IA (mesures/longueurs-sft-1.7.json)');
+  const triees = [...lireLongueurs(RACINE).longueurs].sort((a, b) => a - b);
+  const mediane = triees[Math.floor((triees.length - 1) / 2)];
+  exiger(2 * mediane < SFT.longueur, 'la moitié des conversations du jeu ne tient plus dans une demi-rangée');
+  return { ...f, exemples, plusLong, mediane: nombre(mediane), remplies: pourcent(part(sienne), 1), longueur: nombre(SFT.longueur), court: nombre(LONGUEURS_DE_RANGEE[0]) };
 })();
 
 export const FUITE = (() => {
@@ -368,12 +420,101 @@ export const AFFINAGE = (() => {
 })();
 
 
+export const BALAYAGE = (() => {
+  const b = lireBalayage(RACINE);
+  exiger(b !== null, 'le relevé du balayage du taux (mesures/balayage-sft-1.7.json) manque');
+  const e = b.essais;
+  const derniere = (x) => x.validations[x.validations.length - 1][1];
+  // « Quatre essais de 300 pas » : le même nombre de pas pour chacun.
+  exiger(e.every((x) => x.pas === e[0].pas), 'les essais du balayage n’ont plus tous le même nombre de pas');
+  // « À chaque mesure, le plus grand taux est devant » : à chaque pas mesuré, la perte baisse quand le taux monte.
+  e.forEach((x, i) => i === 0 || x.validations.forEach(([, v], j) => exiger(v < e[i - 1].validations[j][1], `au pas ${x.validations[j][0]}, le taux ${x.taux_max} n’est plus devant le précédent`)));
+  // « La règle retient donc le plus grand » ; le premier affinage complet a tourné à ce taux, la version publiée à celui d'en dessous.
+  const retenu = retenuDuBalayage(e);
+  exiger(retenu === e.length - 1, 'la règle du balayage ne retient plus le plus grand taux');
+  exiger(e[retenu].taux_max === SFT_FORT.taux_max && SFT_FORT_COURT.taux_max === SFT_FORT.taux_max, 'les versions à 3e-4 n’ont plus le taux que retient le balayage');
+  const publie = e.findIndex((x) => x.taux_max === SFT.taux_max);
+  exiger(publie === retenu - 1 && SFT_COURT.taux_max === SFT.taux_max, 'le taux publié n’est plus l’essai juste sous celui que retient la règle');
+  // Les versions à 3e-4 ont les mêmes réglages que les versions publiées, sauf le taux.
+  exiger(SFT_FORT.jetons_total === SFT.jetons_total && SFT_FORT_COURT.jetons_total === SFT_COURT.jetons_total, 'les versions à 3e-4 n’ont plus la longueur des versions à 1e-4');
+  return {
+    n: enLettres(e.length),
+    pas: nombre(e[0].pas),
+    retenu: reglage(e[retenu].taux_max),
+    derniereRetenu: formaterPerte(derniere(e[retenu])),
+    publie: reglage(e[publie].taux_max),
+    dernierePublie: formaterPerte(derniere(e[publie])),
+  };
+})();
+
+export const OUBLI = (() => {
+  const choix = choixOubli(RACINE);
+  const phrase = phraseDeLOubli(RACINE);
+  const f = faitsDeLOubli(RACINE);
+  exiger(choix !== null && phrase !== null, 'les relevés de ton IA 1.5 et de ton IA 1.7 manquent : le pari « oubli » n’a pas de réponse');
+  const { v17, court, fort, fortCourt } = VERSIONS;
+  const oubli = (r) => m(r, 'oubli', 'perte');
+  const conv = (r) => m(r, 'perte_conversation', 'perte');
+  const fin = (r) => m(r, 'tenue', 'terminee');
+  // L'acquis : « un affinage fait oublier une part du pré-entraînement ; plus son taux est grand, plus il fait oublier ».
+  exiger(f.ecart > SEUIL_UN_PEU_OUBLI, 'ton IA 1.7 n’oublie plus « une part » de son pré-entraînement');
+  exiger(oubli(fort) > oubli(v17) && oubli(fortCourt) > oubli(court), 'au taux 3e-4, ton IA n’oublie plus davantage qu’à 1e-4');
+  // « Au plus petit taux, la version courte oublie moins » (au moins 0,1 nat de moins), « apprend moins bien les
+  // conversations et finit moins de réponses » ; « le taux qui apprend le mieux à converser est celui qui fait le plus oublier ».
+  exiger(oubli(fortCourt) - oubli(court) > SEUIL_UN_PEU_OUBLI, 'la version courte à 1e-4 n’oublie plus nettement moins que celle à 3e-4');
+  exiger(conv(court) > conv(fortCourt) && conv(v17) > conv(fort), 'au taux 1e-4, ton IA n’apprend plus moins bien les conversations qu’à 3e-4');
+  exiger(fin(court) < fin(fortCourt), 'la version courte à 1e-4 ne finit plus moins de réponses que celle à 3e-4');
+  // « Elle respecte à peu près autant les consignes d'IFEval-FR, à {n} invites près. »
+  const invites = Math.abs(invitesRespectees(court.mesures.ifeval_fr) - invitesRespectees(fortCourt.mesures.ifeval_fr));
+  exiger(invites < SEUIL_CONSIGNES_EN_INVITES, 'les deux versions courtes ne respectent plus autant de consignes d’IFEval-FR');
+  return {
+    choix,
+    phrase: typographier(phrase),
+    tolerance: nombre(TOLERANCE_OUBLI, 2),
+    avant: formaterPerte(f.avant),
+    fort: formaterPerte(oubli(fort)),
+    court: formaterPerte(oubli(court)),
+    fortCourt: formaterPerte(oubli(fortCourt)),
+    convCourt: formaterPerte(conv(court)),
+    convFortCourt: formaterPerte(conv(fortCourt)),
+    finCourt: pourcent(fin(court), 1),
+    finFortCourt: pourcent(fin(fortCourt), 1),
+    invites: enLettres(invites),
+    pasCourt: nombre(SFT_COURT.jetons_total / SFT_COURT.taille_lot_jetons),
+    nomsCourts: ['Ton IA 1.5', `Courte, à ${reglage(SFT_FORT_COURT.taux_max)}`, `Courte, à ${reglage(SFT_COURT.taux_max)}`],
+  };
+})();
+
+export const COURBE = (() => {
+  // La version publiée : « d'une traite, en {durée} de calcul » ; « sa perte de validation baisse à chaque mesure ».
+  const t = lireEntrainement('sft-1.7', RACINE);
+  exiger(t !== null, 'le relevé de l’affinage publié (mesures/entrainement-sft-1.7.json) manque');
+  exiger(t.sessions.length === 1 && t.resume.pauses === 0, 'l’affinage publié n’a plus tourné d’une traite');
+  const v = t.courbe.validations;
+  exiger(v.every(([, x], i) => i === 0 || x < v[i - 1][1]), 'la perte de validation de l’affinage publié ne baisse plus à chaque mesure');
+  exiger(t.resume.jetons_vus === SFT.jetons_total, 'l’affinage publié n’a plus lu tous les jetons de sa configuration');
+  // « L'auteur l'a fait deux fois pour de vrai, sur l'affinage à 3e-4. »
+  const fort = lireEntrainement('sft-1.7-3e-4', RACINE);
+  exiger(fort !== null && fort.resume.pauses === 2 && fort.sessions.length === 3, 'l’affinage à 3e-4 n’a plus deux pauses et trois sessions');
+  return {
+    titre: `La courbe de l’affinage publié, au taux ${reglage(SFT.taux_max)}`,
+    titreSessions: `Les sessions du premier affinage complet, au taux ${reglage(SFT_FORT.taux_max)}`,
+    premiere: formaterPerte(v[0][1]),
+    pasPremiere: nombre(v[0][0]),
+    derniere: formaterPerte(v[v.length - 1][1]),
+    pasDerniere: nombre(v[v.length - 1][0]),
+    duree: dureeDeCalcul(t.resume.secondes_de_calcul),
+  };
+})();
+
 export const ATTENTES = (() => {
   // nanochat d20 : l'affinage ne change pas ARC-Challenge (« rien de gagné »), à moins d'un point.
   const n = NANOCHAT_D20;
   exiger(n.arcApres.valeur < n.arcAvant.valeur + 0.01, 'chez nanochat d20, l’affinage fait maintenant gagner un point sur ARC-Challenge');
+  const tonIA = lireEntrainement('sft-1.7', RACINE).resume.parametres;
   return {
     parametres: nombre(Math.round(n.parametres.valeur / 1e6)),
+    tonIA: nombre(Math.round(tonIA / 1e6)),
     avant: pourcent(n.arcAvant.valeur, 2),
     apres: pourcent(n.arcApres.valeur, 2),
     minutes: nombre(n.minutesSft.valeur),
@@ -382,24 +523,43 @@ export const ATTENTES = (() => {
 
 export const CONSIGNES = (() => {
   const choix = choixConsignes(RACINE);
-  const ifeval15 = TON_IA_15.mesures.ifeval_fr;
-  exiger(ifeval15 !== undefined && !('absente' in ifeval15), 'IFEval-FR manque dans le relevé de ton IA 1.5');
-  const avant = pourcent(ifeval15.invite_stricte, 1);
-  // « Sa perte sur des conversations n'a pas encore été mesurée : son évaluation a eu lieu avant que le jeu d'affinage existe. »
-  exiger('absente' in TON_IA_15.mesures.perte_conversation, 'la perte sur des conversations de ton IA 1.5 est maintenant mesurée : l’étape 8 dit le contraire');
-  // « Sa part de réponses finies n'y compte que les réponses d'IFEval-FR. »
-  exiger(TON_IA_15.mesures.tenue.n === ifeval15.n, 'la tenue de ton IA 1.5 ne compte plus seulement les réponses d’IFEval-FR : l’étape 8 dit le contraire');
-  const releve = formaterDate(TON_IA_15.releve_le);
-  const nIfeval = nombre(ifeval15.n);
-  if (choix === null) return { choix: null, avant, releve, nIfeval, apres: null, juste: null };
-  return { choix, avant, releve, nIfeval, apres: pourcent(TON_IA_17.mesures.ifeval_fr.invite_stricte, 1), juste: choix.find((c) => c.juste).texte };
-})();
-
-export const OUBLI = (() => {
-  const choix = choixOubli(RACINE);
-  const phrase = phraseDeLOubli(RACINE);
-  const f = faitsDeLOubli(RACINE);
-  return { choix, phrase: phrase === null ? null : typographier(phrase), tolerance: nombre(TOLERANCE_OUBLI, 2), avant: f === null ? null : formaterPerte(f.avant) };
+  const f = faitsDesConsignes(RACINE);
+  exiger(choix !== null && f !== null, 'les relevés de ton IA 1.5 et de ton IA 1.7 manquent : le pari « consignes » n’a pas de réponse');
+  // « Moins d'invites que ton IA 1.5 … consigne par consigne aussi, elle en respecte moins » ; l'acquis le dit.
+  exiger(f.sens === 'moins' && f.consignesApres < f.consignesAvant, 'ton IA 1.7 ne respecte plus moins de consignes d’IFEval-FR que ton IA 1.5');
+  // L'acquis : « elle finit environ une réponse sur deux » (de 40 à 60 %).
+  const fin17 = m(TON_IA_17, 'tenue', 'terminee');
+  exiger(Math.abs(fin17 - 0.5) <= 0.1, 'ton IA 1.7 ne finit plus environ une réponse sur deux');
+  // « Les deux versions ont passé ces épreuves le même jour, sur les mêmes questions » : ton IA 1.5 est la référence du rapport.
+  exiger(TON_IA_15.releve_le === TON_IA_17.releve_le, 'les relevés de ton IA 1.5 et de ton IA 1.7 ne sont plus du même jour');
+  exiger(m(TON_IA_15, 'tenue', 'n') === m(TON_IA_17, 'tenue', 'n'), 'ton IA 1.5 et ton IA 1.7 n’ont plus répondu au même nombre de questions');
+  // « Elle finit {x} de ses réponses, contre {y} … sa perte sur les conversations passe de … à … ».
+  exiger(fin17 > m(TON_IA_15, 'tenue', 'terminee'), 'ton IA 1.7 ne finit plus plus de réponses que ton IA 1.5');
+  exiger(m(TON_IA_17, 'perte_conversation', 'perte') < m(TON_IA_15, 'perte_conversation', 'perte'), 'la perte sur les conversations ne baisse plus');
+  // Les échantillons cités, tels quels.
+  const reponse = (invite) => reponseALInvite(TON_IA_17, invite).texte;
+  exiger(reponse('Pourquoi le ciel est-il bleu ?').includes('parce que les nuages sont blancs'), 'la réponse de ton IA 1.7 sur le ciel bleu a changé');
+  exiger(reponse('Combien font 12 fois 7 ?').startsWith('Pour déterminer combien font 12 fois 7 ?'), 'ton IA 1.7 ne répète plus « Combien font 12 fois 7 ? »');
+  exiger(reponse('Quelle est la capitale de la France ?').includes('Paris'), 'ton IA 1.7 ne dit plus que Paris est la capitale de la France');
+  return {
+    choix,
+    juste: choix.find((c) => c.juste).texte,
+    avant: pourcent(f.avant, 1),
+    apres: pourcent(f.apres, 1),
+    invitesAvant: nombre(f.invitesAvant),
+    invitesApres: nombre(f.invitesApres),
+    n: nombre(f.n),
+    consignesAvant: pourcent(f.consignesAvant, 1),
+    consignesApres: pourcent(f.consignesApres, 1),
+    finAvant: pourcent(m(TON_IA_15, 'tenue', 'terminee'), 1),
+    finApres: pourcent(fin17, 1),
+    convAvant: formaterPerte(m(TON_IA_15, 'perte_conversation', 'perte')),
+    convApres: formaterPerte(m(TON_IA_17, 'perte_conversation', 'perte')),
+    questions: nombre(m(TON_IA_17, 'tenue', 'n')),
+    finies: nombre(TON_IA_17.echantillons.filter((e) => e.terminee).length),
+    sur: nombre(TON_IA_17.echantillons.length),
+    echantillons: enLettres(TON_IA_17.echantillons.length),
+  };
 })();
 
 
@@ -411,6 +571,8 @@ export const LABO = (() => {
   exiger(LLAMA_2.perteSurLesReponses.valeur && s.bfd.valeur && s.perteMasquee.valeur, 'Llama 2 ou SmolLM3 ne font plus ce que dit l’encadré');
   // « Bien moins que ton IA » ou « bien plus » : SmolLM3 lit son jeu quatre fois, bien plus de jetons que ton IA 1.7.
   exiger(s.jetonsSft.valeur * s.epoques.valeur > 10 * SFT.jetons_total, 'SmolLM3 ne lit plus dix fois plus de jetons d’affinage que ton IA');
+  // « Ton IA, elle, a lu {n} jetons » : ceux de son affinage publié.
+  exiger(lireEntrainement('sft-1.7', RACINE)?.resume.jetons_vus === SFT.jetons_total, 'l’affinage publié n’a plus lu les jetons que dit l’encadré');
   const milliards = (x) => `${nombre(x / 1e9, decimalesUtiles(x / 1e9, 1))} ${x / 1e9 >= 2 ? 'milliards' : 'milliard'}`;
   return {
     iParametres: milliards(i.parametres.valeur),
@@ -446,6 +608,8 @@ export const SUITE = (() => {
 <OuvertureConversation />
 
 Forge a posé cette question à ton IA, celle qui est née au {LIENS.l15 ? <a href={LIENS.l15}>chapitre 1.5</a> : 'chapitre 1.5'}. Elle ne répond pas : elle répète la question, puis enchaîne une phrase qui revient en boucle, jusqu'à ce que forge la coupe. Ce n'est pas un accident de cette question-là : ses {OUVERTURE.n} réponses aux questions fixes de forge, à l'étape 8, tournent toutes en boucle, et aucune ne finit. Ton IA n'a appris qu'à prolonger des textes, comme le {LIENS.l16 ? <a href={LIENS.l16}>chapitre 1.6</a> : 'chapitre 1.6'} l'a montré.
+
+Dessous, la réponse de ton IA 1.7, celle que ce chapitre construit. Elle ne répète plus la question, et rend la parole : elle a fini son tour. Mais elle se répète encore.
 
 <Pari
   id="fin"
@@ -573,11 +737,11 @@ Chaque bouton de l'atelier se choisit d'un clic, ou au clavier : Tab, puis Entr�
 
 <Etape numero={4} titre="Ranger les conversations">
 
-L'affinage, comme le pré-entraînement, lit des rangées de longueur fixe : {FIGURE.longueur} jetons pour ton IA, la longueur de son contexte. Une conversation est souvent bien plus courte. Une seule par rangée, et le reste serait du bourrage : des places perdues, et du calcul pour rien. Forge en range donc plusieurs par rangée, sans jamais en couper une : c'est l'empaquetage. Il suit BFD, de l'anglais *best-fit decreasing* : les plus longues d'abord, chacune dans la rangée où elle laisse le moins de place libre.
+L'affinage, comme le pré-entraînement, lit des rangées de longueur fixe : {FIGURE.longueur} jetons pour ton IA, la longueur de son contexte. Une conversation est souvent bien plus courte : dans le jeu de ton IA, la moitié en font au plus {FIGURE.mediane}. Une seule par rangée, et le reste serait du bourrage : des places perdues, et du calcul pour rien. Forge en range donc plusieurs par rangée, sans jamais en couper une : c'est l'empaquetage. Il suit BFD, de l'anglais *best-fit decreasing* : les plus longues d'abord, chacune dans la rangée où elle laisse le moins de place libre.
 
 <FigureEmpaquetage client:load resultats={FIGURE.resultats} source={FIGURE.source} exemples={FIGURE.exemples} plusLong={FIGURE.plusLong} />
 
-Avec des rangées assez longues pour les plus longues conversations, aucune n'est écartée, et BFD remplit presque toutes les places. Avec des rangées plus courtes, de {FIGURE.court} jetons par exemple, il faut écarter les conversations trop longues : forge n'en coupe jamais une, car sa fin serait perdue. Voici l'empaquetage de forge :
+Avec les rangées de ton IA, de {FIGURE.longueur} jetons, aucune conversation n'est écartée, et BFD remplit presque toutes les places : {FIGURE.remplies}. Avec des rangées plus courtes, de {FIGURE.court} jetons par exemple, il faut écarter les conversations trop longues, car forge n'en coupe jamais une : sa fin serait perdue. Et les places se remplissent moins bien. Voici l'empaquetage de forge :
 
 <CodeExplique fichier="projets/forge/forge/affinage/empaquetage.py" symbole="empaqueter">
   <li data-lignes="1-3">`empaqueter` reçoit les exemples, chacun ses jetons et son masque, la longueur d'une rangée et le jeton de bourrage.</li>
@@ -688,45 +852,76 @@ Sa perte passe de {ESSAI.premiere} à {ESSAI.derniere}, et ses réponses finisse
 
 Ton IA, la vraie, s'affine de la même façon, sur la carte graphique de l'auteur. Elle part de sa version publiée, `ton-ia-1.5`, et lit le jeu d'affinage que forge a préparé à partir des sources de l'étape 5, en rangées de {AFFINAGE.longueur} jetons. Ses réglages sont dans `configs/sft-1.7.toml`, dans le dossier de forge : {AFFINAGE.pas} pas de {AFFINAGE.lot} jetons, bourrage compris, soit {AFFINAGE.jetons} jetons en tout. Le taux d'apprentissage monte en {AFFINAGE.echauffement} pas jusqu'à {AFFINAGE.taux}, puis redescend jusqu'à {AFFINAGE.tauxMin}, sur le planning du {LIENS.l15 ? <a href={LIENS.l15}>chapitre 1.5</a> : 'chapitre 1.5'}.
 
-Pour le taux, la configuration le dit en commentaire : aucune source n'en donne pour un modèle de cette taille entraîné de zéro. Il a donc été cherché par un balayage : plusieurs essais courts, chacun avec son taux, et on garde celui dont la perte de validation finit la plus basse.
+Ce taux n'est pas le premier qui a servi. Aucune source n'en donne pour un modèle de cette taille entraîné de zéro, et la configuration le dit en commentaire. Il a donc été cherché par un balayage : {BALAYAGE.n} essais de {BALAYAGE.pas} pas, chacun avec son taux, et une règle fixée avant de les lancer. On garde celui dont la dernière perte de validation, sur des conversations que ton IA n'a jamais lues, est la plus basse.
 
-<p class="a-mesurer" data-a-mesurer data-balayage-absent>{typographier('Les taux essayés et leurs pertes de validation : à relever, avec l’affinage complet.')}</p>
+<TableauBalayage legende="Le balayage du taux d'apprentissage" />
 
-<CourbeEntrainement nom="sft-1.7" titre="La courbe de l'affinage de ton IA" />
+À chaque mesure, le plus grand taux est devant. La règle retient donc {BALAYAGE.retenu} : {BALAYAGE.derniereRetenu} au dernier pas, contre {BALAYAGE.dernierePublie} pour {BALAYAGE.publie}. Le premier affinage complet de ton IA 1.7 a tourné à ce taux. Puis forge l'a évalué, et une autre mesure a fait changer de taux.
 
-<TableauSessions nom="sft-1.7" titre="Les sessions de l'affinage de ton IA" />
+Un affinage peut faire oublier. À force de lire des conversations, ton IA pourrait moins bien prédire le texte du web qu'elle a lu pendant son pré-entraînement. Forge le mesure par sa perte sur des textes de validation de ce pré-entraînement.
 
-Comme au {LIENS.l15 ? <a href={LIENS.l15}>chapitre 1.5</a> : 'chapitre 1.5'}, l'affinage peut s'arrêter à tout moment, par Ctrl+C, et reprendre exactement là où il en était. Il existe aussi une version courte, en {AFFINAGE.pasCourt} pas au lieu de {AFFINAGE.pas}, avec les mêmes réglages : `configs/sft-1.7-court.toml`. Les deux se lancent avec la commande `entrainer` de forge, sur une carte graphique NVIDIA ; les commandes à copier viendront ici avec la version publiée de ton IA 1.7.
+<Pari
+  id="oubli"
+  question="Après son affinage complet, la perte de ton IA 1.7 publiée sur le texte du web…"
+  precision={`Celle de ton IA 1.5 : ${OUBLI.avant} nats par jeton. « Ne bouge pas » veut dire à ${OUBLI.tolerance} près.`}
+  choix={OUBLI.choix}
+  acquis="oubli"
+>
+  <p data-test="phrase-oubli">{OUBLI.phrase}</p>
+</Pari>
+
+Et c'est le plus petit taux qui l'a limité. Au taux {BALAYAGE.retenu}, l'affinage complet faisait monter cette perte jusqu'à {OUBLI.fort}. Avant de refaire tout l'affinage, l'auteur a comparé les deux taux sur deux versions courtes, de {OUBLI.pasCourt} pas chacune, entraînées et évaluées comme les autres, l'une à {BALAYAGE.retenu}, l'autre à {BALAYAGE.publie} :
+
+<TableauEtape
+  versions={['1.5@1.7', '1.7-court-3e-4@1.7', '1.7-court@1.7']}
+  noms={OUBLI.nomsCourts}
+  mesures={['oubli', 'perte_conversation', 'tenue', 'ifeval_fr']}
+  legende="Les deux versions courtes, face à ton IA 1.5"
+/>
+
+Au plus petit taux, la version courte oublie moins : {OUBLI.court} contre {OUBLI.fortCourt}. En échange, elle apprend moins bien les conversations, {OUBLI.convCourt} contre {OUBLI.convFortCourt}, et finit moins de réponses, {OUBLI.finCourt} contre {OUBLI.finFortCourt}. Les consignes d'IFEval-FR, elle les respecte à peu près autant, à {OUBLI.invites} invites près. Le taux qui apprend le mieux à converser est aussi celui qui fait le plus oublier.
+
+L'auteur a jugé l'oubli à {BALAYAGE.retenu} trop fort pour la suite : l'affinage complet a été refait à {BALAYAGE.publie}, et c'est lui qui est publié, `ton-ia-1.7`. Les versions à {BALAYAGE.retenu} restent sur son disque, pour comparer, sans être publiées.
+
+<CourbeEntrainement nom="sft-1.7" titre={COURBE.titre} />
+
+La perte de validation de l'affinage publié baisse à chaque mesure, de {COURBE.premiere} au pas {COURBE.pasPremiere} à {COURBE.derniere} au pas {COURBE.pasDerniere}. Il a tourné d'une traite, en {COURBE.duree} de calcul.
+
+Comme au {LIENS.l15 ? <a href={LIENS.l15}>chapitre 1.5</a> : 'chapitre 1.5'}, l'affinage peut s'arrêter à tout moment, par Ctrl+C, et reprendre là où il en était : la même commande, suivie de `--reprendre`. L'auteur l'a fait deux fois pour de vrai, sur le premier affinage, au taux {BALAYAGE.retenu}, avec le même code :
+
+<TableauSessions nom="sft-1.7-3e-4" titre={COURBE.titreSessions} />
+
+L'affinage complet et sa version courte, `configs/sft-1.7-court.toml`, se lancent avec la commande `entrainer` de forge, sur une carte graphique NVIDIA :
+
+<BlocCommande commandes={[AFFINER_1_7, AFFINER_1_7_COURT]} ou="PowerShell, dans le dossier projets/forge" />
 
 </Etape>
 
 <Etape numero={8} titre="Ce qu'elle sait faire maintenant">
 
-D'abord, un point de comparaison. Chez <a href={DISCUSSION_NANOCHAT.url}>nanochat d20</a>, un modèle de {ATTENTES.parametres} millions de paramètres, proche de ton IA, l'affinage fait passer ARC-Challenge, des questions de sciences, de {ATTENTES.avant} à {ATTENTES.apres} : rien de gagné sur ce test-là.
+D'abord, un point de comparaison. Chez <a href={DISCUSSION_NANOCHAT.url}>nanochat d20</a>, un modèle de {ATTENTES.parametres} millions de paramètres, contre {ATTENTES.tonIA} millions pour ton IA, l'affinage fait passer ARC-Challenge, des questions de sciences, de {ATTENTES.avant} à {ATTENTES.apres} : rien de gagné sur ce test-là.
 
 Forge fait passer à chaque version de ton IA les mêmes épreuves. Les consignes d'IFEval-FR : des demandes avec des consignes qu'un programme peut vérifier, comme écrire sans virgule ou rester sous un nombre de mots. La part des réponses qui finissent d'elles-mêmes. Et sa perte sur des conversations qu'elle n'a jamais lues, celles de la validation de son jeu d'affinage.
 
-{CONSIGNES.choix === null ? (
-  <p class="a-mesurer" data-a-mesurer data-pari-a-mesurer="consignes">{typographier('Le pari sur les consignes de ton IA 1.7 : à venir, avec ses mesures.')}</p>
-) : (
-  <Pari
-    id="consignes"
-    question="Sur IFEval-FR, quelle part des invites ton IA 1.7 respecte-t-elle en entier ?"
-    precision={`Ton IA 1.5 en respectait ${CONSIGNES.avant}.`}
-    choix={CONSIGNES.choix}
-    acquis="consignes"
-  >
-    <p>{typographier(`${CONSIGNES.juste} : ${CONSIGNES.apres} des invites, contre ${CONSIGNES.avant} pour ton IA 1.5.`)}</p>
-  </Pari>
-)}
+<Pari
+  id="consignes"
+  question="Sur IFEval-FR, ton IA 1.7 respecte toutes les consignes de…"
+  precision={`Ton IA 1.5 respectait toutes les consignes de ${CONSIGNES.invitesAvant} invites sur ${CONSIGNES.n}, ${CONSIGNES.avant}.`}
+  choix={CONSIGNES.choix}
+  acquis="consignes"
+>
+  <p>{typographier(`${CONSIGNES.juste} : ${CONSIGNES.invitesApres} invites sur ${CONSIGNES.n}, ${CONSIGNES.apres}, contre ${CONSIGNES.invitesAvant} pour ton IA 1.5. Consigne par consigne aussi, elle en respecte moins : ${CONSIGNES.consignesApres} contre ${CONSIGNES.consignesAvant}. Ce que l'affinage lui a appris, ce n'est pas à suivre ces consignes-là.`)}</p>
+</Pari>
 
-<TableauEtape versions={['1.5@1.7', '1.7@1.7', '1.7-court@1.7']} mesures={['ifeval_fr', 'tenue', 'perte_conversation']} legende="Ton IA avant et après l'affinage, sur les mêmes tests" />
+<TableauEtape versions={['1.5@1.7', '1.7@1.7']} mesures={['ifeval_fr', 'tenue', 'perte_conversation', 'oubli']} legende="Ton IA avant et après l'affinage, sur les mêmes tests" />
 
-Ton IA 1.5 respecte toutes les consignes de {CONSIGNES.avant} des invites, sans jamais finir une réponse. Son relevé vient de son évaluation du {CONSIGNES.releve}, faite pour une étape suivante, avant que le jeu d'affinage existe : sa perte sur des conversations n'y est pas, et sa part de réponses finies n'y compte que les {CONSIGNES.nIfeval} réponses d'IFEval-FR.
+Ce que l'affinage lui a appris, le tableau le montre : elle finit {CONSIGNES.finApres} de ses réponses, contre {CONSIGNES.finAvant} pour ton IA 1.5, et sa perte sur les conversations de validation passe de {CONSIGNES.convAvant} à {CONSIGNES.convApres}. Les deux versions ont passé ces épreuves le même jour, sur les mêmes {CONSIGNES.questions} questions : ton IA 1.5 sert de référence dans l'évaluation de ton IA 1.7.
 
-Voici les réponses de ton IA 1.7 aux {OUVERTURE.n} questions fixes de forge, telles quelles :
+Voici les réponses de ton IA 1.7 aux {CONSIGNES.echantillons} questions fixes de forge, telles quelles :
 
 <EchantillonsConversation nom="1.7@1.7" />
+
+Elle en finit {CONSIGNES.finies} sur {CONSIGNES.sur}. Ne te fie pas à ce qu'elles disent. Elle sait que Paris est la capitale de la France ; mais pour elle, le ciel est bleu « parce que les nuages sont blancs ». Et à « Combien font 12 fois 7 ? », elle répète la question sans répondre.
 
 <details class="echantillons-avant" style="margin-bottom: 1.2em">
 <summary><span class="bascule-soleil">Les {OUVERTURE.n} réponses de ton IA 1.5, telles quelles</span></summary>
@@ -734,30 +929,6 @@ Voici les réponses de ton IA 1.7 aux {OUVERTURE.n} questions fixes de forge, te
 <EchantillonsConversation nom="1.5@1.7" />
 
 </details>
-
-Un affinage peut aussi faire oublier : à force de lire des conversations, ton IA pourrait moins bien prédire le texte du web qu'elle a lu pendant son pré-entraînement. Forge le mesure par sa perte sur des textes de validation de son pré-entraînement, avant et après.
-
-{OUBLI.choix === null ? (
-  <p class="a-mesurer" data-a-mesurer data-pari-a-mesurer="oubli">{typographier('Le pari sur ce que ton IA 1.7 a oublié : à venir, avec ses mesures.')}</p>
-) : (
-  <Pari
-    id="oubli"
-    question="Après l'affinage, sa perte sur le texte du web…"
-    precision={`Celle de ton IA 1.5 : ${OUBLI.avant} nats par jeton. « Ne bouge pas » veut dire à ${OUBLI.tolerance} près.`}
-    choix={OUBLI.choix}
-    acquis="oubli"
-  >
-    <p>{OUBLI.phrase}</p>
-  </Pari>
-)}
-
-<TableauEtape versions={['1.5@1.7', '1.7@1.7']} mesures={['oubli']} legende="Ce qu'elle sait encore prédire du français brut" />
-
-{OUBLI.phrase === null ? (
-  <p class="a-mesurer" data-a-mesurer data-oubli-absent>{typographier('Ce que l’affinage lui a fait oublier : à mesurer, avec ton IA 1.7.')}</p>
-) : (
-  <p data-test="phrase-oubli">{OUBLI.phrase}</p>
-)}
 
 </Etape>
 
@@ -773,7 +944,7 @@ Pour Llama 2, Meta a fait écrire {LABO.lAnnotations} exemples à la main, et mi
 
 Tülu 3, d'Ai2, en 2024, publie tout, données et code compris : {LABO.tInvites} questions. Son modèle de {LABO.tParametres} de paramètres s'affine sur {LABO.tCartes} cartes H100 pendant {LABO.tHeures} heures, soit {LABO.tHeuresDeCartes} heures de carte.
 
-SmolLM3, de Hugging Face, en 2025, a {LABO.sParametres} de paramètres. Son jeu d'affinage compte {LABO.sJetons} de jetons, dont {LABO.sRaisonnement} de raisonnement, lus {LABO.sEpoques} fois. Il les range par BFD, et masque la perte des questions : les deux outils de ce chapitre. Ton IA, elle, lira {LABO.tonIA} jetons, bourrage compris.
+SmolLM3, de Hugging Face, en 2025, a {LABO.sParametres} de paramètres. Son jeu d'affinage compte {LABO.sJetons} de jetons, dont {LABO.sRaisonnement} de raisonnement, lus {LABO.sEpoques} fois. Il les range par BFD, et masque la perte des questions : les deux outils de ce chapitre. Ton IA, elle, en a lu {LABO.tonIA}, bourrage compris.
 
 </EncadreLabo>
 
@@ -808,7 +979,11 @@ Ils comparent la perte à la main à celle de forge, mesurent la fuite, et refon
 
 <BlocCommande commandes={[CONVERSATION_MONTRER]} ou="un terminal, dans le dossier du projet" />
 
-Pour parler à ton IA 1.7, forge a une commande, `discuter`, qui charge une version publiée et te laisse lui écrire, tour après tour. Elle viendra ici avec la version publiée de ton IA 1.7.
+Pour parler à ton IA 1.7, forge a une commande, `discuter`, qui charge une version publiée et te laisse lui écrire, tour après tour. Elle demande une carte graphique NVIDIA, et la version téléchargée par forge (`python -m forge publication --etiquette ton-ia-1.7`) :
+
+<BlocCommande commandes={[DISCUTER_1_7]} ou="PowerShell, dans le dossier projets/forge" />
+
+Sans carte, le notebook du chapitre la fait répondre à trois questions, sur ton processeur.
 
 Le projet complet, avec un notebook qui refait tout cela pas à pas, est sur GitHub :
 
@@ -816,6 +991,6 @@ Le projet complet, avec un notebook qui refait tout cela pas à pas, est sur Git
 
 ### À suivre
 
-Tu sais maintenant comment ton IA apprend le format d'une conversation ; ce qu'elle en fait, l'étape 8 le mesure. Un affinage supervisé lui fait imiter ses exemples, sans jamais lui dire si une réponse vaut mieux qu'une autre. Le chapitre 1.8, {SUITE.lien ? <a href={SUITE.lien}>{SUITE.titre}</a> : SUITE.titre}, à venir, lui apprendra à préférer les réponses qu'on juge meilleures.
+Tu sais maintenant comment ton IA apprend le format d'une conversation ; ce qu'elle en fait, l'étape 8 le mesure. Un affinage supervisé lui fait imiter ses exemples, sans jamais lui dire si une réponse vaut mieux qu'une autre. Le chapitre 1.8, {SUITE.lien ? <a href={SUITE.lien}>{SUITE.titre}</a> : SUITE.titre}{SUITE.lien ? '' : ', à venir'}, lui apprendra à préférer les réponses qu'on juge meilleures.
 
 </Etape>
