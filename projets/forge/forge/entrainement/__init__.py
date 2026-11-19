@@ -3,8 +3,9 @@
 Le point d'entrée est `entrainer(lire_config("configs/mini.toml"))`, ou en ligne de commande
 `python -m forge entrainer --config configs/mini.toml` (puis `--reprendre` après une pause).
 Le réglage `methode` choisit la méthode dans le registre `METHODES` : « pre_entrainement »
-(par défaut), « sft », l'affinage supervisé depuis une version publiée (`depart`), ou « dpo »,
-l'apprentissage par préférences depuis une version publiée.
+(par défaut), « sft », l'affinage supervisé depuis une version publiée (`depart`), « dpo »,
+l'apprentissage par préférences depuis une version publiée, ou « grpo », l'apprentissage par
+renforcement sur des problèmes générés, qui ne se lance que si son contrôle de départ trouve un signal.
 """
 
 from forge.entrainement.boucle import CompilationImpossible, ConfigEntrainement, entrainer, lire_config

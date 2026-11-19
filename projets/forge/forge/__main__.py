@@ -408,6 +408,12 @@ def _numero_de_pas(texte: str) -> int:
     return valeur
 
 
+# Le code de sortie de `forge entrainer` quand le contrôle de départ du GRPO ne trouve aucune réponse juste : la boucle
+# le rend elle-même (`forge.entrainement.boucle.CODE_RECOMPENSE_NULLE`) ; recopié ici pour l'aide, qui ne doit pas
+# charger PyTorch. Un test vérifie que ce sont les mêmes.
+CODE_RECOMPENSE_NULLE = 6
+
+
 def _commande_entrainer(choix: argparse.Namespace) -> int:
     """`forge entrainer` : entraîne ton IA ; Ctrl+C met en pause, `--reprendre` repart de là."""
     # Imports ici : PyTorch est long à charger, les autres commandes n'en ont pas besoin.
@@ -459,9 +465,10 @@ def _ajouter_entrainer(sous_parseurs) -> None:
     commande = _nouvelle_commande(
         sous_parseurs,
         "entrainer",
-        "Entraîne ton IA : pré-entraînement sur les jetons encodés, ou affinage (methode = \"sft\") "
-        "depuis une version publiée. Ctrl+C met en pause (avec sauvegarde) ; --reprendre repart de la "
-        "dernière sauvegarde.",
+        "Entraîne ton IA : pré-entraînement sur les jetons encodés, ou affinage depuis une version publiée "
+        "(methode = \"sft\", \"dpo\" ou \"grpo\"). Ctrl+C met en pause (avec sauvegarde) ; --reprendre repart de la "
+        "dernière sauvegarde. Le GRPO commence par un contrôle de départ : s'il ne trouve aucune réponse juste, "
+        f"rien n'est lancé, code {CODE_RECOMPENSE_NULLE} (forge.entrainement.boucle.CODE_RECOMPENSE_NULLE).",
     )
     commande.add_argument(
         "--config",
@@ -479,7 +486,8 @@ def _ajouter_entrainer(sous_parseurs) -> None:
         type=_numero_de_pas,
         default=None,
         metavar="N",
-        help="s'arrêter (avec sauvegarde) au pas N, pour un essai chronométré ; --reprendre continue ensuite",
+        help="s'arrêter (avec sauvegarde) au pas N, pour un essai chronométré ; --reprendre continue ensuite. "
+        "0 : seulement le contrôle de départ du GRPO (controle.json), sans pas ni sauvegarde",
     )
     commande.set_defaults(fonction=_commande_entrainer)
 
@@ -1164,7 +1172,7 @@ def _ajouter_preparer(sous_parseurs) -> None:
 
 # Le code de sortie de `forge preferences` quand le taux de paires est sous le seuil de l'utilisateur : ni 1 (une
 # erreur), ni 2 (argparse), ni 3 ou 4 (pris par travail-long.ps1 : « le même travail tourne déjà », « le script a
-# échoué »), ni 130 (une pause).
+# échoué »), ni 6 (`forge entrainer`, GRPO sans signal), ni 130 (une pause).
 CODE_SOUS_LE_SEUIL = 5
 
 

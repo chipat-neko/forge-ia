@@ -13,6 +13,10 @@
 - pour la DPO, quand le journal les a : la log-probabilité par jeton de la réponse choisie
   (`logps_choisie`) et l'exactitude (la part des paires classées dans le bon ordre), avec leur
   moyenne sur les mêmes derniers pas ;
+- pour le GRPO : la récompense moyenne (la part des réponses justes), avec sa moyenne sur les mêmes
+  derniers pas, et la dernière réussite de validation (`reussite_val`) au lieu de la perte de
+  validation. Ses pas n'ont pas tous les mêmes jetons : ni jetons vus, ni débit en jetons, mais des
+  secondes par pas ;
 - le débit récent et le temps restant estimé ;
 - la dernière sauvegarde (fichier et pas).
 
@@ -69,7 +73,7 @@ class Reglages:
     sortie: str  # la valeur de `sortie` dans le TOML
     dossier_sortie: Path
     pas_total: int
-    taille_lot_jetons: int
+    taille_lot_jetons: int | None  # None pour le GRPO, qui compte en pas
 
     @property
     def journal(self) -> Path:
@@ -86,7 +90,8 @@ def lire_reglages(chemin: Path | str) -> Reglages:
 
     Mêmes règles que `ConfigEntrainement` : un nom de sortie va sous
     `FORGE_DONNEES/entrainements/`, un chemin absolu est gardé tel quel ; le nombre de pas est
-    `jetons_total ÷ taille_lot_jetons`, arrondi au-dessus.
+    `jetons_total ÷ taille_lot_jetons`, arrondi au-dessus, et pour le GRPO (`methode = "grpo"`),
+    le `pas` de sa table `[grpo]`.
     """
     fichier = Path(chemin)
     if not fichier.is_file():
@@ -98,6 +103,8 @@ def lire_reglages(chemin: Path | str) -> Reglages:
         valeurs = tomllib.loads(fichier.read_text(encoding="utf-8"))
     except (tomllib.TOMLDecodeError, UnicodeDecodeError) as erreur:
         raise ValueError(f"{chemin} n'est pas un fichier TOML valide{_FINE}: {erreur}.") from erreur
+    if valeurs.get("methode") == "grpo":
+        return _reglages_du_grpo(chemin, valeurs)
     manquants = [nom for nom in ("jetons_total", "taille_lot_jetons", "sortie") if nom not in valeurs]
     if manquants:
         raise ValueError(f"Réglage manquant dans {chemin}{_FINE}: {', '.join(manquants)}.")
@@ -115,6 +122,27 @@ def lire_reglages(chemin: Path | str) -> Reglages:
         dossier_sortie=dossier,
         pas_total=-(-valeurs["jetons_total"] // valeurs["taille_lot_jetons"]),
         taille_lot_jetons=valeurs["taille_lot_jetons"],
+    )
+
+
+def _reglages_du_grpo(chemin: Path | str, valeurs: dict) -> Reglages:
+    """`sortie` et le `pas` de la table `[grpo]` : le GRPO n'a ni `jetons_total` ni `taille_lot_jetons`."""
+    table = valeurs.get("grpo")
+    pas = table.get("pas") if isinstance(table, dict) else None
+    manquants = [nom for nom, present in (("[grpo] pas", pas is not None), ("sortie", "sortie" in valeurs)) if not present]
+    if manquants:
+        raise ValueError(f"Réglage manquant dans {chemin}{_FINE}: {', '.join(manquants)}.")
+    if not isinstance(pas, int) or isinstance(pas, bool) or pas < 1:
+        raise ValueError(f"pas vaut {pas!r} dans la table [grpo] de {chemin}{_FINE}: il faut un nombre entier d'au moins 1.")
+    sortie = valeurs["sortie"]
+    if not isinstance(sortie, str) or not sortie:
+        raise ValueError(f"sortie vaut {sortie!r} dans {chemin}{_FINE}: il faut un nom de dossier.")
+    return Reglages(
+        fichier=str(chemin),
+        sortie=sortie,
+        dossier_sortie=sous_forge_donnees(sortie, "entrainements"),
+        pas_total=pas,
+        taille_lot_jetons=None,
     )
 
 
@@ -222,14 +250,14 @@ class Suivi:
     pas_de_l_etat: int | None  # le pas de la pause, de la fin ou de la perte infinie
     pas: int  # le dernier pas fini
     pas_total: int
-    jetons_vus: int
-    jetons_total: int
+    jetons_vus: int | None  # None (et jetons_total aussi) pour le GRPO, qui compte en pas
+    jetons_total: int | None
     perte: float | None
     perte_moyenne: float | None
     pertes_moyennees: int
     perte_val: float | None
     pas_val: int | None
-    debit: float | None  # jetons par seconde
+    debit: float | None  # jetons par seconde (pas par seconde pour le GRPO)
     pas_du_debit: int  # le nombre de pas sur lequel le débit est mesuré
     restant: float | None  # secondes ; None si inconnu ou fini
     sauvegarde: str | None
@@ -237,13 +265,18 @@ class Suivi:
     # La DPO : les valeurs des `PERTES_RECENTES` derniers pas qui en ont (aucune hors DPO).
     logps_choisie_recentes: tuple[float, ...] = ()
     exactitude_recentes: tuple[float, ...] = ()
+    # Le GRPO : la récompense moyenne des derniers pas, et la dernière réussite de validation.
+    recompense_recentes: tuple[float, ...] = ()
+    reussite_val: float | None = None
+    pas_reussite_val: int | None = None
 
 
-def _debit(pas_faits: list[dict], taille_lot: int) -> tuple[float | None, int]:
+def _debit(pas_faits: list[dict], taille_lot: int | None) -> tuple[float | None, int]:
     """Jetons par seconde sur les `PAS_RECENTS` derniers pas, et le nombre de pas mesurés.
 
     Les `secondes` du journal ne comptent pas les pauses : un débit mesuré à cheval sur une
-    pause reste juste. Avec un seul pas, on prend son propre débit.
+    pause reste juste. Avec un seul pas, on prend son propre débit. Sans `taille_lot` (le GRPO),
+    des pas par seconde.
     """
     if not pas_faits:
         return None, 0
@@ -253,7 +286,12 @@ def _debit(pas_faits: list[dict], taille_lot: int) -> tuple[float | None, int]:
         duree = dernier["secondes"] - base["secondes"]
         nombre = dernier["pas"] - base["pas"]
         if duree > 0 and nombre > 0:
-            return nombre * taille_lot / duree, nombre
+            return nombre * (taille_lot or 1) / duree, nombre
+    if taille_lot is None:  # le GRPO n'écrit pas de débit en jetons : celui de tout ce qui précède
+        secondes = dernier.get("secondes")
+        if _est_un_nombre(secondes) and secondes > 0:
+            return dernier["pas"] / secondes, 1
+        return None, 0
     vitesse = dernier.get("jetons_par_seconde")
     if _est_un_nombre(vitesse) and vitesse > 0:
         return float(vitesse), 1
@@ -266,8 +304,11 @@ def _recentes(pas_faits: list[dict], cle: str) -> tuple[float, ...]:
     return tuple(valeurs[-PERTES_RECENTES:])
 
 
-def calculer_suivi(lignes: list[dict], pas_total: int, taille_lot: int, actif: bool | None = None) -> Suivi:
-    """Résume le journal `lignes` ; `actif` : un processus d'entraînement tourne-t-il (None : inconnu) ?"""
+def calculer_suivi(lignes: list[dict], pas_total: int, taille_lot: int | None, actif: bool | None = None) -> Suivi:
+    """Résume le journal `lignes` ; `actif` : un processus d'entraînement tourne-t-il (None : inconnu) ?
+
+    `taille_lot` : les jetons d'un pas, ou None pour le GRPO (ni jetons vus, débit en pas par seconde).
+    """
     pas_faits = [ligne for ligne in lignes if _est_un_pas(ligne)]
     dernier = pas_faits[-1] if pas_faits else None
     pas = dernier["pas"] if dernier else 0
@@ -289,23 +330,26 @@ def calculer_suivi(lignes: list[dict], pas_total: int, taille_lot: int, actif: b
 
     pertes = [ligne["perte"] for ligne in pas_faits[-PERTES_RECENTES:]]
     validations = [ligne for ligne in pas_faits if _est_un_nombre(ligne.get("perte_val"))]
+    reussites = [ligne for ligne in pas_faits if _est_un_nombre(ligne.get("reussite_val"))]
     sauvegardes = [
         ligne for ligne in lignes if ligne.get("evenement") == "sauvegarde" and isinstance(ligne.get("fichier"), str)
     ]
     debit, pas_du_debit = _debit(pas_faits, taille_lot)
     restant = None
     if etat != FINI and debit:
-        restant = max(0, pas_total - pas) * taille_lot / debit
-    jetons_vus = dernier.get("jetons_vus") if dernier else 0
-    if not isinstance(jetons_vus, int):
-        jetons_vus = pas * taille_lot
+        restant = max(0, pas_total - pas) * (taille_lot or 1) / debit
+    jetons_vus = None
+    if taille_lot is not None:
+        jetons_vus = dernier.get("jetons_vus") if dernier else 0
+        if not isinstance(jetons_vus, int):
+            jetons_vus = pas * taille_lot
     return Suivi(
         etat=etat,
         pas_de_l_etat=pas_de_l_etat,
         pas=pas,
         pas_total=pas_total,
         jetons_vus=jetons_vus,
-        jetons_total=pas_total * taille_lot,
+        jetons_total=None if taille_lot is None else pas_total * taille_lot,
         perte=pertes[-1] if pertes else None,
         perte_moyenne=sum(pertes) / len(pertes) if pertes else None,
         pertes_moyennees=len(pertes),
@@ -318,6 +362,9 @@ def calculer_suivi(lignes: list[dict], pas_total: int, taille_lot: int, actif: b
         pas_sauvegarde=sauvegardes[-1].get("pas") if sauvegardes else None,
         logps_choisie_recentes=_recentes(pas_faits, "logps_choisie"),
         exactitude_recentes=_recentes(pas_faits, "exactitude"),
+        recompense_recentes=_recentes(pas_faits, "recompense_moyenne"),
+        reussite_val=reussites[-1]["reussite_val"] if reussites else None,
+        pas_reussite_val=reussites[-1]["pas"] if reussites else None,
     )
 
 
@@ -392,7 +439,8 @@ def texte_du_suivi(suivi: Suivi, reglages: Reglages) -> str:
 
     part = _pourcent(suivi.pas, suivi.pas_total)
     lignes.append(f"  Pas{_FINE}: {_entier(suivi.pas)} sur {_entier(suivi.pas_total)} ({part})")
-    lignes.append(f"  Jetons vus{_FINE}: {_entier(suivi.jetons_vus)} sur {_entier(suivi.jetons_total)}")
+    if suivi.jetons_total is not None:
+        lignes.append(f"  Jetons vus{_FINE}: {_entier(suivi.jetons_vus)} sur {_entier(suivi.jetons_total)}")
     if suivi.perte is None:
         lignes.append(f"  Dernière perte{_FINE}: aucun pas fini pour l'instant")
     elif suivi.pertes_moyennees >= 2:
@@ -407,7 +455,14 @@ def texte_du_suivi(suivi: Suivi, reglages: Reglages) -> str:
         lignes.append(f"  Log-probabilité de la choisie{_FINE}: {valeur}")
     if suivi.exactitude_recentes:
         lignes.append(f"  Exactitude{_FINE}: {_derniere_et_moyenne(suivi.exactitude_recentes, _part, ' des paires')}")
-    if suivi.perte_val is None:
+    if suivi.recompense_recentes:
+        valeur = _derniere_et_moyenne(suivi.recompense_recentes, _part, " des réponses justes")
+        lignes.append(f"  Récompense moyenne{_FINE}: {valeur}")
+    if suivi.reussite_val is not None:
+        lignes.append(
+            f"  Dernière validation{_FINE}: réussite {_part(suivi.reussite_val)} (pas {_entier(suivi.pas_reussite_val)})"
+        )
+    elif suivi.perte_val is None:
         lignes.append(f"  Dernière validation{_FINE}: aucune pour l'instant")
     else:
         lignes.append(f"  Dernière validation{_FINE}: {_decimal(suivi.perte_val, 3)} (pas {_entier(suivi.pas_val)})")
@@ -417,7 +472,10 @@ def texte_du_suivi(suivi: Suivi, reglages: Reglages) -> str:
             if suivi.pas_du_debit == 1
             else f"sur les {suivi.pas_du_debit} derniers pas, validations et sauvegardes comprises"
         )
-        lignes.append(f"  Débit récent{_FINE}: {_entier(suivi.debit)} jetons/s ({sur})")
+        if suivi.jetons_total is None:  # le GRPO : des secondes par pas
+            lignes.append(f"  Débit récent{_FINE}: {_decimal(1 / suivi.debit, 1)} s par pas ({sur})")
+        else:
+            lignes.append(f"  Débit récent{_FINE}: {_entier(suivi.debit)} jetons/s ({sur})")
     if suivi.etat != FINI:
         if suivi.restant is None:
             lignes.append(f"  Temps restant estimé{_FINE}: inconnu (aucun pas fini pour l'instant)")

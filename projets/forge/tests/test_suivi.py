@@ -267,6 +267,94 @@ def test_les_mesures_de_la_dpo(tmp_path, capsys):
     )
 
 
+def ecrire_config_grpo(dossier: Path, pas_total: int = 400) -> Path:
+    """Une configuration de GRPO : ni jetons_total ni taille_lot_jetons, le nombre de pas est dans [grpo]."""
+    fichier = dossier / "essai.toml"
+    fichier.write_text(
+        "\n".join(
+            [
+                'methode = "grpo"',
+                'depart = "ton-ia-1.9-traces"',
+                'preset = "tres_grand"',
+                'donnees = "rl-1.9"',
+                "micro_lot = 8",
+                "taux_max = 1e-6",
+                "echauffement = 10",
+                "evaluation_tous_pas = 20",
+                f"sortie = '{dossier / 'essai'}'",
+                "",
+                "[grpo]",
+                f"pas = {pas_total}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return fichier
+
+
+def pas_grpo_(pas: int, secondes: float, recompense: float, **autres) -> dict:
+    """La ligne de journal d'un pas de GRPO : sans jetons vus ni débit en jetons."""
+    return {
+        "pas": pas,
+        "perte": 0.01,
+        "taux": 1e-6,
+        "secondes": secondes,
+        "recompense_moyenne": recompense,
+        "groupes_sans_signal": 0.5,
+        "longueur_moyenne": 80.0,
+        "secondes_generation": 20.0,
+        "secondes_apprentissage": 5.0,
+        **autres,
+    }
+
+
+def test_les_mesures_du_grpo(tmp_path, capsys):
+    """Le GRPO : la récompense moyenne et la réussite de validation ; des secondes par pas, aucun jeton."""
+    config = ecrire_config_grpo(tmp_path, pas_total=400)
+    lignes = debut_du_journal() + [
+        pas_grpo_(pas, 25.0 * pas, 0.25 if pas % 2 == 0 else 0.125, **({"reussite_val": 0.1} if pas == 20 else {}))
+        for pas in range(1, 31)
+    ]
+    ecrire_journal(tmp_path, lignes)
+    texte = suivi(capsys, config)
+    assert f"Pas{FINE}: 30 sur 400" in texte
+    assert "Jetons vus" not in texte and "jetons/s" not in texte
+    # Dernier pas (30) : 25 % ; moyenne des pas 11 à 30 : (0,25 + 0,125) ÷ 2 = 18,75 %.
+    assert (
+        f"Récompense moyenne{FINE}: 25{FINE}% des réponses justes (moyenne des {PERTES_RECENTES} derniers "
+        f"pas{FINE}: 18,8{FINE}%)" in texte
+    )
+    assert f"Dernière validation{FINE}: réussite 10{FINE}% (pas 20)" in texte
+    assert f"Débit récent{FINE}: 25,0 s par pas (sur les 29 derniers pas" in texte
+    assert f"Temps restant estimé{FINE}: 2 h 34 min" in texte  # 370 pas de 25 s : 9 250 s
+
+    # Avant la première validation, et avec un seul pas : son propre débit.
+    ecrire_journal(tmp_path, debut_du_journal() + [pas_grpo_(1, 24.0, 0.0)])
+    texte = suivi(capsys, config)
+    assert f"Dernière validation{FINE}: aucune pour l'instant" in texte
+    assert f"Débit récent{FINE}: 24,0 s par pas (sur le dernier pas)" in texte
+
+
+def test_reglages_du_grpo_lus_comme_l_entrainement(tmp_path, monkeypatch):
+    from forge.entrainement import lire_config  # importe PyTorch : seulement dans ce test
+
+    monkeypatch.setenv("FORGE_DONNEES", str(tmp_path))
+    fichier = ecrire_config_grpo(tmp_path, pas_total=123)
+    reglages, config = lire_reglages(fichier), lire_config(fichier)
+    assert reglages.dossier_sortie == config.dossier_sortie
+    assert reglages.pas_total == config.pas_total == 123
+    assert reglages.taille_lot_jetons is config.taille_lot_jetons is None
+
+
+def test_configuration_du_grpo_incomplete(tmp_path, capsys):
+    fichier = tmp_path / "grpo.toml"
+    fichier.write_text('methode = "grpo"\n', encoding="utf-8")
+    assert main(["suivi", "--config", str(fichier)]) == 1
+    erreur = capsys.readouterr().err
+    assert "[grpo] pas" in erreur and "sortie" in erreur and "jetons_total" not in erreur
+
+
 # --- Le débit et le temps restant ------------------------------------------------------
 
 

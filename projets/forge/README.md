@@ -294,7 +294,7 @@ décident de ce qui change :
 - `methode` : `"pre_entrainement"` (par défaut : la section précédente) ou `"sft"`, l'affinage
   supervisé. Ton IA apprend alors des conversations, et la perte ne porte que sur les jetons appris
   (les réponses de l'assistant) : c'est leur moyenne sur tout le pas, tous micro-lots compris. Ou
-  `"dpo"`, l'apprentissage par préférences (plus bas) ;
+  `"dpo"`, l'apprentissage par préférences, ou `"grpo"`, l'apprentissage par renforcement (plus bas) ;
 - `depart` : la version publiée d'où l'on part, obligatoire pour un affinage. Un nom va sous
   `FORGE_DONNEES/publications/` (le dossier que remplit `python -m forge publication --etiquette
   ton-ia-1.5`), un chemin absolu est gardé tel quel. Ses poids sont copiés dans le modèle avant le
@@ -366,6 +366,75 @@ récompenses, la marge entre elles et l'exactitude (la part des paires déjà da
 `forge suivi` montre la log-probabilité des choisies et l'exactitude. La validation mesure la perte de
 la DPO et l'exactitude sur les 256 premières paires de validation.
 
+Avec `methode = "grpo"`, ton IA apprend par renforcement, à la manière de nanochat : à chaque pas, elle
+écrit plusieurs réponses à chaque problème d'un lot, une réponse juste reçoit une récompense de 1 (sinon
+0), et elle apprend à rendre plus probables les réponses meilleures que la moyenne de leur problème, sans
+KL ni écrêtage. `donnees` est un dossier de problèmes d'entraînement de `forge problemes` (sous
+`FORGE_DONNEES/problemes/`) ; ceux de l'évaluation et de la validation du RL sont refusés. Il n'y a ni
+`jetons_total` ni `taille_lot_jetons` : la table `[grpo]` donne le nombre de pas (`pas`, obligatoire) et le
+tirage des réponses ; `micro_lot` est le nombre de réponses apprises d'un coup.
+
+Avant le premier pas d'un entraînement neuf, un **contrôle de départ** fait répondre la version de départ
+à `controle_invites` problèmes du dossier, `controle_reponses` fois chacun. Le RL n'amplifie qu'un
+comportement déjà présent : si aucune réponse n'est juste, il n'aurait aucun signal, et rien n'est lancé.
+La commande s'arrête alors sans rien sauvegarder, avec le code 6 et le message « Aucune des N réponses
+n'est juste : le RL n'aurait aucun signal. Rien n'est lancé. ». Dans tous les cas, le résultat va au
+journal et dans `controle.json`, dans la sortie : `invites`, `reponses`, `justes`, `taux` et `lance` (vrai si
+le RL peut partir), plus sa durée et la version de départ. `--arreter-apres 0` fait seulement ce contrôle,
+sans pas ni sauvegarde (l'exemple plus bas).
+
+Le contrôle affiche son avancement toutes les 30 secondes ; Ctrl+C l'arrête sans rien sauvegarder (la
+reprise le refait). Une reprise depuis une sauvegarde ne le refait pas. Si la mémoire de la carte manque
+pendant une génération (le contrôle, les tirages, la validation), le message dit de réduire
+`lot_de_generation` dans `[grpo]` : on peut le changer en reprenant, comme augmenter `pas`.
+
+Un exemple complet, sur des problèmes de `forge problemes --sortie rl-1.9 --nombre 20000 --graine-depart
+2000000 --difficultes 1,2`, avec les valeurs de nanochat ; les réglages de ton IA 1.9 viendront avec son
+entraînement :
+
+```toml
+methode = "grpo"
+depart = "ton-ia-1.9-traces"   # la version de départ
+preset = "tres_grand"          # les dimensions de la version de départ
+donnees = "rl-1.9"             # FORGE_DONNEES/problemes/rl-1.9, d'usage entrainement
+micro_lot = 8                  # les réponses apprises d'un coup
+taux_max = 1e-6
+echauffement = 10
+poids_decroissance = 0.0
+evaluation_tous_pas = 20
+appareil = "cuda"
+sortie = "essai-grpo"
+
+[grpo]
+pas = 400
+invites_par_pas = 16           # problèmes par pas
+reponses_par_invite = 16       # réponses par problème, comparées entre elles
+jetons_max_reponse = 256       # au-delà, la réponse est coupée, donc fausse
+temperature = 1.0
+top_k = 50
+lot_de_generation = 32         # réponses écrites ensemble : à réduire si la mémoire manque
+controle_invites = 200         # le contrôle de départ : 200 problèmes…
+controle_reponses = 8          # … × 8 tirages
+evaluation_invites = 200       # les problèmes de la validation
+```
+
+Enregistré sous `essai-grpo.toml`, il se lance d'abord pour le seul contrôle de départ, puis, si le contrôle
+a trouvé des réponses justes, pour de bon (sans sauvegarde à reprendre, c'est un entraînement neuf : le
+contrôle, identique, est refait avant le premier pas) :
+
+```powershell
+uv run --extra gpu python -m forge entrainer --config essai-grpo.toml --arreter-apres 0
+uv run --extra gpu python -m forge entrainer --config essai-grpo.toml
+```
+
+Le journal écrit à chaque pas la perte, la récompense moyenne (la part des réponses justes), la part des
+problèmes sans signal (`groupes_sans_signal` : toutes leurs réponses ont la même récompense, ils
+n'apprennent rien), la longueur moyenne des réponses et les temps de génération et d'apprentissage ; un
+pas sans aucun signal ne bouge pas les poids. La validation (`reussite_val`) est la part de 200 problèmes
+réussis en glouton, tirés des graines de la validation du RL (5 000 000 et suivantes, aux difficultés du
+dossier), que l'entraînement ne voit jamais : `meilleur.pt` garde la plus haute. `forge suivi` montre la
+récompense moyenne et la dernière réussite de validation.
+
 ### Ton IA 1.7 : apprendre à converser
 
 La version 1.7 est le premier vrai affinage : un SFT de `ton-ia-1.5` sur des conversations en
@@ -407,7 +476,8 @@ dans `docs/mesures/ton-ia-1.7-LISEZMOI.md`.
 
 `suivi` lit le journal d'un entraînement et dit où il en est : état (en cours, en pause, fini,
 arrêté sans pause), pas, perte récente et de validation, débit, temps restant estimé et dernière
-sauvegarde. Il ne fait que lire et n'importe pas PyTorch : on peut le lancer aussi souvent qu'on
+sauvegarde ; pour le GRPO, la récompense moyenne et la réussite de validation, et le débit en secondes
+par pas. Il ne fait que lire et n'importe pas PyTorch : on peut le lancer aussi souvent qu'on
 veut, dans une autre console, pendant l'entraînement.
 
 ```powershell

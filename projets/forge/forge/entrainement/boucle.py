@@ -53,7 +53,14 @@ from torch import nn
 from forge.chemins import OCTETS_PAR_GO, PlaceInsuffisante, sous_forge_donnees
 from forge.donnees.jetons import empreinte_du_tokenizer
 from forge.entrainement.chargeur import ChargeurJetons, empreinte_du_tokenizer_des_jetons
-from forge.entrainement.methodes import METHODES, PerteNonFinie, PreparationInterrompue, VersionDeDepart
+from forge.entrainement.methodes import (
+    METHODES,
+    GenerationSansMemoire,
+    PerteNonFinie,
+    PreparationInterrompue,
+    RecompenseNulle,
+    VersionDeDepart,
+)
 from forge.entrainement.planning import taux
 from forge.entrainement.sauvegarde import (
     CONSEIL_DE_REPRISE,
@@ -96,6 +103,11 @@ SOUS_DOSSIERS_DES_DONNEES = {"pre_entrainement": "jetons", "sft": "affinage", "d
 
 # Code de sortie quand la perte devient infinie (2 : manque de mémoire de la carte graphique).
 CODE_PERTE_INFINIE = 3
+
+# Code de sortie quand le contrôle de départ du GRPO ne trouve aucune réponse juste : le RL n'aurait aucun
+# signal, rien n'est lancé. Ni 1 (une erreur), ni 2 (argparse, la mémoire), ni 3 ou 4 (travail-long.ps1 :
+# « le même travail tourne déjà », « le script a échoué »), ni 5 (`forge preferences` sous le seuil), ni 130 (une pause).
+CODE_RECOMPENSE_NULLE = 6
 
 
 class CompilationImpossible(RuntimeError):
@@ -158,12 +170,89 @@ def _reglages_dpo(valeur, fichier: str) -> ReglagesDPO:
     return ReglagesDPO(**valeur)
 
 
+@dataclass(frozen=True)
+class ReglagesGRPO:
+    """Les réglages propres au GRPO, la table `[grpo]` du TOML (voir `forge.raisonnement.grpo`).
+
+    Les valeurs de `invites_par_pas`, `reponses_par_invite`, `jetons_max_reponse`, `temperature` et `top_k`
+    sont celles de nanochat (`scripts/chat_rl.py`, « méthodes », §4.3) :
+
+    - `pas` : le nombre de pas, obligatoire (le GRPO n'a ni `jetons_total` ni `taille_lot_jetons`) ;
+    - `invites_par_pas` : les problèmes de chaque pas ;
+    - `reponses_par_invite` : les réponses tirées pour chaque problème, comparées entre elles (au moins 2) ;
+    - `jetons_max_reponse` : la longueur maximale d'une réponse ; plus longue, elle est coupée, donc fausse ;
+    - `temperature`, `top_k` : le tirage des réponses (une température nulle les rendrait toutes égales) ;
+    - `lot_de_generation` : les réponses écrites ensemble sur la carte, à réduire en cas de manque de mémoire
+      pendant la génération (on peut le changer en reprenant) ;
+    - `controle_invites`, `controle_reponses` : le contrôle de départ, `controle_invites` problèmes du dossier
+      × `controle_reponses` tirages, avant le premier pas d'un entraînement neuf ;
+    - `evaluation_invites` : les problèmes de la validation (`reussite_val`), tirés des graines de la validation du RL.
+    """
+
+    pas: int
+    invites_par_pas: int = 16
+    reponses_par_invite: int = 16
+    jetons_max_reponse: int = 256
+    temperature: float = 1.0
+    top_k: int = 50
+    lot_de_generation: int = 32
+    controle_invites: int = 200
+    controle_reponses: int = 8
+    evaluation_invites: int = 200
+
+    def __post_init__(self) -> None:
+        for nom, minimum, pourquoi in (
+            ("pas", 1, ""),
+            ("invites_par_pas", 1, ""),
+            ("reponses_par_invite", 2, " : le GRPO compare les réponses d'un même problème, avec une seule il n'apprend rien"),
+            ("jetons_max_reponse", 1, ""),
+            ("top_k", 0, " (0 : pas de limite)"),
+            ("lot_de_generation", 1, ""),
+            ("controle_invites", 1, ""),
+            ("controle_reponses", 1, ""),
+            ("evaluation_invites", 1, ""),
+        ):
+            valeur = getattr(self, nom)
+            if not isinstance(valeur, int) or isinstance(valeur, bool) or valeur < minimum:
+                raise ValueError(f"{nom} vaut {valeur!r} dans [grpo] : il faut un nombre entier d'au moins {minimum}{pourquoi}.")
+        if not isinstance(self.temperature, int | float) or isinstance(self.temperature, bool) or self.temperature <= 0:
+            raise ValueError(
+                f"temperature vaut {self.temperature!r} dans [grpo] : il faut un nombre plus grand que 0 (1.0 par "
+                "défaut ; à 0, toutes les réponses d'un problème seraient les mêmes, sans aucun signal)."
+            )
+        object.__setattr__(self, "temperature", float(self.temperature))
+
+
+def _reglages_grpo(valeur, fichier: str) -> ReglagesGRPO:
+    """La table `[grpo]` (un dictionnaire, ou déjà des `ReglagesGRPO`) ; obligatoire : elle donne le nombre de pas."""
+    if isinstance(valeur, ReglagesGRPO):
+        return valeur
+    if valeur is None:
+        raise ValueError(
+            f'methode = "grpo" demande une table [grpo] dans {fichier}, avec au moins le nombre de pas : '
+            "[grpo] puis pas = 400 sur la ligne suivante."
+        )
+    if not isinstance(valeur, dict):
+        raise ValueError(f"[grpo] doit être une table de réglages dans {fichier}, pas {valeur!r}.")
+    connus = [champ.name for champ in dataclasses.fields(ReglagesGRPO)]
+    inconnus = sorted(set(valeur) - set(connus))
+    if inconnus:
+        raise ValueError(
+            f"Réglage inconnu dans la table [grpo] de {fichier} : {', '.join(inconnus)}. "
+            f"Réglages possibles : {', '.join(connus)}."
+        )
+    if "pas" not in valeur:
+        raise ValueError(f"Réglage manquant dans la table [grpo] de {fichier} : pas (le nombre de pas du GRPO).")
+    return ReglagesGRPO(**valeur)
+
+
 @dataclass(frozen=True, kw_only=True)
 class ConfigEntrainement:
     """Les réglages d'un entraînement, lus depuis un fichier TOML par `lire_config`.
 
     - `methode` : la méthode d'entraînement, un nom de `METHODES` (`forge.entrainement.methodes`) :
-      « pre_entrainement » (par défaut), « sft » (affinage supervisé) ou « dpo » (préférences) ;
+      « pre_entrainement » (par défaut), « sft » (affinage supervisé), « dpo » (préférences) ou « grpo »
+      (apprentissage par renforcement sur des problèmes) ;
     - `depart` : pour un affinage, le dossier de la version publiée d'où l'on part (un nom va sous
       `FORGE_DONNEES/publications/`, là où `forge publication` la télécharge). Obligatoire pour
       un affinage, interdit pour le pré-entraînement, qui part de poids tirés au hasard ;
@@ -171,15 +260,17 @@ class ConfigEntrainement:
       aussi donner une `ConfigModele` (ou, dans le TOML, une table `[preset]`) ;
     - `donnees` : le dossier des données. Pour le pré-entraînement, celui des jetons de
       `forge encoder --donnees <nom>` (un nom va sous `FORGE_DONNEES/jetons/`) ; pour le SFT et la
-      DPO, un jeu d'affinage (sous `FORGE_DONNEES/affinage/`). Un chemin absolu est gardé tel quel ;
+      DPO, un jeu d'affinage (sous `FORGE_DONNEES/affinage/`) ; pour le GRPO, des problèmes
+      d'entraînement de `forge problemes` (sous `FORGE_DONNEES/problemes/`). Un chemin absolu est gardé tel quel ;
     - `jetons_total` : combien de jetons lire en tout ; avec `taille_lot_jetons`, il fixe le
-      nombre de pas ;
+      nombre de pas. Le GRPO n'a ni l'un ni l'autre : son nombre de pas est `[grpo] pas` ;
     - `taille_lot_jetons` : jetons vus par pas d'optimisation (le « lot ») ; pour un affinage,
       ce sont les positions des rangées, bourrage compris ;
     - `longueur` : la longueur des lignes (des rangées d'un jeu d'affinage), par défaut le
       contexte du modèle. Celle d'un jeu d'affinage doit être la sienne ;
     - `micro_lot` : lignes de `longueur` jetons traitées d'un coup par la carte ; le lot est
-      atteint par accumulation. À réduire en cas de manque de mémoire ;
+      atteint par accumulation. À réduire en cas de manque de mémoire. Pour le GRPO, les réponses
+      (invite et réponse) apprises d'un coup ;
     - `taux_max`, `echauffement` : le planning du taux d'apprentissage (voir `planning.py`) ;
     - `poids_decroissance` : la « décroissance des poids » d'AdamW, qui tire doucement les
       poids vers 0 (sur les matrices seulement, pas sur les RMSNorm) ;
@@ -195,7 +286,8 @@ class ConfigEntrainement:
       `FORGE_DONNEES/entrainements/`) ;
     - `dpo`, `grpo` : les tables `[dpo]` et `[grpo]` du TOML, réglages propres à ces méthodes.
       Pour methode = "dpo", `dpo` devient des `ReglagesDPO` (leurs valeurs par défaut sans table),
-      et `micro_lot` doit être pair : une paire (choisie, rejetée) tient dans un même micro-lot ;
+      et `micro_lot` doit être pair : une paire (choisie, rejetée) tient dans un même micro-lot.
+      Pour methode = "grpo", `grpo` devient des `ReglagesGRPO`, et la table est obligatoire (`pas`) ;
     - `fichier` : le fichier TOML lu, rempli par `lire_config` (il sert aux messages).
     """
 
@@ -219,7 +311,7 @@ class ConfigEntrainement:
     compiler: str = "auto"
     sortie: str
     dpo: ReglagesDPO | dict | None = None
-    grpo: dict | None = None
+    grpo: ReglagesGRPO | dict | None = None
     fichier: str | None = None
 
     def __post_init__(self) -> None:
@@ -259,6 +351,8 @@ class ConfigEntrainement:
                     "rejetée) dans un même micro-lot, il faut un nombre pair. Mets par exemple micro_lot = "
                     f"{max(2, self.micro_lot - 1)} dans {self.fichier or 'la configuration'}."
                 )
+        if self.methode == "grpo":
+            object.__setattr__(self, "grpo", _reglages_grpo(self.grpo, self.fichier or "la configuration"))
         if self.graine >= 2**32:
             raise ValueError(f"graine vaut {self.graine} : il faut un entier plus petit que 2³² (4 294 967 296).")
         for nom in ("taux_max", "ecretage", "sauvegarde_minutes"):
@@ -349,7 +443,9 @@ class ConfigEntrainement:
 
     @property
     def pas_total(self) -> int:
-        """Nombre de pas d'optimisation pour lire `jetons_total` jetons (arrondi au-dessus)."""
+        """Nombre de pas d'optimisation pour lire `jetons_total` jetons (arrondi au-dessus) ; `[grpo] pas` pour le GRPO."""
+        if self.methode == "grpo":
+            return self.grpo.pas
         return -(-self.jetons_total // self.taille_lot_jetons)
 
     @property
@@ -700,7 +796,11 @@ def _verifier_sauvegarde(etat: dict, config: ConfigEntrainement) -> list[str]:
         # Le preset est déjà comparé, dimension par dimension, juste au-dessus.
         if reglage in REGLAGES_LIBRES or reglage == "preset" or ancienne == valeur:
             continue
-        if reglage == "jetons_total" and valeur > ancienne:
+        if reglage == "grpo" and isinstance(ancienne, dict) and isinstance(valeur, dict):
+            differences_grpo, notes_grpo = _changements_grpo(ancienne, valeur)
+            differences += differences_grpo
+            notes += notes_grpo
+        elif reglage == "jetons_total" and valeur > ancienne:
             notes.append(
                 f"jetons_total passe de {ancienne} à {valeur} : le planning du taux est recalculé "
                 f"sur {config.pas_total} pas."
@@ -710,18 +810,47 @@ def _verifier_sauvegarde(etat: dict, config: ConfigEntrainement) -> list[str]:
         else:
             differences.append(f"{reglage} : {ancienne!r} dans la sauvegarde, {valeur!r} maintenant")
     if differences:
+        grpo = " Pour le GRPO : changer lot_de_generation et augmenter pas, dans [grpo]." if config.methode == "grpo" else ""
         raise ValueError(
             f"La configuration a changé depuis la sauvegarde du pas {etat['pas']} : "
             f"{' ; '.join(differences)}. Ces réglages changent le calcul : remets les valeurs de la "
             "sauvegarde pour reprendre, ou change `sortie` pour commencer un nouvel entraînement. "
             f"En reprenant, on peut changer {', '.join(REGLAGES_LIBRES[:5])}, augmenter "
-            "jetons_total et baisser taux_max."
+            f"jetons_total et baisser taux_max.{grpo}"
         )
     return notes
 
 
-def _signaler_manque_de_memoire(config: ConfigEntrainement, appareil: torch.device) -> None:
-    """Le message d'un manque de mémoire sur la carte graphique, puis l'arrêt (code 2)."""
+def _changements_grpo(avant: dict, maintenant: dict) -> tuple[list[str], list[str]]:
+    """Les changements de la table `[grpo]` depuis la sauvegarde : ceux qui sont refusés, et les notes des permis.
+
+    `lot_de_generation` peut changer : c'est le remède à un manque de mémoire pendant la génération (les tirages
+    suivants ne sont alors plus ceux d'une traite). `pas` peut augmenter, comme `jetons_total` : le planning du
+    taux est recalculé sur le nouveau nombre de pas.
+    """
+    differences, notes = [], []
+    for nom, valeur in maintenant.items():
+        ancienne = avant.get(nom)
+        if ancienne == valeur:
+            continue
+        if nom == "lot_de_generation":
+            notes.append(
+                f"[grpo] lot_de_generation passe de {ancienne} à {valeur} : les tirages des pas suivants ne sont plus "
+                "ceux d'une traite."
+            )
+        elif nom == "pas" and isinstance(ancienne, int) and valeur > ancienne:
+            notes.append(f"[grpo] pas passe de {ancienne} à {valeur} : le planning du taux est recalculé sur {valeur} pas.")
+        else:
+            differences.append(f"[grpo] {nom} : {ancienne!r} dans la sauvegarde, {valeur!r} maintenant")
+    return differences, notes
+
+
+def _signaler_manque_de_memoire(config: ConfigEntrainement, appareil: torch.device, en_generant: bool = False) -> None:
+    """Le message d'un manque de mémoire sur la carte graphique, puis l'arrêt (code 2).
+
+    `en_generant` : la mémoire a manqué pendant une génération du GRPO (tirages, contrôle de départ, validation) ;
+    le remède est alors de réduire `lot_de_generation`, pas `micro_lot`.
+    """
     libre = "inconnue"
     if appareil.type == "cuda":
         gc.collect()
@@ -733,7 +862,9 @@ def _signaler_manque_de_memoire(config: ConfigEntrainement, appareil: torch.devi
             pass
     fichier = config.fichier or "<fichier>"
     memoire = f"Mémoire libre sur la carte graphique : {libre} (Windows et les programmes ouverts en prennent une partie)."
-    if config.micro_lot > 1:
+    if en_generant:
+        message = _manque_de_memoire_en_generant(config, memoire)
+    elif config.micro_lot > 1:
         message = (
             f"La carte graphique manque de mémoire pour micro_lot = {config.micro_lot}.\n{memoire}\n"
             f"Réduis micro_lot dans {fichier}, ferme les jeux ou logiciels 3D ouverts, puis relance avec "
@@ -743,6 +874,25 @@ def _signaler_manque_de_memoire(config: ConfigEntrainement, appareil: torch.devi
         message = _manque_de_memoire_avec_un_micro_lot_de_1(config, memoire)
     print(message, file=sys.stderr, flush=True)
     raise SystemExit(2)
+
+
+def _manque_de_memoire_en_generant(config: ConfigEntrainement, memoire: str) -> str:
+    """Le message quand la mémoire manque pendant une génération du GRPO : réduire `lot_de_generation`."""
+    fichier = config.fichier or "<fichier>"
+    lot = config.grpo.lot_de_generation
+    debut = f"La carte graphique manque de mémoire pendant une génération du GRPO, avec lot_de_generation = {lot}"
+    if lot > 1:
+        return (
+            f"{debut} (les réponses écrites ensemble).\n{memoire}\n"
+            f"Réduis lot_de_generation dans la table [grpo] de {fichier} (par exemple {lot // 2}), ferme les jeux ou "
+            "logiciels 3D ouverts, puis relance avec --reprendre."
+        )
+    return (
+        f"{debut}, le plus petit possible.\n{memoire}\n"
+        "Ferme les programmes qui prennent la carte (jeux, logiciels 3D, vidéos, un autre entraînement), puis "
+        f'relance : {_commande_de_reprise(config)} ; ou mets appareil = "cpu" dans {fichier} (bien plus lent), '
+        "puis relance avec --reprendre."
+    )
 
 
 def _manque_de_memoire_avec_un_micro_lot_de_1(config: ConfigEntrainement, memoire: str) -> str:
@@ -872,22 +1022,28 @@ def entrainer(config: ConfigEntrainement, reprendre: bool = False, arreter_apres
 
     Ctrl+C met en pause (voir le début du module). Un manque de mémoire sur la carte
     graphique affiche la marche à suivre, puis quitte avec `SystemExit(2)`. Une perte qui
-    devient infinie arrête tout SANS sauvegarder, avec `SystemExit(3)`.
+    devient infinie arrête tout SANS sauvegarder, avec `SystemExit(3)`. Un GRPO dont le
+    contrôle de départ ne trouve aucune réponse juste ne lance rien et ne sauvegarde rien :
+    `SystemExit(CODE_RECOMPENSE_NULLE)` (6).
+
+    `arreter_apres=0` ne fait aucun pas : seulement la préparation de la méthode (le contrôle de
+    départ du GRPO, la référence de la DPO).
 
     Sur GPU, deux entraînements identiques peuvent différer légèrement (certains calculs de
     la carte additionnent dans un ordre qui varie) ; la reprise, elle, repart exactement du
     point sauvegardé.
     """
     appareil = _verifier_appareil(config)
-    manque_de_memoire = False
+    manque_de_memoire = en_generant = False
     try:
         return _entrainer(config, appareil, reprendre, arreter_apres)
-    except torch.cuda.OutOfMemoryError:
+    except torch.cuda.OutOfMemoryError as erreur:
         manque_de_memoire = True
+        en_generant = isinstance(erreur, GenerationSansMemoire)
     # Hors du bloc `except` : l'erreur et les tenseurs qu'elle retenait sont libérés avant
     # de mesurer la mémoire restée libre.
     if manque_de_memoire:
-        _signaler_manque_de_memoire(config, appareil)
+        _signaler_manque_de_memoire(config, appareil, en_generant)
     raise AssertionError("inatteignable")
 
 
@@ -898,6 +1054,7 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
     chemin_journal = sortie / "journal.jsonl"
     longueur = config.longueur_des_rangees
     pas_total = config.pas_total
+    jetons_par_pas = config.taille_lot_jetons  # None pour le GRPO, dont les pas n'ont pas tous les mêmes jetons
     fin = pas_total if arreter_apres is None else min(pas_total, arreter_apres)
     # La mesure de validation qui choisit `meilleur.pt` : la plus petite perte, ou la plus grande réussite.
     mesure_val = "reussite_val" if methode.plus_grand_est_meilleur else "perte_val"
@@ -963,6 +1120,11 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
             "sauvegarde": None,
             "meilleure_perte_val": None if etat is None else etat["meilleure_perte_val"],
         }
+    except RecompenseNulle as refus:
+        # Le contrôle de départ du GRPO n'a trouvé aucune réponse juste : rien n'est lancé, rien n'est sauvegardé.
+        noter_au_journal(notes)
+        print(refus, file=sys.stderr, flush=True)
+        raise SystemExit(CODE_RECOMPENSE_NULLE) from None
     except BaseException:
         if notes:  # ce que la méthode a constaté avant d'échouer (le contrôle du GRPO…) reste au journal
             noter_au_journal(notes)
@@ -989,10 +1151,18 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
         for ligne in notes:
             journal.ecrire(ligne)
         depuis = "" if depart is None else f", depuis la version {depart.version} ({config.dossier_depart})"
+        if jetons_par_pas is None:  # le GRPO : des problèmes et des réponses, pas un nombre fixe de jetons
+            g = config.grpo
+            par_pas = (
+                f"{g.invites_par_pas} problèmes × {g.reponses_par_invite} réponses par pas (au plus "
+                f"{g.jetons_max_reponse} jetons chacune, apprises {config.micro_lot} à la fois)"
+            )
+        else:
+            par_pas = (
+                f"{entier(jetons_par_pas)} jetons par pas ({config.accumulation} × {config.micro_lot} lignes de {longueur})"
+            )
         print(
-            f"{debut} Modèle de {entier(nombre_parametres(config.modele))} paramètres, "
-            f"{entier(config.taille_lot_jetons)} jetons par pas ({config.accumulation} × "
-            f"{config.micro_lot} lignes de {longueur}), sur "
+            f"{debut} Modèle de {entier(nombre_parametres(config.modele))} paramètres, {par_pas}, sur "
             f"{'la carte graphique' if appareil.type == 'cuda' else 'le processeur'}"
             f"{'' if config.methode == 'pre_entrainement' else f', méthode {config.methode}'}{depuis}.\n"
             f"Journal : {chemin_journal}\nSauvegardes : {sauvegardes}\n"
@@ -1016,7 +1186,7 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
             tout = {
                 **_etat_du_modele(config, modele, pas, depart),
                 "pas_total": pas_total,
-                "jetons_vus": pas * config.taille_lot_jetons,
+                "jetons_vus": None if jetons_par_pas is None else pas * jetons_par_pas,
                 "secondes": secondes_avant + (time.perf_counter() - debut_session),
                 "meilleure_perte_val": meilleure,
                 "optimiseur": optimiseur.state_dict(),
@@ -1052,18 +1222,22 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
                         flush=True,
                     )
                     raise SystemExit(CODE_PERTE_INFINIE) from None
-                vitesse = config.taille_lot_jetons / max(time.perf_counter() - debut_pas, 1e-9)
+                duree_du_pas = max(time.perf_counter() - debut_pas, 1e-9)
                 perte = resultat["perte"]
                 pertes.append(perte)
-                ligne = {
-                    "pas": pas,
-                    "jetons_vus": pas * config.taille_lot_jetons,
-                    "perte": perte,
-                    "taux": taux_du_pas,
-                    "jetons_par_seconde": round(vitesse, 1),
-                    "secondes": round(secondes_avant + (time.perf_counter() - debut_session), 3),
-                    **{cle: valeur for cle, valeur in resultat.items() if cle != "perte"},  # ce que la méthode ajoute
-                }
+                if jetons_par_pas is None:  # le GRPO : ni jetons vus, ni débit en jetons
+                    ligne = {"pas": pas, "perte": perte, "taux": taux_du_pas}
+                else:
+                    vitesse = jetons_par_pas / duree_du_pas
+                    ligne = {
+                        "pas": pas,
+                        "jetons_vus": pas * jetons_par_pas,
+                        "perte": perte,
+                        "taux": taux_du_pas,
+                        "jetons_par_seconde": round(vitesse, 1),
+                    }
+                ligne["secondes"] = round(secondes_avant + (time.perf_counter() - debut_session), 3)
+                ligne.update({cle: valeur for cle, valeur in resultat.items() if cle != "perte"})  # ce que la méthode ajoute
                 if validation is not None and (pas % config.evaluation_tous_pas == 0 or pas == pas_total):
                     ligne.update(methode.valider(modele, validation, depart_validation, appareil, config, contexte))
                     mesure = ligne[mesure_val]
@@ -1081,12 +1255,19 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
                     or pas == fin
                 ):
                     dernier_affichage = maintenant
-                    restant = (pas_total - pas) * config.taille_lot_jetons / vitesse
                     val = f" · validation {nombre(ligne[mesure_val], 3)}" if mesure_val in ligne else ""
+                    if jetons_par_pas is None:
+                        restant = (pas_total - pas) * duree_du_pas
+                        debit = f"{nombre(duree_du_pas, 1)} s par pas"
+                        if "recompense_moyenne" in ligne:
+                            val += f" · récompense {nombre(ligne['recompense_moyenne'], 3)}"
+                    else:
+                        restant = (pas_total - pas) * jetons_par_pas / vitesse
+                        debit = f"{entier(vitesse)} jetons/s"
                     print(
                         f"pas {pas}/{pas_total} · perte {nombre(perte, 3)}{val} · "
                         f"taux {scientifique(taux_du_pas)} · "
-                        f"{entier(vitesse)} jetons/s · reste ≈ {duree(restant)}",
+                        f"{debit} · reste ≈ {duree(restant)}",
                         flush=True,
                     )
 
@@ -1101,6 +1282,8 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
         if pause.demandee:
             journal.ecrire({"evenement": "pause", "pas": pas})
             print(f"Entraînement mis en pause au pas {pas}. Pour reprendre : {_commande_de_reprise(config)}", flush=True)
+        elif not pertes and arreter_apres == 0:
+            print("Arrêt demandé avant le premier pas (--arreter-apres 0) : aucun pas, rien n'est sauvegardé.", flush=True)
         elif not pertes:
             print(f"Rien à faire : l'entraînement est déjà au pas {pas} (fin prévue au pas {pas_total}).", flush=True)
         elif pas >= pas_total:
