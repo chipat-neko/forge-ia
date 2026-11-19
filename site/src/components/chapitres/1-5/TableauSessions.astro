@@ -29,7 +29,7 @@ const { nom, titre } = Astro.props;
 const entrainement = lireEntrainement(nom, new URL('../', root));
 const lignes = entrainement === null ? [] : lignesDesSessions(entrainement.sessions);
 const idLegende = `sessions-${nom}`;
-const absent = typographier(`${titre} : à mesurer, quand cet entraînement sera fini.`);
+const absent = typographier(`${titre} : à mesurer, après l’entraînement.`);
 ---
 
 {
