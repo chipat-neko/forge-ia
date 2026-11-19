@@ -1,0 +1,46 @@
+# Ton IA 1.7, version courte au taux 1e-4 : configs/sft-1.7-court.toml, avec un taux trois fois
+# plus petit. Seuls changent taux_max et sortie.
+#
+# Pourquoi cet essai : à 3e-4, ton IA apprend le mieux à converser (plus basse perte de validation
+# du balayage), mais elle oublie beaucoup de son pré-entraînement. Sa perte sur le texte de
+# validation du pré-entraînement passe de 2,347 (ton IA 1.5) à 2,998 pour la version courte et à
+# 3,766 pour la version complète. Cet essai mesure si un taux plus petit oublie moins.
+#
+# Lancer, depuis projets/forge (après « . .\outils\env-forge.ps1 » à la racine du dépôt) :
+#   uv run --extra gpu python -m forge entrainer --config configs/sft-1.7-court-1e-4.toml
+# Ctrl+C met en pause (le pas en cours se termine, puis tout est sauvegardé) ; pour reprendre :
+#   uv run --extra gpu python -m forge entrainer --config configs/sft-1.7-court-1e-4.toml --reprendre
+# Il faut avoir d'abord la version de départ et le jeu :
+#   uv run --extra gpu python -m forge publication --etiquette ton-ia-1.5
+#   uv run --extra gpu python -m forge preparer --recette sft-1.7
+#
+# Réglé le 19 novembre 2026.
+
+methode = "sft"
+depart = "ton-ia-1.5"
+preset = "tres_grand"
+donnees = "sft-1.7"
+
+# Une heure au débit mesuré, comme la version courte à 3e-4 : 739 pas de 65 536 jetons.
+jetons_total = 48_431_104
+taille_lot_jetons = 65_536
+longueur = 2048
+micro_lot = 1
+
+# Taux d'apprentissage : montée de 0 à taux_max pendant les 50 premiers pas, puis descente en
+# cosinus jusqu'à taux_max ÷ 10 au dernier pas. 1e-4 : le deuxième taux du balayage de 300 pas
+# (perte de validation 1,279 au pas 300, contre 1,214 à 3e-4).
+taux_max = 1e-4
+echauffement = 50
+
+poids_decroissance = 0.0
+betas = [0.9, 0.95]
+ecretage = 1.0
+graine = 1234
+evaluation_tous_pas = 100
+sauvegarde_minutes = 30
+appareil = "cuda"
+compiler = "auto"
+
+# Dossier du journal et des sauvegardes (sous FORGE_DONNEES/entrainements/).
+sortie = "ton-ia-1.7-court-1e-4"
