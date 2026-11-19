@@ -419,7 +419,9 @@ def _effacer(dossier: Path) -> None:
     def rendre_inscriptible(fonction, chemin, erreur):
         nonlocal cause
         for cible in (os.path.dirname(chemin), chemin):
-            if not _dans_le_dossier(cible, dossier) or os.path.islink(cible):
+            # Ni lien symbolique ni jonction Windows (`islink` ne voit pas les jonctions) : on ne touche jamais
+            # leur cible, hors du dossier jetable.
+            if not _dans_le_dossier(cible, dossier) or os.path.islink(cible) or os.path.isjunction(cible):
                 continue
             try:
                 os.chmod(cible, stat.S_IRWXU)
