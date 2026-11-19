@@ -477,7 +477,7 @@ dans `docs/mesures/ton-ia-1.7-LISEZMOI.md`.
 `suivi` lit le journal d'un entraînement et dit où il en est : état (en cours, en pause, fini,
 arrêté sans pause), pas, perte récente et de validation, débit, temps restant estimé et dernière
 sauvegarde ; pour le GRPO, la récompense moyenne et la réussite de validation, et le débit en secondes
-par pas. Il ne fait que lire et n'importe pas PyTorch : on peut le lancer aussi souvent qu'on
+par pas, ou, après un contrôle de départ sans aucune réponse juste (code 6), que rien n'a été lancé. Il ne fait que lire et n'importe pas PyTorch : on peut le lancer aussi souvent qu'on
 veut, dans une autre console, pendant l'entraînement.
 
 ```powershell

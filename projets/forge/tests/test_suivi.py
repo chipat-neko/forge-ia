@@ -336,6 +336,25 @@ def test_les_mesures_du_grpo(tmp_path, capsys):
     assert f"Débit récent{FINE}: 24,0 s par pas (sur le dernier pas)" in texte
 
 
+def test_grpo_sans_recompense_au_controle_de_depart(tmp_path, capsys, processus):
+    """Code 6 : le journal finit par `recompense_nulle`. Ni un plantage, ni une pause : rien n'a été lancé."""
+    from forge.raisonnement.grpo import NOM_DU_CONTROLE  # importe PyTorch : seulement dans ce test
+
+    processus["actif"] = False  # la commande s'est arrêtée
+    config = ecrire_config_grpo(tmp_path)
+    controle = {"invites": 200, "reponses": 1600, "justes": 0, "taux": 0.0, "lance": False, "secondes": 95.2,
+                "depart": "ton-ia-1.9-traces"}
+    ecrire_journal(tmp_path, [{"evenement": "recompense_nulle", "controle": controle, "pas": 0}])
+    texte = suivi(capsys, config)
+    assert texte.splitlines()[0] == (
+        f"Entraînement « essai »{FINE}: arrêté, aucune récompense au contrôle de départ (aucune des "
+        f"1{FINE}600 réponses n'est juste)"
+    )
+    assert "planté" not in texte and "--reprendre" not in texte and "Temps restant" not in texte
+    assert f"Contrôle{FINE}: {tmp_path / 'essai' / NOM_DU_CONTROLE}" in texte
+    assert "rien n'est lancé" in texte and "referait le même contrôle" in texte
+
+
 def test_reglages_du_grpo_lus_comme_l_entrainement(tmp_path, monkeypatch):
     from forge.entrainement import lire_config  # importe PyTorch : seulement dans ce test
 

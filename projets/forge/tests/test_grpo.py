@@ -284,7 +284,7 @@ def test_controle_seul(tmp_path, recompense_par_parite, capsys):
     assert not (tmp_path / "grpo" / "sauvegardes").exists()
     sortie = capsys.readouterr().out
     assert f"Contrôle de départ{FINE}: {controle['justes']} réponses justes sur 6" in sortie
-    assert "aucun pas" in sortie
+    assert f"Arrêt demandé (--arreter-apres 0){FINE}: aucun pas fait, rien n'est sauvegardé." in sortie
 
 
 def test_jetons_apres_l_arret_hors_perte():
@@ -393,6 +393,40 @@ def test_un_pas_sans_aucun_signal_ne_bouge_pas_les_poids(tmp_path, monkeypatch):
     assert all(torch.equal(apres[nom], depart[nom]) for nom in depart)
 
 
+def test_reprise_exacte_a_travers_des_pas_sans_signal(tmp_path, monkeypatch, recompense_par_parite):
+    """Les pas 1 et 4 sans aucun signal (aucune mise à jour) : trois sessions, pas 1 | 2 à 4 | 5 et 6, donnent au bit
+    près les pertes, les poids et l'état d'AdamW d'une traite, dont le compteur ne compte que les vraies mises à jour."""
+    vraie = grpo.tirer
+    sans_signal = {grpo.graine_du_pas(1234, 1), grpo.graine_du_pas(1234, 4)}
+
+    def tirer(modele, tok, problemes, n_reponses, graine, reglages, **options):
+        tirage = vraie(modele, tok, problemes, n_reponses, graine, reglages, **options)
+        if graine in sans_signal:  # toutes les réponses du pas ont la même récompense
+            return dataclasses.replace(tirage, recompenses=torch.ones_like(tirage.recompenses))
+        return tirage
+
+    monkeypatch.setattr(grpo, "tirer", tirer)
+    traite = entrainer(cfg_grpo(tmp_path / "traite"))["pertes"]
+    assert traite[0] == traite[3] == 0.0 and all(traite[k] != 0 for k in (1, 2, 4, 5))
+    config = cfg_grpo(tmp_path / "sessions")
+    assert config.graine == 1234
+    sessions = entrainer(config, arreter_apres=1)["pertes"]
+    sessions += entrainer(config, reprendre=True, arreter_apres=4)["pertes"]
+    sessions += entrainer(config, reprendre=True)["pertes"]
+    assert sessions == traite
+    a = charger_derniere(tmp_path / "traite" / "sauvegardes")
+    b = charger_derniere(tmp_path / "sessions" / "sauvegardes")
+    assert all(torch.equal(a["modele"][nom], b["modele"][nom]) for nom in a["modele"])
+    etats_a, etats_b = a["optimiseur"]["state"], b["optimiseur"]["state"]
+    assert etats_a.keys() == etats_b.keys()
+    for numero, etat in etats_a.items():
+        assert all(torch.equal(etat[cle], etats_b[numero][cle]) for cle in etat)
+        assert etat["step"].item() == 4  # 6 pas de la boucle, dont 2 sans mise à jour
+    assert [l["groupes_sans_signal"] for l in lignes_de_pas(tmp_path / "sessions")] == [
+        l["groupes_sans_signal"] for l in lignes_de_pas(tmp_path / "traite")
+    ]
+
+
 # --------------------------------------------------------------------------------------
 # Le contrôle de départ
 # --------------------------------------------------------------------------------------
@@ -484,6 +518,38 @@ def test_le_chargeur_d_invites(tmp_path):
     assert [[p.id for p in a.lot()] for _ in range(4)] == [[p.id for p in b.lot()] for _ in range(4)]
     with pytest.raises(ValueError, match="graine"):
         ChargeurInvites(dossier, 4, graine=4).restaurer(a.etat())
+
+
+def test_le_chargeur_refuse_des_problemes_regeneres(tmp_path):
+    """Un dossier régénéré avec le même nombre de problèmes, mais d'autres graines : la reprise est refusée."""
+    a = ChargeurInvites(ecrire_problemes(tmp_path / "a", nombre=10), 4, graine=0)
+    autre = ecrire_problemes(tmp_path / "b", nombre=10, graine=GRAINES_RL + 1000)
+    b = ChargeurInvites(autre, 4, graine=0)
+    assert len(a.problemes) == len(b.problemes) and a.etat()["empreinte"] != b.etat()["empreinte"]
+    with pytest.raises(ValueError, match="n'a plus les problèmes de la sauvegarde") as erreur:
+        b.restaurer(a.etat())
+    assert "forge problemes" in str(erreur.value) and "sortie" in str(erreur.value)
+    b.restaurer(ChargeurInvites(autre, 4, graine=0).etat())  # les mêmes problèmes : accepté
+
+
+def test_les_problemes_ne_sont_lus_qu_une_fois(tmp_path, monkeypatch, recompense_par_parite):
+    """Un entraînement neuf lit les premiers problèmes pour le contrôle, puis tous une fois ; une reprise, une fois."""
+    vraie = grpo.lire_elements
+    lus = []
+
+    def lire_elements(dossier, prefixe):
+        lus.append(0)
+        for element in vraie(dossier, prefixe):
+            lus[-1] += 1
+            yield element
+
+    monkeypatch.setattr(grpo, "lire_elements", lire_elements)
+    config = cfg_grpo(tmp_path / "grpo")
+    entrainer(config, arreter_apres=1)
+    assert lus == [3, 40]  # les 3 problèmes du contrôle, puis les 40 du chargeur
+    lus.clear()
+    entrainer(config, reprendre=True, arreter_apres=2)
+    assert lus == [40]
 
 
 @pytest.mark.parametrize("graine, usage", [(1_000_000, "evaluation"), (GRAINES_VALIDATION_RL, "validation_rl")])
@@ -594,7 +660,10 @@ def test_grpo_s_importe_en_premier():
     grpo.py importe forge.evaluation, qui importe forge.entrainement, donc methodes.py, qui se sert de grpo.py :
     methodes.py importe le module, pas ses noms (comme pour la DPO).
     """
-    resultat = subprocess.run([sys.executable, "-c", "import forge.raisonnement.grpo"], capture_output=True, text=True)
+    # Un délai, pour qu'un import bloqué ne bloque pas toute la suite ; pas 2 s : PyTorch seul en prend environ 5.
+    resultat = subprocess.run(
+        [sys.executable, "-c", "import forge.raisonnement.grpo"], capture_output=True, text=True, timeout=120
+    )
     assert resultat.returncode == 0, resultat.stderr
 
 

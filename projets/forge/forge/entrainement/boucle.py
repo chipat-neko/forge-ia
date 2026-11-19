@@ -204,7 +204,7 @@ class ReglagesGRPO:
         for nom, minimum, pourquoi in (
             ("pas", 1, ""),
             ("invites_par_pas", 1, ""),
-            ("reponses_par_invite", 2, " : le GRPO compare les réponses d'un même problème, avec une seule il n'apprend rien"),
+            ("reponses_par_invite", 2, f"{ESPACE_FINE}: le GRPO compare les réponses d'un même problème, avec une seule il n'apprend rien"),
             ("jetons_max_reponse", 1, ""),
             ("top_k", 0, " (0 : pas de limite)"),
             ("lot_de_generation", 1, ""),
@@ -214,11 +214,13 @@ class ReglagesGRPO:
         ):
             valeur = getattr(self, nom)
             if not isinstance(valeur, int) or isinstance(valeur, bool) or valeur < minimum:
-                raise ValueError(f"{nom} vaut {valeur!r} dans [grpo] : il faut un nombre entier d'au moins {minimum}{pourquoi}.")
+                raise ValueError(
+                    f"{nom} vaut {valeur!r} dans [grpo]{ESPACE_FINE}: il faut un nombre entier d'au moins {minimum}{pourquoi}."
+                )
         if not isinstance(self.temperature, int | float) or isinstance(self.temperature, bool) or self.temperature <= 0:
             raise ValueError(
-                f"temperature vaut {self.temperature!r} dans [grpo] : il faut un nombre plus grand que 0 (1.0 par "
-                "défaut ; à 0, toutes les réponses d'un problème seraient les mêmes, sans aucun signal)."
+                f"temperature vaut {self.temperature!r} dans [grpo]{ESPACE_FINE}: il faut un nombre plus grand que 0 (1.0 "
+                f"par défaut{ESPACE_FINE}; à 0, toutes les réponses d'un problème seraient les mêmes, sans aucun signal)."
             )
         object.__setattr__(self, "temperature", float(self.temperature))
 
@@ -229,7 +231,7 @@ def _reglages_grpo(valeur, fichier: str) -> ReglagesGRPO:
         return valeur
     if valeur is None:
         raise ValueError(
-            f'methode = "grpo" demande une table [grpo] dans {fichier}, avec au moins le nombre de pas : '
+            f'methode = "grpo" demande une table [grpo] dans {fichier}, avec au moins le nombre de pas{ESPACE_FINE}: '
             "[grpo] puis pas = 400 sur la ligne suivante."
         )
     if not isinstance(valeur, dict):
@@ -238,11 +240,13 @@ def _reglages_grpo(valeur, fichier: str) -> ReglagesGRPO:
     inconnus = sorted(set(valeur) - set(connus))
     if inconnus:
         raise ValueError(
-            f"Réglage inconnu dans la table [grpo] de {fichier} : {', '.join(inconnus)}. "
-            f"Réglages possibles : {', '.join(connus)}."
+            f"Réglage inconnu dans la table [grpo] de {fichier}{ESPACE_FINE}: {', '.join(inconnus)}. "
+            f"Réglages possibles{ESPACE_FINE}: {', '.join(connus)}."
         )
     if "pas" not in valeur:
-        raise ValueError(f"Réglage manquant dans la table [grpo] de {fichier} : pas (le nombre de pas du GRPO).")
+        raise ValueError(
+            f"Réglage manquant dans la table [grpo] de {fichier}{ESPACE_FINE}: pas (le nombre de pas du GRPO)."
+        )
     return ReglagesGRPO(**valeur)
 
 
@@ -810,7 +814,11 @@ def _verifier_sauvegarde(etat: dict, config: ConfigEntrainement) -> list[str]:
         else:
             differences.append(f"{reglage} : {ancienne!r} dans la sauvegarde, {valeur!r} maintenant")
     if differences:
-        grpo = " Pour le GRPO : changer lot_de_generation et augmenter pas, dans [grpo]." if config.methode == "grpo" else ""
+        grpo = (
+            f" Pour le GRPO{ESPACE_FINE}: changer lot_de_generation et augmenter pas, dans [grpo]."
+            if config.methode == "grpo"
+            else ""
+        )
         raise ValueError(
             f"La configuration a changé depuis la sauvegarde du pas {etat['pas']} : "
             f"{' ; '.join(differences)}. Ces réglages changent le calcul : remets les valeurs de la "
@@ -835,13 +843,15 @@ def _changements_grpo(avant: dict, maintenant: dict) -> tuple[list[str], list[st
             continue
         if nom == "lot_de_generation":
             notes.append(
-                f"[grpo] lot_de_generation passe de {ancienne} à {valeur} : les tirages des pas suivants ne sont plus "
-                "ceux d'une traite."
+                f"[grpo] lot_de_generation passe de {ancienne} à {valeur}{ESPACE_FINE}: les tirages des pas suivants ne "
+                "sont plus ceux d'une traite."
             )
         elif nom == "pas" and isinstance(ancienne, int) and valeur > ancienne:
-            notes.append(f"[grpo] pas passe de {ancienne} à {valeur} : le planning du taux est recalculé sur {valeur} pas.")
+            notes.append(
+                f"[grpo] pas passe de {ancienne} à {valeur}{ESPACE_FINE}: le planning du taux est recalculé sur {valeur} pas."
+            )
         else:
-            differences.append(f"[grpo] {nom} : {ancienne!r} dans la sauvegarde, {valeur!r} maintenant")
+            differences.append(f"[grpo] {nom}{ESPACE_FINE}: {ancienne!r} dans la sauvegarde, {valeur!r} maintenant")
     return differences, notes
 
 
@@ -890,8 +900,8 @@ def _manque_de_memoire_en_generant(config: ConfigEntrainement, memoire: str) -> 
     return (
         f"{debut}, le plus petit possible.\n{memoire}\n"
         "Ferme les programmes qui prennent la carte (jeux, logiciels 3D, vidéos, un autre entraînement), puis "
-        f'relance : {_commande_de_reprise(config)} ; ou mets appareil = "cpu" dans {fichier} (bien plus lent), '
-        "puis relance avec --reprendre."
+        f'relance{ESPACE_FINE}: {_commande_de_reprise(config)}{ESPACE_FINE}; ou mets appareil = "cpu" dans {fichier} '
+        "(bien plus lent), puis relance avec --reprendre."
     )
 
 
@@ -1258,9 +1268,9 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
                     val = f" · validation {nombre(ligne[mesure_val], 3)}" if mesure_val in ligne else ""
                     if jetons_par_pas is None:
                         restant = (pas_total - pas) * duree_du_pas
-                        debit = f"{nombre(duree_du_pas, 1)} s par pas"
+                        debit = f"{nombre(duree_du_pas, 1, milliers=ESPACE_FINE)} s par pas"
                         if "recompense_moyenne" in ligne:
-                            val += f" · récompense {nombre(ligne['recompense_moyenne'], 3)}"
+                            val += f" · récompense {nombre(ligne['recompense_moyenne'], 3, milliers=ESPACE_FINE)}"
                     else:
                         restant = (pas_total - pas) * jetons_par_pas / vitesse
                         debit = f"{entier(vitesse)} jetons/s"
@@ -1283,7 +1293,7 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
             journal.ecrire({"evenement": "pause", "pas": pas})
             print(f"Entraînement mis en pause au pas {pas}. Pour reprendre : {_commande_de_reprise(config)}", flush=True)
         elif not pertes and arreter_apres == 0:
-            print("Arrêt demandé avant le premier pas (--arreter-apres 0) : aucun pas, rien n'est sauvegardé.", flush=True)
+            print(f"Arrêt demandé (--arreter-apres 0){ESPACE_FINE}: aucun pas fait, rien n'est sauvegardé.", flush=True)
         elif not pertes:
             print(f"Rien à faire : l'entraînement est déjà au pas {pas} (fin prévue au pas {pas_total}).", flush=True)
         elif pas >= pas_total:

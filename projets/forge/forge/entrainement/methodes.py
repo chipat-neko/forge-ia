@@ -469,20 +469,21 @@ def _preparer_grpo(config, modele, appareil, noter, *, depart: VersionDeDepart |
     """
     reglages = config.grpo
     tok = grpo.tokenizer_du_depart(config.dossier_depart)
-    problemes = grpo.lire_problemes(config.dossier_donnees)
     contexte = {
         "tokenizer": tok,
+        # Lit l'index du dossier : un dossier incomplet, ou d'un autre usage, est refusé dès ici.
         "validation": grpo.problemes_de_validation(config.dossier_donnees, reglages.evaluation_invites),
     }
     if reprise:
         return contexte
+    # Seulement les problèmes du contrôle : le chargeur, créé ensuite, lit le dossier entier une fois.
+    problemes = grpo.lire_problemes(config.dossier_donnees, reglages.controle_invites)
     chemin = config.dossier_sortie / grpo.NOM_DU_CONTROLE
     chemin.unlink(missing_ok=True)  # celui d'un essai précédent ne doit pas passer pour celui-ci
     try:
         with _en_generant():
             controle = grpo.controle_de_depart(
-                modele, tok, problemes[: reglages.controle_invites], reglages, grpo.graine_du_pas(config.graine, 0),
-                depart.version,
+                modele, tok, problemes, reglages, grpo.graine_du_pas(config.graine, 0), depart.version
             )
     except KeyboardInterrupt:
         raise PreparationInterrompue(

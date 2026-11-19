@@ -29,6 +29,8 @@ contrôle, du « pas 0 », par paquets dont les graines sont tirées de `Hasard(
 refait donc exactement les mêmes tirages.
 """
 
+import hashlib
+import itertools
 import json
 import time
 from collections.abc import Sequence
@@ -100,8 +102,9 @@ def _index_des_problemes(dossier: Path) -> dict:
     return contenu
 
 
-def lire_problemes(dossier: Path) -> list[Probleme]:
-    """Tous les problèmes d'un dossier de `forge problemes` d'usage `entrainement`, dans l'ordre du fichier.
+def lire_problemes(dossier: Path, maximum: int | None = None) -> list[Probleme]:
+    """Les problèmes d'un dossier de `forge problemes` d'usage `entrainement`, dans l'ordre du fichier : tous, ou
+    les `maximum` premiers (la lecture s'arrête là).
 
     Un dossier incomplet lève `DonneesManquantes` ; un dossier d'un autre usage (évaluation, validation du RL),
     `ValueError`.
@@ -117,8 +120,17 @@ def lire_problemes(dossier: Path) -> list[Probleme]:
             etapes=tuple(element["etapes"]),
             reponse=int(element["reponse"]),
         )
-        for element in lire_elements(dossier, "problemes")
+        for element in itertools.islice(lire_elements(dossier, "problemes"), maximum)
     ]
+
+
+def empreinte_des_problemes(problemes: Sequence[Probleme]) -> str:
+    """Le SHA-256 des identifiants, énoncés et réponses, dans l'ordre : deux dossiers de même taille mais générés
+    avec d'autres graines, difficultés ou familles n'ont pas la même empreinte."""
+    hachage = hashlib.sha256()
+    for p in problemes:
+        hachage.update(json.dumps([p.id, p.enonce, p.reponse], ensure_ascii=False).encode("utf-8") + b"\n")
+    return hachage.hexdigest()
 
 
 class ChargeurInvites:
@@ -126,16 +138,18 @@ class ChargeurInvites:
 
     L'ordre ne dépend que de `(graine, époque)`, comme les autres chargeurs de la forge : `etat()` et
     `restaurer(etat)` reprennent exactement au même endroit. Un lot à cheval sur deux époques prend la fin de
-    l'une et le début de l'autre.
+    l'une et le début de l'autre. L'état retient l'empreinte des problèmes (`empreinte_des_problemes`) : une reprise
+    sur un dossier régénéré, même de même taille, est refusée.
     """
 
     def __init__(self, dossier: Path, taille_lot: int, graine: int) -> None:
         if not isinstance(taille_lot, int) or taille_lot < 1:
-            raise ValueError(f"La taille de lot vaut {taille_lot!r} : il faut au moins un problème par lot.")
+            raise ValueError(f"La taille de lot vaut {taille_lot!r}{_FINE}: il faut au moins un problème par lot.")
         self.dossier = Path(dossier)
         self.problemes = lire_problemes(self.dossier)
         if not self.problemes:
             raise ValueError(f"{self.dossier} n'a aucun problème{_FINE}: génère-les avec {_COMMANDE_DES_PROBLEMES}")
+        self.empreinte = empreinte_des_problemes(self.problemes)
         self.taille_lot = taille_lot
         self.graine = graine
         self.epoque = 0
@@ -166,24 +180,34 @@ class ChargeurInvites:
             "epoque": self.epoque,
             "position": self.position,
             "problemes": len(self.problemes),
+            "empreinte": self.empreinte,
         }
 
     def restaurer(self, etat: dict) -> None:
         """Replace le chargeur à la position décrite par `etat` (venu de `etat()`)."""
         if etat.get("version") != VERSION_DE_L_ETAT:
             raise ValueError(
-                f"État du chargeur de problèmes de version {etat.get('version')!r}, cette version de la forge lit la "
-                f"version {VERSION_DE_L_ETAT}."
+                f"État du chargeur de problèmes de version {etat.get('version')!r}{_FINE}: cette version de la forge lit "
+                f"la version {VERSION_DE_L_ETAT}."
             )
         if etat["graine"] != self.graine:
             raise ValueError(
-                f"La sauvegarde a été faite avec la graine {etat['graine']}, la configuration donne {self.graine} : "
+                f"La sauvegarde a été faite avec la graine {etat['graine']}, la configuration donne {self.graine}{_FINE}: "
                 f"remets graine = {etat['graine']} pour reprendre le même entraînement."
             )
-        if etat["problemes"] != len(self.problemes):
+        if etat["problemes"] != len(self.problemes) or etat.get("empreinte") != self.empreinte:
+            combien = (
+                f"{entier(etat['problemes'], milliers=_FINE)} problèmes alors, {entier(len(self.problemes), milliers=_FINE)} "
+                "maintenant"
+                if etat["problemes"] != len(self.problemes)
+                else f"autant de problèmes, mais pas les mêmes{_FINE}: empreinte {str(etat.get('empreinte'))[:12]}… alors, "
+                f"{self.empreinte[:12]}… maintenant"
+            )
             raise ValueError(
-                f"Le dossier {self.dossier} n'a plus les problèmes de la sauvegarde ({etat['problemes']} alors, "
-                f"{len(self.problemes)} maintenant). Reprends avec les mêmes problèmes."
+                f"Le dossier {self.dossier} n'a plus les problèmes de la sauvegarde ({combien}){_FINE}: il a été "
+                "régénéré ou remplacé. Pour reprendre, remets les mêmes problèmes (la même commande `forge problemes`, "
+                f"avec les mêmes --nombre, --graine-depart, --difficultes et --familles){_FINE}; sinon, change `sortie` "
+                "pour commencer un nouvel entraînement."
             )
         self.epoque = int(etat["epoque"])
         self.position = int(etat["position"])
@@ -390,7 +414,11 @@ def controle_de_depart(
     """
     n = reglages.controle_reponses
     total = len(problemes) * n
-    print(f"Contrôle de départ{_FINE}: {entier(len(problemes), milliers=_FINE)} problèmes × {n} tirages avec {version}…", flush=True)
+    print(
+        f"Contrôle de départ{_FINE}: {entier(len(problemes), milliers=_FINE)} problèmes × {entier(n, milliers=_FINE)} "
+        f"tirages avec {version}…",
+        flush=True,
+    )
     paquet = max(1, reglages.lot_de_generation // n)
     hasard = Hasard(graine)
     justes = faites = 0
@@ -405,7 +433,7 @@ def controle_de_depart(
             debit = faites / max(maintenant - debut, 1e-9)
             print(
                 f"Contrôle de départ{_FINE}: {entier(faites, milliers=_FINE)} réponses sur {entier(total, milliers=_FINE)} "
-                f"({nombre(100 * faites / total, 1)}{_FINE}%) · {nombre(debit, 1, milliers=_FINE)} réponses/s · "
+                f"({nombre(100 * faites / total, 1, milliers=_FINE)}{_FINE}%) · {nombre(debit, 1, milliers=_FINE)} réponses/s · "
                 f"reste ≈ {duree((total - faites) / debit)}",
                 flush=True,
             )
@@ -413,7 +441,7 @@ def controle_de_depart(
     taux = justes / total
     print(
         f"Contrôle de départ{_FINE}: {entier(justes, milliers=_FINE)} réponses justes sur {entier(total, milliers=_FINE)} "
-        f"({nombre(100 * taux, 1)}{_FINE}%), en {duree(secondes)}.",
+        f"({nombre(100 * taux, 1, milliers=_FINE)}{_FINE}%), en {duree(secondes)}.",
         flush=True,
     )
     return {

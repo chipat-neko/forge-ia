@@ -722,5 +722,8 @@ def test_dpo_s_importe_en_premier():
     dpo.py importe forge.evaluation, qui importe forge.entrainement, donc methodes.py, qui se sert de
     dpo.py : methodes.py importe le module, pas ses noms, pour que cet ordre-là marche aussi.
     """
-    resultat = subprocess.run([sys.executable, "-c", "import forge.affinage.dpo"], capture_output=True, text=True)
+    # Un délai, pour qu'un import bloqué ne bloque pas toute la suite ; pas 2 s : PyTorch seul en prend environ 5.
+    resultat = subprocess.run(
+        [sys.executable, "-c", "import forge.affinage.dpo"], capture_output=True, text=True, timeout=120
+    )
     assert resultat.returncode == 0, resultat.stderr

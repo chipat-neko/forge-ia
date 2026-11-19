@@ -3,7 +3,8 @@
 `python -m forge suivi --config configs/principal.toml` lit le journal de l'entraînement
 (`<sortie>/journal.jsonl`, écrit par `forge entrainer`) et affiche :
 
-- l'état : en cours, en pause, fini ou jamais lancé, d'après la dernière ligne du journal ; et
+- l'état : en cours, en pause, fini ou jamais lancé, d'après la dernière ligne du journal (ou, pour
+  le GRPO, arrêté sans rien lancer : aucune récompense au contrôle de départ) ; et
   « arrêté sans pause » quand le journal ne finit ni par une pause ni par la fin alors qu'aucun
   processus `forge entrainer` ne tourne pour cette configuration (un plantage, une coupure de
   courant…). On regarde les processus, pas la date du journal : sur un disque exFAT (le D: de
@@ -57,9 +58,15 @@ ARRETE = "arrêté sans pause"
 EN_PAUSE = "en pause"
 FINI = "fini"
 PERTE_INFINIE = "perte infinie"
+RECOMPENSE_NULLE = "aucune récompense au contrôle de départ"
 
-# Les évènements qui terminent une session de l'entraînement.
-_FINS_DE_SESSION = ("pause", "fin", "perte_non_finie")
+# Les évènements qui terminent une session de l'entraînement. `recompense_nulle` : le contrôle de départ du GRPO
+# n'a trouvé aucune réponse juste, rien n'a été lancé (code 6).
+_FINS_DE_SESSION = ("pause", "fin", "perte_non_finie", "recompense_nulle")
+
+# Le fichier du contrôle de départ du GRPO, dans la sortie : le nom de `forge.raisonnement.grpo.NOM_DU_CONTROLE`,
+# recopié pour ne pas importer PyTorch (un test vérifie que c'est le même).
+NOM_DU_CONTROLE = "controle.json"
 
 
 # --- La configuration -----------------------------------------------------------------
@@ -246,7 +253,7 @@ def _est_un_pas(ligne: dict) -> bool:
 class Suivi:
     """Où en est un entraînement, d'après son journal."""
 
-    etat: str  # une des constantes JAMAIS_LANCE, EN_COURS, ARRETE, EN_PAUSE, FINI, PERTE_INFINIE
+    etat: str  # une des constantes JAMAIS_LANCE, EN_COURS, ARRETE, EN_PAUSE, FINI, PERTE_INFINIE, RECOMPENSE_NULLE
     pas_de_l_etat: int | None  # le pas de la pause, de la fin ou de la perte infinie
     pas: int  # le dernier pas fini
     pas_total: int
@@ -269,6 +276,7 @@ class Suivi:
     recompense_recentes: tuple[float, ...] = ()
     reussite_val: float | None = None
     pas_reussite_val: int | None = None
+    controle: dict | None = None  # le contrôle de départ d'un GRPO arrêté sans récompense (sa ligne du journal)
 
 
 def _debit(pas_faits: list[dict], taille_lot: int | None) -> tuple[float | None, int]:
@@ -323,6 +331,8 @@ def calculer_suivi(lignes: list[dict], pas_total: int, taille_lot: int | None, a
         etat = FINI
     elif evenement == "perte_non_finie":
         etat = PERTE_INFINIE
+    elif evenement == "recompense_nulle":
+        etat = RECOMPENSE_NULLE
     elif actif is False:
         etat = ARRETE
     else:
@@ -338,6 +348,7 @@ def calculer_suivi(lignes: list[dict], pas_total: int, taille_lot: int | None, a
     restant = None
     if etat != FINI and debit:
         restant = max(0, pas_total - pas) * (taille_lot or 1) / debit
+    controle = lignes[-1].get("controle") if etat == RECOMPENSE_NULLE else None
     jetons_vus = None
     if taille_lot is not None:
         jetons_vus = dernier.get("jetons_vus") if dernier else 0
@@ -365,6 +376,7 @@ def calculer_suivi(lignes: list[dict], pas_total: int, taille_lot: int | None, a
         recompense_recentes=_recentes(pas_faits, "recompense_moyenne"),
         reussite_val=reussites[-1]["reussite_val"] if reussites else None,
         pas_reussite_val=reussites[-1]["pas"] if reussites else None,
+        controle=controle if isinstance(controle, dict) else None,
     )
 
 
@@ -414,6 +426,19 @@ def texte_du_suivi(suivi: Suivi, reglages: Reglages) -> str:
                 f"  Pour le lancer{_FINE}: {lancer}",
             ]
         )
+
+    if suivi.etat == RECOMPENSE_NULLE:
+        reponses = (suivi.controle or {}).get("reponses")
+        combien = f" (aucune des {_entier(reponses)} réponses n'est juste)" if _est_un_nombre(reponses) else ""
+        lignes = [
+            f"{titre}arrêté, {RECOMPENSE_NULLE}{combien}",
+            f"  Le RL n'aurait aucun signal{_FINE}: rien n'est lancé, rien n'est sauvegardé.",
+            f"  Contrôle{_FINE}: {reglages.dossier_sortie / NOM_DU_CONTROLE}",
+            f"  Relancer la même commande referait le même contrôle{_FINE}: ton IA doit d'abord réussir quelques "
+            "problèmes (un SFT de raisonnement, ou des problèmes plus faciles).",
+            f"  Journal{_FINE}: {reglages.journal}",
+        ]
+        return "\n".join(lignes)
 
     if suivi.etat == EN_PAUSE:
         lignes = [f"{titre}{EN_PAUSE} au pas {_entier(suivi.pas_de_l_etat or suivi.pas)}"]
