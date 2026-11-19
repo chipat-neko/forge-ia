@@ -54,6 +54,8 @@
   const p = $derived(phraseDeLaPerteDpo(betaDeLIndice($indiceBeta), $ecartChoisie, $ecartRejetee));
   /** « nat » jusqu'à 2 exclus, « nats » au-delà, comme le pluriel français. */
   const unite = $derived(Number(p.perte.replace(',', '.')) >= 2 ? 'nats' : 'nat');
+  /** L'unité après l'écart de la choisie : « nat » sous 2 en valeur absolue, « nats » au-delà. */
+  const uniteChoisie = $derived(Math.abs($ecartChoisie) >= 2 ? 'nats' : 'nat');
 
   // L'acquis : au premier réglage d'un des trois nombres.
   const depart = `${INDICE_BETA_DEPART}|${ECART_CHOISIE_DEPART}|${ECART_REJETEE_DEPART}`;
@@ -97,7 +99,7 @@
       testId="dpo-choisie"
       texte={ecartEnTexte}
       pixelsParUnite={14}
-    /> nat, et la rejetée de <NombreManipulable
+    /> {uniteChoisie}, et la rejetée de <NombreManipulable
       canal={REJETEE}
       min={ECART_MIN}
       max={ECART_MAX}

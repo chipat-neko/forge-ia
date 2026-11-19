@@ -28,6 +28,7 @@ import {
   type Note,
 } from './atelier-1-8';
 import { deriveeDpo, perteDpo } from './dpo';
+import { noteSansJustesse } from './notes';
 import { FICHIERS_PARTIE_1 } from './fichiers';
 import type { ConsigneDInvite, ReglagesConsigne } from './notes';
 
@@ -82,6 +83,8 @@ describe('la note d’une réponse, critère par critère', () => {
       const e = expliquerNote(t.texte, t.terminee, t.invite);
       // Une question n'a pas de réponse à vérifier : « juste » est acquis, comme dans forge.
       expect(e.note, t.nom).toStrictEqual({ terminee: t.note.terminee, juste: 1, consignes: t.note.consignes, francais: t.note.francais, longueur: t.note.longueur });
+      // Les valeurs sont celles du jumeau, noteSansJustesse, et « juste » est acquis.
+      expect(e.note, t.nom).toStrictEqual({ ...noteSansJustesse(t.texte, t.terminee, t.invite), juste: 1 });
       expect(e.mots, t.nom).toBe(t.mots);
       expect(e.langue, t.nom).toBe(t.langue);
       expect(e.consignes.map((c) => [c.id, c.respectee]), t.nom).toStrictEqual(t.invite.map(([id]) => [id, t.verdicts[id]]));
@@ -145,18 +148,28 @@ describe('l’ordre des notes', () => {
   });
 });
 
-describe('le défi : écrire une réponse qui obtient la note la plus haute', () => {
+describe('le défi : écrire sa propre réponse qui obtient la note la plus haute', () => {
   const invite: ConsigneDInvite[] = [['mots_max', { n: 20 }], ['sans_virgule', {}]];
+  const paire = [
+    { lettre: 'A', texte: 'La capitale de la France est Paris, une grande ville au bord de la Seine.' },
+    { lettre: 'B', texte: 'Paris est la capitale de la France.' },
+  ];
+  const defi = (texte: string, finie = true) => {
+    const e = expliquerNote(texte, finie, invite);
+    return { reussi: defiReussi(e, texte, paire), texte: texteDuDefi(e, texte, paire) };
+  };
 
   it('réussi seulement à la note la plus haute, et le texte le dit', () => {
-    const bonne = expliquerNote('La capitale de la France est Paris.', true, invite);
-    expect(defiReussi(bonne)).toBe(true);
-    expect(texteDuDefi(bonne)).toMatch(/^Défi réussi/);
-    const virgule = expliquerNote('La capitale de la France est Paris, au bord de la Seine.', true, invite);
-    expect(defiReussi(virgule)).toBe(false);
-    expect(texteDuDefi(virgule)).toBe(`Pas encore${FINE}: 1 consigne sur 2.`);
-    const coupee = expliquerNote('Paris', false, invite);
-    expect(texteDuDefi(coupee)).toBe(`Pas encore${FINE}: elle est coupée par la limite de jetons${FINE}; 1 mot, moins de 3.`);
+    expect(defi('La capitale de la France est Paris.')).toStrictEqual({ reussi: true, texte: `Défi réussi${FINE}: ta réponse a la note la plus haute, (1, 1, 2, 1, 1).` });
+    expect(defi('La capitale de la France est Paris, au bord de la Seine.')).toStrictEqual({ reussi: false, texte: `Pas encore${FINE}: 1 consigne sur 2.` });
+    expect(defi('Paris', false).texte).toBe(`Pas encore${FINE}: elle est coupée par la limite de jetons${FINE}; 1 mot, moins de 3.`);
+  });
+
+  it('refuse une copie d’une réponse de la paire, même à une espace près', () => {
+    for (const copie of ['Paris est la capitale de la France.', '  Paris est la   capitale de la France.\n']) {
+      expect(estLaPlusHaute(expliquerNote(copie, true, invite))).toBe(true);
+      expect(defi(copie)).toStrictEqual({ reussi: false, texte: `Pas encore${FINE}: c’est la réponse B de la paire. Écris la tienne.` });
+    }
   });
 });
 
@@ -185,7 +198,7 @@ describe('la phrase de la perte DPO', () => {
     // La dérivée selon la choisie est négative (la monter fait baisser la perte), celle selon la rejetée est l'opposée.
     const p = phraseDeLaPerteDpo(0.1, 1, -1);
     expect(deriveeDpo(0.1, 1, -1)).toBeLessThan(0);
-    expect(p.suite).toMatch(/pousse la choisie vers le haut et la rejetée vers le bas/);
+    expect(p.suite).toMatch(/la descente de gradient pousse la choisie vers le haut et la rejetée vers le bas/);
     // L'ordre de la paire décide de la force : à l'envers (z < 0), plus de la moitié de β ; dans l'ordre, moins.
     expect(phraseDeLaPerteDpo(0.1, -1, 1).suite).toMatch(/à l’envers/);
     expect(phraseDeLaPerteDpo(0.1, 1, -1).suite).toMatch(/déjà dans le bon ordre/);

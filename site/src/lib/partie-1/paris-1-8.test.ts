@@ -11,6 +11,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { avecConsignes, comparerNotes, expliquerNote, phraseDeConsigne } from './atelier-1-8';
 import { FICHIERS_ETAPES } from './etapes';
 import { FICHIERS_PARTIE_1 } from './fichiers';
+import { MOTS_MAXIMUM, MOTS_MINIMUM } from './notes';
 import {
   CONFIG_DPO_18,
   CONSIGNES_D_EXEMPLE,
@@ -27,8 +28,10 @@ import {
   faitsDeForge18,
   faitsDeLaLongueur,
   faitsDeLaVraisemblance,
+  faitsDuPariNotes,
   faitsDuProjet18,
   FICHIERS_1_8,
+  lignesDuCode,
   lireConsignesDeReference,
   lirePairesExemples,
   lireReglagesDpo18,
@@ -40,6 +43,7 @@ import {
   REPONSES_D_EXEMPLE,
   sensDeLaChoisie,
   sensDeLaLongueur,
+  textesDuPariNotes,
   TOLERANCE_LONGUEUR,
   TOLERANCE_VRAISEMBLANCE,
   TRANCHES_VICTOIRE,
@@ -178,11 +182,34 @@ describe('la paire de l’ouverture et de l’atelier', () => {
   });
 });
 
-describe('le pari « notes » : l’ordre des critères', () => {
-  it('une réponse finie bat une réponse coupée, même si la coupée respecte plus de consignes', () => {
-    const choix = choixOrdreDesCriteres();
+describe('le pari « notes » : l’ordre des critères, sur la paire de l’ouverture', () => {
+  it('sur l’exemple : la réponse B, préférée, imaginée coupée, perd contre la A, finie', () => {
+    const choix = choixOrdreDesCriteres(depot());
     expect(choix.filter((c) => c.juste)).toHaveLength(1);
-    expect(juste(choix)).toStrictEqual(['Celle qui finit son tour']);
+    expect(juste(choix)).toStrictEqual(['La réponse A, finie']);
+    expect(choix.findIndex((c) => c.juste)).toBe(0);
+    const t = textesDuPariNotes(depot());
+    expect(t.question).toMatch(/forge y préfère la réponse B/);
+    expect(t.explication).toMatch(/^La réponse A, finie/);
+  });
+
+  it('avec un paires-exemples.json fabriqué : le pari, l’ouverture et l’atelier parlent de la même paire', () => {
+    const racine = depot({ [FICHIERS_1_8.pairesExemples]: [paireProbleme(), paireQuestion()] });
+    const p = paireDeLOuverture(racine);
+    const f = faitsDuPariNotes(racine);
+    // La préférée est la réponse que forge a choisie ; l'autre, la rejetée, est donnée finie.
+    expect(f.preferee).toBe(p.choisie);
+    const lettres = p.reponses.map((r) => r.lettre);
+    expect(lettres).toContain(f.preferee);
+    expect(lettres).toContain(f.autre);
+    expect(f.coupee.note.terminee).toBe(0);
+    expect(f.finie.note.terminee).toBe(1);
+    const t = textesDuPariNotes(racine);
+    expect(t.question).toContain(`forge y préfère la réponse ${p.choisie}`);
+    expect(juste(choixOrdreDesCriteres(racine))).toStrictEqual([`La réponse ${f.autre}, finie`]);
+    // Rien ne parle plus de l'exemple : ni ses réponses, ni sa virgule.
+    for (const r of REPONSES_D_EXEMPLE) expect(`${t.question} ${t.precision} ${t.explication}`).not.toContain(r.texte);
+    expect(`${t.question} ${t.precision} ${t.explication}`).not.toMatch(/virgule/);
   });
 });
 
@@ -214,7 +241,20 @@ describe('ce que le chapitre lit dans forge', () => {
   });
 
   it('ce que le chapitre dit du projet 1.8, relu dans son README', () => {
-    expect(faitsDuProjet18(RACINE)).toStrictEqual({ noterEgaleForge: true, perteA1e12: true, pousserSansPaire: true });
+    expect(faitsDuProjet18(RACINE)).toStrictEqual({ noterEgaleForge: true, perteA1e12: true, pousserSansPaire: true, pointsDuTestDpo: 27, reglagesDuBalayage: true });
+  });
+
+  it('les bornes de longueur du jumeau sont celles de forge', () => {
+    const f = faitsDeForge18(RACINE);
+    expect([MOTS_MINIMUM, MOTS_MAXIMUM]).toStrictEqual([f.motsMinimum, f.motsMaximum]);
+  });
+
+  it('le nombre de lignes d’un extrait montré, région ou symbole sans sa docstring', () => {
+    const racine = depot({
+      'projets/essai.py': 'def f(x):\n    """Une docstring."""\n    y = x\n    return y\n\n\n# region: r\na = 1\nb = 2\n# fin: r\n',
+    });
+    expect(lignesDuCode('projets/essai.py', 'symbole', 'f', racine)).toBe(3);
+    expect(lignesDuCode('projets/essai.py', 'region', 'r', racine)).toBe(2);
   });
 
   it('le pari « paires » : la meilleure coupée, pas de paire (le plancher de forge)', () => {
@@ -292,10 +332,20 @@ describe('ce qui a changé (étape 8) : la longueur et la victoire', () => {
   it('la phrase de la longueur dit si elle grandit sans mieux suivre les consignes d’IFEval-FR', () => {
     const sansMieux = phraseDeLaLongueur(avec({ invite: 0.3 }, { motsModele: 80, motsReference: 60, invite: 0.3 }));
     expect(sansMieux).toMatch(/plus longues/);
-    expect(sansMieux).toMatch(/sans mieux suivre/);
+    expect(sansMieux).toMatch(/sans respecter plus souvent les consignes d’IFEval-FR/);
     const mieux = phraseDeLaLongueur(avec({ invite: 0.3 }, { motsModele: 80, motsReference: 60, invite: 0.4 }));
-    expect(mieux).not.toMatch(/sans mieux suivre/);
+    expect(mieux).toMatch(/respectent plus souvent toutes les consignes d’IFEval-FR/);
+    // Les consignes d'IFEval-FR et celles des paires sont vérifiées par le même module : rien sur des consignes « pas apprises ».
+    expect(`${sansMieux} ${mieux}`).not.toMatch(/apprise/);
     expect(phraseDeLaLongueur(avec({}, { motsModele: 40, motsReference: 60 }))).toMatch(/plus courtes/);
+  });
+
+  it('sans la mesure d’IFEval-FR, la phrase s’arrête à la longueur, et le pari garde son explication', () => {
+    const r17 = rapport18('ton-ia-1.7', {});
+    const sansIfeval = { ...r17, mesures: { ...r17.mesures, ifeval_fr: { absente: 'IFEval-FR n’est pas téléchargé' } } };
+    const racine = depot({ [FICHIERS_ETAPES['1.7@1.8']]: sansIfeval, [FICHIERS_ETAPES['1.8@1.8']]: rapport18('ton-ia-1.8', { motsModele: 80, motsReference: 60 }) });
+    expect(choixLongueur(racine)).not.toBeNull();
+    expect(phraseDeLaLongueur(racine)).toMatch(/^Ses réponses sont plus longues.*aux mêmes invites\.$/);
   });
 
   it('la victoire : trois tranches, un seul juste', () => {

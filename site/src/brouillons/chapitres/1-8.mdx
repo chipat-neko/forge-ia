@@ -54,7 +54,7 @@ import { chapitresParus } from '../../lib/chapitres-parus';
 import { exigeur } from '../../lib/exiger';
 import { decimalesUtiles, nombre, pourcent } from '../../lib/nombres';
 import { hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
-import { CRITERES, estLaPlusHaute, expliquerNote, noteEnTexte, phraseDeConsigne } from '../../lib/partie-1/atelier-1-8';
+import { CRITERES, estLaPlusHaute, expliquerNote, phraseDeConsigne } from '../../lib/partie-1/atelier-1-8';
 import { ALIGNEMENT_DPO, ALIGNEMENT_NOTER, ALIGNEMENT_POUSSER, ALIGNEMENT_TESTS, PREFERENCES_1_8 } from '../../lib/partie-1/commandes';
 import { MESURES_DE_L_ETAPE } from '../../lib/partie-1/etapes';
 import {
@@ -65,12 +65,13 @@ import {
   choixVictoire,
   choixVraisemblance,
   faitsDeForge18,
-  faitsDuPariNotes,
   faitsDuProjet18,
+  lignesDuCode,
   paireDeLOuverture,
   phraseDeLaLongueur,
   phraseDeLaNote,
   phraseDeLaVraisemblance,
+  textesDuPariNotes,
   TOLERANCE_LONGUEUR,
   TOLERANCE_VRAISEMBLANCE,
 } from '../../lib/partie-1/paris-1-8';
@@ -154,17 +155,32 @@ export const CRITERES_DE_FORGE = (() => {
 })();
 
 export const NOTES = (() => {
-  const f = faitsDuPariNotes();
-  const choix = choixOrdreDesCriteres();
-  exiger(choix.find((c) => c.juste)?.texte === 'Celle qui finit son tour', 'le juste du pari « notes » n’est plus la réponse finie');
-  exiger(CRITERES[0] === 'terminee', 'la fin du tour n’est plus le premier critère');
+  // Le pari « notes » porte sur la paire de l'ouverture, la vraie ou celle de l'exemple : sa réponse préférée,
+  // imaginée coupée, contre l'autre, finie (textesDuPariNotes garde que la finie gagne).
+  const textes = textesDuPariNotes(RACINE);
   return {
-    choix,
-    coupee: typographier(`« ${f.texteCoupee} »`),
-    finie: typographier(`« ${f.texteFinie} »`),
-    noteCoupee: noteEnTexte(f.coupee.note),
-    noteFinie: noteEnTexte(f.finie.note),
+    choix: choixOrdreDesCriteres(RACINE),
+    question: textes.question,
+    precision: textes.precision,
+    explication: typographier(textes.explication),
   };
+})();
+
+export const CODE = (() => {
+  // Les explications de CodeExplique visent des plages de lignes : si un extrait change de longueur, elles glissent
+  // sans bruit. On garde donc le nombre de lignes de chaque extrait montré.
+  const extraits = [
+    ['projets/1.8-alignement/alignement_pas_a_pas/noter.py', 'region', 'noter', 110, 'de l’étape 3'],
+    ['projets/forge/forge/preferences/noter.py', 'symbole', 'sans_paire', 7, 'de l’étape 4'],
+    ['projets/forge/forge/preferences/construction.py', 'symbole', 'construire_paires', 132, 'de l’étape 4'],
+    ['projets/1.8-alignement/alignement_pas_a_pas/perte_dpo.py', 'region', 'perte-dpo', 46, 'de l’étape 5'],
+    ['projets/1.8-alignement/tests/test_perte_dpo.py', 'region', 'test-dpo', 12, 'de l’étape 10'],
+  ];
+  for (const [fichier, sorte, nom, lignes, ou] of extraits) {
+    const lu = lignesDuCode(fichier, sorte, nom, RACINE);
+    exiger(lu === lignes, `${nom} (${fichier}) a maintenant ${lu} lignes au lieu de ${lignes} : recale les plages data-lignes du CodeExplique ${ou}, puis ce nombre`);
+  }
+  return {};
 })();
 
 export const ATELIER = (() => {
@@ -229,6 +245,8 @@ export const PIEGE = (() => {
 export const BALAYAGE = (() => {
   // « On compare leurs taux de victoire, sur les invites de validation des paires » : le README de forge le dit.
   exiger(FORGE.balayageDepartageParLaVictoire, 'forge ne départage plus les essais d’un balayage par la victoire');
+  // « Le taux d'apprentissage, β, la normalisation par la longueur, le poids du terme SFT » : ce que relève `balayage`.
+  exiger(PROJET.reglagesDuBalayage, 'le relevé du balayage ne garde plus le taux, β, la normalisation et le poids SFT');
   return {};
 })();
 
@@ -295,7 +313,11 @@ export const FIN = (() => {
   exiger(PROJET.noterEgaleForge && PROJET.perteA1e12 && PROJET.pousserSansPaire, 'le README du projet 1.8 ne dit plus ce que l’étape 10 en dit');
   // L'« À suivre » : le chapitre 1.9, un lien s'il a paru.
   const { chapitre } = trouverChapitre('1.9');
-  return { titre: typographier(`« ${titreCourt(chapitre.titre)} »`), lien: PARUS.has(chapitre.numero) ? hrefChapitre(chapitre.numero) : null };
+  return {
+    titre: typographier(`« ${titreCourt(chapitre.titre)} »`),
+    lien: PARUS.has(chapitre.numero) ? hrefChapitre(chapitre.numero) : null,
+    points: nombre(PROJET.pointsDuTestDpo),
+  };
 })();
 
 <Etape numero={1} titre="Deux réponses, une meilleure">
@@ -352,13 +374,13 @@ Deux notes se comparent critère par critère, dans cet ordre.
 
 <Pari
   id="notes"
-  question="Deux réponses à l'invite de l'ouverture : l'une respecte les deux consignes, mais forge l'a coupée ; l'autre finit son tour, mais a une virgule. Laquelle forge préfère-t-il ?"
-  precision={`La coupée : ${NOTES.coupee}. La finie : ${NOTES.finie}.`}
+  question={NOTES.question}
+  precision={NOTES.precision}
   choix={NOTES.choix}
   acquis="notes"
   ouvre="atelier"
 >
-  <p>{typographier(`Celle qui finit son tour. La fin du tour est le premier critère : une réponse coupée perd toujours, quoi qu'elle contienne. Ici, la coupée a la note ${NOTES.noteCoupee}, la finie ${NOTES.noteFinie} : forge compare d'abord 0 et 1, et s'arrête là.`)}</p>
+  <p>{NOTES.explication}</p>
 </Pari>
 
 Dans l'atelier, écris ta propre réponse à l'invite de l'ouverture. Sa note se recalcule à chaque frappe, critère par critère, avec la raison de chacun. Une bascule dit si ta réponse a fini son tour, ou si forge l'a coupée : essaie les deux.
@@ -370,9 +392,9 @@ Dans l'atelier, écris ta propre réponse à l'invite de l'ouverture. Sa note se
 <details class="reponse-defi">
 <summary><span class="bascule-soleil">La réponse du défi</span></summary>
 
-<p>{typographier(`Une réponse qui finit son tour, d'au moins ${ATELIER.min} mots, pas dans une autre langue, et qui respecte les ${ATELIER.nConsignes} consignes : ${ATELIER.phrases}.${ATELIER.exemple === null ? '' : ` La réponse ${ATELIER.exemple} de l'ouverture en est une.`}`)}</p>
+<p>{typographier(`Une réponse qui finit son tour, d'au moins ${ATELIER.min} mots, pas dans une autre langue, et qui respecte les ${ATELIER.nConsignes} consignes : ${ATELIER.phrases}.${ATELIER.exemple === null ? '' : ` La réponse ${ATELIER.exemple} de l'ouverture a cette note, mais le défi la refuse : il veut la tienne. Dis la même chose avec d'autres mots, en gardant les consignes.`}`)}</p>
 
-Une seule faute suffit à perdre, et l'ordre des critères dit laquelle compte le plus. C'est ce que fera forge avec les deux réponses de ton IA : il ne pèse rien, il compare.
+Une seule faute suffit à perdre, et l'ordre des critères dit laquelle compte le plus. C'est ce que fait forge avec les deux réponses de ton IA : il ne pèse rien, il compare.
 
 </details>
 
@@ -386,7 +408,7 @@ Le projet du chapitre refait la note de forge en disant pourquoi, critère par c
   <li data-lignes="44-58">Juste : acquis pour une question ; pour un problème, le dernier nombre du texte doit être la réponse attendue.</li>
   <li data-lignes="60-78">Consignes : chacune est vérifiée par le contrôle de forge, et on compte celles qui sont respectées.</li>
   <li data-lignes="80-91">Français : refusé seulement si la langue est reconnue comme une autre ; un texte trop court pour en juger passe.</li>
-  <li data-lignes="93-101">Longueur : de 3 à 300 mots.</li>
+  <li data-lignes="93-101">Longueur : de {CRITERES_DE_FORGE.min} à {CRITERES_DE_FORGE.max} mots.</li>
   <li data-lignes="103-110">La note, ses critères, ses consignes, les mots et la langue.</li>
 </CodeExplique>
 
@@ -567,7 +589,7 @@ Voici les réponses de ton IA 1.8 aux questions fixes de forge, telles quelles :
 
 <Etape numero={9} titre="Chez un grand labo">
 
-Ton IA apprend de paires notées par des programmes, sur une seule carte. Les grands labos en font noter des centaines de milliers, ou des millions, par des personnes ou par d'autres modèles.
+Ton IA apprend de paires notées par des programmes, sur une seule carte. Les grands labos en rassemblent bien plus : environ {LABO.qPaires} paires pour Qwen2.5, triées par des contrôles et relues ; {LABO.tPaires8B} pour Tülu 3, notées par un autre modèle ; {LABO.lMeta} comparaisons faites par des personnes pour Llama 2.
 
 <EncadreLabo sources={SOURCES_LABO_1_8}>
 
@@ -597,10 +619,10 @@ Le projet vérifie sa perte à la main contre celle de forge :
 
 <CodeExplique fichier="projets/1.8-alignement/tests/test_perte_dpo.py" region="test-dpo">
   <li data-lignes="1-2">Le test compte les points qu'il vérifie.</li>
-  <li data-lignes="3-6">Trois valeurs de β, trois log-probabilités de la choisie, trois de la rejetée ; celles de la référence sont fixes.</li>
+  <li data-lignes="3-6">Une grille : des valeurs de β, et des log-probabilités de la choisie et de la rejetée ; celles de la référence sont fixes.</li>
   <li data-lignes="7-8">La perte de forge, sur des tenseurs en float64, sans le terme SFT : la DPO seule.</li>
   <li data-lignes="9-10">La perte à la main, égale à celle de forge à 10⁻¹² près.</li>
-  <li data-lignes="12">Les 27 points ont été vérifiés.</li>
+  <li data-lignes="12">Les {FIN.points} points de la grille ont été vérifiés.</li>
 </CodeExplique>
 
 <RecupererProjet
@@ -623,6 +645,6 @@ Le projet complet, avec un notebook qui refait tout cela pas à pas, est sur Git
 
 ### À suivre
 
-Ton IA sait maintenant préférer, d'après des contrôles qui vérifient la forme de ses réponses. Le chapitre 1.9, {FIN.lien ? <a href={FIN.lien}>{FIN.titre}</a> : FIN.titre}, à venir, passe aux problèmes de calcul, dont la réponse se vérifie.
+Ce chapitre a montré comment forge classe les réponses de ton IA, et comment la DPO apprend de ces classements. Ce qu'elle en retient, ce sont les mesures de l'étape 8 qui le disent. Le chapitre 1.9, {FIN.lien ? <a href={FIN.lien}>{FIN.titre}</a> : FIN.titre}, à venir, passe aux problèmes de calcul, dont la réponse se vérifie.
 
 </Etape>

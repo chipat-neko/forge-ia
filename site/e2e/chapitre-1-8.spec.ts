@@ -22,6 +22,7 @@ import {
   betaDeLIndice,
   ECART_MAX,
   ECART_MIN,
+  estLaPlusHaute,
   expliquerNote,
   INDICE_BETA_MAX,
   INDICE_BETA_MIN,
@@ -224,9 +225,17 @@ test('l’atelier : le défi, la bascule de fin de tour, et la comparaison', asy
   const defi = atelier.locator('[data-test="an-defi"]');
   // À l'arrivée, le texte du champ n'a pas la note la plus haute.
   await expect(defi).toContainText('Pas encore');
-  await ecrire(page, 'Paris est la capitale de la France.');
-  const max = expliquerNote('Paris est la capitale de la France.', true, PAIRE.consignes);
-  if (Object.entries(max.note).every(([nom, v]) => v === max.criteres.find((c) => c.nom === nom)!.maximum)) {
+  // Recopier la réponse de la paire qui a la note la plus haute ne réussit pas le défi : il veut la tienne.
+  const auMaximum = PAIRE.reponses.find((r) => estLaPlusHaute(expliquerNote(r.texte, true, PAIRE.consignes)));
+  if (auMaximum !== undefined) {
+    await ecrire(page, auMaximum.texte);
+    await expect(defi).toContainText(`c’est la réponse ${auMaximum.lettre} de la paire`);
+  }
+  if (!PAIRE.reelle) {
+    // Une réponse à soi, finie, sous 20 mots et sans virgule : le défi est réussi.
+    const tienne = 'La capitale de la France est Paris.';
+    expect(estLaPlusHaute(expliquerNote(tienne, true, PAIRE.consignes))).toBe(true);
+    await ecrire(page, tienne);
     await expect(defi).toContainText('Défi réussi');
     // Coupée par la limite, la même réponse perd : la fin du tour passe avant tout le reste.
     await finie(page, false);

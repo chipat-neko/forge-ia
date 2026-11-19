@@ -3,8 +3,8 @@
 //
 // Leurs bonnes réponses sont calculées, jamais tapées :
 // - « note » : la réponse que les contrôles de forge préfèrent, par le jumeau des notes (noteSansJustesse, et la fin
-//   du tour), sur la paire de l'ouverture ;
-// - « notes » : l'ordre des critères, sur deux réponses de l'exemple, l'une finie, l'autre coupée ;
+//   du tour, par expliquerNote d'atelier-1-8.ts), sur la paire de l'ouverture ;
+// - « notes » : l'ordre des critères, sur la même paire, la réponse préférée imaginée coupée et l'autre finie ;
 // - « paires » : le plancher de forge (noter.py), relu dans son code ;
 // - « vraisemblance » : les courbes de la DPO (mesures/entrainement-dpo-1.8.json) ;
 // - « longueur » et « victoire » : la mesure victoire du rapport de ton IA 1.8 (« 1.8@1.8 »).
@@ -32,14 +32,17 @@ import {
   critereQuiDepartage,
   CRITERES,
   expliquerNote,
+  noteEnTexte,
   phraseDeConsigne,
   type Critere,
   type Note,
   type NoteExpliquee,
 } from './atelier-1-8';
 import { estAbsente, lireRapportEtape, lireSeries, refaire, type NombresDeMesure, type RapportEtape } from './etapes';
+import { extraireRegion } from '../regions';
+import { extraireSymbole } from '../symboles';
 import { FICHIERS_PARTIE_1 } from './fichiers';
-import type { ConsigneDInvite, ReglagesConsigne } from './notes';
+import { MOTS_MAXIMUM, MOTS_MINIMUM, type ConsigneDInvite, type ReglagesConsigne } from './notes';
 
 const FINE = '\u202F';
 
@@ -293,13 +296,13 @@ export function paireDeLOuverture(racineDepot: string | URL = '..'): PaireDeLOuv
 // ---------- Étape 1 : le pari « note » ----------
 
 /** Les choix du pari « note ». */
-export const TEXTES_NOTE = Object.freeze(['La réponse A', 'La réponse B', 'Aucune : elles ont la même note'] as const);
+export const TEXTES_NOTE = Object.freeze(['La réponse A', 'Aucune : elles ont la même note', 'La réponse B'] as const);
 
 /** Le pari « note » : la réponse que les contrôles de forge préfèrent, par le jumeau, sur la paire de l'ouverture. */
 export function choixNote(racineDepot: string | URL = '..'): Choix[] {
   const p = paireDeLOuverture(racineDepot);
   const c = comparerNotes(p.reponses[0].note, p.reponses[1].note);
-  const juste = c > 0 ? 0 : c < 0 ? 1 : 2;
+  const juste = c > 0 ? 0 : c < 0 ? 2 : 1;
   if (p.choisie !== null) exiger(TEXTES_NOTE[juste] === `La réponse ${p.choisie}`, 'le jumeau ne préfère plus la réponse que forge a choisie');
   return TEXTES_NOTE.map((texte, i) => ({ texte, juste: i === juste }));
 }
@@ -310,7 +313,8 @@ function aEgalite(e: NoteExpliquee, c: Critere): string {
   if (c === 'terminee') return x.verdict ? 'finissent leur tour' : 'sont coupées par la limite de jetons';
   if (c === 'consignes') return `respectent ${nombre(x.valeur)} consigne${x.valeur >= 2 ? 's' : ''} sur ${nombre(x.maximum)}`;
   if (c === 'francais') return x.verdict ? 'passent le contrôle du français' : 'sont dans une autre langue';
-  if (c === 'longueur') return x.verdict ? `ont de 3 à 300 mots` : 'sortent des 3 à 300 mots';
+  const bornes = `${nombre(MOTS_MINIMUM)} à ${nombre(MOTS_MAXIMUM)} mots`;
+  if (c === 'longueur') return x.verdict ? `ont de ${bornes}` : `sortent des ${bornes}`;
   return x.verdict ? 'sont justes' : 'sont fausses';
 }
 
@@ -328,7 +332,7 @@ function departage(c: Critere, G: string, g: NoteExpliquee, L: string, l: NoteEx
     );
   }
   if (c === 'francais') return `${G} passe le contrôle du français, alors que ${L} est dans une autre langue`;
-  if (c === 'longueur') return `${G} a ${nombre(g.mots)} mots, ${L} ${nombre(l.mots)}, hors des 3 à 300`;
+  if (c === 'longueur') return `${G} a ${nombre(g.mots)} mots, ${L} ${nombre(l.mots)}, hors des ${nombre(MOTS_MINIMUM)} à ${nombre(MOTS_MAXIMUM)}`;
   return `${G} est juste, ${L} non`;
 }
 
@@ -351,26 +355,59 @@ export function phraseDeLaNote(racineDepot: string | URL = '..'): string {
 
 // ---------- Étape 3 : le pari « notes », l'ordre des critères ----------
 
-/** Les choix du pari « notes ». */
-export const TEXTES_ORDRE = Object.freeze(['Celle qui respecte les deux consignes', 'Celle qui finit son tour', 'Aucune : elles se valent'] as const);
-
-/** Les deux réponses du pari « notes » : la courte de l'exemple, coupée, et la longue, finie mais avec sa virgule. */
-export function faitsDuPariNotes(): { coupee: NoteExpliquee; finie: NoteExpliquee; texteCoupee: string; texteFinie: string } {
-  const consignes = CONSIGNES_D_EXEMPLE.map(([id, k]) => [id, k] as ConsigneDInvite);
-  const texteCoupee = REPONSES_D_EXEMPLE[1].texte;
-  const texteFinie = REPONSES_D_EXEMPLE[0].texte;
-  const coupee = expliquerNote(texteCoupee, false, consignes);
-  const finie = expliquerNote(texteFinie, true, consignes);
-  exiger(coupee.note.consignes === consignes.length && finie.note.consignes < consignes.length, 'la réponse coupée ne respecte plus les deux consignes, ou la finie toutes');
-  return { coupee, finie, texteCoupee, texteFinie };
+/** Le pari « notes », tiré de la paire de l'ouverture : sa réponse préférée, imaginée coupée, et l'autre, finie. */
+export interface FaitsDuPariNotes {
+  /** La lettre de la réponse que forge préfère dans la paire, et celle de l'autre. */
+  preferee: Lettre;
+  autre: Lettre;
+  /** Leurs notes telles quelles, puis la préférée coupée et l'autre finie. */
+  notePreferee: Note;
+  noteAutre: Note;
+  coupee: NoteExpliquee;
+  finie: NoteExpliquee;
 }
 
-/** Le pari « notes » : une réponse finie qui oublie une consigne, ou une coupée qui les respecte toutes. */
-export function choixOrdreDesCriteres(): Choix[] {
-  const { coupee, finie } = faitsDuPariNotes();
-  const c = comparerNotes(coupee.note, finie.note);
+/** Les faits du pari « notes », sur la paire de l'ouverture (la vraie, ou celle de l'exemple). */
+export function faitsDuPariNotes(racineDepot: string | URL = '..'): FaitsDuPariNotes {
+  const p = paireDeLOuverture(racineDepot);
+  const [a, b] = p.reponses;
+  const c = comparerNotes(a.note, b.note);
+  exiger(c !== 0, 'les deux réponses de la paire de l’ouverture ont la même note : le pari « notes » n’a plus de réponse préférée');
+  const [g, l] = c > 0 ? [a, b] : [b, a];
+  return {
+    preferee: g.lettre,
+    autre: l.lettre,
+    notePreferee: g.note,
+    noteAutre: l.note,
+    coupee: expliquerNote(g.texte, false, p.consignes),
+    finie: expliquerNote(l.texte, true, p.consignes),
+  };
+}
+
+/** Le pari « notes » : la réponse préférée, si forge l'avait coupée, contre l'autre, finie. */
+export function choixOrdreDesCriteres(racineDepot: string | URL = '..'): Choix[] {
+  const f = faitsDuPariNotes(racineDepot);
+  const textes = [`La réponse ${f.autre}, finie`, `La réponse ${f.preferee}, coupée`, 'Aucune : elles se valent'];
+  const c = comparerNotes(f.finie.note, f.coupee.note);
   const juste = c > 0 ? 0 : c < 0 ? 1 : 2;
-  return TEXTES_ORDRE.map((texte, i) => ({ texte, juste: i === juste }));
+  return textes.map((texte, i) => ({ texte, juste: i === juste }));
+}
+
+/** La question, la précision et l'explication du pari « notes », calculées sur la paire de l'ouverture. */
+export function textesDuPariNotes(racineDepot: string | URL = '..'): { question: string; precision: string; explication: string } {
+  const f = faitsDuPariNotes(racineDepot);
+  const juste = choixOrdreDesCriteres(racineDepot).find((x) => x.juste)!.texte;
+  exiger(juste === `La réponse ${f.autre}, finie` && CRITERES[0] === 'terminee', 'une réponse coupée ne perd plus toujours');
+  return {
+    question:
+      `Reprends la paire de l’ouverture : forge y préfère la réponse ${f.preferee}. Imagine qu’il l’ait coupée à la ` +
+      `limite de jetons, et que la ${f.autre} finisse son tour. Laquelle préfère-t-il alors${FINE}?`,
+    precision: `Sans coupure, la ${f.preferee} a la note ${noteEnTexte(f.notePreferee)}, la ${f.autre} ${noteEnTexte(f.noteAutre)}.`,
+    explication:
+      `La réponse ${f.autre}, finie. La fin du tour est le premier critère${FINE}: une réponse coupée perd toujours, même ` +
+      `avec ce qui la faisait gagner. Coupée, la ${f.preferee} a la note ${noteEnTexte(f.coupee.note)}${FINE}; la ` +
+      `${f.autre}, finie, ${noteEnTexte(f.finie.note)}${FINE}: forge compare d’abord 0 et 1, et s’arrête là.`,
+  };
 }
 
 // ---------- Ce que le chapitre dit de forge, relu dans son code ----------
@@ -476,16 +513,41 @@ export function faitsDeForge18(racineDepot: string | URL = '..'): FaitsDeForge18
   };
 }
 
-/** Ce que le chapitre dit du projet 1.8, relu dans son README. */
-export function faitsDuProjet18(racineDepot: string | URL = '..'): { noterEgaleForge: boolean; perteA1e12: boolean; pousserSansPaire: boolean } {
+/** Ce que le chapitre dit du projet 1.8, relu dans son README, son test de la perte et son relevé du balayage. */
+export function faitsDuProjet18(racineDepot: string | URL = '..'): {
+  noterEgaleForge: boolean;
+  perteA1e12: boolean;
+  pousserSansPaire: boolean;
+  pointsDuTestDpo: number;
+  reglagesDuBalayage: boolean;
+} {
   const readme = enUneLigne(lireTexte(racineDepot, 'projets/1.8-alignement/README.md'));
+  const test = lireTexte(racineDepot, 'projets/1.8-alignement/tests/test_perte_dpo.py');
+  const resumer = lireTexte(racineDepot, 'projets/1.8-alignement/alignement_pas_a_pas/resumer.py');
+  const points = /^ {4}assert ecarts == (\d+)$/m.exec(test);
+  if (points === null) throw new Error('projets/1.8-alignement/tests/test_perte_dpo.py : « assert ecarts == … » ne se lit plus. Revois faitsDuProjet18.');
   return {
+    pointsDuTestDpo: Number(points[1]),
+    // « Le taux d'apprentissage, β, la normalisation par la longueur, le poids du terme SFT » : ce que relève `balayage`.
+    reglagesDuBalayage: ['"taux_max": valeurs["taux_max"]', '"beta": dpo.beta', '"normaliser_longueur": dpo.normaliser_longueur', '"poids_sft": dpo.poids_sft'].every(
+      (k) => resumer.includes(k),
+    ),
     noterEgaleForge: readme.includes('la `note` rendue est celle de `forge.preferences.noter` (un test, sur cinquante réponses)'),
     perteA1e12: readme.includes('égale à `perte_dpo` de forge à 10⁻¹² près'),
     pousserSansPaire: readme.includes(
       'La paire est la première de `mesures/paires-exemples.json` quand ce fichier existe, sinon une paire fabriquée, et la commande le dit.',
     ),
   };
+}
+
+/**
+ * Le nombre de lignes d'un extrait que montre CodeExplique : une région, ou un symbole sans sa docstring. Le chapitre
+ * le garde par exiger, pour que ses explications par plages de lignes ne glissent pas sans bruit si le code change.
+ */
+export function lignesDuCode(fichier: string, sorte: 'region' | 'symbole', nom: string, racineDepot: string | URL = '..'): number {
+  const source = readFileSync(join(enChemin(racineDepot), fichier), 'utf8');
+  const code = sorte === 'region' ? extraireRegion(source, nom, fichier) : extraireSymbole(source, nom, fichier, { docstring: false });
+  return code.split('\n').length;
 }
 
 // ---------- Étape 4 : le pari « paires » ----------
@@ -670,24 +732,26 @@ export function choixLongueur(racineDepot: string | URL = '..'): Choix[] | null 
 }
 
 /**
- * La phrase de la longueur, qui suit les rapports : plus longues, plus courtes ou de même longueur, et, si elles
- * s'allongent, si c'est en suivant mieux les consignes d'IFEval-FR, une mesure que les paires n'ont pas apprise.
- * Null sans les rapports de ton IA 1.7 et de ton IA 1.8 à l'étape 1.8.
+ * La phrase de la longueur, qui suit les rapports : plus longues, plus courtes ou de même longueur ; et, si elles
+ * s'allongent, si elles respectent plus souvent toutes les consignes d'IFEval-FR. Les consignes d'IFEval-FR et celles
+ * des paires sont vérifiées par le même module de forge (forge/evaluation/consignes.py) : seules les invites
+ * diffèrent, et la phrase n'en dit pas plus. Sans la mesure d'IFEval-FR de ton IA 1.7 ou de ton IA 1.8, elle s'arrête
+ * à la longueur. Null sans la mesure victoire de ton IA 1.8.
  */
 export function phraseDeLaLongueur(racineDepot: string | URL = '..'): string | null {
   const s = sensDeLaLongueur(racineDepot);
   const f = faitsDeLaLongueur(racineDepot);
+  if (s === null || f === null) return null;
+  const debut = `Ses réponses sont ${s}${FINE}: ${nombre(f.modele, 1)} mots en moyenne, contre ${nombre(f.reference, 1)} pour ton IA 1.7, aux mêmes invites.`;
   const i17 = mesure(lireRapportEtape('1.7@1.8', racineDepot), 'ifeval_fr');
   const i18 = mesure(lireRapportEtape('1.8@1.8', racineDepot), 'ifeval_fr');
-  if (s === null || f === null || i17 === null || i18 === null) return null;
-  const debut = `Ses réponses sont ${s}${FINE}: ${nombre(f.modele, 1)} mots en moyenne, contre ${nombre(f.reference, 1)} pour ton IA 1.7, aux mêmes invites.`;
-  if (s !== 'plus longues') return debut;
+  if (s !== 'plus longues' || i17 === null || i18 === null) return debut;
   const avant = nombreDe(i17, 'invite_stricte');
   const apres = nombreDe(i18, 'invite_stricte');
   const ifeval = `${pourcent(apres, 1)} des invites d’IFEval-FR respectées en entier, contre ${pourcent(avant, 1)}`;
   return apres > avant + 0.01
-    ? `${debut} Et elles suivent mieux des consignes que les paires n’ont pas apprises${FINE}: ${ifeval}.`
-    : `${debut} Elles s’allongent sans mieux suivre les consignes d’IFEval-FR${FINE}: ${ifeval}.`;
+    ? `${debut} Et elles respectent plus souvent toutes les consignes d’IFEval-FR${FINE}: ${ifeval}.`
+    : `${debut} Elles s’allongent sans respecter plus souvent les consignes d’IFEval-FR${FINE}: ${ifeval}.`;
 }
 
 /** Une tranche d'un pari : son texte, et la valeur sous laquelle elle s'arrête (non comprise). */

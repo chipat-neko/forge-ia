@@ -32,7 +32,7 @@
 //   examples, while those that fail are treated as negative examples for Direct Preference Optimization (DPO)
 //   training », « we make use of both human and automated review processes », « approximately 150,000 training
 //   pairs », « trained for one epoch […] with a learning rate of 7 × 10−7 » ;
-// - Tülu 3 (Lambert et al., arXiv 2411.15124, v5) : section 1, « 354,192 instances for preference tuning », « used
+// - Tülu 3 (Lambert et al., arXiv 2411.15124, v5) : section 2.3, « Tülu 3 Recipe », « 354,192 instances for preference tuning », « used
 //   length-normalized DPO throughout the development process and training our final models » ; section 5.2.1,
 //   « Stage 3: Preference Annotation » : « After generating four responses for each prompt, we use an
 //   LLM-as-a-judge […], specifically GPT-4o-2024-0806, to rate each response from 1 to 5 » ; tableau 15, total 354,192,
@@ -199,12 +199,12 @@ export const QWEN_25 = Object.freeze({
 
 /** Tülu 3 (Ai2, 2024) : la DPO normalisée par la longueur, des paires jugées par un autre modèle. */
 export const TULU_3_DPO = Object.freeze({
-  pairesTotal: chiffre(354_192, ARTICLE_TULU_3, 'section 1 (« 354,192 instances for preference tuning ») et tableau 15, total'),
+  pairesTotal: chiffre(354_192, ARTICLE_TULU_3, 'section 2.3, « Tülu 3 Recipe » (« 354,192 instances for preference tuning ») et tableau 15, total'),
   paires8B: chiffre(271_409, ARTICLE_TULU_3, 'tableau 15, colonne 8B'),
   invitesTableau7: chiffre(425_145, ARTICLE_TULU_3, 'tableau 7, colonne des préférences, total (marqué γ)'),
   reponsesParInvite: chiffre(4, ARTICLE_TULU_3, 'section 5.2.1, « Stage 3: Preference Annotation » (« After generating four responses for each prompt »)'),
   juge: chiffre('GPT-4o', ARTICLE_TULU_3, 'section 5.2.1, « Stage 3: Preference Annotation » (« specifically GPT-4o-2024-0806, to rate each response from 1 to 5 »)'),
-  normaliseeParLaLongueur: chiffre(true, ARTICLE_TULU_3, 'section 1 (« used length-normalized DPO throughout the development process and training our final models »)'),
+  normaliseeParLaLongueur: chiffre(true, ARTICLE_TULU_3, 'section 2.3, « Tülu 3 Recipe » (« used length-normalized DPO throughout the development process and training our final models »)'),
   beta: chiffre(5, ARTICLE_TULU_3, 'tableau 20 (« KL penalty coefficient β 5 »)'),
   taux8B: chiffre(5e-7, ARTICLE_TULU_3, 'tableau 20, colonne 8B (« Learning Rate 5 × 10-7 »)'),
   epoques: chiffre(1, ARTICLE_TULU_3, 'tableau 20 (« Number of Epochs 1 »)'),

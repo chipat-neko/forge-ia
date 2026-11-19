@@ -14,7 +14,16 @@
 
 import { nombre, pourcent } from '../nombres';
 import { deriveeDpo, perteDpo, sigmoide } from './dpo';
-import { langue, MOTS_MAXIMUM, MOTS_MINIMUM, mots, VERIFICATEURS_CONTRAINTES, type ConsigneDInvite, type ReglagesConsigne } from './notes';
+import {
+  langue,
+  MOTS_MAXIMUM,
+  MOTS_MINIMUM,
+  mots,
+  noteSansJustesse,
+  VERIFICATEURS_CONTRAINTES,
+  type ConsigneDInvite,
+  type ReglagesConsigne,
+} from './notes';
 
 const FINE = '\u202F';
 
@@ -105,11 +114,13 @@ function critere(nom: Critere, valeur: number, maximum: number, raison: string):
 
 /**
  * La note d'une réponse à une question, critère par critère, avec la raison de chacun : terminée (la bascule de
- * l'atelier), juste (acquis pour une question), le nombre de consignes respectées, le français, la longueur de 3 à
- * 300 mots. Les contrôles sont ceux du jumeau (notes.ts) ; les raisons reprennent celles d'expliquer_note.
+ * l'atelier), juste (acquis pour une question), le nombre de consignes respectées, le français, la longueur en mots.
+ * Les valeurs sont celles du jumeau, noteSansJustesse (notes.ts) ; le détail des consignes, la langue et le nombre de
+ * mots viennent des mêmes contrôles, pour les raisons, qui reprennent celles d'expliquer_note.
  */
 export function expliquerNote(texte: string, terminee: boolean, consignes: readonly ConsigneDInvite[]): NoteExpliquee {
-  const fin = critere('terminee', terminee ? 1 : 0, 1, terminee ? 'elle a fini son tour' : 'elle est coupée par la limite de jetons');
+  const valeurs = noteSansJustesse(texte, terminee, consignes);
+  const fin = critere('terminee', valeurs.terminee, 1, terminee ? 'elle a fini son tour' : 'elle est coupée par la limite de jetons');
   const juste = critere('juste', 1, 1, `une question n’a pas de réponse à vérifier${FINE}: le critère est acquis`);
 
   const jugees: ConsigneJugee[] = consignes.map(([id, reglages]) => {
@@ -117,13 +128,14 @@ export function expliquerNote(texte: string, terminee: boolean, consignes: reado
     if (verifier === undefined) throw new Error(`La consigne « ${id} » est inconnue : les consignes sont ${Object.keys(VERIFICATEURS_CONTRAINTES).join(', ')}.`);
     return { id, consigne: phraseDeConsigne(id, reglages), respectee: verifier(texte, reglages) };
   });
-  const respectees = jugees.filter((c) => c.respectee).length;
+  const respectees = valeurs.consignes;
+  if (jugees.filter((c) => c.respectee).length !== respectees) throw new Error('expliquerNote : le détail des consignes ne redonne plus la note du jumeau.');
   const consigne = critere('consignes', respectees, jugees.length, `${pluriel(respectees, 'consigne')} sur ${nombre(jugees.length)}`);
 
   const laLangue = langue(texte);
   const francais = critere(
     'francais',
-    laLangue === 'autre' ? 0 : 1,
+    valeurs.francais,
     1,
     {
       fr: 'en français',
@@ -139,7 +151,7 @@ export function expliquerNote(texte: string, terminee: boolean, consignes: reado
       : n > MOTS_MAXIMUM
         ? `${pluriel(n, 'mot')}, plus de ${nombre(MOTS_MAXIMUM)}`
         : pluriel(n, 'mot');
-  const longueur = critere('longueur', n >= MOTS_MINIMUM && n <= MOTS_MAXIMUM ? 1 : 0, 1, raisonLongueur);
+  const longueur = critere('longueur', valeurs.longueur, 1, raisonLongueur);
 
   const criteres = [fin, juste, consigne, francais, longueur];
   const note = Object.fromEntries(criteres.map((c) => [c.nom, c.valeur])) as Note;
@@ -172,16 +184,28 @@ export function estLaPlusHaute(e: NoteExpliquee): boolean {
   return e.criteres.every((c) => c.verdict);
 }
 
-// ---------- Le défi : écrire une réponse qui obtient la note la plus haute ----------
+// ---------- Le défi : écrire sa propre réponse qui obtient la note la plus haute ----------
 
-/** Le défi est réussi quand la note est la plus haute possible pour cette invite. */
-export function defiReussi(e: NoteExpliquee): boolean {
-  return estLaPlusHaute(e);
+/** Un texte sans ses blancs de bord ni ses blancs répétés : une copie reste une copie, à une espace près. */
+function sansBlancs(texte: string): string {
+  return texte.replace(/\s+/g, ' ').trim();
 }
 
-/** Ce que dit le défi : réussi, ou ce qui manque, par les raisons des critères qui ne sont pas au maximum. */
-export function texteDuDefi(e: NoteExpliquee): string {
-  if (defiReussi(e)) return `Défi réussi${FINE}: ta réponse a la note la plus haute, ${noteEnTexte(e.note)}.`;
+/** La réponse de la paire que le texte recopie, ou null : le défi demande une réponse à soi. */
+export function copieDe(texte: string, reponses: readonly { lettre: string; texte: string }[]): string | null {
+  return reponses.find((r) => sansBlancs(r.texte) === sansBlancs(texte))?.lettre ?? null;
+}
+
+/** Le défi est réussi quand la note est la plus haute possible, et que la réponse n'est pas une de celles de la paire. */
+export function defiReussi(e: NoteExpliquee, texte: string, reponses: readonly { lettre: string; texte: string }[]): boolean {
+  return estLaPlusHaute(e) && copieDe(texte, reponses) === null;
+}
+
+/** Ce que dit le défi : réussi, recopié, ou ce qui manque, par les raisons des critères qui ne sont pas au maximum. */
+export function texteDuDefi(e: NoteExpliquee, texte: string, reponses: readonly { lettre: string; texte: string }[]): string {
+  const copie = copieDe(texte, reponses);
+  if (copie !== null) return `Pas encore${FINE}: c’est la réponse ${copie} de la paire. Écris la tienne.`;
+  if (defiReussi(e, texte, reponses)) return `Défi réussi${FINE}: ta réponse a la note la plus haute, ${noteEnTexte(e.note)}.`;
   const manque = e.criteres.filter((c) => !c.verdict).map((c) => c.raison);
   return `Pas encore${FINE}: ${manque.join(`${FINE}; `)}.`;
 }
@@ -231,6 +255,6 @@ export function phraseDeLaPerteDpo(beta: number, ecartChoisie: number, ecartReje
       : z > 0
         ? `la paire est déjà dans le bon ordre${FINE}: la poussée faiblit à mesure que l’écart grandit`
         : 'les deux sont à égalité face à la référence';
-  const suite = `Pour la faire baisser, le gradient ${sens}, avec la même force${FINE}: ${force} par nat, soit ${pourcent(part)} de β. Ici, ${ordre}.`;
+  const suite = `Pour la faire baisser, la descente de gradient ${sens}, avec la même force${FINE}: ${force} par nat, soit ${pourcent(part)} de β. Ici, ${ordre}.`;
   return { perte: nombre(perte, 3), force, suite };
 }

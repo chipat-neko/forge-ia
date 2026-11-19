@@ -114,12 +114,13 @@
     annonce = untrack(() => phraseDeLaNote);
   });
   let annonceDefi = $state('');
-  let reussiAvant = untrack(() => defiReussi(e));
+  const reussi = $derived(defiReussi(e, texte, COMPARAISON.reponses));
+  let reussiAvant = untrack(() => reussi);
   $effect(() => {
-    const r = defiReussi(e);
+    const r = reussi;
     if (r === reussiAvant) return;
     reussiAvant = r;
-    annonceDefi = r ? untrack(() => texteDuDefi(e)) : '';
+    annonceDefi = r ? untrack(() => texteDuDefi(e, texte, COMPARAISON.reponses)) : '';
   });
 </script>
 
@@ -215,10 +216,10 @@
     </div>
   {/if}
 
-  <div class="defi" class:reussi={defiReussi(e)} data-defi>
+  <div class="defi" class:reussi data-defi>
     <h3>Défi</h3>
-    <p>Écris une réponse qui obtient la note la plus haute.</p>
-    <p class="etat" data-test="an-defi">{texteDuDefi(e)}</p>
+    <p>Écris ta propre réponse, pas une copie de celles de la paire, et obtiens la note la plus haute.</p>
+    <p class="etat" data-test="an-defi">{texteDuDefi(e, texte, COMPARAISON.reponses)}</p>
     <p class="vh" role="status">{annonceDefi}</p>
   </div>
 </div>
