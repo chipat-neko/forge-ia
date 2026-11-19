@@ -7,6 +7,7 @@ Job qui refuse un second processus) est signalé dans le test.
 import ast
 import os
 import shutil
+import stat
 import sys
 import textwrap
 import time
@@ -310,6 +311,90 @@ def test_un_effacement_impossible_n_arrete_pas_executer_tous(monkeypatch):
     assert len(restes) == 3
     messages = " ".join(str(a.message) for a in avertissements)
     assert all(dossier in messages for dossier in restes)
+
+
+def test_l_effacement_ne_touche_rien_hors_du_dossier_jetable(monkeypatch, tmp_path):
+    """Quand l'effacement échoue sur le dossier jetable lui-même, son parent (le `TEMP` de l'utilisateur, `/tmp`
+    en 1777 sous Linux) ne reçoit aucun `chmod` : `os.chmod`, espionné, ne voit que des chemins du dossier."""
+    dossier = tmp_path / "forge-code-essai"
+    (dossier / "sous-dossier").mkdir(parents=True)
+    (dossier / "sous-dossier" / "fichier.txt").write_text("x", encoding="utf-8")
+    vrai_rmdir, vrai_chmod = os.rmdir, os.chmod
+    touches: list[str] = []
+
+    def rmdir_qui_refuse_la_racine(chemin, *arguments, **options):
+        if options.get("dir_fd") is None and os.path.abspath(chemin) == str(dossier):
+            raise PermissionError(13, "effacement refusé (essai)", str(chemin))
+        return vrai_rmdir(chemin, *arguments, **options)
+
+    def chmod_espion(chemin, mode, *arguments, **options):
+        touches.append(os.path.abspath(chemin))
+        return vrai_chmod(chemin, mode, *arguments, **options)
+
+    monkeypatch.setattr(os, "rmdir", rmdir_qui_refuse_la_racine)
+    monkeypatch.setattr(os, "chmod", chmod_espion)
+    with pytest.warns(execution.DossierJetableNonEfface):
+        execution._effacer(dossier)
+    monkeypatch.undo()
+    assert touches, "l'effacement n'a rien eu à rendre inscriptible : l'essai ne montre rien"
+    assert str(tmp_path) not in touches
+    assert all(execution._dans_le_dossier(chemin, dossier) for chemin in touches), touches
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="un lien symbolique demande des droits particuliers sous Windows")
+def test_l_effacement_ne_suit_pas_un_lien_symbolique(tmp_path):
+    """Linux : un lien vers un fichier de l'utilisateur, dans un dossier sans droit d'écriture. `os.chmod` suivrait
+    le lien et changerait les droits du fichier visé : il est sauté."""
+    cible = tmp_path / "fichier-de-l-utilisateur.txt"
+    cible.write_text("à garder", encoding="utf-8")
+    os.chmod(cible, 0o600)
+    programme = textwrap.dedent(
+        f"""
+        import os
+        os.mkdir("d")
+        os.symlink({str(cible)!r}, os.path.join("d", "lien"))
+        os.chmod("d", 0o500)
+        print(os.path.realpath(os.getcwd()))
+        """
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", execution.DossierJetableNonEfface)
+        resultat = executer(programme, delai=DELAI)
+    assert resultat.reussi, resultat.sortie
+    assert not Path(resultat.sortie.strip()).exists()
+    assert stat.S_IMODE(os.stat(cible).st_mode) == 0o600
+    assert cible.read_text(encoding="utf-8") == "à garder"
+
+
+def test_sous_w_error_l_avertissement_ne_remplace_pas_le_resultat(monkeypatch, capsys):
+    """`-W error` change les avertissements en exceptions : le dossier resté est alors nommé sur la sortie
+    d'erreur, et le résultat est rendu."""
+    effacer_pour_de_vrai = shutil.rmtree
+    restes: set[str] = set()
+
+    def rmtree_refuse(chemin, **options):
+        restes.add(str(chemin))
+        raise PermissionError(13, "effacement refusé (essai)", str(chemin))
+
+    monkeypatch.setattr(shutil, "rmtree", rmtree_refuse)
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", execution.DossierJetableNonEfface)
+            resultat = executer("print(1)", delai=DELAI)
+    finally:
+        monkeypatch.undo()
+        for dossier in restes:
+            effacer_pour_de_vrai(dossier, ignore_errors=True)
+    assert resultat.reussi and resultat.sortie == "1\n"
+    assert len(restes) == 1
+    assert next(iter(restes)) in capsys.readouterr().err
+
+
+def test_un_programme_qui_renvoie_le_code_de_l_amorce_reste_un_echec():
+    """Après le départ, un code 198 vient du programme, pas de l'amorce : `echec`, pas `erreur_systeme`."""
+    resultat = executer(f"import sys\nsys.exit({execution._CODE_SANS_DEPART})", delai=DELAI)
+    assert resultat.raison == "echec"
+    assert not resultat.reussi
 
 
 def test_des_reglages_impossibles_sont_refuses():

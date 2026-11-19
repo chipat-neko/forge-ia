@@ -52,6 +52,9 @@ class DossierJetableNonEfface(UserWarning):
 
 # Les codes de sortie propres à l'amorce (des codes qu'un programme de test n'a pas de raison de choisir) : le
 # programme a levé MemoryError ; l'amorce n'a pas reçu son départ, et le programme n'a pas tourné.
+# Un programme peut renvoyer ces codes lui-même. Pour 198, la forge sait si elle a donné le départ : après le
+# départ, c'est le programme qui l'a renvoyé, compté `echec`. Pour 197, il serait compté `memoire` au lieu
+# d'`echec` : sans conséquence, les deux sont des échecs (`reussi` faux, même pass@k), seule l'étiquette change.
 _CODE_MEMOIRE = 197
 _CODE_SANS_DEPART = 198
 
@@ -259,6 +262,7 @@ def _lancer(
     job = None
     lecteur = None
     trop_long = False
+    depart_donne = False
     try:
         if sys.platform == "win32":
             try:
@@ -276,7 +280,7 @@ def _lancer(
             target=_lire, args=(processus.stdout, _OCTETS_PAR_CARACTERE * sortie_max + 4, morceaux), daemon=True
         )
         lecteur.start()
-        _donner_le_depart(processus)
+        depart_donne = _donner_le_depart(processus)
         depart = time.monotonic()
         if job is not None:
             try:
@@ -294,8 +298,11 @@ def _lancer(
             _arreter(processus, job)
         if job is not None:
             job.fermer()
-        if lecteur is None:  # le programme n'a pas reçu son départ
+        try:  # déjà fermée après le départ ; encore ouverte si une interruption l'a précédé
             processus.stdin.close()
+        except OSError:
+            pass
+        if lecteur is None:  # personne ne lit la sortie
             processus.stdout.close()
 
     # Le tuyau se ferme quand le dernier processus qui l'avait meurt. Sous Linux, un processus sorti du groupe
@@ -309,7 +316,7 @@ def _lancer(
         raison = "reussi"
     elif code == _CODE_MEMOIRE:
         raison = "memoire"
-    elif code == _CODE_SANS_DEPART:
+    elif code == _CODE_SANS_DEPART and not depart_donne:
         raison = "erreur_systeme"
         texte = "L'amorce n'a pas reçu son octet de départ : le programme n'a pas été exécuté."[:sortie_max]
     else:
@@ -317,13 +324,14 @@ def _lancer(
     return ResultatExecution(raison == "reussi", raison, texte, secondes)
 
 
-def _donner_le_depart(processus: subprocess.Popen) -> None:
-    """Envoie l'octet de départ à l'amorce, puis ferme son entrée standard."""
+def _donner_le_depart(processus: subprocess.Popen) -> bool:
+    """Envoie l'octet de départ à l'amorce, puis ferme son entrée standard ; faux si l'envoi a échoué."""
     try:
         processus.stdin.write(_DEPART)
         processus.stdin.close()
     except OSError:
-        pass  # l'amorce est déjà morte : son code de sortie le dira
+        return False  # l'amorce est déjà morte : son code de sortie le dira
+    return True
 
 
 def _arreter(processus: subprocess.Popen, job: "_JobWindows | None") -> None:
@@ -397,10 +405,13 @@ def _effacer(dossier: Path) -> None:
     """Efface le dossier jetable. Ne lève jamais d'`OSError` : le résultat du programme passe avant.
 
     Ce que le programme a mis en lecture seule est rendu inscriptible, et aussi le dossier qui le contient : sous
-    Linux, c'est un dossier sans droit d'écriture qui empêche d'effacer ce qu'il contient. Un fichier tenu ouvert
-    un instant par un autre programme (un antivirus, un indexeur, sous Windows) : on réessaie après une courte
-    pause, `len(_PAUSES_D_EFFACEMENT) + 1` passes en tout ; chaque passe efface tout ce qu'elle peut. Si le dossier
-    reste, un avertissement `DossierJetableNonEfface` le nomme : un `executer_tous` ne s'arrête pas pour autant.
+    Linux, c'est un dossier sans droit d'écriture qui empêche d'effacer ce qu'il contient. Rien n'est touché hors
+    du dossier jetable : ni son parent (le `TEMP` de l'utilisateur, `/tmp` en 1777 sous Linux), ni la cible d'un
+    lien symbolique (`os.chmod` le suivrait). Un fichier tenu ouvert un instant par un autre programme (un
+    antivirus, un indexeur, sous Windows) : on réessaie après une courte pause, `len(_PAUSES_D_EFFACEMENT) + 1`
+    passes en tout ; chaque passe efface tout ce qu'elle peut. Si le dossier reste, un avertissement
+    `DossierJetableNonEfface` le nomme : un `executer_tous` ne s'arrête pas pour autant, et même sous `-W error`,
+    l'avertissement ne remplace pas le résultat (il est alors écrit sur la sortie d'erreur).
     """
     # La première erreur d'une passe : celle qui bloque (les suivantes, « dossier non vide », en découlent).
     cause: OSError | None = None
@@ -408,6 +419,8 @@ def _effacer(dossier: Path) -> None:
     def rendre_inscriptible(fonction, chemin, erreur):
         nonlocal cause
         for cible in (os.path.dirname(chemin), chemin):
+            if not _dans_le_dossier(cible, dossier) or os.path.islink(cible):
+                continue
             try:
                 os.chmod(cible, stat.S_IRWXU)
             except OSError:
@@ -433,12 +446,23 @@ def _effacer(dossier: Path) -> None:
             return
         if pause is not None:
             time.sleep(pause)
-    warnings.warn(
+    message = (
         f"Le dossier jetable {dossier} n'a pas pu être effacé ({cause}) : il reste sous TEMP. "
-        "Efface-le à la main quand plus aucun programme ne s'en sert.",
-        DossierJetableNonEfface,
-        stacklevel=3,
+        "Efface-le à la main quand plus aucun programme ne s'en sert."
     )
+    try:
+        warnings.warn(message, DossierJetableNonEfface, stacklevel=3)
+    except DossierJetableNonEfface:  # -W error : l'avertissement ne prend pas la place du résultat
+        print(message, file=sys.stderr)
+
+
+def _dans_le_dossier(chemin, dossier: Path) -> bool:
+    """Vrai si `chemin` est `dossier` ou se trouve dedans (comparaison des chemins absolus, sans les résoudre)."""
+    try:
+        racine = os.path.abspath(dossier)
+        return os.path.commonpath([racine, os.path.abspath(chemin)]) == racine
+    except ValueError:  # deux lecteurs différents, sous Windows
+        return False
 
 
 if sys.platform == "win32":
