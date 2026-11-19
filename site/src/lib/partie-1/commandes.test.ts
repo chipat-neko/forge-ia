@@ -572,3 +572,56 @@ describe('commandes du chapitre 1.7', () => {
     expect(ecrit(commandes.CONVERSATION_ESSAI, '--json')).toBe(MESURES_PARTIE_1.essaiAffinage);
   });
 });
+
+// Le chapitre 1.8 : le projet de l'alignement pas à pas (noter, dpo, pousser), vérifié contre le __main__.py et le
+// README du projet ; et la commande de forge qui construit les paires de ton IA 1.8, dans le README de forge.
+describe('commandes du chapitre 1.8', () => {
+  const PROJET = `${RACINE}/projets/1.8-alignement`;
+  const MAIN = readFileSync(`${PROJET}/alignement_pas_a_pas/__main__.py`, 'utf8').replace(/\r\n?/g, '\n');
+  const README = readFileSync(`${PROJET}/README.md`, 'utf8').replace(/\r\n?/g, '\n');
+  const README_DE_FORGE = readFileSync(`${RACINE}/projets/forge/README.md`, 'utf8').replace(/\r\n?/g, '\n');
+  const MAIN_DE_FORGE = readFileSync(`${RACINE}/projets/forge/forge/__main__.py`, 'utf8');
+
+  it('les commandes du projet, à l’identique', () => {
+    expect(commandes.ALLER_AU_PROJET_1_8).toBe('cd forge-ia/projets/1.8-alignement');
+    expect(commandes.ALIGNEMENT_NOTER).toBe(
+      'uv run --extra cpu python -m alignement_pas_a_pas noter "paris est la capitale." --consigne minuscules --consigne mots_max:n=20',
+    );
+    expect(commandes.ALIGNEMENT_DPO).toBe('uv run --extra cpu python -m alignement_pas_a_pas dpo --pc -12 --pr -20 --qc -14 --qr -18 --beta 0.1');
+    expect(commandes.ALIGNEMENT_POUSSER).toBe('uv run --extra cpu python -m alignement_pas_a_pas pousser --pas 40');
+    expect(commandes.ALIGNEMENT_TESTS).toBe('uv run --extra cpu pytest -q');
+  });
+
+  it('ce sont des commandes du script, avec leurs options, et celles du README du projet', () => {
+    for (const [sous, commande, options] of [
+      ['noter', commandes.ALIGNEMENT_NOTER, ['--consigne']],
+      ['dpo', commandes.ALIGNEMENT_DPO, ['--pc', '--pr', '--qc', '--qr', '--beta']],
+      ['pousser', commandes.ALIGNEMENT_POUSSER, ['--pas']],
+    ] as const) {
+      expect(MAIN).toContain(`add_parser("${sous}"`);
+      for (const option of options) {
+        expect(commande).toContain(`${option} `);
+        expect(MAIN, `${sous} ${option}`).toMatch(new RegExp(`\\w+\\.add_argument\\("${option}"`));
+      }
+    }
+    for (const c of [commandes.ALLER_AU_PROJET_1_8, commandes.ALIGNEMENT_NOTER, commandes.ALIGNEMENT_DPO, commandes.ALIGNEMENT_POUSSER, commandes.ALIGNEMENT_TESTS]) {
+      expect(README, c).toContain(`${c}\n`);
+    }
+  });
+
+  it('PREFERENCES_1_8 : la commande de forge qui fait écrire les paires à ton IA 1.7, telle que le README de forge la donne', () => {
+    expect(commandes.PREFERENCES_1_8).toBe(
+      'uv run --extra gpu python -m forge preferences --modele "$env:FORGE_DONNEES\\publications\\ton-ia-1.7" --recette preferences-1.8',
+    );
+    expect(README_DE_FORGE).toContain(`${commandes.PREFERENCES_1_8}\n`);
+    for (const [, option] of commandes.PREFERENCES_1_8.matchAll(/ (--[a-z-]+)/g)) {
+      if (option === '--extra') continue; // l'option de uv
+      expect(MAIN_DE_FORGE, option).toContain(`"${option}"`);
+    }
+  });
+
+  it('DPO_1_8 attend que le README de forge donne la commande de l’entraînement de ton IA 1.8 (et sa configuration)', () => {
+    // Tant que configs/dpo-1.8.toml n'existe pas, le README de forge ne la donne pas : le brouillon la dit en prose.
+    if (!existsSync(`${RACINE}/projets/forge/configs/dpo-1.8.toml`)) expect('DPO_1_8' in commandes).toBe(false);
+  });
+});

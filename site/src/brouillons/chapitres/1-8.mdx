@@ -1,0 +1,628 @@
+---
+partie: 1
+numero: "1.8"
+titre: "L'aligner : préférences et récompenses"
+chapeau: "Ton IA 1.7 répond, mais rien ne lui a jamais dit qu'une réponse vaut mieux qu'une autre. Forge lui fait écrire deux réponses par invite, les note par des contrôles programmés, sans juge, et ton IA apprend de ces paires avec la DPO. Puis tu regardes le piège de cette méthode, et ce qu'elle a changé."
+programme: "10 étapes, 3 paris, environ 40 minutes."
+acquis:
+  - cle: preference
+    texte: "Préférer, c'est classer deux réponses à la même invite : l'une est choisie, l'autre rejetée."
+    ou: "à l'étape 1"
+  - cle: notes
+    texte: "Forge note une réponse sur cinq critères, dans un ordre fixe : finie, juste, consignes, français, longueur. Le premier qui diffère décide."
+    ou: "à l'étape 3"
+  - cle: atelier
+    texte: "Une réponse coupée perd toujours : la fin du tour passe avant les consignes, le français et la longueur."
+    ou: "à l'étape 3, dans l'atelier"
+  - cle: paires
+    texte: "Forge ne garde une paire que si la réponse choisie a fini son tour ; deux notes égales n'en donnent pas."
+    ou: "à l'étape 4"
+  - cle: dpo
+    texte: "La perte DPO ne dépend que de l'écart entre la choisie et la rejetée, chacune mesurée face à la référence."
+    ou: "à l'étape 5"
+---
+
+{/*
+  Brouillon du chapitre 1.8 (tâche 5 du plan 8), écrit avant les paires et la DPO de ton IA 1.8.
+
+  À la tâche 12, avec la Release ton-ia-1.8 et les relevés du projet 1.8 (mesures/paires-exemples.json,
+  balayage-1.8.json, entrainement-dpo-1.8.json, etape-ton-ia-1.7.json, etape-ton-ia-1.8.json et
+  etape-ton-ia-1.8-court.json) :
+  - l'ouverture et l'atelier prennent d'eux-mêmes la première vraie paire d'une question à consignes, à la place de
+    la paire écrite pour l'exemple (paireDeLOuverture) ;
+  - les paris « vraisemblance », « longueur » et « victoire » remplacent leurs « à mesurer » (étapes 6 et 8), et les
+    acquis « piege » et « longueur » entrent dans le frontmatter (le parcours en attend alors 7) ; le programme
+    compte 6 paris ;
+  - les chiffres de la construction des paires (taux de paires, critère qui départage) demandent un relevé du projet,
+    tiré de l'index du jeu de paires : il n'existe pas encore (étape 4) ;
+  - DPO_1_8 entre dans commandes.ts quand le README de forge donne la commande de l'entraînement de ton IA 1.8, avec
+    configs/dpo-1.8.toml ; l'étape 7 la montre alors dans un bloc, à côté de PREFERENCES_1_8.
+*/}
+
+import { root } from 'astro:config/server';
+import AtelierNote from '../../components/chapitres/1-8/AtelierNote.svelte';
+import CourbePreferences from '../../components/chapitres/1-8/CourbePreferences.astro';
+import OuverturePreferences from '../../components/chapitres/1-8/OuverturePreferences.astro';
+import PhraseDpo from '../../components/chapitres/1-8/PhraseDpo.svelte';
+import TableauBalayage from '../../components/chapitres/1-8/TableauBalayage.astro';
+import EchantillonsConversation from '../../components/chapitres/1-7/EchantillonsConversation.astro';
+import TableauEtape from '../../components/chapitres/1-7/TableauEtape.astro';
+import BlocCommande from '../../components/gabarit/BlocCommande.astro';
+import RecupererProjet from '../../components/gabarit/RecupererProjet.astro';
+import { dixPuissance, formaterDate } from '../../lib/calculateur/formats';
+import { chapitresParus } from '../../lib/chapitres-parus';
+import { exigeur } from '../../lib/exiger';
+import { decimalesUtiles, nombre, pourcent } from '../../lib/nombres';
+import { hrefChapitre, titreCourt, trouverChapitre } from '../../lib/parcours';
+import { CRITERES, estLaPlusHaute, expliquerNote, noteEnTexte, phraseDeConsigne } from '../../lib/partie-1/atelier-1-8';
+import { ALIGNEMENT_DPO, ALIGNEMENT_NOTER, ALIGNEMENT_POUSSER, ALIGNEMENT_TESTS, PREFERENCES_1_8 } from '../../lib/partie-1/commandes';
+import { MESURES_DE_L_ETAPE } from '../../lib/partie-1/etapes';
+import {
+  choixLongueur,
+  choixNote,
+  choixOrdreDesCriteres,
+  choixPaires,
+  choixVictoire,
+  choixVraisemblance,
+  faitsDeForge18,
+  faitsDuPariNotes,
+  faitsDuProjet18,
+  paireDeLOuverture,
+  phraseDeLaLongueur,
+  phraseDeLaNote,
+  phraseDeLaVraisemblance,
+  TOLERANCE_LONGUEUR,
+  TOLERANCE_VRAISEMBLANCE,
+} from '../../lib/partie-1/paris-1-8';
+import {
+  ARTICLE_COMMUNITY_ALIGNMENT,
+  ARTICLE_DPO,
+  ARTICLE_DPOP,
+  COMMUNITY_ALIGNMENT,
+  DPO,
+  DPOP,
+  FICHE_COMMUNITY_ALIGNMENT_FR,
+  INSTRUCTGPT_RM,
+  LLAMA_2_RLHF,
+  LU_LE_1_8,
+  QWEN_25,
+  SOURCES_DONNEES_1_8,
+  SOURCES_DPO_1_8,
+  SOURCES_LABO_1_8,
+  TULU_3_DPO,
+} from '../../lib/partie-1/sources-1-8';
+import { LICENCE_LLAMA_33 } from '../../lib/partie-1/sources-1-7';
+import { typographier } from '../../lib/typo';
+
+export const exiger = exigeur('le texte du chapitre 1.8 (1-8.mdx)');
+
+export const FINE = String.fromCharCode(0x202f);
+
+export const PARUS = await chapitresParus();
+
+export const LIENS = {
+  // Les chapitres 1.1 à 1.6 ont paru ; 1.7 est encore un brouillon : un lien ne vise qu'un chapitre paru.
+  l16: PARUS.has('1.6') ? hrefChapitre('1.6') : null,
+  l17: PARUS.has('1.7') ? hrefChapitre('1.7') : null,
+};
+
+export const RACINE = new URL('../', root); // Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+
+export const FORGE = faitsDeForge18(RACINE);
+export const PROJET = faitsDuProjet18(RACINE);
+export const PAIRE = paireDeLOuverture(RACINE);
+
+export const puissance = (x) => {
+  // Un nombre en puissance de dix, tel qu'il est réglé : « 7 × 10⁻⁷ ».
+  const [mantisse, exposant] = x.toExponential().split('e');
+  return `${nombre(Number(mantisse), decimalesUtiles(Number(mantisse), 2))}${FINE}×${FINE}${dixPuissance(Number(exposant))}`;
+};
+
+export const enLettres = (n) => ({ 2: 'deux', 3: 'trois', 4: 'quatre', 5: 'cinq', 8: 'huit', 10: 'dix' })[n] ?? nombre(n);
+
+export const NOTE = (() => {
+  // « Forge la fait répondre deux fois à la même invite, en tirant chaque jeton au hasard, selon ses probabilités,
+  // parmi les 50 plus probables. »
+  exiger(FORGE.recette.reponsesParInvite === 2, 'forge ne fait plus écrire deux réponses par invite');
+  exiger(FORGE.recette.temperature === 1, 'forge ne tire plus les réponses des paires à la température 1');
+  const choix = choixNote(RACINE);
+  return { choix, explication: typographier(phraseDeLaNote(RACINE)), topK: nombre(FORGE.recette.topK) };
+})();
+
+export const QUI = (() => {
+  // Étape 2 : les trois façons de décider, et le jeu écarté.
+  exiger(TULU_3_DPO.juge.valeur === 'GPT-4o', 'Tülu 3 ne fait plus noter ses réponses par GPT-4o');
+  exiger(INSTRUCTGPT_RM.etiqueteurs.valeur === 40, 'InstructGPT n’a plus une quarantaine d’étiqueteurs');
+  exiger(QWEN_25.controles.valeur && QWEN_25.domaines.valeur, 'Qwen2.5 ne trie plus ses paires par des contrôles');
+  // « Une réponse fausse, mais finie, en français et dans les consignes, passe » : pour une question, « juste » est acquis.
+  exiger(FORGE.questionSansJustesse, 'forge vérifie maintenant la justesse d’une réponse à une question');
+  const c = COMMUNITY_ALIGNMENT;
+  exiger(c.modeleDesReponses.valeur.startsWith('Llama-3.3') && c.clauseLlama.valeur.includes('Llama'), 'les réponses de Community Alignment ne sont plus celles de Llama 3.3');
+  return {
+    licence: c.licence.valeur,
+    paires: nombre(c.pairesFr.valeur),
+    annotateurs: nombre(c.annotateurs.valeur),
+    modele: c.modeleDesReponses.valeur,
+    luLe: formaterDate(LU_LE_1_8),
+  };
+})();
+
+export const CRITERES_DE_FORGE = (() => {
+  // La liste de l'étape 3 : les critères de forge, dans leur ordre.
+  exiger(JSON.stringify(FORGE.criteres) === JSON.stringify(CRITERES), 'les critères de forge ne sont plus ceux du chapitre, dans le même ordre');
+  return { nombre: enLettres(FORGE.criteres.length), min: nombre(FORGE.motsMinimum), max: nombre(FORGE.motsMaximum) };
+})();
+
+export const NOTES = (() => {
+  const f = faitsDuPariNotes();
+  const choix = choixOrdreDesCriteres();
+  exiger(choix.find((c) => c.juste)?.texte === 'Celle qui finit son tour', 'le juste du pari « notes » n’est plus la réponse finie');
+  exiger(CRITERES[0] === 'terminee', 'la fin du tour n’est plus le premier critère');
+  return {
+    choix,
+    coupee: typographier(`« ${f.texteCoupee} »`),
+    finie: typographier(`« ${f.texteFinie} »`),
+    noteCoupee: noteEnTexte(f.coupee.note),
+    noteFinie: noteEnTexte(f.finie.note),
+  };
+})();
+
+export const ATELIER = (() => {
+  const notes = PAIRE.reponses.map((r) => ({ r, e: expliquerNote(r.texte, r.terminee, PAIRE.consignes) }));
+  // Le champ commence par une réponse qui n'a pas la note la plus haute une fois finie : le défi reste à faire.
+  const depart = PAIRE.reponses.find((r) => !estLaPlusHaute(expliquerNote(r.texte, true, PAIRE.consignes)))?.texte ?? '';
+  exiger(!estLaPlusHaute(expliquerNote(depart, true, PAIRE.consignes)), 'le texte de départ de l’atelier a déjà la note la plus haute');
+  const exemple = notes.find((x) => estLaPlusHaute(x.e));
+  return {
+    depart,
+    comparaison: { reelle: PAIRE.reelle, reponses: PAIRE.reponses.map(({ lettre, texte, terminee }) => ({ lettre, texte, terminee })) },
+    phrases: PAIRE.consignes.map(([id, k]) => typographier(`« ${phraseDeConsigne(id, k)} »`)).join(' et '),
+    nConsignes: enLettres(PAIRE.consignes.length),
+    exemple: exemple === undefined ? null : exemple.r.lettre,
+    min: nombre(FORGE.motsMinimum),
+  };
+})();
+
+export const PAIRES = (() => {
+  const f = FORGE;
+  exiger(f.questionsNonApprises, 'les questions des paires ne sont plus celles de Luth-2 que le SFT n’a pas apprises');
+  exiger(f.consignesMin === 1 && f.consignesMax === 2, 'forge n’ajoute plus une ou deux consignes à une question');
+  exiger(choixPaires(RACINE).find((c) => c.juste)?.texte === 'N’en fait pas de paire', 'le juste du pari « paires » a changé');
+  exiger(f.plancherFinieEtJuste && f.modeleMotAMot && f.egaliteSansPaire, 'le plancher de forge, ou sa raison, ou la règle des égalités a changé');
+  return {
+    choix: choixPaires(RACINE),
+    invites: nombre(f.invites),
+    invitesCourt: nombre(f.invitesCourt),
+    questions: pourcent(1 - f.partDesProblemes),
+    problemes: pourcent(f.partDesProblemes),
+    nNouveaux: nombre(f.recette.nNouveaux),
+    topK: nombre(f.recette.topK),
+    longueur: nombre(f.recette.longueur),
+    paquet: nombre(f.invitesParPaquet),
+    seuil: pourcent(f.seuilDuTauxDePaires),
+    validation: pourcent(f.recette.partValidation),
+  };
+})();
+
+export const PERTE = (() => {
+  exiger(DPO.sansModeleDeRecompense.valeur && DPO.pertedeClassification.valeur, 'l’article de la DPO ne dit plus qu’elle se passe d’un modèle de récompense');
+  exiger(DPO.reponsesDeLaReference.valeur && DPO.betaEtReference.valeur && DPO.gradient.valeur, 'l’article de la DPO ne dit plus ce que l’étape 5 en cite');
+  exiger(FORGE.referenceCalculeeUneFois, 'forge ne calcule plus la référence une fois, avant le premier pas');
+  exiger(FORGE.dpo.normaliserLongueur === false, 'forge normalise maintenant par la longueur par défaut');
+  return { beta: nombre(FORGE.dpo.beta, 1) };
+})();
+
+export const PIEGE = (() => {
+  exiger(DPOP.baisseDeLaChoisie.valeur && DPOP.reponsesProches.valeur && DPOP.penalite.valeur, 'l’article de DPOP ne dit plus ce que l’étape 6 en cite');
+  const choix = choixVraisemblance(RACINE);
+  const phrase = phraseDeLaVraisemblance(RACINE);
+  return {
+    choix,
+    juste: choix === null ? null : choix.find((c) => c.juste).texte,
+    phrase: phrase === null ? null : typographier(phrase),
+    tolerance: nombre(TOLERANCE_VRAISEMBLANCE, 2),
+    poidsSft: nombre(FORGE.dpo.poidsSft),
+    luLe: formaterDate(LU_LE_1_8),
+  };
+})();
+
+export const BALAYAGE = (() => {
+  // « On compare leurs taux de victoire, sur les invites de validation des paires » : le README de forge le dit.
+  exiger(FORGE.balayageDepartageParLaVictoire, 'forge ne départage plus les essais d’un balayage par la victoire');
+  return {};
+})();
+
+export const CHANGE = (() => {
+  // « Les mesures du chapitre 1.7, et une de plus : la victoire. »
+  exiger(JSON.stringify(MESURES_DE_L_ETAPE['1.8']) === JSON.stringify([...MESURES_DE_L_ETAPE['1.7'], 'victoire']), 'l’étape 1.8 ne mesure plus celles de 1.7 et la victoire');
+  exiger(FORGE.victoirePasUnJuge && FORGE.egaliteUneDemie, 'le README de forge ne dit plus ce que l’étape 8 dit de la victoire');
+  exiger(FORGE.longueursDesPaires && FORGE.memeNoteCourteOuLongue, 'forge ne relève plus la longueur des paires, ou préfère maintenant une longueur');
+  const victoire = choixVictoire(RACINE);
+  const longueur = choixLongueur(RACINE);
+  const phrase = phraseDeLaLongueur(RACINE);
+  return {
+    victoire,
+    justeVictoire: victoire === null ? null : victoire.find((c) => c.juste).texte,
+    longueur,
+    justeLongueur: longueur === null ? null : longueur.find((c) => c.juste).texte,
+    phrase: phrase === null ? null : typographier(phrase),
+    tolerance: pourcent(TOLERANCE_LONGUEUR),
+  };
+})();
+
+export const LABO = (() => {
+  const i = INSTRUCTGPT_RM;
+  const l = LLAMA_2_RLHF;
+  const q = QWEN_25;
+  const t = TULU_3_DPO;
+  exiger(i.partDuPreEntrainement.valeur === i.petaflopsPpo.valeur / i.petaflopsGpt3.valeur, 'la part du PPO d’InstructGPT n’est plus 60 ÷ 3 640');
+  exiger(t.heuresDeCartes8B.valeur === t.cartes8B.valeur * t.heures8B.valeur, 'les heures de carte de Tülu 3 ne sont plus 8 fois 10');
+  // « β y vaut 5, sur des écarts par jeton : il ne se compare pas au 0,1 de forge, qui compare des réponses entières. »
+  exiger(t.normaliseeParLaLongueur.valeur && !FORGE.dpo.normaliserLongueur, 'Tülu 3 ne normalise plus par la longueur, ou forge le fait par défaut');
+  exiger(i.noteScalaire.valeur && l.protocoleBinaire.valeur && l.echantillonnageParRejet.valeur && q.revueHumaineEtAutomatique.valeur, 'un fait de l’encadré a changé');
+  return {
+    iRm: nombre(i.invitesRm.valeur),
+    iPpo: nombre(i.invitesPpo.valeur),
+    iMin: nombre(i.reponsesAClasserMin.valeur),
+    iMax: nombre(i.reponsesAClasserMax.valeur),
+    iParametres: nombre(i.parametresRm.valeur / 1e9),
+    iEtiqueteurs: nombre(i.etiqueteurs.valeur),
+    iPetaflops: nombre(i.petaflopsPpo.valeur),
+    iGpt3: nombre(i.petaflopsGpt3.valeur),
+    iPart: pourcent(i.partDuPreEntrainement.valeur, 1),
+    lMeta: nombre(l.comparaisonsMeta.valeur),
+    lTotal: nombre(l.comparaisonsTotal.valeur),
+    lModeles: enLettres(l.modelesDeRecompense.valeur),
+    lVersions: enLettres(l.versionsRlhf.valeur),
+    qPaires: nombre(q.paires.valeur),
+    qTaux: puissance(q.taux.valeur),
+    qEpoques: q.epoques.valeur === 1 ? 'une fois' : `${enLettres(q.epoques.valeur)} fois`,
+    tReponses: enLettres(t.reponsesParInvite.valeur),
+    tPaires8B: nombre(t.paires8B.valeur),
+    tTotal: nombre(t.pairesTotal.valeur),
+    tTableau7: nombre(t.invitesTableau7.valeur),
+    tBeta: nombre(t.beta.valeur),
+    tTaux: puissance(t.taux8B.valeur),
+    tEpoques: t.epoques.valeur === 1 ? 'une fois' : `${enLettres(t.epoques.valeur)} fois`,
+    tCartes: nombre(t.cartes8B.valeur),
+    tHeures: nombre(t.heures8B.valeur),
+    tHeuresDeCartes: nombre(t.heuresDeCartes8B.valeur),
+    forgeBeta: nombre(FORGE.dpo.beta, 1),
+  };
+})();
+
+export const FIN = (() => {
+  exiger(PROJET.noterEgaleForge && PROJET.perteA1e12 && PROJET.pousserSansPaire, 'le README du projet 1.8 ne dit plus ce que l’étape 10 en dit');
+  // L'« À suivre » : le chapitre 1.9, un lien s'il a paru.
+  const { chapitre } = trouverChapitre('1.9');
+  return { titre: typographier(`« ${titreCourt(chapitre.titre)} »`), lien: PARUS.has(chapitre.numero) ? hrefChapitre(chapitre.numero) : null };
+})();
+
+<Etape numero={1} titre="Deux réponses, une meilleure">
+
+Ton IA 1.7, celle du {LIENS.l17 ? <a href={LIENS.l17}>chapitre 1.7</a> : 'chapitre 1.7'}, sait répondre. Mais à la même question, elle n'écrit pas toujours la même réponse : quand forge la fait écrire pour ce chapitre, chaque jeton est tiré au hasard, selon ses probabilités, parmi les {NOTE.topK} plus probables. Forge la fait donc répondre deux fois à la même invite. Deux réponses, et une question : laquelle est la meilleure ?
+
+<OuverturePreferences />
+
+<Pari
+  id="note"
+  question="Laquelle des deux les contrôles de forge préfèrent-ils ?"
+  precision="Les contrôles de forge sont de petits programmes : ils ne lisent pas le sens, ils vérifient ce qui se vérifie."
+  choix={NOTE.choix}
+  acquis="preference"
+>
+  <p>{NOTE.explication}</p>
+</Pari>
+
+« Préférer », ici, n'a rien de vague : c'est classer deux réponses à la même invite, l'une choisie, l'autre rejetée. L'affinage du chapitre 1.7 montrait à ton IA une bonne réponse à imiter ; il ne lui disait jamais qu'une autre réponse valait moins. Une paire le dit. Ce chapitre apprend à ton IA à donner plus de probabilité à la réponse choisie qu'à la rejetée, sur des milliers de paires comme celle-ci. On appelle cela l'aligner : rapprocher ce qu'elle écrit de ce qu'on préfère.
+
+</Etape>
+
+<Etape numero={2} titre="Qui décide ?">
+
+Pour classer deux réponses, il faut quelqu'un, ou quelque chose, qui décide. Il y a trois façons de faire.
+
+- Des personnes lisent les réponses et choisissent. C'est la façon des grands labos de l'étape 9 : InstructGPT en paie une quarantaine.
+- Un autre modèle, bien plus grand, lit les deux réponses et les note. On l'appelle un juge. Tülu 3, à l'étape 9, fait noter les siennes par GPT-4o.
+- De petits programmes vérifient ce qui se vérifie : la réponse a-t-elle fini, respecte-t-elle les consignes, est-elle en français, est-elle juste quand on connaît la réponse. Qwen2.5, à l'étape 9, trie ainsi une partie de ses paires.
+
+Ce chapitre prend la troisième, et seulement elle : pas de juge. Un juge serait un autre modèle à faire tourner à côté de ton IA, et ce qu'il préfère deviendrait ce que ton IA apprend à préférer. Un contrôle programmé ne prend aucune mémoire de carte, donne toujours la même note au même texte, et dit pourquoi. Son prix : il ne voit que ce qu'un programme sait vérifier. Une réponse fausse à une question, mais finie, en français et dans les consignes, passe.
+
+Il existe pourtant un grand jeu de préférences en français, choisies par des personnes : Community Alignment, de Meta, sous licence {QUI.licence}. Plus de {QUI.annotateurs} personnes y ont choisi, entre plusieurs réponses, celle qu'elles préféraient, et sa partie française, préparée pour la DPO par <a href={FICHE_COMMUNITY_ALIGNMENT_FR.url}>CATIE-AQ</a>, compte {QUI.paires} paires. Mais les réponses entre lesquelles elles ont choisi ont été écrites par un modèle de Meta, <a href={ARTICLE_COMMUNITY_ALIGNMENT.url}>{QUI.modele}</a>. Or la <a href={LICENCE_LLAMA_33.url}>licence de Llama 3.3</a> demande que tout modèle entraîné sur les réponses d'un Llama porte un nom qui commence par « Llama ». Ce chapitre ne s'en sert pas : les réponses de ses paires, c'est ton IA qui les écrit.
+
+<Fragment slot="note">
+
+<p>{typographier(`Sources de cette étape, lues le ${QUI.luLe} : `)}{SOURCES_DONNEES_1_8.map((x, i) => <span>{i > 0 ? ', ' : ''}<a href={x.url}>{typographier(x.titre)}</a></span>)}.</p>
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={3} titre="L'atelier des notes">
+
+Forge note chaque réponse sur {CRITERES_DE_FORGE.nombre} critères, du plus important au moins important :
+
+1. finie : la réponse a-t-elle fini son tour, ou forge l'a-t-elle coupée à la limite de jetons ?
+2. juste : pour un problème de calcul, son dernier nombre est-il la réponse attendue ? Pour une question, le critère est acquis ;
+3. consignes : combien des consignes de l'invite respecte-t-elle ?
+4. français : est-elle dans une autre langue ? Un texte trop court pour en juger passe ;
+5. longueur : a-t-elle de {CRITERES_DE_FORGE.min} à {CRITERES_DE_FORGE.max} mots ?
+
+Deux notes se comparent critère par critère, dans cet ordre.
+
+<Pari
+  id="notes"
+  question="Deux réponses à l'invite de l'ouverture : l'une respecte les deux consignes, mais forge l'a coupée ; l'autre finit son tour, mais a une virgule. Laquelle forge préfère-t-il ?"
+  precision={`La coupée : ${NOTES.coupee}. La finie : ${NOTES.finie}.`}
+  choix={NOTES.choix}
+  acquis="notes"
+  ouvre="atelier"
+>
+  <p>{typographier(`Celle qui finit son tour. La fin du tour est le premier critère : une réponse coupée perd toujours, quoi qu'elle contienne. Ici, la coupée a la note ${NOTES.noteCoupee}, la finie ${NOTES.noteFinie} : forge compare d'abord 0 et 1, et s'arrête là.`)}</p>
+</Pari>
+
+Dans l'atelier, écris ta propre réponse à l'invite de l'ouverture. Sa note se recalcule à chaque frappe, critère par critère, avec la raison de chacun. Une bascule dit si ta réponse a fini son tour, ou si forge l'a coupée : essaie les deux.
+
+<Verrou nom="atelier" message="Fais le pari juste au-dessus : l'atelier s'ouvre juste après.">
+  <AtelierNote client:load invite={PAIRE.invite} consignes={PAIRE.consignes} depart={ATELIER.depart} comparaison={ATELIER.comparaison} verrou="atelier" acquis="atelier" />
+</Verrou>
+
+<details class="reponse-defi">
+<summary><span class="bascule-soleil">La réponse du défi</span></summary>
+
+<p>{typographier(`Une réponse qui finit son tour, d'au moins ${ATELIER.min} mots, pas dans une autre langue, et qui respecte les ${ATELIER.nConsignes} consignes : ${ATELIER.phrases}.${ATELIER.exemple === null ? '' : ` La réponse ${ATELIER.exemple} de l'ouverture en est une.`}`)}</p>
+
+Une seule faute suffit à perdre, et l'ordre des critères dit laquelle compte le plus. C'est ce que fera forge avec les deux réponses de ton IA : il ne pèse rien, il compare.
+
+</details>
+
+Le projet du chapitre refait la note de forge en disant pourquoi, critère par critère :
+
+<CodeExplique fichier="projets/1.8-alignement/alignement_pas_a_pas/noter.py" region="noter">
+  <li data-lignes="1">Les cinq critères, dans l'ordre de la note de forge, `Note`.</li>
+  <li data-lignes="16-17">Un critère : son nom, sa valeur, son maximum, son verdict (la valeur est-elle le maximum ?) et sa raison.</li>
+  <li data-lignes="20">`expliquer_note` reçoit le texte d'une réponse, si elle a fini son tour, et l'invite.</li>
+  <li data-lignes="36-42">Finie : 1 si la réponse a fini son tour, 0 si la limite de jetons l'a coupée.</li>
+  <li data-lignes="44-58">Juste : acquis pour une question ; pour un problème, le dernier nombre du texte doit être la réponse attendue.</li>
+  <li data-lignes="60-78">Consignes : chacune est vérifiée par le contrôle de forge, et on compte celles qui sont respectées.</li>
+  <li data-lignes="80-91">Français : refusé seulement si la langue est reconnue comme une autre ; un texte trop court pour en juger passe.</li>
+  <li data-lignes="93-101">Longueur : de 3 à 300 mots.</li>
+  <li data-lignes="103-110">La note, ses critères, ses consignes, les mots et la langue.</li>
+</CodeExplique>
+
+Un test du projet vérifie, sur cinquante réponses, que la note rendue est bien celle de forge.
+
+<Fragment slot="note">
+
+La page note ta réponse avec le jumeau en TypeScript des contrôles de forge, vérifié sur les textes de référence que le Python du projet a notés, dont des pièges : accents combinés, apostrophes courbes, espaces insécables, emoji, dix mille caractères. Le champ jaune se manipule ; la bascule aussi, d'un clic ou au clavier.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={4} titre="Fabriquer des paires">
+
+Pour fabriquer ses paires, forge prend {PAIRES.invites} invites ({PAIRES.invitesCourt} pour une version courte). {PAIRES.questions} sont des questions de Luth-2, le jeu du chapitre 1.7, que son affinage n'a pas apprises, chacune avec une ou deux consignes ajoutées à la fin. Les {PAIRES.problemes} restants sont des problèmes de calcul, générés par programme, avec leur réponse. Ton IA 1.7 écrit deux réponses à chaque invite, de {PAIRES.nNouveaux} jetons au plus, chaque jeton tiré parmi les {PAIRES.topK} plus probables. Forge les note, et garde la meilleure et la moins bonne. Sauf dans un cas.
+
+<Pari
+  id="paires"
+  question="Les deux réponses de ton IA à une invite sont coupées par la limite de jetons, mais l'une respecte la consigne et l'autre non. Forge…"
+  precision="La note de forge les départage : elles diffèrent sur les consignes."
+  choix={PAIRES.choix}
+  acquis="paires"
+>
+
+N'en fait pas de paire. Forge ne garde une paire que si la réponse choisie a fini son tour, et, pour un problème, si elle est juste. La raison : la DPO prend la réponse choisie pour modèle, et forge lui ajoute un terme qui l'apprend mot à mot, l'étape 6 y revient. Une réponse coupée lui apprendrait à ne pas finir. Forge compte ces invites à part, « sans bonne réponse », comme les égalités : deux notes égales ne donnent pas de paire non plus.
+
+</Pari>
+
+Le plancher tient en quelques lignes, dans le code de forge :
+
+<CodeExplique fichier="projets/forge/forge/preferences/noter.py" symbole="sans_paire">
+  <li data-lignes="1">`sans_paire` reçoit les notes des réponses d'une invite, et dit pourquoi elles ne donnent pas de paire.</li>
+  <li data-lignes="2">La meilleure et la moins bonne, par l'ordre des critères.</li>
+  <li data-lignes="3-4">Toutes égales : pas de paire.</li>
+  <li data-lignes="5-6">La meilleure n'a pas fini son tour, ou elle est fausse : aucune bonne réponse, pas de paire.</li>
+  <li data-lignes="7">Sinon, la paire est gardée.</li>
+</CodeExplique>
+
+Et voici la construction entière, telle que forge la fait tourner sur la carte graphique de l'auteur :
+
+<CodeExplique fichier="projets/forge/forge/preferences/construction.py" symbole="construire_paires">
+  <li data-lignes="1-8">`construire_paires` reçoit la version publiée qui écrit les réponses, ton IA 1.7, la recette, où écrire, et l'appareil.</li>
+  <li data-lignes="9-27">Le dossier du jeu, l'appareil, la version chargée ; ses réglages sont retenus, pour qu'une reprise ne mélange pas deux constructions.</li>
+  <li data-lignes="29-36">Un travail fini n'est pas refait.</li>
+  <li data-lignes="38-45">Une reprise relit ses invites, et repart au paquet suivant.</li>
+  <li data-lignes="46-72">Au premier départ : le nombre de réponses écrites à la fois, figé jusqu'au bout ; puis les invites de la recette, écrites sur le disque.</li>
+  <li data-lignes="74-81">Les invites se traitent par paquets, avec deux réponses par invite.</li>
+  <li data-lignes="82-90">Ctrl+C finit le paquet en cours, puis s'arrête : la même commande reprend au suivant.</li>
+  <li data-lignes="92-102">Les réponses du paquet, tirées au hasard, celles d'une même invite dans le même paquet.</li>
+  <li data-lignes="103-114">Pour chaque invite : ses réponses notées, la paire et le critère qui l'a départagée, ou pourquoi il n'y en a pas, comptés.</li>
+  <li data-lignes="115-130">Le paquet est validé, et une ligne dit où en est la construction.</li>
+  <li data-lignes="131-132">À la fin, le jeu de la DPO : pour chaque paire, la rangée de la réponse choisie, puis celle de la rejetée.</li>
+</CodeExplique>
+
+Les invites passent par paquets de {PAIRES.paquet}. Environ {PAIRES.validation} d'entre elles vont dans la validation : leurs paires ne seront jamais apprises. Si le taux de paires utilisables tombe sous {PAIRES.seuil}, forge s'arrête et le dit, avant la DPO.
+
+<p class="a-mesurer" data-a-mesurer data-construction-absente>{typographier('Le taux de paires utilisables de ton IA, et le critère qui a départagé ses paires : à relever, quand forge aura construit ses paires.')}</p>
+
+</Etape>
+
+<Etape numero={5} titre="La perte DPO">
+
+Les paires sont prêtes. Pour les apprendre, ce chapitre prend la DPO, de l'anglais *direct preference optimization*, publiée par <a href={ARTICLE_DPO.url}>Rafailov et ses coauteurs</a> en 2023. Elle n'a besoin ni d'un modèle qui note les réponses, ni de faire écrire ton IA pendant l'entraînement : une perte de classification sur des paires suffit.
+
+Il lui faut deux versions de ton IA. La politique, celle qu'on entraîne. Et la référence : ton IA 1.7 telle qu'elle était au départ, qui ne bouge plus. Pour chaque réponse, on mesure sa log-probabilité, la somme des log-probabilités de ses jetons, selon l'une et selon l'autre. L'écart entre les deux, c'est ce que l'entraînement a fait gagner à la réponse, ou perdre. La perte d'une paire compare l'écart de la choisie à celui de la rejetée : elle est grande quand la rejetée a gagné plus que la choisie, et tend vers zéro quand la choisie a pris beaucoup d'avance.
+
+<PhraseDpo client:load acquis="dpo" />
+
+β dit jusqu'où la politique peut s'éloigner de la référence : c'est ainsi que l'article de la DPO le présente. Forge prend {PERTE.beta} si on ne lui dit rien ; celui de ton IA 1.8 est un des réglages du balayage de l'étape 7. Forge a aussi une variante, `normaliser_longueur`, qui compare les écarts par jeton plutôt que par réponse entière ; par défaut, elle est coupée.
+
+Les deux réponses d'une paire viennent de ton IA 1.7, la référence elle-même : c'est le schéma de l'article de la DPO, qui tire les deux réponses du modèle de départ. Et la référence ne bouge pas : forge calcule ses log-probabilités une seule fois, avant le premier pas, et les range dans le jeu.
+
+Le projet du chapitre refait la perte à la main :
+
+<CodeExplique fichier="projets/1.8-alignement/alignement_pas_a_pas/perte_dpo.py" region="perte-dpo">
+  <li data-lignes="1-6">σ, la sigmoïde, qui écrase un nombre entre 0 et 1, sans jamais calculer l'exponentielle d'un grand nombre.</li>
+  <li data-lignes="9-14">−ln σ(z), écrit pour rester exact quand z est très grand ou très négatif.</li>
+  <li data-lignes="17-27">La perte d'une paire : les deux écarts, leur différence multipliée par β, puis −ln σ.</li>
+  <li data-lignes="30-36">Le terme SFT, à part : la perte par jeton de la réponse choisie. L'étape suivante dit pourquoi.</li>
+  <li data-lignes="39-46">La dérivée selon l'écart de la choisie : toujours négative, et l'opposée selon celui de la rejetée.</li>
+</CodeExplique>
+
+<Fragment slot="note">
+
+Tout ce qui est jaune se manipule. Fais glisser un nombre à la souris ou au doigt ; au clavier, atteins-le avec Tab, puis utilise les flèches, ou Début et Fin pour ses bornes.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={6} titre="Le piège de la vraisemblance">
+
+La perte ne regarde que la différence entre les deux écarts. Elle baisse autant si la choisie monte que si la rejetée descend. Rien, dans la perte, n'empêche les deux de descendre, pourvu que la rejetée descende plus vite.
+
+{PIEGE.choix === null ? (
+  <p class="a-mesurer" data-a-mesurer data-pari-a-mesurer="vraisemblance">{typographier('Le pari sur la réponse choisie pendant la DPO de ton IA : à venir, avec ses courbes.')}</p>
+) : (
+  <Pari
+    id="vraisemblance"
+    question="Pendant la DPO, la probabilité que ton IA donne à la réponse choisie…"
+    precision={`La log-probabilité moyenne par jeton des réponses choisies, du début à la fin. « Ne bouge pas » veut dire à ${PIEGE.tolerance} près.`}
+    choix={PIEGE.choix}
+    acquis="piege"
+  >
+    <p>{PIEGE.phrase}</p>
+  </Pari>
+)}
+
+<CourbePreferences titre="Les réponses choisies et rejetées pendant la DPO de ton IA" />
+
+Ce piège est connu. <a href={ARTICLE_DPOP.url}>Pal et ses coauteurs</a> montrent en 2024 que la perte DPO peut faire baisser la probabilité de la réponse choisie, tant que l'écart avec la rejetée grandit, surtout quand les deux réponses diffèrent de peu. Leur remède, DPOP, ajoute à la perte une pénalité dès que la choisie devient moins probable que selon la référence.
+
+Forge en prend un autre : le terme SFT. À la perte DPO, il ajoute la perte par jeton de la réponse choisie, celle de l'affinage du chapitre 1.7, avec un poids, `poids_sft`, de {PIEGE.poidsSft} si on ne lui dit rien. Ce terme pousse la choisie vers le haut, jeton par jeton. Ce n'est pas le remède de DPOP, et ce chapitre ne dit pas qu'il suffit : c'est la courbe de ton IA qui le dit.
+
+<Fragment slot="note">
+
+<p>{typographier(`Sources des étapes 5 et 6, lues le ${PIEGE.luLe} : `)}{SOURCES_DPO_1_8.map((x, i) => <span>{i > 0 ? ', ' : ''}<a href={x.url}>{typographier(x.titre)}</a></span>)}.</p>
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={7} titre="Le balayage">
+
+Quels réglages pour la DPO de ton IA ? Comme pour l'affinage du chapitre 1.7, ils se cherchent par un balayage : plusieurs essais courts, chacun avec ses réglages, le taux d'apprentissage, β, la normalisation par la longueur, le poids du terme SFT. On compare ensuite leurs taux de victoire contre ton IA 1.7, sur des invites que la DPO n'apprend pas : celles de la validation des paires.
+
+<TableauBalayage legende="Le balayage de la DPO de ton IA" />
+
+Les paires se construisent sur la carte graphique de l'auteur, avec la commande `preferences` de forge :
+
+<BlocCommande commandes={[PREFERENCES_1_8]} ou="PowerShell, dans le dossier projets/forge, sur une carte NVIDIA" />
+
+La DPO elle-même se lance avec la commande `entrainer` de forge, et une configuration dont la méthode est `dpo`. Celle de ton IA 1.8 viendra ici avec son entraînement.
+
+</Etape>
+
+<Etape numero={8} titre="Ce qui a changé">
+
+Forge fait passer à ton IA 1.8 les mesures du chapitre 1.7, et une de plus : la victoire. Aux mêmes invites, ton IA 1.8 et ton IA 1.7 répondent ; forge note les deux réponses comme celles des paires, et compte qui gagne, une égalité comptant une demie. Ce sont les critères qui ont choisi les paires : un taux élevé est attendu, par construction. Ce n'est pas un juge de qualité.
+
+{CHANGE.victoire === null ? (
+  <p class="a-mesurer" data-a-mesurer data-pari-a-mesurer="victoire">{typographier('Le pari sur la victoire de ton IA 1.8 : à venir, avec ses mesures.')}</p>
+) : (
+  <Pari
+    id="victoire"
+    question="Face à ton IA 1.7, aux mêmes invites, quelle part ton IA 1.8 gagne-t-elle ?"
+    precision="Une égalité compte une demie."
+    choix={CHANGE.victoire}
+  >
+    <p>{typographier(`${CHANGE.justeVictoire}.`)}</p>
+  </Pari>
+)}
+
+<TableauEtape versions={['1.7@1.8', '1.8@1.8', '1.8-court@1.8']} mesures={['ifeval_fr', 'tenue', 'victoire', 'oubli']} legende="Ton IA avant et après la DPO, sur les mêmes tests" />
+
+La longueur se surveille. Ce que la DPO apprend, c'est ce qui sépare les réponses choisies des rejetées : si les choisies étaient plus longues, ton IA pourrait apprendre à allonger. Chez forge, deux réponses aussi bonnes l'une que l'autre, une courte et une longue, ont la même note ; et forge relève, en construisant les paires, la longueur moyenne des choisies et des rejetées.
+
+{CHANGE.longueur === null ? (
+  <p class="a-mesurer" data-a-mesurer data-pari-a-mesurer="longueur">{typographier('Le pari sur la longueur des réponses de ton IA 1.8 : à venir, avec ses mesures.')}</p>
+) : (
+  <Pari
+    id="longueur"
+    question="Après la DPO, ses réponses sont…"
+    precision={`En mots, aux invites de la victoire, face à celles de ton IA 1.7. « De même longueur » veut dire à ${CHANGE.tolerance} près.`}
+    choix={CHANGE.longueur}
+    acquis="longueur"
+  >
+    <p>{CHANGE.phrase}</p>
+  </Pari>
+)}
+
+Voici les réponses de ton IA 1.8 aux questions fixes de forge, telles quelles :
+
+<EchantillonsConversation nom="1.8@1.8" />
+
+</Etape>
+
+<Etape numero={9} titre="Chez un grand labo">
+
+Ton IA apprend de paires notées par des programmes, sur une seule carte. Les grands labos en font noter des centaines de milliers, ou des millions, par des personnes ou par d'autres modèles.
+
+<EncadreLabo sources={SOURCES_LABO_1_8}>
+
+InstructGPT, d'OpenAI, en 2022, entraîne d'abord un modèle de récompense : un modèle de {LABO.iParametres} milliards de paramètres qui lit une question et une réponse, et rend une note, un seul nombre. Ses étiqueteurs, une quarantaine, classent de {LABO.iMin} à {LABO.iMax} réponses par question, sur environ {LABO.iRm} questions. Puis l'apprentissage par renforcement, PPO, fait écrire le modèle sur environ {LABO.iPpo} autres questions, sans étiquette humaine, et le récompense avec cette note. Pour son plus grand modèle, il faut {LABO.iPetaflops} pétaflops/s-jours de calcul : {LABO.iPart} des {LABO.iGpt3} pétaflops/s-jours du pré-entraînement de GPT-3.
+
+Pour Llama 2, Meta fait comparer des réponses deux à deux : {LABO.lMeta} comparaisons, {LABO.lTotal} avec celles de jeux ouverts. Elle entraîne {LABO.lModeles} modèles de récompense, l'un pour l'utilité, l'autre pour la sécurité, en {LABO.lVersions} tours, de RLHF-V1 à RLHF-V5. Entre autres méthodes, elle fait écrire plusieurs réponses au modèle et garde la meilleure selon la récompense.
+
+Qwen2.5, d'Alibaba, en 2024, fabrique une partie de ses paires presque comme forge, là où une réponse se vérifie : mathématiques, code, consignes. Son modèle affiné réécrit des réponses à de nouvelles questions ; celles qui passent ses contrôles deviennent des choisies, celles qui échouent des rejetées, et des personnes relisent aussi. Environ {LABO.qPaires} paires, lues {LABO.qEpoques}, au taux de {LABO.qTaux}.
+
+Tülu 3, d'Ai2, en 2024, fait écrire {LABO.tReponses} réponses par question, par son modèle et par d'autres, et les fait noter par un juge, GPT-4o. Son modèle de 8 milliards de paramètres apprend de {LABO.tPaires8B} paires, {LABO.tEpoques}, au taux de {LABO.tTaux}, avec une DPO normalisée par la longueur : son β vaut {LABO.tBeta}, mais sur des écarts par jeton, et ne se compare pas au {LABO.forgeBeta} de forge, qui compare des réponses entières. Il s'entraîne {LABO.tHeures} heures sur {LABO.tCartes} cartes H100, soit {LABO.tHeuresDeCartes} heures de carte. L'article compte {LABO.tTotal} paires pour l'ensemble de ses mélanges, mais {LABO.tTableau7} invites de préférence à son tableau 7 : ces deux comptes ne s'accordent pas.
+
+Le modèle de récompense d'InstructGPT et de Llama 2 ne tourne pas ici. C'est un second modèle, entraîné sur les comparaisons, qui note chaque réponse pendant l'apprentissage par renforcement. La DPO s'en passe : ses paires sont fixes, et sa perte suffit.
+
+</EncadreLabo>
+
+<Fragment slot="note">
+
+Deux nombres de l'encadré sont des calculs faits ici, sur des chiffres publiés : la part d'InstructGPT, {LABO.iPetaflops} pétaflops/s-jours sur {LABO.iGpt3}, et les heures de carte de Tülu 3, {LABO.tCartes} cartes pendant {LABO.tHeures} heures.
+
+</Fragment>
+
+</Etape>
+
+<Etape numero={10} titre="Le projet">
+
+Le projet vérifie sa perte à la main contre celle de forge :
+
+<CodeExplique fichier="projets/1.8-alignement/tests/test_perte_dpo.py" region="test-dpo">
+  <li data-lignes="1-2">Le test compte les points qu'il vérifie.</li>
+  <li data-lignes="3-6">Trois valeurs de β, trois log-probabilités de la choisie, trois de la rejetée ; celles de la référence sont fixes.</li>
+  <li data-lignes="7-8">La perte de forge, sur des tenseurs en float64, sans le terme SFT : la DPO seule.</li>
+  <li data-lignes="9-10">La perte à la main, égale à celle de forge à 10⁻¹² près.</li>
+  <li data-lignes="12">Les 27 points ont été vérifiés.</li>
+</CodeExplique>
+
+<RecupererProjet
+  projet="1.8-alignement"
+  intro="Le projet du chapitre est dans le dépôt du site : la note expliquée critère par critère, la perte DPO à la main, et quelques pas de DPO sur une paire."
+  suite="Puis, dans le dossier du projet, lance ses tests :"
+/>
+
+<BlocCommande commandes={[ALIGNEMENT_TESTS]} ou="un terminal, dans le dossier du projet" />
+
+Le projet utilise PyTorch, comme ceux des chapitres 1.4 à 1.7 : `--extra cpu` prend sa version pour le processeur, qui suffit ici. Pour noter une réponse, calculer la perte d'une paire, ou voir ce que quelques pas de DPO poussent sur un modèle minuscule :
+
+<BlocCommande commandes={[ALIGNEMENT_NOTER, ALIGNEMENT_DPO, ALIGNEMENT_POUSSER]} ou="un terminal, dans le dossier du projet" />
+
+`pousser` prend la première paire de ton IA quand elle existe ; sinon une paire fabriquée à la main, et il le dit.
+
+Le projet complet, avec un notebook qui refait tout cela pas à pas, est sur GitHub :
+
+<LiensProjet projet="1.8-alignement" />
+
+### À suivre
+
+Ton IA sait maintenant préférer, d'après des contrôles qui vérifient la forme de ses réponses. Le chapitre 1.9, {FIN.lien ? <a href={FIN.lien}>{FIN.titre}</a> : FIN.titre}, à venir, passe aux problèmes de calcul, dont la réponse se vérifie.
+
+</Etape>

@@ -8,7 +8,8 @@
 //
 // Un nom de FICHIERS_ETAPES est « version@étape » : « 1.7@1.7 » est ton IA 1.7 mesurée à l'étape 1.7,
 // « 1.5@1.7 » est ton IA 1.5 (la version du chapitre 1.5) passant les mêmes mesures, « 1.7-court@1.7 » la
-// version d'essai plus courte de 1.7. Les noms de versions des fichiers sont ceux des Releases (« ton-ia-1.7 »).
+// version d'essai plus courte de 1.7. La version de référence d'un rapport (ton IA 1.5 en 1.7, ton IA 1.7 en 1.8)
+// est résumée dans le projet de l'étape, avec `resumer --reference`. Les noms de versions des fichiers sont ceux des Releases (« ton-ia-1.7 »).
 //
 // Tant qu'un fichier manque, lireRapportEtape rend null, et la page pose data-a-mesurer. Un fichier qui a le
 // mauvais format est une erreur qui dit quel relevé refaire : la construction s'arrête plutôt que d'afficher un
@@ -28,6 +29,7 @@ export const FICHIERS_ETAPES = Object.freeze({
   '1.5@1.7': 'projets/1.7-conversation/mesures/etape-ton-ia-1.5.json',
   '1.7@1.7': 'projets/1.7-conversation/mesures/etape-ton-ia-1.7.json',
   '1.7-court@1.7': 'projets/1.7-conversation/mesures/etape-ton-ia-1.7-court.json',
+  '1.7@1.8': 'projets/1.8-alignement/mesures/etape-ton-ia-1.7.json',
   '1.8@1.8': 'projets/1.8-alignement/mesures/etape-ton-ia-1.8.json',
   '1.8-court@1.8': 'projets/1.8-alignement/mesures/etape-ton-ia-1.8-court.json',
   '1.5@1.9': 'projets/1.9-raisonnement/mesures/etape-ton-ia-1.5.json',
@@ -97,6 +99,13 @@ const PAQUETS_DES_PROJETS: Readonly<Record<string, string>> = Object.freeze({
   '1.8-alignement': 'alignement_pas_a_pas',
 });
 
+// Le relevé de la version de référence de chaque projet : la référence du rapport de l'étape (`--reference` de
+// `forge evaluer-etape`), que `resumer --reference` résume.
+const REFERENCES_DES_PROJETS: Readonly<Record<string, string>> = Object.freeze({
+  '1.7-conversation': 'etape-ton-ia-1.5.json',
+  '1.8-alignement': 'etape-ton-ia-1.7.json',
+});
+
 /**
  * Ce qu'il faut relancer pour refaire le relevé `fichier` (un chemin depuis la racine du dépôt) : la commande du
  * projet qui l'écrit, pas celle d'un autre. Un fichier d'un projet inconnu reçoit le message général.
@@ -115,7 +124,7 @@ export function refaire(fichier: string): string {
   if (nom.startsWith('entrainement-dpo')) return commande('courbes --journal <journal.jsonl>');
   if (nom === 'paires-exemples.json') return commande('paires --jeu <dossier du jeu de paires>');
   if (nom.startsWith('balayage')) return commande('balayage <dossier d’essai> <dossier d’essai>');
-  if (nom === 'etape-ton-ia-1.5.json') return commande('resumer --rapport <rapport.json> --reference');
+  if (nom === REFERENCES_DES_PROJETS[dossier]) return commande('resumer --rapport <rapport.json> --reference');
   if (nom.startsWith('etape-')) return commande('resumer --rapport <rapport.json>');
   return general;
 }
@@ -316,6 +325,13 @@ export const LIGNES_DES_MESURES: Readonly<Record<string, LigneDeMesure>> = Objec
     precision: 'en nats par jeton, sur la validation de son pré-entraînement',
     valeur: (m) => nombre(lu(m, 'perte'), 3),
     detail: (m) => `sur ${nombre(lu(m, 'n'))} morceaux`,
+  },
+  // Étape 1.8 : chaque version du rapport garde son taux contre l'autre (celui de la référence est le complément).
+  victoire: {
+    libelle: 'Victoires aux contrôles',
+    precision: 'part des invites où sa réponse a la meilleure note, face à l’autre version du rapport (une égalité compte une demie)',
+    valeur: (m) => pourcent(lu(m, 'taux'), 1),
+    detail: (m) => `sur ${nombre(lu(m, 'n'))} invites`,
   },
 });
 

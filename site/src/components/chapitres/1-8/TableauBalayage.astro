@@ -1,0 +1,149 @@
+---
+// Les essais du balayage de la DPO de ton IA 1.8 : leurs réglages (taux, β, longueur normalisée, poids du terme SFT),
+// leur taux de victoire contre ton IA 1.7 sur les invites de validation des paires, la longueur de leurs réponses, et
+// la log-probabilité de la réponse choisie au début et à la fin. Lus à la construction dans le relevé du projet 1.8
+// (mesures/balayage-1.8.json, écrit par `balayage`), par essaisDuBalayage (paris-1-8.ts) : rien n'est recalculé.
+//
+// L'essai retenu, celui qui a les réglages de configs/dpo-1.8.toml, est signalé par un trait indigo dans la marge, et
+// dit aux lecteurs d'écran. Une mesure absente d'un essai s'écrit « absente ». Tant que le relevé manque, le
+// composant affiche « à mesurer », marqué data-a-mesurer. Un tableau typographié, sans cadre, comme TableauEtape.
+import { root } from 'astro:config/server';
+import { dixPuissance } from '../../../lib/calculateur/formats';
+import { decimalesUtiles, nombre, pourcent } from '../../../lib/nombres';
+import { essaisDuBalayage } from '../../../lib/partie-1/paris-1-8';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  /** La légende, sans point final. */
+  legende: string;
+}
+
+const { legende } = Astro.props;
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const b = essaisDuBalayage(new URL('../', root));
+const FINE = '\u202F';
+// Un taux d'apprentissage en puissance de dix (« 1 × 10⁻⁶ »), tel qu'il est réglé ; les autres réglages en clair.
+const reglage = (x: number) => {
+  if (Math.abs(x) >= 1e-3) return nombre(x, 2);
+  const [mantisse, exposant] = x.toExponential().split('e');
+  return `${nombre(Number(mantisse), decimalesUtiles(Number(mantisse), 2))}${FINE}×${FINE}${dixPuissance(Number(exposant))}`;
+};
+const id = 'tableau-balayage-1-8';
+const absent = typographier(`${legende} : à mesurer, avec le balayage de ton IA 1.8.`);
+---
+
+{
+  b === null ? (
+    <p class="a-mesurer" data-a-mesurer data-balayage-absent>
+      {absent}
+    </p>
+  ) : (
+    <figure class="tableau-balayage" data-tableau-balayage>
+      <figcaption id={id}>
+        <span class="objet">{typographier(legende)}</span>
+        {typographier(
+          b.retenu === null
+            ? 'Relevé par le projet 1.8 sur les essais de forge. La configuration finale n’est pas encore écrite : aucun essai n’est marqué.'
+            : 'Relevé par le projet 1.8 sur les essais de forge. Le trait dans la marge marque l’essai retenu, celui de configs/dpo-1.8.toml.',
+        )}
+      </figcaption>
+      <div class="defile" role="region" aria-labelledby={id} tabindex="0">
+        <table aria-labelledby={id}>
+          <thead>
+            <tr>
+              <th scope="col">Essai</th>
+              <th scope="col" class="nombre">Taux</th>
+              <th scope="col" class="nombre">β</th>
+              <th scope="col">Normalisée</th>
+              <th scope="col" class="nombre">Poids SFT</th>
+              <th scope="col" class="nombre">Victoire</th>
+              <th scope="col" class="nombre">Mots, lui et 1.7</th>
+              <th scope="col" class="nombre">Choisie, début et fin</th>
+            </tr>
+          </thead>
+          <tbody>
+            {b.essais.map((e, i) => (
+              <tr class:list={[{ retenu: i === b.retenu }]} data-essai={e.essai} data-retenu={i === b.retenu ? 'oui' : undefined}>
+                <th scope="row">
+                  {e.essai}
+                  {i === b.retenu && <span class="vh"> (retenu)</span>}
+                </th>
+                <td class="nombre">{reglage(e.reglages.taux_max)}</td>
+                <td class="nombre">{nombre(e.reglages.beta, 2)}</td>
+                <td>{e.reglages.normaliser_longueur ? 'oui' : 'non'}</td>
+                <td class="nombre">{nombre(e.reglages.poids_sft, 1)}</td>
+                <td class="nombre">{'absente' in e.victoire ? 'absente' : pourcent(e.victoire.taux, 1)}</td>
+                <td class="nombre">{'absente' in e.longueur ? 'absente' : `${nombre(e.longueur.mots_modele, 1)} et ${nombre(e.longueur.mots_reference, 1)}`}</td>
+                <td class="nombre">{`${nombre(e.logps_choisie.debut, 2)} et ${nombre(e.logps_choisie.fin, 2)}`}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </figure>
+  )
+}
+
+<style>
+  .tableau-balayage {
+    margin: 1.4em 0 1.2em;
+  }
+
+  figcaption {
+    font-family: var(--titres);
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--indigo-doux);
+    margin-bottom: 10px;
+  }
+
+  figcaption .objet {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--indigo);
+    margin-bottom: 4px;
+  }
+
+  /* Huit colonnes ne tiennent pas à 390 px : le tableau défile dans son cadre, jamais la page. */
+  .defile {
+    overflow-x: auto;
+    padding-left: 6px; /* la place du trait de l'essai retenu */
+  }
+
+  table {
+    border-collapse: collapse;
+    border-top: 2px solid var(--indigo);
+    font-family: var(--titres);
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  th,
+  td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--brume);
+    text-align: left;
+  }
+
+  thead th {
+    font-weight: 600;
+    color: var(--indigo-doux);
+  }
+
+  .nombre {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* L'essai retenu : un trait indigo dans la marge, sans couleur criarde. */
+  tr.retenu th {
+    box-shadow: inset 3px 0 0 var(--indigo);
+    font-weight: 700;
+  }
+
+  .a-mesurer {
+    font-style: italic;
+    color: var(--indigo-doux);
+  }
+</style>

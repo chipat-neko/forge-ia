@@ -1,0 +1,154 @@
+---
+// L'ouverture du chapitre 1.8 : une invite, et deux réponses côte à côte, telles quelles, sans dire laquelle forge
+// préfère : c'est le pari « note », juste dessous, qui le demande.
+//
+// La paire vient de paireDeLOuverture (paris-1-8.ts) : la première vraie paire d'une question à consignes de
+// projets/1.8-alignement/mesures/paires-exemples.json, ses réponses rangées dans l'ordre de leur texte (la lettre ne
+// trahit pas la choisie). Tant que ce relevé n'existe pas, ce sont deux réponses écrites pour l'exemple, sur une
+// invite construite comme celles de forge ; la légende le dit, et une ligne « à mesurer » (data-a-mesurer) tient la
+// place de la vraie paire.
+//
+// L'invite et les réponses ne sont pas du texte du site : data-pagefind-ignore, en chasse fixe, sans typographie.
+import { root } from 'astro:config/server';
+import { paireDeLOuverture } from '../../../lib/partie-1/paris-1-8';
+import { typographier } from '../../../lib/typo';
+
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const p = paireDeLOuverture(new URL('../', root));
+const FIN = typographier('Elle a fini son tour.');
+const COUPEE = typographier('Coupée par la limite de jetons : elle n’avait pas fini.');
+const legende = p.reelle
+  ? typographier(
+      `Une invite du jeu de paires de ton IA, et les deux réponses que ton IA 1.7 y a écrites, telles quelles. ` +
+        `La question vient de ${p.source!.nom}, sous licence ${p.source!.licence}.`,
+    )
+  : typographier(
+      'Deux réponses écrites pour l’exemple, à une invite construite comme celles de forge : une question, puis deux consignes que forge sait vérifier.',
+    );
+const A_MESURER = typographier('Une vraie invite de forge et les deux réponses de ton IA 1.7 : à mesurer, quand forge aura construit ses paires.');
+---
+
+<figure class="ouverture-preferences" data-test="ouverture-preferences">
+  <div class="invite">
+    <span class="qui">L’invite</span>
+    {
+      p.systeme !== null && (
+        <div class="systeme" data-pagefind-ignore>
+          {p.systeme}
+        </div>
+      )
+    }
+    <div class="question" data-test="op-invite" data-pagefind-ignore>{p.invite}</div>
+  </div>
+  <div class="reponses">
+    {
+      p.reponses.map((r) => (
+        <div class="reponse" data-reponse={r.lettre}>
+          <span class="qui">Réponse {r.lettre}</span>
+          <div class="texte" data-test="op-texte" data-pagefind-ignore>{r.texte}</div>
+          <p class="etat">{r.terminee ? FIN : COUPEE}</p>
+        </div>
+      ))
+    }
+  </div>
+  <figcaption>{legende}</figcaption>
+  {
+    !p.reelle && (
+      <p class="a-mesurer" data-a-mesurer data-paire-a-mesurer>
+        {A_MESURER}
+      </p>
+    )
+  }
+</figure>
+
+<style>
+  .ouverture-preferences {
+    margin: 40px 0 1.2em;
+    border-top: 2px solid var(--indigo);
+    padding-top: 14px;
+  }
+
+  /* Qui parle : un nom en Gabarito, au-dessus de ce qu'il dit, comme à l'ouverture du chapitre 1.7. */
+  .qui {
+    display: block;
+    font-family: var(--titres);
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--indigo-doux);
+    margin-bottom: 4px;
+  }
+
+  .invite {
+    margin-bottom: 18px;
+  }
+
+  /* L'invite telle que ton IA la lit : ses retours à la ligne gardés, en grand. */
+  .question {
+    font-family: var(--titres);
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 1.3;
+    color: var(--indigo);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .systeme {
+    font-family: var(--mono);
+    font-variant-ligatures: none;
+    font-size: 14px;
+    color: var(--indigo-doux);
+    white-space: pre-wrap;
+    margin-bottom: 6px;
+  }
+
+  /* Les deux réponses côte à côte ; l'une sous l'autre sur un téléphone. */
+  .reponses {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+
+  .texte {
+    padding: 12px 16px;
+    background: var(--brume-claire);
+    border-radius: 10px;
+    font-family: var(--mono);
+    font-variant-ligatures: none; /* les caractères tels qu'ils sont écrits */
+    font-size: 14px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .etat {
+    margin: 6px 0 0;
+    font-family: var(--titres);
+    font-size: 14px;
+    color: var(--indigo-doux);
+  }
+
+  figcaption {
+    margin-top: 14px;
+    font-family: var(--titres);
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--indigo-doux);
+  }
+
+  .a-mesurer {
+    margin: 6px 0 0;
+    font-style: italic;
+    color: var(--indigo-doux);
+  }
+
+  @media (max-width: 720px) {
+    .reponses {
+      grid-template-columns: 1fr;
+    }
+
+    .question {
+      font-size: 21px;
+    }
+  }
+</style>

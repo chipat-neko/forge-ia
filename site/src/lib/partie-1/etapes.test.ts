@@ -56,6 +56,8 @@ describe('FICHIERS_ETAPES', () => {
     expect(FICHIERS_ETAPES['1.5@1.7']).toBe('projets/1.7-conversation/mesures/etape-ton-ia-1.5.json');
     expect(FICHIERS_ETAPES['1.7-court@1.7']).toBe('projets/1.7-conversation/mesures/etape-ton-ia-1.7-court.json');
     expect(FICHIERS_ETAPES['1.8-court@1.8']).toBe('projets/1.8-alignement/mesures/etape-ton-ia-1.8-court.json');
+    // Ton IA 1.7 à l'étape 1.8 : la référence du rapport de ton IA 1.8, résumée dans le projet 1.8.
+    expect(FICHIERS_ETAPES['1.7@1.8']).toBe('projets/1.8-alignement/mesures/etape-ton-ia-1.7.json');
     expect(FICHIERS_ETAPES['1.5@1.9']).toBe('projets/1.9-raisonnement/mesures/etape-ton-ia-1.5.json');
     // L'étape 1.10 est dans le projet 1.10, pas dans le projet 1.1 : « 1.10 » n'est pas pris pour « 1.1 » plus un zéro.
     expect(FICHIERS_ETAPES['1.10@1.10']).toBe('projets/1.10-code/mesures/etape-ton-ia-1.10.json');
@@ -115,6 +117,14 @@ describe('refaire : la commande du projet qui écrit le relevé', () => {
     expect(refaire(FICHIERS_ETAPES['1.7@1.7'])).toContain('python -m conversation_pas_a_pas resumer');
     expect(refaire(FICHIERS_ETAPES['1.5@1.7'])).toContain('resumer --rapport <rapport.json> --reference --json mesures/etape-ton-ia-1.5.json');
     expect(refaire(FICHIERS_ETAPES['1.8@1.8'])).not.toContain('conversation_pas_a_pas');
+  });
+
+  it('la version de référence d’un rapport se résume avec --reference : ton IA 1.5 en 1.7, ton IA 1.7 en 1.8', () => {
+    expect(refaire(FICHIERS_ETAPES['1.7@1.8'])).toBe(
+      'Relance le relevé, depuis projets/1.8-alignement, avec « uv run --extra cpu python -m alignement_pas_a_pas resumer --rapport <rapport.json> --reference --json mesures/etape-ton-ia-1.7.json », ou corrige le fichier.',
+    );
+    expect(refaire(FICHIERS_ETAPES['1.7@1.7'])).not.toContain('--reference');
+    expect(refaire(FICHIERS_ETAPES['1.8@1.8'])).not.toContain('--reference');
   });
 
   it('dit « courbes », « paires » ou « balayage » pour les autres relevés de 1.8', () => {
@@ -273,7 +283,20 @@ describe('les lignes du tableau d’une étape', () => {
   it('un rapport qui manque, ou une mesure absente : null, la page pose « à mesurer »', () => {
     expect(celluleDeMesure(null, 'ifeval_fr')).toBeNull();
     expect(celluleDeMesure(r, 'oubli')).toBeNull();
-    expect(() => celluleDeMesure(r, 'victoire')).toThrow(/victoire.*LIGNES_DES_MESURES/s);
+    // Une mesure sans ligne arrête la construction, avec l'endroit où l'ajouter (celles de 1.9 viennent avec leur chapitre).
+    expect(() => celluleDeMesure(r, 'problemes')).toThrow(/problemes.*LIGNES_DES_MESURES/s);
+  });
+
+  it('chaque mesure de l’étape 1.8 a sa ligne, dont la victoire : son taux, sur combien d’invites', () => {
+    for (const nom of MESURES_DE_L_ETAPE['1.8']) expect(LIGNES_DES_MESURES[nom], nom).toBeDefined();
+    const r18: RapportEtape = {
+      ...r,
+      version: 'ton-ia-1.8',
+      etape: '1.8',
+      mesures: { ...r.mesures, victoire: { victoires: 120, egalites: 40, defaites: 40, taux: 0.7, mots_modele: 61.5, mots_reference: 58, n: 200 } },
+    };
+    expect(celluleDeMesure(r18, 'victoire')).toStrictEqual({ valeur: `70,0${FINE}%`, detail: 'sur 200 invites' });
+    expect(LIGNES_DES_MESURES.victoire.precision).toMatch(/une égalité compte une demie/);
   });
 
   it('le nom de chaque version, en tête de colonne', () => {

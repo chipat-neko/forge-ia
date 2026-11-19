@@ -1,0 +1,251 @@
+---
+// Les courbes de la DPO de ton IA 1.8 : la log-probabilité moyenne par jeton des réponses choisies (trait plein,
+// indigo) et des réponses rejetées (tirets, lavande), au fil des pas. Elles viennent du relevé du projet 1.8
+// (mesures/entrainement-dpo-1.8.json, écrit par `courbes` à partir du journal de forge, en paquets de pas), lu à la
+// construction par lireSeries : rien n'est recalculé.
+//
+// Un SVG dessiné à la main (aucune bibliothèque), en viewBox 640 × 280, par dessinDesCourbes (paris-1-8.ts). Les
+// textes (graduations, légende) sont du HTML posé autour. Le SVG est caché aux lecteurs d'écran : un tableau, caché à
+// l'écran, dit la même chose, paquet par paquet.
+//
+// Tant que le relevé manque, le composant affiche « à mesurer », marqué data-a-mesurer.
+import { root } from 'astro:config/server';
+import { nombre } from '../../../lib/nombres';
+import { lireSeries } from '../../../lib/partie-1/etapes';
+import { dessinDesCourbes, FICHIERS_1_8 } from '../../../lib/partie-1/paris-1-8';
+import { typographier } from '../../../lib/typo';
+
+interface Props {
+  /** Le titre de la figure, sans point final. */
+  titre: string;
+}
+
+const { titre } = Astro.props;
+const LARGEUR = 640;
+const HAUTEUR = 280;
+// Le site est dans le dossier site/ : le dépôt est un dossier plus haut.
+const series = lireSeries(FICHIERS_1_8.courbes, new URL('../', root));
+const dessin = series === null ? null : dessinDesCourbes(series, LARGEUR, HAUTEUR);
+if (dessin !== null && /NaN|Infinity/.test(dessin.choisie + dessin.rejetee)) {
+  throw new Error('CourbePreferences : une courbe contient une valeur non finie. Vérifie mesures/entrainement-dpo-1.8.json.');
+}
+const enHaut = (v: number) => (dessin === null ? 0 : ((dessin.yMax - v) / (dessin.yMax - dessin.yMin)) * 100);
+const gradY = dessin === null ? [] : [dessin.yMax, (dessin.yMax + dessin.yMin) / 2, dessin.yMin].map((v) => ({ v, haut: enHaut(v) }));
+const gradX = dessin === null ? [] : [0, dessin.xMax / 2, dessin.xMax].map((v) => ({ v: Math.round(v), gauche: (v / dessin.xMax) * 100 }));
+const ecrire = (x: number | null) => (x === null ? 'aucune' : nombre(x, 3));
+const absent = typographier(`${titre} : à mesurer, avec l’entraînement de ton IA 1.8.`);
+---
+
+{
+  dessin === null ? (
+    <p class="a-mesurer" data-a-mesurer data-courbe-dpo-absente>
+      {absent}
+    </p>
+  ) : (
+    <figure class="courbe-preferences" data-courbe-dpo>
+      <div class="cadre">
+        <span class="titre-axe titre-y" aria-hidden="true">
+          log-probabilité par jeton
+        </span>
+        <div class="graduations-y" aria-hidden="true">
+          {gradY.map((g) => (
+            <span style={`top: ${g.haut}%`}>{nombre(g.v, 2)}</span>
+          ))}
+        </div>
+        <svg viewBox={`0 0 ${LARGEUR} ${HAUTEUR}`} preserveAspectRatio="none" aria-hidden="true" data-test="courbe-dpo-svg">
+          <path class="rejetee" d={dessin.rejetee} />
+          <path class="choisie" d={dessin.choisie} />
+        </svg>
+      </div>
+      <div class="graduations-x" aria-hidden="true">
+        {gradX.map((g) => (
+          <span style={`left: ${g.gauche}%`}>{nombre(g.v)}</span>
+        ))}
+      </div>
+      <span class="titre-axe titre-x" aria-hidden="true">
+        pas
+      </span>
+      <figcaption>
+        <span class="titre-figure">{typographier(titre)}</span>
+        <span class="cles" aria-hidden="true">
+          <span>
+            <svg class="cle" viewBox="0 0 24 8">
+              <line class="choisie" x1="1" x2="23" y1="4" y2="4" />
+            </svg>
+            les réponses choisies
+          </span>
+          <span>
+            <svg class="cle" viewBox="0 0 24 8">
+              <line class="rejetee" x1="1" x2="23" y1="4" y2="4" />
+            </svg>
+            les réponses rejetées
+          </span>
+        </span>
+        {typographier('En moyenne sur les paires de chaque paquet de pas. Plus haut, plus probable.')}
+      </figcaption>
+      <div class="vh" data-test="courbe-dpo-tableau" data-pagefind-ignore>
+        <table>
+          <caption>{typographier(`${titre}, en nombres : la log-probabilité moyenne par jeton, paquet par paquet.`)}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Pas</th>
+              <th scope="col">Réponses choisies</th>
+              <th scope="col">Réponses rejetées</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dessin.lignes.map((l) => (
+              <tr>
+                <th scope="row">{nombre(l.pas)}</th>
+                <td>{ecrire(l.choisie)}</td>
+                <td>{ecrire(l.rejetee)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </figure>
+  )
+}
+
+<style>
+  .courbe-preferences {
+    margin: 0.8em 0 1.4em;
+    font-family: var(--titres);
+    font-size: 13px;
+    line-height: 1.2;
+    color: var(--indigo-doux);
+    --gauche: 3em;
+  }
+
+  .cadre {
+    position: relative;
+    padding: 1.6em 0 0 var(--gauche);
+  }
+
+  .titre-axe {
+    font-weight: 600;
+  }
+
+  .titre-y {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .titre-x {
+    display: block;
+    text-align: right;
+    margin-top: 2px;
+  }
+
+  .graduations-y {
+    position: absolute;
+    top: 1.6em;
+    bottom: 0;
+    left: 0;
+    width: var(--gauche);
+  }
+
+  .graduations-y span,
+  .graduations-x span {
+    position: absolute;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .graduations-y span {
+    right: 0.7em;
+    transform: translateY(-50%);
+  }
+
+  .graduations-x {
+    position: relative;
+    height: 1.4em;
+    margin: 4px 0 0 var(--gauche);
+  }
+
+  .graduations-x span {
+    top: 0;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+
+  .graduations-x span:first-child {
+    transform: none;
+  }
+
+  .graduations-x span:last-child:not(:first-child) {
+    transform: translateX(-100%);
+  }
+
+  svg {
+    display: block;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    aspect-ratio: 640 / 280;
+    overflow: visible;
+    border-bottom: 1px solid var(--indigo-doux);
+  }
+
+  line,
+  path {
+    vector-effect: non-scaling-stroke;
+    fill: none;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  .choisie {
+    stroke: var(--indigo);
+    stroke-width: 2;
+  }
+
+  .rejetee {
+    stroke: var(--lavande);
+    stroke-width: 2;
+    stroke-dasharray: 6 5;
+  }
+
+  figcaption {
+    margin-top: 8px;
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  .titre-figure {
+    display: block;
+    color: var(--indigo);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .cles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  .cle {
+    display: inline-block;
+    width: 24px;
+    height: 8px;
+    max-width: none;
+    margin-right: 4px;
+    vertical-align: middle;
+    overflow: visible;
+  }
+
+  .a-mesurer {
+    font-style: italic;
+    color: var(--indigo-doux);
+  }
+
+  @media (max-width: 720px) {
+    svg {
+      aspect-ratio: 640 / 400;
+    }
+  }
+</style>

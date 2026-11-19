@@ -161,6 +161,24 @@ export const CONVERSATION_ESSAI =
 /** Lancer les tests du projet 1.7, avec la version de PyTorch pour le processeur. */
 export const CONVERSATION_TESTS = 'uv run --extra cpu pytest -q';
 
+// ---------- Chapitre 1.8 : l'alignement pas à pas ----------
+// Les sous-commandes noter, dpo et pousser, et leurs options, sont celles de
+// projets/1.8-alignement/alignement_pas_a_pas/__main__.py ; ces commandes sont celles du README du projet :
+// commandes.test.ts le vérifie. Le projet utilise PyTorch, pour le processeur (--extra cpu), qui suffit à tout ce
+// qu'il calcule.
+
+/** Entrer dans le projet du chapitre 1.8, depuis le dossier où le dépôt a été cloné. */
+export const ALLER_AU_PROJET_1_8 = 'cd forge-ia/projets/1.8-alignement';
+/** La note d'une réponse, critère par critère, avec la raison de chacun. */
+export const ALIGNEMENT_NOTER =
+  'uv run --extra cpu python -m alignement_pas_a_pas noter "paris est la capitale." --consigne minuscules --consigne mots_max:n=20';
+/** La perte DPO d'une paire, à la main et dans forge. */
+export const ALIGNEMENT_DPO = 'uv run --extra cpu python -m alignement_pas_a_pas dpo --pc -12 --pr -20 --qc -14 --qr -18 --beta 0.1';
+/** Quelques pas de DPO sur une paire et un modèle minuscule : ce que la perte pousse. */
+export const ALIGNEMENT_POUSSER = 'uv run --extra cpu python -m alignement_pas_a_pas pousser --pas 40';
+/** Lancer les tests du projet 1.8, avec la version de PyTorch pour le processeur. */
+export const ALIGNEMENT_TESTS = 'uv run --extra cpu pytest -q';
+
 // ---------- Vague 2 : les versions publiées de ton IA (1.7 à 1.10) ----------
 // Chaque chapitre de la vague 2 a sa Release (ton-ia-1.7, ton-ia-1.8…), téléchargée comme ton-ia-1.5 :
 // avec l'outil gh, dans le dossier du PC de l'auteur. Les commandes des chapitres (AFFINER_1_7,
@@ -168,6 +186,13 @@ export const CONVERSATION_TESTS = 'uv run --extra cpu pytest -q';
 // GRPO_1_9, TRADUIRE_1_10, CODE_1_10) entrent ici avec la parution de leur chapitre, quand le README de
 // forge les contient : commandes.test.ts les cherche telles quelles dans projets/forge/README.md. Avant
 // cela, un brouillon dit la commande en prose, sans bloc.
+
+/**
+ * Construire les paires de préférences de ton IA 1.8 : ton IA 1.7 écrit deux réponses par invite, que forge note
+ * (chapitre 1.8, étape 7). Telle que le README de forge la donne, sur une carte NVIDIA, depuis projets/forge.
+ */
+export const PREFERENCES_1_8 =
+  'uv run --extra gpu python -m forge preferences --modele "$env:FORGE_DONNEES\\publications\\ton-ia-1.7" --recette preferences-1.8';
 
 /** Télécharger tous les fichiers d'une version publiée de ton IA (« ton-ia-1.7 »…) dans son dossier du cache : la commande de TELECHARGER_TON_IA, pour une autre étiquette. */
 export function TELECHARGER_VERSION(etiquette: string): string {
