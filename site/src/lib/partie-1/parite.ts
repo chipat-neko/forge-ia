@@ -29,6 +29,7 @@
 import fichierNettoyeur from '../../../../projets/1.2-donnees/tests/attendus.json';
 import fichierConversation from '../../../../projets/1.7-conversation/tests/attendus.json';
 import fichierNgrammes from '../../../../projets/1.1-modele-de-langage/tests/attendus.json';
+import fichierNotes from '../../../../projets/1.8-alignement/tests/attendus.json';
 import type { Attendus } from '../mini-modele/parite';
 import {
   alphabet,
@@ -57,6 +58,7 @@ import {
 } from './nettoyeur';
 import { empaqueterLongueurs } from './bfd';
 import { assemblerConversation, NOMS_SPECIAUX, SPECIAUX_TON_IA, type Role } from './conversation';
+import { langue, mots, MOTS_MAXIMUM, MOTS_MINIMUM, noteSansJustesse, VERIFICATEURS_CONTRAINTES, type ReglagesConsigne } from './notes';
 import type { NomSource } from './donnees';
 import { TEXTE_DU_SITE } from './texte-1-1';
 
@@ -265,9 +267,49 @@ export function attendusConversation(): Attendus {
   return refaireConversation(fichierConversation as unknown as EntreesConversation);
 }
 
+/** Les entrées du fichier d'attendus des notes : les consignes de référence, les textes à noter et la grille de la perte DPO. */
+export interface EntreesNotes {
+  consignes: { id: string; kwargs: ReglagesConsigne; consigne: string }[];
+  textes: { nom: string; texte: string; terminee: boolean; invite: [string, ReglagesConsigne][] }[];
+  grille_dpo: { beta: number; ecart_choisie: number; ecart_rejetee: number }[];
+}
+
+/**
+ * Les sections du fichier des notes, refaites à partir de ses seules entrées : pour chaque texte de référence, ses
+ * mots, sa langue, le verdict de chacune des huit consignes et de la longueur, et sa note sans la justesse. La
+ * grille de la perte DPO n'est pas refaite ici (dpo.test.ts la compare à 10⁻¹² près) : ses points sont rendus
+ * sans leur perte ni leur dérivée, que CLES_NON_REFAITES retire du fichier.
+ */
+export function refaireNotes(entrees: EntreesNotes): Attendus {
+  return {
+    consignes: entrees.consignes,
+    textes: entrees.textes.map(({ nom, texte, terminee, invite }) => {
+      const n = mots(texte).length;
+      return {
+        nom,
+        texte,
+        terminee,
+        invite,
+        mots: n,
+        langue: langue(texte),
+        verdicts: Object.fromEntries(entrees.consignes.map(({ id, kwargs }) => [id, VERIFICATEURS_CONTRAINTES[id](texte, kwargs)])),
+        longueur: n >= MOTS_MINIMUM && n <= MOTS_MAXIMUM,
+        note: noteSansJustesse(texte, terminee, invite),
+      };
+    }),
+    grille_dpo: entrees.grille_dpo.map(({ beta, ecart_choisie, ecart_rejetee }) => ({ beta, ecart_choisie, ecart_rejetee })),
+  };
+}
+
+/** Les attendus des notes (FICHIERS_PARTIE_1.notes), refaits ici. */
+export function attendusNotes(): Attendus {
+  return refaireNotes(fichierNotes as unknown as EntreesNotes);
+}
+
 /** Chaque calcul de parité de la Partie 1, sous le nom de son fichier dans FICHIERS_PARTIE_1. */
 export const CALCULS_PARTIE_1: Record<string, () => unknown | Promise<unknown>> = {
   ngrammes: attendusNgrammes,
   nettoyeur: attendusNettoyeur,
   conversation: attendusConversation,
+  notes: attendusNotes,
 };

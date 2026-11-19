@@ -1,0 +1,1557 @@
+{
+ "consignes": [
+  {
+   "id": "mots_max",
+   "kwargs": {
+    "n": 20
+   },
+   "consigne": "Réponds en 20 mots au plus."
+  },
+  {
+   "id": "phrases_max",
+   "kwargs": {
+    "n": 2
+   },
+   "consigne": "Réponds en 2 phrases au plus."
+  },
+  {
+   "id": "minuscules",
+   "kwargs": {},
+   "consigne": "Écris toute ta réponse en minuscules."
+  },
+  {
+   "id": "sans_virgule",
+   "kwargs": {},
+   "consigne": "N'utilise aucune virgule."
+  },
+  {
+   "id": "mot_obligatoire",
+   "kwargs": {
+    "mot": "paris"
+   },
+   "consigne": "Emploie le mot « paris » dans ta réponse."
+  },
+  {
+   "id": "puces",
+   "kwargs": {
+    "n": 3
+   },
+   "consigne": "Réponds par exactement 3 puces, chacune commençant par « - »."
+  },
+  {
+   "id": "fin_imposee",
+   "kwargs": {
+    "phrase": "C'est tout pour aujourd'hui."
+   },
+   "consigne": "Termine ta réponse par la phrase exacte : « C'est tout pour aujourd'hui. »"
+  },
+  {
+   "id": "titre",
+   "kwargs": {},
+   "consigne": "Donne d'abord un titre entre doubles chevrons, comme « titre »."
+  }
+ ],
+ "textes": [
+  {
+   "nom": "vide",
+   "texte": "",
+   "terminee": true,
+   "invite": [],
+   "mots": 0,
+   "langue": "indetermine",
+   "verdicts": {
+    "mots_max": false,
+    "phrases_max": false,
+    "minuscules": false,
+    "sans_virgule": false,
+    "mot_obligatoire": false,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": false,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 0
+   }
+  },
+  {
+   "nom": "blancs",
+   "texte": "   \n\t  ",
+   "terminee": true,
+   "invite": [
+    [
+     "phrases_max",
+     {
+      "n": 2
+     }
+    ],
+    [
+     "mot_obligatoire",
+     {
+      "mot": "paris"
+     }
+    ]
+   ],
+   "mots": 0,
+   "langue": "indetermine",
+   "verdicts": {
+    "mots_max": false,
+    "phrases_max": false,
+    "minuscules": false,
+    "sans_virgule": false,
+    "mot_obligatoire": false,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": false,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 0
+   }
+  },
+  {
+   "nom": "chiffres-seuls",
+   "texte": "2026 12 31 1234567890",
+   "terminee": true,
+   "invite": [
+    [
+     "minuscules",
+     {}
+    ],
+    [
+     "titre",
+     {}
+    ]
+   ],
+   "mots": 0,
+   "langue": "indetermine",
+   "verdicts": {
+    "mots_max": false,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": false,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": false,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 0
+   }
+  },
+  {
+   "nom": "francais",
+   "texte": "La capitale de la France est Paris.",
+   "terminee": false,
+   "invite": [
+    [
+     "sans_virgule",
+     {}
+    ]
+   ],
+   "mots": 7,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 0,
+    "consignes": 1,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "francais-virgules",
+   "texte": "Paris, la capitale, est très belle.",
+   "terminee": true,
+   "invite": [
+    [
+     "mot_obligatoire",
+     {
+      "mot": "paris"
+     }
+    ],
+    [
+     "puces",
+     {
+      "n": 3
+     }
+    ]
+   ],
+   "mots": 6,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": false,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 1,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "anglais",
+   "texte": "The capital of France is Paris and it is beautiful.",
+   "terminee": true,
+   "invite": [],
+   "mots": 10,
+   "langue": "autre",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 0,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "francais-avec-un-mot-anglais",
+   "texte": "Le mot the est anglais, mais la phrase est en français, et elle est longue.",
+   "terminee": true,
+   "invite": [
+    [
+     "fin_imposee",
+     {
+      "phrase": "C'est tout pour aujourd'hui."
+     }
+    ]
+   ],
+   "mots": 15,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": false,
+    "mot_obligatoire": false,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "trop-court-pour-la-langue",
+   "texte": "Oui, Paris.",
+   "terminee": false,
+   "invite": [
+    [
+     "titre",
+     {}
+    ],
+    [
+     "fin_imposee",
+     {
+      "phrase": "C'est tout pour aujourd'hui."
+     }
+    ]
+   ],
+   "mots": 2,
+   "langue": "indetermine",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": false,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": false,
+   "note": {
+    "terminee": 0,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 0
+   }
+  },
+  {
+   "nom": "minuscules",
+   "texte": "paris est la capitale de la france.",
+   "terminee": true,
+   "invite": [
+    [
+     "mots_max",
+     {
+      "n": 20
+     }
+    ],
+    [
+     "phrases_max",
+     {
+      "n": 2
+     }
+    ]
+   ],
+   "mots": 7,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": true,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 2,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "puces",
+   "texte": "- Paris\n- Lyon\n- Marseille",
+   "terminee": true,
+   "invite": [
+    [
+     "phrases_max",
+     {
+      "n": 2
+     }
+    ]
+   ],
+   "mots": 3,
+   "langue": "indetermine",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": true,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 1,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "puces-dont-une-vide",
+   "texte": "- Paris\n- \n- Lyon",
+   "terminee": true,
+   "invite": [],
+   "mots": 2,
+   "langue": "indetermine",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": false,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 0
+   }
+  },
+  {
+   "nom": "puces-fins-de-ligne-windows",
+   "texte": "- Paris\r\n- Lyon\r\n- Marseille",
+   "terminee": false,
+   "invite": [
+    [
+     "sans_virgule",
+     {}
+    ],
+    [
+     "minuscules",
+     {}
+    ]
+   ],
+   "mots": 3,
+   "langue": "indetermine",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": true,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 0,
+    "consignes": 1,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "titre-chevrons",
+   "texte": "« La capitale »\nParis est la capitale de la France.",
+   "terminee": true,
+   "invite": [
+    [
+     "mot_obligatoire",
+     {
+      "mot": "paris"
+     }
+    ]
+   ],
+   "mots": 9,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": true
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 1,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "titre-chevrons-ascii",
+   "texte": "<<Capitale>>\nParis est la capitale.",
+   "terminee": true,
+   "invite": [
+    [
+     "puces",
+     {
+      "n": 3
+     }
+    ],
+    [
+     "mots_max",
+     {
+      "n": 20
+     }
+    ]
+   ],
+   "mots": 5,
+   "langue": "indetermine",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": true
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 1,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "titre-vide",
+   "texte": "«  »\nParis.",
+   "terminee": true,
+   "invite": [
+    [
+     "fin_imposee",
+     {
+      "phrase": "C'est tout pour aujourd'hui."
+     }
+    ],
+    [
+     "sans_virgule",
+     {}
+    ]
+   ],
+   "mots": 1,
+   "langue": "indetermine",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": false,
+   "note": {
+    "terminee": 1,
+    "consignes": 1,
+    "francais": 1,
+    "longueur": 0
+   }
+  },
+  {
+   "nom": "fin-imposee",
+   "texte": "Paris est belle.\nC'est tout pour aujourd'hui.",
+   "terminee": false,
+   "invite": [],
+   "mots": 9,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": true,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 0,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "fin-imposee-espace-insecable",
+   "texte": "Paris est belle.\nC'est tout pour aujourd'hui. ",
+   "terminee": true,
+   "invite": [
+    [
+     "mots_max",
+     {
+      "n": 20
+     }
+    ],
+    [
+     "phrases_max",
+     {
+      "n": 2
+     }
+    ]
+   ],
+   "mots": 9,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": true,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 2,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "fin-imposee-espace-fine",
+   "texte": "Paris est belle.\nC'est tout pour aujourd'hui. ",
+   "terminee": true,
+   "invite": [
+    [
+     "phrases_max",
+     {
+      "n": 2
+     }
+    ],
+    [
+     "mot_obligatoire",
+     {
+      "mot": "paris"
+     }
+    ]
+   ],
+   "mots": 9,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": true,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 2,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "fin-imposee-next-line",
+   "texte": "Paris est belle.\nC'est tout pour aujourd'hui.",
+   "terminee": true,
+   "invite": [
+    [
+     "minuscules",
+     {}
+    ]
+   ],
+   "mots": 9,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": true,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "fin-imposee-separateur-de-fichier",
+   "texte": "Paris est belle.\nC'est tout pour aujourd'hui.\u001c",
+   "terminee": false,
+   "invite": [
+    [
+     "sans_virgule",
+     {}
+    ],
+    [
+     "minuscules",
+     {}
+    ]
+   ],
+   "mots": 9,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": true,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 0,
+    "consignes": 1,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "fin-imposee-bom",
+   "texte": "Paris est belle.\nC'est tout pour aujourd'hui.﻿",
+   "terminee": true,
+   "invite": [],
+   "mots": 9,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "fin-imposee-mongol",
+   "texte": "Paris est belle.\nC'est tout pour aujourd'hui.᠎",
+   "terminee": true,
+   "invite": [
+    [
+     "puces",
+     {
+      "n": 3
+     }
+    ]
+   ],
+   "mots": 9,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "fin-imposee-apostrophe-courbe",
+   "texte": "Paris est belle.\nC’est tout pour aujourd’hui.",
+   "terminee": true,
+   "invite": [
+    [
+     "fin_imposee",
+     {
+      "phrase": "C'est tout pour aujourd'hui."
+     }
+    ],
+    [
+     "sans_virgule",
+     {}
+    ]
+   ],
+   "mots": 9,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 1,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "accent-combinant",
+   "texte": "Café est un mot du français, et il a un accent combinant : Paris.",
+   "terminee": false,
+   "invite": [
+    [
+     "titre",
+     {}
+    ],
+    [
+     "fin_imposee",
+     {
+      "phrase": "C'est tout pour aujourd'hui."
+     }
+    ]
+   ],
+   "mots": 13,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": false,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 0,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "apostrophes-courbes",
+   "texte": "L’eau d’Évian n’est pas l’eau de Paris.",
+   "terminee": true,
+   "invite": [
+    [
+     "mots_max",
+     {
+      "n": 20
+     }
+    ]
+   ],
+   "mots": 11,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 1,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "emoji",
+   "texte": "Bonjour 😀 Paris 🇫🇷 est la capitale de la France 👍.",
+   "terminee": true,
+   "invite": [],
+   "mots": 8,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "emoji-colle-au-mot",
+   "texte": "Paris😀 est belle, et 😀paris aussi.",
+   "terminee": true,
+   "invite": [
+    [
+     "minuscules",
+     {}
+    ],
+    [
+     "titre",
+     {}
+    ]
+   ],
+   "mots": 6,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": false,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "lettre-hors-du-premier-plan",
+   "texte": "𝒜paris est un mot de la France.",
+   "terminee": false,
+   "invite": [
+    [
+     "sans_virgule",
+     {}
+    ]
+   ],
+   "mots": 7,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": false,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 0,
+    "consignes": 1,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "chiffre-et-tiret-bas-colles",
+   "texte": "paris2 et 2paris et paris_ et _paris.",
+   "terminee": true,
+   "invite": [
+    [
+     "mot_obligatoire",
+     {
+      "mot": "paris"
+     }
+    ],
+    [
+     "puces",
+     {
+      "n": 3
+     }
+    ]
+   ],
+   "mots": 7,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": true,
+    "sans_virgule": true,
+    "mot_obligatoire": false,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "mot-entier-parmi-d-autres",
+   "texte": "Le paris, le Paris, les Parisiens.",
+   "terminee": true,
+   "invite": [
+    [
+     "puces",
+     {
+      "n": 3
+     }
+    ],
+    [
+     "mots_max",
+     {
+      "n": 20
+     }
+    ]
+   ],
+   "mots": 6,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": false,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 1,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "i-turc-pointe",
+   "texte": "İstanbul est une ville de la Turquie, et elle est grande.",
+   "terminee": true,
+   "invite": [],
+   "mots": 11,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": false,
+    "mot_obligatoire": false,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "sigma-final",
+   "texte": "Le mot grec ΟΔΟΣ ou οδός est dans la langue des Grecs.",
+   "terminee": false,
+   "invite": [
+    [
+     "titre",
+     {}
+    ],
+    [
+     "fin_imposee",
+     {
+      "phrase": "C'est tout pour aujourd'hui."
+     }
+    ]
+   ],
+   "mots": 12,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": false,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 0,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "virgule-pleine-largeur",
+   "texte": "Paris， Lyon et Marseille.",
+   "terminee": true,
+   "invite": [
+    [
+     "mots_max",
+     {
+      "n": 20
+     }
+    ],
+    [
+     "phrases_max",
+     {
+      "n": 2
+     }
+    ]
+   ],
+   "mots": 4,
+   "langue": "indetermine",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 2,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "abreviations",
+   "texte": "M. Dupont est arrivé. Il est 10 h. Dr. Martin aussi!",
+   "terminee": true,
+   "invite": [
+    [
+     "phrases_max",
+     {
+      "n": 2
+     }
+    ]
+   ],
+   "mots": 10,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": false,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": false,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "liste-numerotee",
+   "texte": "1. Paris est belle. 2. Lyon aussi.",
+   "terminee": true,
+   "invite": [
+    [
+     "minuscules",
+     {}
+    ],
+    [
+     "titre",
+     {}
+    ]
+   ],
+   "mots": 5,
+   "langue": "indetermine",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "blancs-de-python-seulement",
+   "texte": "Paris est belle.Lyon aussi.\u001cNice enfin.",
+   "terminee": false,
+   "invite": [],
+   "mots": 7,
+   "langue": "indetermine",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": false,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 0,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "deux-mots",
+   "texte": "Oui non",
+   "terminee": true,
+   "invite": [
+    [
+     "mot_obligatoire",
+     {
+      "mot": "paris"
+     }
+    ]
+   ],
+   "mots": 2,
+   "langue": "indetermine",
+   "verdicts": {
+    "mots_max": true,
+    "phrases_max": true,
+    "minuscules": false,
+    "sans_virgule": true,
+    "mot_obligatoire": false,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": false,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 0
+   }
+  },
+  {
+   "nom": "trois-cents-mots",
+   "texte": "mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot",
+   "terminee": true,
+   "invite": [
+    [
+     "puces",
+     {
+      "n": 3
+     }
+    ],
+    [
+     "mots_max",
+     {
+      "n": 20
+     }
+    ]
+   ],
+   "mots": 300,
+   "langue": "indetermine",
+   "verdicts": {
+    "mots_max": false,
+    "phrases_max": true,
+    "minuscules": true,
+    "sans_virgule": true,
+    "mot_obligatoire": false,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": true,
+   "note": {
+    "terminee": 1,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 1
+   }
+  },
+  {
+   "nom": "trois-cent-un-mots",
+   "texte": "mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot",
+   "terminee": true,
+   "invite": [
+    [
+     "fin_imposee",
+     {
+      "phrase": "C'est tout pour aujourd'hui."
+     }
+    ],
+    [
+     "sans_virgule",
+     {}
+    ]
+   ],
+   "mots": 301,
+   "langue": "indetermine",
+   "verdicts": {
+    "mots_max": false,
+    "phrases_max": true,
+    "minuscules": true,
+    "sans_virgule": true,
+    "mot_obligatoire": false,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": false,
+   "note": {
+    "terminee": 1,
+    "consignes": 1,
+    "francais": 1,
+    "longueur": 0
+   }
+  },
+  {
+   "nom": "dix-mille-caracteres",
+   "texte": "Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. Le chat dort dans la maison, et il rêve de Paris. ",
+   "terminee": false,
+   "invite": [
+    [
+     "titre",
+     {}
+    ]
+   ],
+   "mots": 2200,
+   "langue": "fr",
+   "verdicts": {
+    "mots_max": false,
+    "phrases_max": false,
+    "minuscules": false,
+    "sans_virgule": false,
+    "mot_obligatoire": true,
+    "puces": false,
+    "fin_imposee": false,
+    "titre": false
+   },
+   "longueur": false,
+   "note": {
+    "terminee": 0,
+    "consignes": 0,
+    "francais": 1,
+    "longueur": 0
+   }
+  }
+ ],
+ "grille_dpo": [
+  {
+   "beta": 0.05,
+   "ecart_choisie": -3.5,
+   "ecart_rejetee": -6.0,
+   "perte": 0.6325990353171691,
+   "derivee": -0.02343953133131219
+  },
+  {
+   "beta": 0.05,
+   "ecart_choisie": -3.5,
+   "ecart_rejetee": 0.0,
+   "perte": 0.7844704306630469,
+   "derivee": -0.027181934361853944
+  },
+  {
+   "beta": 0.05,
+   "ecart_choisie": -3.5,
+   "ecart_rejetee": 4.5,
+   "perte": 0.9130152523999526,
+   "derivee": -0.0299343830056226
+  },
+  {
+   "beta": 0.05,
+   "ecart_choisie": 0.25,
+   "ecart_rejetee": -6.0,
+   "perte": 0.5490548622706681,
+   "derivee": -0.021125231740709415
+  },
+  {
+   "beta": 0.05,
+   "ecart_choisie": 0.25,
+   "ecart_rejetee": 0.0,
+   "perte": 0.6869167116827901,
+   "derivee": -0.02484375203447342
+  },
+  {
+   "beta": 0.05,
+   "ecart_choisie": 0.25,
+   "ecart_rejetee": 4.5,
+   "perte": 0.8050311234277941,
+   "derivee": -0.0276462994066453
+  },
+  {
+   "beta": 0.05,
+   "ecart_choisie": 8.0,
+   "ecart_rejetee": -6.0,
+   "perte": 0.4031860488854579,
+   "derivee": -0.016590611391591695
+  },
+  {
+   "beta": 0.05,
+   "ecart_choisie": 8.0,
+   "ecart_rejetee": 0.0,
+   "perte": 0.5130152523999526,
+   "derivee": -0.0200656169943774
+  },
+  {
+   "beta": 0.05,
+   "ecart_choisie": 8.0,
+   "ecart_rejetee": 4.5,
+   "perte": 0.6094704306630468,
+   "derivee": -0.02281806563814606
+  },
+  {
+   "beta": 0.1,
+   "ecart_choisie": -3.5,
+   "ecart_rejetee": -6.0,
+   "perte": 0.5759394198788436,
+   "derivee": -0.04378234991142019
+  },
+  {
+   "beta": 0.1,
+   "ecart_choisie": -3.5,
+   "ecart_rejetee": 0.0,
+   "perte": 0.8833821554187771,
+   "derivee": -0.058661757891733016
+  },
+  {
+   "beta": 0.1,
+   "ecart_choisie": -3.5,
+   "ecart_rejetee": 4.5,
+   "perte": 1.1711006659477778,
+   "derivee": -0.06899744811276125
+  },
+  {
+   "beta": 0.1,
+   "ecart_choisie": 0.25,
+   "ecart_rejetee": -6.0,
+   "perte": 0.42870067827651864,
+   "derivee": -0.03486451353339458
+  },
+  {
+   "beta": 0.1,
+   "ecart_choisie": 0.25,
+   "ecart_rejetee": 0.0,
+   "perte": 0.6807253035255248,
+   "derivee": -0.04937503255004896
+  },
+  {
+   "beta": 0.1,
+   "ecart_choisie": 0.25,
+   "ecart_rejetee": 4.5,
+   "perte": 0.9280574001728005,
+   "derivee": -0.06046790847140093
+  },
+  {
+   "beta": 0.1,
+   "ecart_choisie": 8.0,
+   "ecart_rejetee": -6.0,
+   "perte": 0.22041740991845088,
+   "derivee": -0.019781611144141825
+  },
+  {
+   "beta": 0.1,
+   "ecart_choisie": 8.0,
+   "ecart_rejetee": 0.0,
+   "perte": 0.3711006659477777,
+   "derivee": -0.031002551887238758
+  },
+  {
+   "beta": 0.1,
+   "ecart_choisie": 8.0,
+   "ecart_rejetee": 4.5,
+   "perte": 0.5333821554187771,
+   "derivee": -0.041338242108267004
+  },
+  {
+   "beta": 0.5,
+   "ecart_choisie": -3.5,
+   "ecart_rejetee": -6.0,
+   "perte": 0.2519290813453729,
+   "derivee": -0.11135006941265442
+  },
+  {
+   "beta": 0.5,
+   "ecart_choisie": -3.5,
+   "ecart_rejetee": 0.0,
+   "perte": 1.9102241504380872,
+   "derivee": -0.4259764009841553
+  },
+  {
+   "beta": 0.5,
+   "ecart_choisie": -3.5,
+   "ecart_rejetee": 4.5,
+   "perte": 4.0181499279178094,
+   "derivee": -0.4910068950189542
+  },
+  {
+   "beta": 0.5,
+   "ecart_choisie": 0.25,
+   "ecart_rejetee": -6.0,
+   "perte": 0.04299907922908782,
+   "derivee": -0.02104386395780942
+  },
+  {
+   "beta": 0.5,
+   "ecart_choisie": 0.25,
+   "ecart_rejetee": 0.0,
+   "perte": 0.6325990353171691,
+   "derivee": -0.23439531331312188
+  },
+  {
+   "beta": 0.5,
+   "ecart_choisie": 0.25,
+   "ecart_rejetee": 4.5,
+   "perte": 2.2378222787715694,
+   "derivee": -0.44665470302717436
+  },
+  {
+   "beta": 0.5,
+   "ecart_choisie": 8.0,
+   "ecart_rejetee": -6.0,
+   "perte": 0.0009114664537742447,
+   "derivee": -0.0004555255972003227
+  },
+  {
+   "beta": 0.5,
+   "ecart_choisie": 8.0,
+   "ecart_rejetee": 0.0,
+   "perte": 0.018149927917809738,
+   "derivee": -0.008993104981045778
+  },
+  {
+   "beta": 0.5,
+   "ecart_choisie": 8.0,
+   "ecart_rejetee": 4.5,
+   "perte": 0.16022415043808724,
+   "derivee": -0.07402359901584475
+  }
+ ]
+}

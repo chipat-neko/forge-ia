@@ -2,7 +2,7 @@
 // telle quelle, un fichier faux est refusé avec un message qui dit quel relevé refaire, et un fichier qui
 // manque donne null (la page pose alors data-a-mesurer).
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -15,6 +15,7 @@ import {
   lireSeries,
   MESURES_DE_L_ETAPE,
   nomDeVersion,
+  refaire,
   verifierRapportEtape,
 } from './etapes';
 import type { Mesure, RapportEtape } from './etapes';
@@ -68,6 +69,68 @@ describe('FICHIERS_ETAPES', () => {
   it('chaque étape a ses mesures, sans echantillons (rangés à part)', () => {
     expect(Object.keys(MESURES_DE_L_ETAPE)).toEqual(['1.7', '1.8', '1.9', '1.10']);
     for (const mesures of Object.values(MESURES_DE_L_ETAPE)) expect(mesures).not.toContain('echantillons');
+  });
+});
+
+describe('les mesures de chaque étape sont celles de forge', () => {
+  /** Le tableau MESURES_PAR_ETAPE de forge (etape.py) : étape vers noms de mesures, sans les échantillons. */
+  function mesuresDeForge(): Record<string, string[]> {
+    const source = readFileSync('../projets/forge/forge/evaluation/etape.py', 'utf8');
+    const de17 = /_MESURES_DE_1_7 = \(([^)]*)\)/.exec(source);
+    const tableau = /MESURES_PAR_ETAPE: [^=]*= \{([\s\S]*?)\n\}/.exec(source);
+    if (de17 === null || tableau === null) throw new Error('MESURES_PAR_ETAPE n’est plus où ce test le cherche (etape.py) : revois-le.');
+    const noms = (liste: string): string[] => [...liste.matchAll(/"([a-z_0-9]+)"/g)].map((m) => m[1]);
+    const resultat: Record<string, string[]> = {};
+    // Chaque étape est « _MESURES_DE_1_7 » seul, ou un tuple qui peut le déplier (« *_MESURES_DE_1_7 »).
+    for (const [, etape, liste] of tableau[1].matchAll(/"([0-9.]+)": (_MESURES_DE_1_7|\([^)]*\))/g)) {
+      const reprend = liste === '_MESURES_DE_1_7' || liste.includes('*_MESURES_DE_1_7');
+      resultat[etape] = [...(reprend ? noms(de17[1]) : []), ...(liste === '_MESURES_DE_1_7' ? [] : noms(liste))].filter((nom) => nom !== 'echantillons');
+    }
+    return resultat;
+  }
+
+  it('1.7, 1.8 et 1.9 : mêmes mesures que forge, dans le même ordre (« victoire » est celle de 1.8)', () => {
+    const forge = mesuresDeForge();
+    for (const etape of ['1.7', '1.8', '1.9'] as const) {
+      expect(forge[etape], `forge n'a pas l'étape ${etape}`).toBeDefined();
+      expect(MESURES_DE_L_ETAPE[etape], etape).toStrictEqual(forge[etape]);
+    }
+    expect(forge['1.8']).toContain('victoire');
+  });
+
+  it('1.10 : dès que forge a l’étape (tâche 21 du plan 7), ses mesures sont celles d’ici', () => {
+    const forge = mesuresDeForge();
+    // Les clés attendues par le plan 7 : humaneval, humaneval_fr et fim_ligne s'ajoutent à celles de 1.9 sans mgsm.
+    expect(MESURES_DE_L_ETAPE['1.10']).toStrictEqual(['ifeval_fr', 'tenue', 'oubli', 'problemes', 'humaneval', 'humaneval_fr', 'fim_ligne']);
+    if (forge['1.10'] !== undefined) expect(MESURES_DE_L_ETAPE['1.10']).toStrictEqual(forge['1.10']);
+  });
+});
+
+describe('refaire : la commande du projet qui écrit le relevé', () => {
+  it('cite le paquet de 1.8 pour un fichier de 1.8, et celui de 1.7 pour un fichier de 1.7', () => {
+    expect(refaire(FICHIERS_ETAPES['1.8@1.8'])).toBe(
+      'Relance le relevé, depuis projets/1.8-alignement, avec « uv run --extra cpu python -m alignement_pas_a_pas resumer --rapport <rapport.json> --json mesures/etape-ton-ia-1.8.json », ou corrige le fichier.',
+    );
+    expect(refaire(FICHIERS_ETAPES['1.8-court@1.8'])).toContain('--json mesures/etape-ton-ia-1.8-court.json');
+    expect(refaire(FICHIERS_ETAPES['1.7@1.7'])).toContain('python -m conversation_pas_a_pas resumer');
+    expect(refaire(FICHIERS_ETAPES['1.5@1.7'])).toContain('resumer --rapport <rapport.json> --reference --json mesures/etape-ton-ia-1.5.json');
+    expect(refaire(FICHIERS_ETAPES['1.8@1.8'])).not.toContain('conversation_pas_a_pas');
+  });
+
+  it('dit « courbes », « paires » ou « balayage » pour les autres relevés de 1.8', () => {
+    expect(refaire('projets/1.8-alignement/mesures/entrainement-dpo-1.8.json')).toContain('alignement_pas_a_pas courbes --journal <journal.jsonl> --json mesures/entrainement-dpo-1.8.json');
+    expect(refaire('projets/1.8-alignement/mesures/paires-exemples.json')).toContain('alignement_pas_a_pas paires --jeu');
+    expect(refaire('projets/1.8-alignement/mesures/balayage-1.8.json')).toContain('alignement_pas_a_pas balayage');
+  });
+
+  it('garde le message général pour un projet qui n’a pas encore son paquet', () => {
+    expect(refaire(FICHIERS_ETAPES['1.9@1.9'])).toContain('python -m <paquet du projet> resumer');
+    expect(refaire('projets/essai.json')).toContain('python -m <paquet du projet> resumer');
+  });
+
+  it('est le message d’une erreur de lecture, avec la commande du bon projet', () => {
+    const faux = { version: ' ', etape: '1.8', releve_le: '2026-12-01', mesures: {}, echantillons: [] };
+    expect(() => verifierRapportEtape(faux, FICHIERS_ETAPES['1.8@1.8'])).toThrow(/version est vide.*alignement_pas_a_pas resumer/s);
   });
 });
 

@@ -90,9 +90,35 @@ export function estAbsente(mesure: Mesure): mesure is MesureAbsente {
   return typeof (mesure as MesureAbsente).absente === 'string';
 }
 
-const REFAIRE =
-  'Relance le relevé avec « python -m <paquet du projet> resumer --rapport <rapport.json> --json <ce fichier> » ' +
-  '(voir le README du projet du chapitre), ou corrige le fichier.';
+// Le paquet Python de chaque projet qui sait refaire ses relevés (`python -m <paquet> resumer`, etc.). Les projets
+// 1.9 et 1.10 n'y sont pas encore : leur message reste général jusqu'à leur tâche.
+const PAQUETS_DES_PROJETS: Readonly<Record<string, string>> = Object.freeze({
+  '1.7-conversation': 'conversation_pas_a_pas',
+  '1.8-alignement': 'alignement_pas_a_pas',
+});
+
+/**
+ * Ce qu'il faut relancer pour refaire le relevé `fichier` (un chemin depuis la racine du dépôt) : la commande du
+ * projet qui l'écrit, pas celle d'un autre. Un fichier d'un projet inconnu reçoit le message général.
+ */
+export function refaire(fichier: string): string {
+  const general =
+    'Relance le relevé avec « python -m <paquet du projet> resumer --rapport <rapport.json> --json <ce fichier> » ' +
+    '(voir le README du projet du chapitre), ou corrige le fichier.';
+  const trouve = /^projets\/([^/]+)\/mesures\/([^/]+)$/.exec(fichier);
+  if (trouve === null) return general;
+  const [, dossier, nom] = trouve;
+  const paquet = PAQUETS_DES_PROJETS[dossier];
+  if (paquet === undefined) return general;
+  const commande = (arguments_: string): string =>
+    `Relance le relevé, depuis projets/${dossier}, avec « uv run --extra cpu python -m ${paquet} ${arguments_} --json mesures/${nom} », ou corrige le fichier.`;
+  if (nom.startsWith('entrainement-dpo')) return commande('courbes --journal <journal.jsonl>');
+  if (nom === 'paires-exemples.json') return commande('paires --jeu <dossier du jeu de paires>');
+  if (nom.startsWith('balayage')) return commande('balayage <dossier d’essai> <dossier d’essai>');
+  if (nom === 'etape-ton-ia-1.5.json') return commande('resumer --rapport <rapport.json> --reference');
+  if (nom.startsWith('etape-')) return commande('resumer --rapport <rapport.json>');
+  return general;
+}
 
 function objet(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -125,7 +151,7 @@ function fauteDeNombres(x: unknown, chemin: string): string | null {
  * une erreur qui nomme le fichier et le champ, et dit quel relevé refaire.
  */
 export function verifierRapportEtape(valeur: unknown, fichier: string): RapportEtape {
-  const faute = (quoi: string): Error => new Error(`${fichier}${FINE}: ${quoi}. ${REFAIRE}`);
+  const faute = (quoi: string): Error => new Error(`${fichier}${FINE}: ${quoi}. ${refaire(fichier)}`);
   if (!objet(valeur)) throw faute('ce n’est pas un objet JSON');
   if (!texte(valeur.version) || valeur.version.trim() === '') throw faute('version est vide');
   if (!texte(valeur.etape) || !Object.hasOwn(MESURES_DE_L_ETAPE, valeur.etape)) {
@@ -191,7 +217,7 @@ function lireJson(chemin: string, fichier: string): unknown {
     return JSON.parse(readFileSync(chemin, 'utf8'));
   } catch (erreur) {
     const raison = erreur instanceof Error ? erreur.message : String(erreur);
-    throw new Error(`${fichier}${FINE}: JSON illisible (${raison}). ${REFAIRE}`);
+    throw new Error(`${fichier}${FINE}: JSON illisible (${raison}). ${refaire(fichier)}`);
   }
 }
 
@@ -210,7 +236,7 @@ export function lireRapportEtape(nom: NomRapportEtape, racineDepot: string | URL
   const etapeDuNom = nom.slice(nom.indexOf('@') + 1);
   if (rapport.etape !== etapeDuNom) {
     throw new Error(
-      `${fichier}${FINE}: le rapport est celui de l’étape ${rapport.etape}, mais « ${nom} » attend l’étape ${etapeDuNom}. ${REFAIRE}`,
+      `${fichier}${FINE}: le rapport est celui de l’étape ${rapport.etape}, mais « ${nom} » attend l’étape ${etapeDuNom}. ${refaire(fichier)}`,
     );
   }
   return rapport;
@@ -229,7 +255,7 @@ export function lireSeries(fichier: string, racineDepot: string | URL = '..'): R
   const chemin = join(racine, fichier);
   if (!existsSync(chemin)) return null;
   const valeur = lireJson(chemin, fichier);
-  const faute = (quoi: string): Error => new Error(`${fichier}${FINE}: ${quoi}. ${REFAIRE}`);
+  const faute = (quoi: string): Error => new Error(`${fichier}${FINE}: ${quoi}. ${refaire(fichier)}`);
   if (!objet(valeur)) throw faute('ce n’est pas un objet JSON');
   const series: Record<string, [number, number][]> = {};
   for (const [cle, points] of Object.entries(valeur)) {

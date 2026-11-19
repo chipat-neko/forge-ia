@@ -19,6 +19,8 @@ Pour 1.2, elle refait le nettoyage des textes, avec les blancs de fin de Python,
 
 Pour 1.7, elle refait le format de conversation : les jetons spéciaux de ton IA, l'assemblage de six conversations en jetons avec leur masque de perte (une réponse vide est refusée), et le placement de l'empaquetage BFD pour cinq listes de longueurs et quatre tailles de rangée.
 
+Pour 1.8, elle refait la note d'une réponse : le nombre de mots, la langue, le verdict de chacune des huit consignes et de la longueur, et la note sans la justesse, sur quarante textes de référence (accent combinant, apostrophe courbe, emoji, texte vide, dix mille caractères). La perte DPO passe par exp et log1p : la page ne la refait pas, elle se compare à 10⁻¹² près dans les tests du site.
+
 <ControleParite client:load jeu="partie-1" />
 
 </Etape>

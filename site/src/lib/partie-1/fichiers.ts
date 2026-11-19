@@ -14,6 +14,7 @@ export const FICHIERS_PARTIE_1: Readonly<Record<string, string>> = Object.freeze
   ngrammes: 'projets/1.1-modele-de-langage/tests/attendus.json',
   nettoyeur: 'projets/1.2-donnees/tests/attendus.json',
   conversation: 'projets/1.7-conversation/tests/attendus.json',
+  notes: 'projets/1.8-alignement/tests/attendus.json',
 });
 
 /**
@@ -21,10 +22,12 @@ export const FICHIERS_PARTIE_1: Readonly<Record<string, string>> = Object.freeze
  * Pour chaque fichier, les clés de chaque élément d'une section. Pour 1.1 : les
  * deux perplexités de chaque ordre (section ordres), qui passent par exp et
  * log, dont le dernier chiffre change d'un système à l'autre. Les comparaisons
- * les retirent du fichier (partieRefaite).
+ * les retirent du fichier (partieRefaite). Pour 1.8 : la perte DPO et sa dérivée de chaque point de la grille
+ * (section grille_dpo), qui passent par exp et log1p, comparées à 10⁻¹² près par dpo.test.ts.
  */
 export const CLES_NON_REFAITES: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = Object.freeze({
   ngrammes: Object.freeze({ ordres: Object.freeze(['perplexite_entrainement', 'perplexite_validation']) }),
+  notes: Object.freeze({ grille_dpo: Object.freeze(['perte', 'derivee']) }),
 });
 
 /**
