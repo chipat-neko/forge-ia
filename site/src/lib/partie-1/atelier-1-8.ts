@@ -186,14 +186,20 @@ export function estLaPlusHaute(e: NoteExpliquee): boolean {
 
 // ---------- Le défi : écrire sa propre réponse qui obtient la note la plus haute ----------
 
-/** Un texte sans ses blancs de bord ni ses blancs répétés : une copie reste une copie, à une espace près. */
-function sansBlancs(texte: string): string {
-  return texte.replace(/\s+/g, ' ').trim();
+/**
+ * Un texte réduit à ses lettres et à ses chiffres, en minuscules, séparés d'une espace : une copie reste une copie,
+ * à la casse, à la ponctuation et aux blancs près. Une autre phrase, même proche, n'en est pas une.
+ */
+function reduit(texte: string): string {
+  return texte
+    .toLowerCase()
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ')
+    .trim();
 }
 
-/** La réponse de la paire que le texte recopie, ou null : le défi demande une réponse à soi. */
+/** La réponse de la paire que le texte recopie (casse, ponctuation et blancs mis à part), ou null. */
 export function copieDe(texte: string, reponses: readonly { lettre: string; texte: string }[]): string | null {
-  return reponses.find((r) => sansBlancs(r.texte) === sansBlancs(texte))?.lettre ?? null;
+  return reponses.find((r) => reduit(r.texte) === reduit(texte))?.lettre ?? null;
 }
 
 /** Le défi est réussi quand la note est la plus haute possible, et que la réponse n'est pas une de celles de la paire. */
@@ -201,13 +207,18 @@ export function defiReussi(e: NoteExpliquee, texte: string, reponses: readonly {
   return estLaPlusHaute(e) && copieDe(texte, reponses) === null;
 }
 
-/** Ce que dit le défi : réussi, recopié, ou ce qui manque, par les raisons des critères qui ne sont pas au maximum. */
+/**
+ * Ce que dit le défi : d'abord ce qui manque à la note, par les raisons des critères qui ne sont pas au maximum ;
+ * à la note la plus haute, une copie d'une réponse de la paire est refusée ; sinon, le défi est réussi.
+ */
 export function texteDuDefi(e: NoteExpliquee, texte: string, reponses: readonly { lettre: string; texte: string }[]): string {
+  if (!estLaPlusHaute(e)) {
+    const manque = e.criteres.filter((c) => !c.verdict).map((c) => c.raison);
+    return `Pas encore${FINE}: ${manque.join(`${FINE}; `)}.`;
+  }
   const copie = copieDe(texte, reponses);
   if (copie !== null) return `Pas encore${FINE}: c’est la réponse ${copie} de la paire. Écris la tienne.`;
-  if (defiReussi(e, texte, reponses)) return `Défi réussi${FINE}: ta réponse a la note la plus haute, ${noteEnTexte(e.note)}.`;
-  const manque = e.criteres.filter((c) => !c.verdict).map((c) => c.raison);
-  return `Pas encore${FINE}: ${manque.join(`${FINE}; `)}.`;
+  return `Défi réussi${FINE}: ta réponse a la note la plus haute, ${noteEnTexte(e.note)}.`;
 }
 
 // ---------- La phrase de la perte DPO ----------

@@ -387,10 +387,13 @@ export function faitsDuPariNotes(racineDepot: string | URL = '..'): FaitsDuPariN
 /** Le pari « notes » : la réponse préférée, si forge l'avait coupée, contre l'autre, finie. */
 export function choixOrdreDesCriteres(racineDepot: string | URL = '..'): Choix[] {
   const f = faitsDuPariNotes(racineDepot);
-  const textes = [`La réponse ${f.autre}, finie`, `La réponse ${f.preferee}, coupée`, 'Aucune : elles se valent'];
+  // Dans l'ordre des lettres, puis « Aucune » : la place du juste dépend de la paire, pas du pari.
+  const finie = `La réponse ${f.autre}, finie`;
+  const coupee = `La réponse ${f.preferee}, coupée`;
+  const textes = f.autre < f.preferee ? [finie, coupee] : [coupee, finie];
   const c = comparerNotes(f.finie.note, f.coupee.note);
-  const juste = c > 0 ? 0 : c < 0 ? 1 : 2;
-  return textes.map((texte, i) => ({ texte, juste: i === juste }));
+  const juste = c > 0 ? finie : c < 0 ? coupee : 'Aucune : elles se valent';
+  return [...textes, 'Aucune : elles se valent'].map((texte) => ({ texte, juste: texte === juste }));
 }
 
 /** La question, la précision et l'explication du pari « notes », calculées sur la paire de l'ouverture. */
@@ -401,12 +404,14 @@ export function textesDuPariNotes(racineDepot: string | URL = '..'): { question:
   return {
     question:
       `Reprends la paire de l’ouverture : forge y préfère la réponse ${f.preferee}. Imagine qu’il l’ait coupée à la ` +
-      `limite de jetons, et que la ${f.autre} finisse son tour. Laquelle préfère-t-il alors${FINE}?`,
-    precision: `Sans coupure, la ${f.preferee} a la note ${noteEnTexte(f.notePreferee)}, la ${f.autre} ${noteEnTexte(f.noteAutre)}.`,
+      `limite de jetons, et que la réponse ${f.autre} finisse son tour. Laquelle préfère-t-il alors${FINE}?`,
+    precision:
+      `Telles que forge les a notées à l’ouverture, la réponse ${f.preferee} a ${noteEnTexte(f.notePreferee)}, ` +
+      `la réponse ${f.autre} ${noteEnTexte(f.noteAutre)}.`,
     explication:
       `La réponse ${f.autre}, finie. La fin du tour est le premier critère${FINE}: une réponse coupée perd toujours, même ` +
-      `avec ce qui la faisait gagner. Coupée, la ${f.preferee} a la note ${noteEnTexte(f.coupee.note)}${FINE}; la ` +
-      `${f.autre}, finie, ${noteEnTexte(f.finie.note)}${FINE}: forge compare d’abord 0 et 1, et s’arrête là.`,
+      `avec ce qui la faisait gagner. Coupée, la réponse ${f.preferee} aurait la note ${noteEnTexte(f.coupee.note)}${FINE}; ` +
+      `finie, la réponse ${f.autre} aurait ${noteEnTexte(f.finie.note)}${FINE}: forge compare d’abord 0 et 1, et s’arrête là.`,
   };
 }
 
@@ -746,13 +751,19 @@ export function phraseDeLaLongueur(racineDepot: string | URL = '..'): string | n
   const i17 = mesure(lireRapportEtape('1.7@1.8', racineDepot), 'ifeval_fr');
   const i18 = mesure(lireRapportEtape('1.8@1.8', racineDepot), 'ifeval_fr');
   if (s !== 'plus longues' || i17 === null || i18 === null) return debut;
-  const avant = nombreDe(i17, 'invite_stricte');
-  const apres = nombreDe(i18, 'invite_stricte');
-  const ifeval = `${pourcent(apres, 1)} des invites d’IFEval-FR respectées en entier, contre ${pourcent(avant, 1)}`;
-  return apres > avant + 0.01
+  const n = nombreDe(i18, 'n');
+  exiger(nombreDe(i17, 'n') === n, 'ton IA 1.7 et ton IA 1.8 n’ont pas passé le même nombre d’invites d’IFEval-FR');
+  // Les invites respectées en entier, comptées : la part d'invites, fois leur nombre.
+  const avant = Math.round(nombreDe(i17, 'invite_stricte') * n);
+  const apres = Math.round(nombreDe(i18, 'invite_stricte') * n);
+  const ifeval = `${nombre(apres)} des ${nombre(n)} invites d’IFEval-FR respectées en entier, contre ${nombre(avant)}`;
+  return apres - avant >= SEUIL_IFEVAL_EN_INVITES
     ? `${debut} Et elles respectent plus souvent toutes les consignes d’IFEval-FR${FINE}: ${ifeval}.`
     : `${debut} Elles s’allongent sans respecter plus souvent les consignes d’IFEval-FR${FINE}: ${ifeval}.`;
 }
+
+/** L'écart, en invites d'IFEval-FR respectées en entier, à partir duquel la phrase dit « plus souvent ». */
+export const SEUIL_IFEVAL_EN_INVITES = 3;
 
 /** Une tranche d'un pari : son texte, et la valeur sous laquelle elle s'arrête (non comprise). */
 export interface Tranche {

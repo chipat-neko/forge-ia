@@ -218,7 +218,10 @@
 
   <div class="defi" class:reussi data-defi>
     <h3>Défi</h3>
-    <p>Écris ta propre réponse, pas une copie de celles de la paire, et obtiens la note la plus haute.</p>
+    <p>
+      Écris ta propre réponse, et obtiens la note la plus haute. Recopier une réponse de la paire ne compte pas, même en
+      changeant la casse, la ponctuation ou les espaces.
+    </p>
     <p class="etat" data-test="an-defi">{texteDuDefi(e, texte, COMPARAISON.reponses)}</p>
     <p class="vh" role="status">{annonceDefi}</p>
   </div>

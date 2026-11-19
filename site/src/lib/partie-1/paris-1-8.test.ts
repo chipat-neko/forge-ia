@@ -42,6 +42,7 @@ import {
   QUESTION_D_EXEMPLE,
   REPONSES_D_EXEMPLE,
   sensDeLaChoisie,
+  SEUIL_IFEVAL_EN_INVITES,
   sensDeLaLongueur,
   textesDuPariNotes,
   TOLERANCE_LONGUEUR,
@@ -191,6 +192,25 @@ describe('le pari « notes » : l’ordre des critères, sur la paire de l’ouv
     const t = textesDuPariNotes(depot());
     expect(t.question).toMatch(/forge y préfère la réponse B/);
     expect(t.explication).toMatch(/^La réponse A, finie/);
+    // Deux réponses finies : la précision donne leurs notes telles que forge les a données.
+    expect(t.precision).toBe('Telles que forge les a notées à l’ouverture, la réponse B a (1, 1, 2, 1, 1), la réponse A (1, 1, 1, 1, 1).');
+  });
+
+  it('la précision du pari « notes » est vraie sur une vraie paire, que la rejetée soit coupée ou finie', () => {
+    // La rejetée coupée (paireQuestion) : sa note réelle a 0 pour la fin du tour, et la précision le dit tel quel.
+    const coupee = textesDuPariNotes(depot({ [FICHIERS_1_8.pairesExemples]: [paireQuestion()] }));
+    expect(coupee.precision).toBe('Telles que forge les a notées à l’ouverture, la réponse B a (1, 1, 1, 1, 1), la réponse A (0, 1, 1, 1, 1).');
+    expect(coupee.precision).not.toMatch(/sans coupure/i);
+    // Les deux finies : la rejetée, d'un seul mot, perd sur la longueur.
+    const deuxFinies = {
+      ...paireQuestion(),
+      rejetee: { texte: 'Lyon', terminee: true, note: { ...note(1, 1), longueur: 0 }, jetons: 2, logp_reference: -5.0 },
+      raison: 'longueur',
+    };
+    const finies = textesDuPariNotes(depot({ [FICHIERS_1_8.pairesExemples]: [deuxFinies] }));
+    expect(finies.precision).toBe('Telles que forge les a notées à l’ouverture, la réponse B a (1, 1, 1, 1, 1), la réponse A (1, 1, 1, 1, 0).');
+    expect(finies.explication).toMatch(/^La réponse A, finie/);
+    expect(juste(choixOrdreDesCriteres(depot({ [FICHIERS_1_8.pairesExemples]: [deuxFinies] })))).toStrictEqual(['La réponse A, finie']);
   });
 
   it('avec un paires-exemples.json fabriqué : le pari, l’ouverture et l’atelier parlent de la même paire', () => {
@@ -335,6 +355,14 @@ describe('ce qui a changé (étape 8) : la longueur et la victoire', () => {
     expect(sansMieux).toMatch(/sans respecter plus souvent les consignes d’IFEval-FR/);
     const mieux = phraseDeLaLongueur(avec({ invite: 0.3 }, { motsModele: 80, motsReference: 60, invite: 0.4 }));
     expect(mieux).toMatch(/respectent plus souvent toutes les consignes d’IFEval-FR/);
+    // L'écart se compte en invites, sur les 235 : 94 contre 71 (arrondis de 0,4 et 0,3 × 235).
+    expect(mieux).toMatch(/94 des 235 invites d’IFEval-FR respectées en entier, contre 71/);
+    // Deux invites de plus ne suffisent pas à dire « plus souvent » ; trois, si.
+    expect(SEUIL_IFEVAL_EN_INVITES).toBe(3);
+    const deuxDePlus = phraseDeLaLongueur(avec({ invite: 70 / 235 }, { motsModele: 80, motsReference: 60, invite: 72 / 235 }));
+    expect(deuxDePlus).toMatch(/sans respecter plus souvent/);
+    const troisDePlus = phraseDeLaLongueur(avec({ invite: 70 / 235 }, { motsModele: 80, motsReference: 60, invite: 73 / 235 }));
+    expect(troisDePlus).toMatch(/respectent plus souvent/);
     // Les consignes d'IFEval-FR et celles des paires sont vérifiées par le même module : rien sur des consignes « pas apprises ».
     expect(`${sansMieux} ${mieux}`).not.toMatch(/apprise/);
     expect(phraseDeLaLongueur(avec({}, { motsModele: 40, motsReference: 60 }))).toMatch(/plus courtes/);

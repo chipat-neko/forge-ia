@@ -165,11 +165,23 @@ describe('le défi : écrire sa propre réponse qui obtient la note la plus haut
     expect(defi('Paris', false).texte).toBe(`Pas encore${FINE}: elle est coupée par la limite de jetons${FINE}; 1 mot, moins de 3.`);
   });
 
-  it('refuse une copie d’une réponse de la paire, même à une espace près', () => {
-    for (const copie of ['Paris est la capitale de la France.', '  Paris est la   capitale de la France.\n']) {
-      expect(estLaPlusHaute(expliquerNote(copie, true, invite))).toBe(true);
-      expect(defi(copie)).toStrictEqual({ reussi: false, texte: `Pas encore${FINE}: c’est la réponse B de la paire. Écris la tienne.` });
+  it('refuse une copie d’une réponse de la paire, à la casse, à la ponctuation et aux blancs près', () => {
+    for (const copie of [
+      'Paris est la capitale de la France.',
+      '  Paris est la   capitale de la France.\n',
+      'Paris est la capitale de la France',
+      'paris est la capitale de la france !',
+      'Paris est la capitale de la France…',
+    ]) {
+      expect(estLaPlusHaute(expliquerNote(copie, true, invite)), copie).toBe(true);
+      expect(defi(copie), copie).toStrictEqual({ reussi: false, texte: `Pas encore${FINE}: c’est la réponse B de la paire. Écris la tienne.` });
     }
+    // Une autre phrase, même proche, est une réponse à soi.
+    expect(defi('Paris est bien la capitale de la France.').reussi).toBe(true);
+  });
+
+  it('à une réponse de la paire qui n’a pas la note la plus haute, le défi dit ce qui lui manque, pas qu’elle est copiée', () => {
+    expect(defi(paire[0].texte)).toStrictEqual({ reussi: false, texte: `Pas encore${FINE}: 1 consigne sur 2.` });
   });
 });
 
