@@ -649,6 +649,45 @@ mesure dont les données manquent rend `{"absente": "<raison>"}` et dit quelle c
 (`forge conversations --source ifeval_fr`, `forge preparer --recette sft-1.7`, `forge encoder`). Sur la
 carte, le lot de génération est le plus grand que la mémoire libre permet.
 
+## Exécuter le code que ton IA écrit
+
+Pour noter le code de ton IA (HumanEval et sa version française, au chapitre 1.10), la forge l'exécute avec
+ses tests. `forge.code.execution.executer` lance un programme Python dans un sous-processus limité et dit
+comment il a fini (`reussi`, `echec`, `delai`, `memoire` ou `erreur_systeme`) ; `executer_tous` en lance
+plusieurs à la fois, autant que de fils de calcul. Toute commande de la forge qui exécute du code généré
+passe par là :
+
+```powershell
+uv run --extra gpu python -c "from forge.code.execution import executer; print(executer('print(1 + 1)', delai=5))"
+```
+
+Ce qui est limité :
+
+- **le délai** (5 s par défaut) : au-delà, le programme est arrêté (`delai`) ;
+- **la mémoire** (512 Mio par défaut) : une allocation de trop lève `MemoryError` (`memoire`) ;
+- **les processus** : sous Windows, un objet Job n'en admet qu'un (le programme ne peut pas en lancer un
+  autre) et tue ce qu'il contient à la fin ; sous Linux, le programme ouvre sa propre session, et tout son
+  groupe de processus est tué à la fin ;
+- **le dossier et la sortie** : le programme tourne dans un dossier jetable sous `TEMP`, effacé ensuite, avec
+  l'interpréteur Python de base en mode isolé (`-I`, la bibliothèque standard seulement) et un environnement
+  réduit ; sa sortie est tronquée à 10 000 caractères.
+
+Ce qui n'est **pas** empêché, car ce n'est pas un vrai bac à sable :
+
+- **le réseau** : le programme peut ouvrir des connexions, télécharger ou envoyer des données ;
+- **l'écriture dans tes dossiers**, hors du dossier jetable : tout ce que ton compte a le droit de modifier
+  ou d'effacer ;
+- **la lecture de tes fichiers** : documents, clés, jetons de connexion, données de la forge ;
+- sous Linux, un processus que le programme lance et qui quitte son groupe (`setsid`) lui survit.
+
+C'est fait pour le code de ton IA aux problèmes de HumanEval, sur ton PC : du code qui peut boucler, prendre
+trop de mémoire ou écrire des mégaoctets, mais qu'on ne soupçonne pas de nuire. Du code venu d'ailleurs, ou
+écrit pour nuire, doit tourner dans une machine virtuelle ou un conteneur sans réseau.
+
+Le score se compte par `forge.code.passk.pass_a_k(n, c, k)` : sur `n` réponses tirées pour un problème, dont `c`
+passent les tests, la chance qu'au moins une de `k` réponses passe, estimée sans biais (article Codex,
+arXiv 2107.03374, section 2.1).
+
 ## Discuter avec une version publiée
 
 `discuter` ouvre une conversation dans le terminal avec une version affinée (ton-ia-1.7 et les suivantes ;

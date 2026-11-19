@@ -1,0 +1,248 @@
+"""Tests de l'exécution du code généré dans un sous-processus limité (`forge.code.execution`).
+
+Chaque test qui lance un sous-processus prend un délai d'au plus 2 s. Ce qui est propre à Windows (l'objet
+Job qui refuse un second processus) est signalé dans le test.
+"""
+
+import ast
+import os
+import sys
+import textwrap
+import time
+from pathlib import Path
+
+import psutil
+import pytest
+
+from forge.code import execution
+from forge.code.execution import ResultatExecution, executer, executer_tous
+
+DELAI = 2.0
+
+
+def test_un_programme_juste_reussit():
+    resultat = executer("print(1+1)", delai=DELAI)
+    assert isinstance(resultat, ResultatExecution)
+    assert resultat.reussi
+    assert resultat.raison == "reussi"
+    assert resultat.sortie == "2\n"
+    assert 0 <= resultat.secondes < DELAI
+
+
+def test_une_assertion_fausse_echoue():
+    resultat = executer("assert False", delai=DELAI)
+    assert not resultat.reussi
+    assert resultat.raison == "echec"
+    assert "AssertionError" in resultat.sortie
+
+
+def test_une_boucle_sans_fin_est_arretee_au_delai():
+    debut = time.monotonic()
+    resultat = executer("while True: pass", delai=1.0)
+    duree = time.monotonic() - debut
+    assert resultat.raison == "delai"
+    assert not resultat.reussi
+    assert duree < 1.0 + 2
+
+
+def test_deux_gigaoctets_sont_refuses_sans_bloquer():
+    """La limite de mémoire refuse l'allocation : `memoire` (ou `echec`), jamais un blocage."""
+    debut = time.monotonic()
+    resultat = executer("donnees = bytearray(2 * 1024**3)\nprint(len(donnees))", delai=DELAI)
+    duree = time.monotonic() - debut
+    assert resultat.raison in ("memoire", "echec")
+    assert not resultat.reussi
+    assert duree < DELAI + 2
+
+
+def test_une_memory_error_donne_la_raison_memoire():
+    resultat = executer("raise MemoryError", delai=DELAI)
+    assert resultat.raison == "memoire"
+    assert not resultat.reussi
+    assert "MemoryError" in resultat.sortie
+
+
+def test_la_sortie_est_tronquee_a_sortie_max_caracteres():
+    resultat = executer("print('x' * 1_000_000)", delai=DELAI)
+    assert resultat.reussi
+    assert len(resultat.sortie) == 10_000
+    assert resultat.sortie == "x" * 10_000
+    # Des caractères de plusieurs octets : la limite compte des caractères, pas des octets.
+    court = executer("print('\u00e9' * 1_000)", delai=DELAI, sortie_max=100)
+    assert court.sortie == "\u00e9" * 100
+
+
+def test_la_sortie_reunit_sorties_et_erreurs_en_utf8():
+    programme = "import sys\nprint('\u00e9t\u00e9 \u2192 1\u202f000')\nprint('erreur', file=sys.stderr)"
+    resultat = executer(programme, delai=DELAI)
+    assert resultat.reussi
+    assert "\u00e9t\u00e9 \u2192 1\u202f000\n" in resultat.sortie
+    assert "erreur\n" in resultat.sortie
+
+
+def test_le_dossier_jetable_est_le_dossier_courant_et_disparait_apres_l_appel():
+    programme = textwrap.dedent(
+        """
+        import os, stat, tempfile
+        # realpath : un même chemin écrit pareil (liens symboliques, noms courts « RUNNER~1 » sous Windows).
+        print(os.path.realpath(os.getcwd()))
+        print(os.path.realpath(tempfile.gettempdir()))
+        os.mkdir("sous-dossier")
+        fichier = os.path.join("sous-dossier", "lecture-seule.txt")
+        with open(fichier, "w") as f:
+            f.write("ce fichier en lecture seule doit partir aussi")
+        os.chmod(fichier, stat.S_IREAD)
+        """
+    )
+    resultat = executer(programme, delai=DELAI)
+    assert resultat.reussi, resultat.sortie
+    dossier, temporaire = resultat.sortie.splitlines()
+    assert Path(dossier).name.startswith("forge-code-")
+    assert os.path.normcase(dossier) == os.path.normcase(temporaire)
+    assert not Path(dossier).exists()
+
+
+def test_le_dossier_jetable_disparait_aussi_apres_un_delai():
+    resultat = executer("import os\nprint(os.getcwd(), flush=True)\nwhile True: pass", delai=1.0)
+    assert resultat.raison == "delai"
+    assert not Path(resultat.sortie.strip()).exists()
+
+
+def test_l_environnement_du_programme_est_reduit(monkeypatch):
+    monkeypatch.setenv("FORGE_SECRET_DE_TEST", "ne doit pas passer")
+    resultat = executer("import os\nprint(sorted(os.environ))", delai=DELAI)
+    assert resultat.reussi, resultat.sortie
+    noms = {nom.upper() for nom in ast.literal_eval(resultat.sortie)}
+    assert "FORGE_SECRET_DE_TEST" not in noms
+    assert {"PATH", "TEMP", "TMP", "PYTHONIOENCODING"} <= noms
+
+
+# Le programme relève son PID, puis celui de l'enfant qu'il lance (ou le refus), dans un fichier de son
+# dossier jetable. L'enfant porte une marque (`forge-test-enfant`), visible dans sa ligne de commande.
+PROGRAMME_ENFANT = textwrap.dedent(
+    """
+    import os, subprocess, sys
+    with open("pids.txt", "w", encoding="utf-8") as releve:
+        releve.write(f"parent {{os.getpid()}}\\n")
+    try:
+        enfant = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)  # forge-test-enfant"])
+    except OSError as erreur:
+        with open("pids.txt", "a", encoding="utf-8") as releve:
+            releve.write(f"refus {{erreur!r}}\\n")
+        raise
+    with open("pids.txt", "a", encoding="utf-8") as releve:
+        releve.write(f"enfant {{enfant.pid}}\\n")
+    if {attendre}:
+        enfant.wait()
+    """
+)
+
+
+def _processus_du_test(pid: int, marques: tuple[str, ...]) -> psutil.Process | None:
+    """Le processus `pid` s'il vit encore et vient de ce test (une marque dans sa ligne de commande), sinon None.
+
+    La marque écarte un autre programme qui aurait reçu le même numéro : seul un processus de ce test est
+    compté, et tué au nettoyage. Un zombie (fini, pas encore ramassé par son parent) ne vit plus.
+    """
+    try:
+        processus = psutil.Process(pid)
+        if processus.status() == psutil.STATUS_ZOMBIE:
+            return None
+        ligne = " ".join(processus.cmdline())
+    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+        return None
+    return processus if any(marque in ligne for marque in marques) else None
+
+
+@pytest.mark.parametrize("attendre", [True, False], ids=["parent-qui-attend", "parent-qui-part"])
+def test_aucun_processus_ne_du_programme_ne_survit(monkeypatch, attendre):
+    """Point à surveiller 4 : un programme qui lance un enfant qui dort 60 s ne laisse aucun processus.
+
+    Le relevé des PID est lu dans le dossier jetable juste avant son effacement. Sous Linux, SIGKILL agit un
+    instant après son envoi : on laisse 2 s aux processus visés pour disparaître.
+    """
+    releves: list[tuple[str, str]] = []
+    effacer = execution._effacer
+
+    def relever_puis_effacer(dossier):
+        fichier = Path(dossier) / "pids.txt"
+        if fichier.exists():
+            releves.append((Path(dossier).name, fichier.read_text(encoding="utf-8")))
+        effacer(dossier)
+
+    monkeypatch.setattr(execution, "_effacer", relever_puis_effacer)
+    resultat = executer(PROGRAMME_ENFANT.format(attendre=attendre), delai=DELAI)
+
+    assert len(releves) == 1, resultat.sortie
+    nom_du_dossier, releve = releves[0]
+    lignes = releve.splitlines()
+    pids = [int(ligne.split()[1]) for ligne in lignes if ligne.split()[0] in ("parent", "enfant")]
+    assert pids, releve
+    # Le parent porte le dossier jetable dans sa ligne de commande (le chemin du programme), l'enfant sa marque.
+    marques = (nom_du_dossier, "forge-test-enfant")
+    vivants = [p for pid in pids if (p := _processus_du_test(pid, marques)) is not None]
+    _, vivants = psutil.wait_procs(vivants, timeout=2)
+    survivants = [p for p in vivants if _processus_du_test(p.pid, marques) is not None]
+    for processus in survivants:  # nettoyage : seulement les processus nés de ce test
+        processus.kill()
+    assert not survivants, f"processus survivants : {survivants}"
+
+    if sys.platform == "win32":
+        # L'objet Job n'admet qu'un processus : la création de l'enfant échoue, et le programme avec.
+        assert lignes[-1].startswith("refus "), releve
+        assert resultat.raison == "echec"
+    elif attendre:
+        assert resultat.raison == "delai"
+    else:
+        assert resultat.raison == "reussi"
+
+
+def test_un_interpreteur_introuvable_donne_erreur_systeme(monkeypatch):
+    monkeypatch.setattr(execution, "_interpreteur", lambda: str(Path("introuvable") / "python-absent"))
+    resultat = executer("print(1)", delai=DELAI)
+    assert resultat.raison == "erreur_systeme"
+    assert not resultat.reussi
+    assert resultat.sortie
+
+
+def test_des_reglages_impossibles_sont_refuses():
+    with pytest.raises(ValueError, match="delai"):
+        executer("print(1)", delai=0)
+    with pytest.raises(ValueError, match="memoire_mo"):
+        executer("print(1)", memoire_mo=0)
+    with pytest.raises(ValueError, match="sortie_max"):
+        executer("print(1)", sortie_max=-1)
+
+
+def test_executer_tous_garde_l_ordre():
+    programmes = [
+        "import time\ntime.sleep(0.5)\nprint(0)",
+        "print(1)",
+        "assert False",
+        "import time\ntime.sleep(0.2)\nprint(3)",
+    ]
+    resultats = executer_tous(programmes, processus=4, delai=DELAI)
+    assert [r.raison for r in resultats] == ["reussi", "reussi", "echec", "reussi"]
+    assert resultats[0].sortie == "0\n"
+    assert resultats[1].sortie == "1\n"
+    assert resultats[3].sortie == "3\n"
+
+
+def test_executer_tous_prend_par_defaut_les_fils_disponibles(monkeypatch):
+    fils_demandes = []
+    pool = execution.ThreadPoolExecutor
+
+    def pool_espionne(max_workers):
+        fils_demandes.append(max_workers)
+        return pool(max_workers=max_workers)
+
+    monkeypatch.setattr(execution, "fils_disponibles", lambda: 3)
+    monkeypatch.setattr(execution, "ThreadPoolExecutor", pool_espionne)
+    resultats = executer_tous(["print('a')", "print('b')"], delai=DELAI, sortie_max=1)
+    assert fils_demandes == [3]
+    assert [r.sortie for r in resultats] == ["a", "b"]
+
+
+def test_executer_tous_refuse_zero_processus():
+    with pytest.raises(ValueError, match="processus"):
+        executer_tous(["print(1)"], processus=0)
