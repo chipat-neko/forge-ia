@@ -43,7 +43,7 @@ export type EtapeDeRapport = '1.7' | '1.8' | '1.9' | '1.10';
 
 /**
  * Les mesures de chaque étape : les clés de MESURES_PAR_ETAPE (projets/forge/forge/evaluation/etape.py) sans
- * `echantillons`, que le rapport range à part. Celles de 1.8 et de 1.10 sont celles que le plan 7 y ajoute.
+ * `echantillons`, que le rapport range à part. Celles de 1.10 sont celles que le plan 7 y ajoutera (tâche 21).
  */
 export const MESURES_DE_L_ETAPE: Readonly<Record<EtapeDeRapport, readonly string[]>> = Object.freeze({
   '1.7': ['perte_conversation', 'ifeval_fr', 'tenue', 'oubli'],

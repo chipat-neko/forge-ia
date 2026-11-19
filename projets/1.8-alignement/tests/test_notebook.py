@@ -82,7 +82,8 @@ def test_notebook_s_execute_de_bout_en_bout_avec_la_correction():
     assert "(DPO + SFT)" in sorties and "True (DPO + SFT)" in sorties
     # 4. Ce que la DPO pousse, sur une paire fabriquée : le carnet le dit.
     assert "Aucune vraie paire n’est encore publiée : ce carnet travaille sur une paire fabriquée." in sorties
-    assert "DPO seule (β 0,1, 40 pas" in sorties and "DPO et terme SFT (β 0,1, 40 pas" in sorties
+    assert "DPO seule (β 0,10, 40 pas" in sorties and "DPO et terme SFT (β 0,10, 40 pas" in sorties
+    assert len(re.findall(r"La marge a grandi : (oui|non)\. La perte a baissé : (oui|non)\. La log-probabilité de la choisie a (monté|baissé)\.", sorties)) == 2
     assert sorties.count("La choisie a ") == 2 and sorties.count("la rejetée a ") == 2
     # La page du site retrouve les mêmes résultats.
     assert "40 textes et 27 points de la grille comparés." in sorties
@@ -133,3 +134,13 @@ def test_notebook_n_importe_pas_le_projet_de_la_cinq():
 
 def test_les_fichiers_que_le_notebook_lit_existent():
     assert (PROJET / "tests" / "attendus.json").exists()
+
+
+def test_les_commentaires_du_notebook_n_ecrivent_pas_d_echappement():
+    # Un commentaire est lu tel quel par l'élève : un échappement de l'espace fine s'y afficherait tel quel.
+    brut = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+    for c in brut["cells"]:
+        if c["cell_type"] == "code":
+            for ligne in "".join(c["source"]).split(chr(10)):
+                if "#" in ligne:
+                    assert "\\u202f" not in ligne.split("#", 1)[1], ligne

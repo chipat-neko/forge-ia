@@ -39,7 +39,8 @@ def moins_log_sigmoide(z: float) -> float:
 def perte_dpo_a_la_main(pc: float, pr: float, qc: float, qr: float, beta: float) -> float:
     """La perte DPO d'une paire : −ln σ(β ((pc − qc) − (pr − qr))).
 
-    Sans le terme SFT (voir `terme_sft_a_la_main`). β dit la force de la préférence : plus il est grand, plus
+    Sans le terme SFT (voir `terme_sft_a_la_main`), et sous la forme non normalisée (`normaliser_longueur` à `false`
+    dans forge : les gains ne sont pas divisés par le nombre de jetons de chaque réponse). β dit la force de la préférence : plus il est grand, plus
     un petit écart de gain suffit à rendre la perte petite.
     """
     gain_choisie = pc - qc

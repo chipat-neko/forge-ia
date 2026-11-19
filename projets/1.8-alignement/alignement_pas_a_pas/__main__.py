@@ -24,9 +24,8 @@ from pathlib import Path
 try:
     import torch
 
-    # `forge.entrainement` d'abord : `forge.affinage.dpo` en premier fait un import circulaire dans forge.
-    from forge.entrainement.boucle import ReglagesDPO  # isort: skip
     from forge.affinage.dpo import perte_dpo
+    from forge.entrainement.boucle import ReglagesDPO
     from forge.erreurs import DonneesManquantes
     from forge.preferences.invites import InvitePreference
 

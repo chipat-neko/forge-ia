@@ -8,7 +8,8 @@ moteur de « ton IA » :
 - il **note une réponse** par les contrôles programmés de forge (`forge.preferences.noter`), critère par critère, avec
   la raison de chacun : « 3 consignes sur 3 », « en français », « 47 mots ». La note rendue est celle de forge ;
 - il refait **la perte DPO** d'une paire : `z = β ((pc − qc) − (pr − qr))`, `perte = −ln σ(z)`, en nombres Python
-  (float64), égale à `perte_dpo` de forge à 10⁻¹² près, avec le terme SFT à part ;
+  (float64), égale à `perte_dpo` de forge à 10⁻¹² près quand `normaliser_longueur` vaut `false` (la forme non normalisée : forge
+  divise sinon les gains par le nombre de jetons de chaque réponse), avec le terme SFT à part ;
 - il fait **quelques pas de DPO sur une seule paire**, avec un modèle minuscule et le vrai code de forge, pour voir ce
   que la perte pousse : la réponse choisie vers le haut, ou la rejetée vers le bas ;
 - il **résume** ce que le plan 7 construit et mesure sur ton IA 1.8 (le rapport d'étape de `forge evaluer-etape`, les
@@ -42,10 +43,6 @@ dépôt entier, pas seulement ce dossier. Il ne modifie aucun fichier de forge.
   IA »).
 
 Et au projet 1.5 : `pre_entrainement.journal` (`lire`, `serie`) pour les courbes.
-
-**Un piège d'import** : `forge.affinage.dpo` importé en premier fait un import circulaire dans forge (dpo → evaluation →
-entrainement → methodes → dpo). Le projet importe donc `forge.entrainement` d'abord (`from forge.entrainement.boucle
-import ReglagesDPO`), ce que fait aussi le notebook. Défaut signalé au plan 7 ; rien n'est contourné en dupliquant forge.
 
 ## Installer uv
 
@@ -102,9 +99,10 @@ uv run --extra cpu python -m alignement_pas_a_pas courbes --journal <journal.jso
   référence (`train/reference.bin`, que la DPO calcule avant son premier pas) et la source de l'invite avec sa licence
   (Luth-2, CC BY 4.0, ou un problème généré par le code du dépôt, MIT). Les réponses de ton IA sont les siennes ; seules
   les invites de Luth-2 sont citées, avec leur licence, comme le plan 8 l'a prévu : six paires au plus.
-- `balayage` résume les essais du balayage de la DPO. Le dossier d'un essai contient `config.toml` (la configuration
-  avec laquelle il a été lancé), `journal.jsonl` (celui de `forge entrainer`) et `rapport.json` (celui de
-  `forge evaluer-etape --etape 1.8 --reference … --invites …`). Le relevé : les réglages (`taux_max`, `beta`,
+- `balayage` résume les essais du balayage de la DPO. **Convention** : chaque essai est rangé dans un dossier qui
+  contient `journal.jsonl` (la sortie de `forge entrainer`), `config.toml` (la configuration de l'essai, copiée à la
+  main : forge ne la recopie pas) et `rapport.json` (celui de
+  `forge evaluer-etape --etape 1.8 --reference … --invites … --sortie <ce dossier>`). Le relevé : les réglages (`taux_max`, `beta`,
   `normaliser_longueur`, `poids_sft`), la victoire (`taux`, `victoires`, `egalites`, `defaites`, `n`), la longueur
   (mots moyens du modèle et de la référence) et `logps_choisie` au début et à la fin (la moyenne du premier et du dernier
   dixième des pas).

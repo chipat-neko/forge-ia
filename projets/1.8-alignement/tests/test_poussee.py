@@ -6,9 +6,8 @@ import math
 import pytest
 import torch
 
-# `forge.entrainement` d'abord : `forge.affinage.dpo` en premier fait un import circulaire dans forge.
-from forge.entrainement.boucle import ReglagesDPO  # isort: skip
 from forge.affinage.dpo import logps_des_rangees
+from forge.entrainement.boucle import ReglagesDPO
 from forge.tokenizer import TokenizerOctets
 
 from alignement_pas_a_pas.perte_dpo import perte_dpo_a_la_main, terme_sft_a_la_main

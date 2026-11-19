@@ -344,6 +344,13 @@ def test_balayage_dit_quoi_refaire(tmp_path):
     (essai / "config.toml").write_text('methode = "dpo"\n', encoding="utf-8")
     with pytest.raises(ValueError, match="taux_max"):
         balayage([essai])
+    (essai / "config.toml").write_text('methode = "dpo"\ntaux_max = 1e-6\n[dpo]\nbeat = 0.1\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="réglage que forge ne connaît pas"):
+        balayage([essai])
+    sans_journal = un_essai(tmp_path / "d", 1e-6, 0.1, -1.0, -1.1)
+    (sans_journal / "journal.jsonl").unlink()
+    with pytest.raises(FileNotFoundError, match="journal.jsonl n'existe pas"):
+        balayage([sans_journal])
     sans_dpo = un_essai(tmp_path / "b", 1e-6, 0.1, -1.0, -1.1)
     (sans_dpo / "journal.jsonl").write_text(json.dumps({"pas": 1, "perte": 0.5}) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="ce n'est pas celui d'une DPO"):

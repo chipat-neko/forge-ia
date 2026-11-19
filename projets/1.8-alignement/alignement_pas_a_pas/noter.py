@@ -30,7 +30,7 @@ def _nombre_lu(valeur) -> str:
     """Un nombre lu dans un texte (un entier ou une fraction), écrit à la française."""
     if valeur.denominator == 1:
         return str(valeur.numerator)
-    return str(float(valeur)).replace(".", ",")
+    return str(round(float(valeur), 4)).replace(".", ",")  # « 0,3333 » : la valeur arrondie, pas ses seize chiffres
 
 
 def _critere(nom: str, valeur: int, maximum: int, raison: str) -> dict:
@@ -106,7 +106,7 @@ def expliquer_note(reponse_texte: str, terminee: bool, invite: InvitePreference)
         {
             "fr": "en français",
             "autre": "dans une autre langue que le français",
-            "indetermine": "trop court pour être jugé : il passe",
+            "indetermine": "moins de 3 mots outils : la langue ne se juge pas, il passe",
         }[la_langue],
     )
 

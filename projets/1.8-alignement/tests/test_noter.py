@@ -1,6 +1,7 @@
 """La note expliquée est celle de forge, et chaque critère dit pourquoi, en français."""
 
 import random
+from fractions import Fraction
 
 import pytest
 from forge.conversation.format import Reponse
@@ -9,7 +10,7 @@ from forge.preferences.invites import InvitePreference
 from forge.preferences.noter import Note, noter, raison_de_la_paire
 
 from alignement_pas_a_pas.attendus import CONSIGNES, TEXTES
-from alignement_pas_a_pas.noter import CRITERES, expliquer_note, note_de
+from alignement_pas_a_pas.noter import CRITERES, _nombre_lu, expliquer_note, note_de
 
 QUESTION = InvitePreference("q", (), (("mots_max", {"n": 20}), ("minuscules", {}), ("sans_virgule", {})), None)
 PROBLEME = InvitePreference("probleme:1", (), (), 84)
@@ -123,10 +124,26 @@ def test_la_langue_et_la_longueur_disent_pourquoi():
     anglais = expliquer_note("The capital of France is Paris and it is beautiful.", True, SANS_CONSIGNE)
     assert anglais["note"]["francais"] == 0 and anglais["criteres"][3]["raison"] == "dans une autre langue que le français"
     court = expliquer_note("Oui.", True, SANS_CONSIGNE)
-    assert court["note"]["francais"] == 1 and court["criteres"][3]["raison"] == "trop court pour être jugé : il passe"
+    assert court["note"]["francais"] == 1 and court["criteres"][3]["raison"] == "moins de 3 mots outils : la langue ne se juge pas, il passe"
     assert court["criteres"][4]["raison"] == "1 mot, moins de 3" and court["note"]["longueur"] == 0
     assert expliquer_note(" ".join(["mot"] * 301), True, SANS_CONSIGNE)["criteres"][4]["raison"] == "301 mots, plus de 300"
     assert expliquer_note(" ".join(["mot"] * 300), True, SANS_CONSIGNE)["criteres"][4]["raison"] == "300 mots"
+
+
+def test_un_long_texte_sans_mots_outils_ne_dit_pas_qu_il_est_court():
+    long_sans_outils = " ".join(f"mot{chr(97 + i % 26)}" for i in range(200)).replace("mot", "zorb")  # 200 mots, aucun mot outil
+    explication = expliquer_note(long_sans_outils, True, SANS_CONSIGNE)
+    assert explication["langue"] == "indetermine" and explication["mots"] == 200
+    raison = explication["criteres"][3]["raison"]
+    assert raison == "moins de 3 mots outils : la langue ne se juge pas, il passe" and "court" not in raison
+    assert explication["criteres"][4]["raison"] == "200 mots"
+    chiffres = expliquer_note(" ".join(["2026"] * 50), True, SANS_CONSIGNE)["criteres"][3]
+    assert chiffres["valeur"] == 1 and "court" not in chiffres["raison"]
+
+
+def test_une_fraction_s_ecrit_arrondie():
+    assert _nombre_lu(Fraction(1, 3)) == "0,3333"
+    assert _nombre_lu(Fraction(5, 2)) == "2,5" and _nombre_lu(Fraction(12, 1)) == "12"
 
 
 def test_deux_notes_se_comparent_dans_l_ordre_des_criteres():

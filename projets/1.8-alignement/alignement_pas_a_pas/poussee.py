@@ -15,12 +15,10 @@ from pathlib import Path
 import forge
 import torch
 
-# `forge.entrainement` d'abord : importer `forge.affinage.dpo` en premier fait un import circulaire dans forge
-# (dpo -> evaluation -> entrainement -> methodes -> dpo), signalé au plan 7.
-from forge.entrainement.boucle import ReglagesDPO  # isort: skip
 from forge.affinage.dpo import logps_des_rangees, perte_dpo
 from forge.affinage.jeu import IGNORE, LotAffinage
 from forge.conversation.format import Tour, invite_de_reponse
+from forge.entrainement.boucle import ReglagesDPO
 from forge.modele import ConfigModele, Transformer
 from forge.tokenizer import TokenizerOctets
 

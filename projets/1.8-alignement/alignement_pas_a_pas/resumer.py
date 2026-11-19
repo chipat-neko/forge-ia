@@ -176,7 +176,10 @@ def _reglages_de_l_essai(config: Path) -> dict:
         raise ValueError(f"{config} n'est pas un fichier TOML lisible ({erreur}).") from erreur
     if "taux_max" not in valeurs:
         raise ValueError(f"{config} n'a pas de `taux_max` : ce n'est pas la configuration d'un entraînement de forge.")
-    dpo = ReglagesDPO(**valeurs.get("dpo", {}))
+    try:
+        dpo = ReglagesDPO(**valeurs.get("dpo", {}))
+    except TypeError as erreur:
+        raise ValueError(f"La table [dpo] de {config} a un réglage que forge ne connaît pas ({erreur}).") from erreur
     return {
         "taux_max": valeurs["taux_max"],
         "beta": dpo.beta,
@@ -188,9 +191,10 @@ def _reglages_de_l_essai(config: Path) -> dict:
 def balayage(dossiers: list[Path]) -> list[dict]:
     """Un relevé par essai du balayage de la DPO, dans l'ordre des `dossiers`.
 
-    Chaque dossier d'essai contient trois fichiers : `config.toml` (la configuration avec laquelle l'essai a été
-    lancé), `journal.jsonl` (celui de `forge entrainer`) et `rapport.json` (celui de `forge evaluer-etape --etape 1.8
-    --reference … --invites …` sur les invites de validation des paires). Rien n'y est modifié.
+    Convention : chaque essai est rangé dans un dossier qui contient `journal.jsonl` (la sortie de `forge entrainer`),
+    `config.toml` (la configuration de l'essai, copiée à la main : forge ne la recopie pas) et `rapport.json` (celui de
+    `forge evaluer-etape --etape 1.8 --reference … --invites … --sortie <ce dossier>`, sur les invites de validation
+    des paires). Rien n'y est modifié.
 
     Le relevé : `essai` (le nom du dossier), `reglages` (`taux_max`, `beta`, `normaliser_longueur`, `poids_sft`),
     `victoire` (`taux`, `victoires`, `egalites`, `defaites`, `n`, ou `{"absente": raison}`), `longueur` (`mots_modele`
@@ -211,9 +215,12 @@ def balayage(dossiers: list[Path]) -> list[dict]:
         else:
             victoire = {cle: mesure[cle] for cle in ("taux", "victoires", "egalites", "defaites", "n")}
             longueur = {"mots_modele": mesure["mots_modele"], "mots_reference": mesure["mots_reference"]}
+        lignes = lire(dossier / "journal.jsonl")
+        if not lignes:
+            raise FileNotFoundError(f"Le journal {dossier / 'journal.jsonl'} n'existe pas ou est vide. {refaire}")
         valeurs = [
             float(ligne["logps_choisie"])
-            for ligne in lire(dossier / "journal.jsonl")
+            for ligne in lignes
             if "evenement" not in ligne
             and isinstance(ligne.get("logps_choisie"), int | float)
             and math.isfinite(ligne["logps_choisie"])
