@@ -23,7 +23,9 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from forge.affinage.dpo import logps_des_rangees, perte_dpo, preparer_reference, verifier_les_paires
+# Le module, pas ses noms : « import forge.affinage.dpo » en premier passe par forge.evaluation, qui
+# importe forge.entrainement, donc ce fichier, avant que dpo.py ait fini (import circulaire).
+from forge.affinage import dpo
 from forge.affinage.jeu import IGNORE, ChargeurAffinage, LotAffinage, lire_index
 from forge.entrainement.chargeur import ChargeurJetons
 from forge.erreurs import DonneesManquantes
@@ -315,7 +317,7 @@ def _preparer_dpo(config, modele, appareil, noter, *, depart: VersionDeDepart | 
     """
     _verifier_le_jeu(config, "dpo")
     try:
-        preparer_reference(config.dossier_donnees, modele, appareil, depart, config.micro_lot, noter)
+        dpo.preparer_reference(config.dossier_donnees, modele, appareil, depart, config.micro_lot, noter)
     except KeyboardInterrupt:
         raise PreparationInterrompue(
             f"Pause pendant le calcul de la référence{_FINE}: rien n'est sauvegardé, la référence sera "
@@ -336,8 +338,8 @@ def _termes_des_paires(modele: nn.Module, lot: LotAffinage, appareil: torch.devi
             f"Le jeu {dossier} n'a pas de référence (reference.bin) : relance la même commande, la DPO la "
             "calcule avant le premier pas."
         )
-    verifier_les_paires(lot, dossier)
-    logps, appris = logps_des_rangees(modele, lot, appareil)
+    dpo.verifier_les_paires(lot, dossier)
+    logps, appris = dpo.logps_des_rangees(modele, lot, appareil)
     reference = lot.reference.to(appareil)
     return [logps[0::2], logps[1::2], reference[0::2], reference[1::2], appris[0::2], appris[1::2]]
 
@@ -375,11 +377,11 @@ def pas_dpo(
     termes = []
     for lot in lots:
         termes_du_lot = _termes_des_paires(modele, lot, appareil, config.dossier_donnees)
-        perte, _ = perte_dpo(*termes_du_lot, config.dpo)
+        perte, _ = dpo.perte_dpo(*termes_du_lot, config.dpo)
         (perte * (termes_du_lot[0].shape[0] / paires)).backward()
         termes.append([terme.detach() for terme in termes_du_lot])
     norme = torch.nn.utils.clip_grad_norm_(modele.parameters(), config.ecretage)
-    perte, mesures = perte_dpo(*(torch.cat(colonne) for colonne in zip(*termes)), config.dpo)
+    perte, mesures = dpo.perte_dpo(*(torch.cat(colonne) for colonne in zip(*termes)), config.dpo)
     if not torch.isfinite(torch.stack([perte, norme.to(perte.dtype)])).all():
         raise PerteNonFinie(f"perte {perte.item()}, norme des gradients {norme.item()}")
     optimiseur.step()
@@ -411,7 +413,7 @@ def mesures_dpo_validation(
                 )
             termes.append(_termes_des_paires(modele, lot, appareil, chargeur_val.dossier))
             restantes -= lot.ids.shape[0]
-    perte, mesures = perte_dpo(*(torch.cat(colonne) for colonne in zip(*termes)), reglages)
+    perte, mesures = dpo.perte_dpo(*(torch.cat(colonne) for colonne in zip(*termes)), reglages)
     return {"perte_val": perte.item(), "exactitude_val": mesures["exactitude"].item()}
 
 

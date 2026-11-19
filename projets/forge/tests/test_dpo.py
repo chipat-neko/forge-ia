@@ -12,6 +12,8 @@ import dataclasses
 import json
 import math
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -712,3 +714,13 @@ def test_dpo_gpu_court(tmp_path):
     jeu = Path(config.donnees)
     finale = marge_sur_l_entrainement(modele_de(charger_derniere(tmp_path / "dpo" / "sauvegardes")), jeu)
     assert finale > marge_sur_l_entrainement(charger_publication(Path(config.depart)).modele, jeu)
+
+
+def test_dpo_s_importe_en_premier():
+    """« import forge.affinage.dpo » seul, dans un interpréteur neuf : pas d'import circulaire.
+
+    dpo.py importe forge.evaluation, qui importe forge.entrainement, donc methodes.py, qui se sert de
+    dpo.py : methodes.py importe le module, pas ses noms, pour que cet ordre-là marche aussi.
+    """
+    resultat = subprocess.run([sys.executable, "-c", "import forge.affinage.dpo"], capture_output=True, text=True)
+    assert resultat.returncode == 0, resultat.stderr
