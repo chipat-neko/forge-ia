@@ -53,7 +53,7 @@ from torch import nn
 from forge.chemins import OCTETS_PAR_GO, PlaceInsuffisante, sous_forge_donnees
 from forge.donnees.jetons import empreinte_du_tokenizer
 from forge.entrainement.chargeur import ChargeurJetons, empreinte_du_tokenizer_des_jetons
-from forge.entrainement.methodes import METHODES, PerteNonFinie, VersionDeDepart
+from forge.entrainement.methodes import METHODES, PerteNonFinie, PreparationInterrompue, VersionDeDepart
 from forge.entrainement.planning import taux
 from forge.entrainement.sauvegarde import (
     CONSEIL_DE_REPRISE,
@@ -65,7 +65,7 @@ from forge.entrainement.sauvegarde import (
 )
 from forge.evaluation.perte import autocast as _autocast  # bf16 sur la carte graphique, 32 bits sur le processeur
 from forge.evaluation.perte import perte_sur_morceaux as _perte_validation  # noqa: F401  (la mesure de `evaluer`, lue par les tests)
-from forge.fichiers import duree, ecrire_texte, entier, nombre, scientifique
+from forge.fichiers import ESPACE_FINE, duree, ecrire_texte, entier, nombre, scientifique
 from forge.modele import PRESETS, ConfigModele, Transformer, nombre_parametres
 from forge.pause import Pause as _Pause
 from forge.processeur import fils_disponibles
@@ -940,16 +940,32 @@ def _entrainer(config: ConfigEntrainement, appareil: torch.device, reprendre: bo
     def noter(ligne: dict) -> None:
         notes.append({**ligne, "pas": pas})
 
+    def noter_au_journal(lignes: list[dict]) -> None:
+        journal = _ouvrir_le_journal(chemin_journal, None if etat is None else pas)
+        try:
+            for ligne in lignes:
+                journal.ecrire(ligne)
+        finally:
+            journal.fermer()
+
     try:
         contexte = methode.preparer(config, modele, appareil, noter, depart=depart, reprise=etat is not None)
+    except PreparationInterrompue as interruption:
+        # Ctrl+C pendant une longue préparation : une pause avant le premier pas, sans sauvegarde.
+        noter_au_journal([*notes, {"evenement": "pause", "pas": pas, "message": str(interruption)}])
+        print(f"{interruption} Pour reprendre{ESPACE_FINE}: {_commande_de_reprise(config)}", flush=True)
+        return {
+            "pertes": [],
+            "pas": pas,
+            "pas_total": pas_total,
+            "termine": False,
+            "en_pause": True,
+            "sauvegarde": None,
+            "meilleure_perte_val": None if etat is None else etat["meilleure_perte_val"],
+        }
     except BaseException:
         if notes:  # ce que la méthode a constaté avant d'échouer (le contrôle du GRPO…) reste au journal
-            journal = _ouvrir_le_journal(chemin_journal, None if etat is None else pas)
-            try:
-                for ligne in notes:
-                    journal.ecrire(ligne)
-            finally:
-                journal.fermer()
+            noter_au_journal(notes)
         raise
     chargeur, validation = methode.creer_chargeurs(config, contexte, noter)
     # La validation relit toujours les mêmes données : elle repart chaque fois de là.

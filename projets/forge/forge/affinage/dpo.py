@@ -28,10 +28,12 @@ des rangées de chaque partie :
 
 Une autre version de départ les fait recalculer ; la même les fait relire, même depuis un autre
 entraînement ou à la reprise. `forge preparer` et `forge preferences` les effacent quand ils réécrivent
-le jeu.
+le jeu. Le calcul affiche son avancement au plus toutes les `SECONDES_ENTRE_PROGRES` secondes ; un
+Ctrl+C l'arrête sans rien écrire (la méthode `dpo` en fait une pause, voir `forge.entrainement.methodes`).
 """
 
 import json
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -45,7 +47,7 @@ from forge.affinage.jeu import IGNORE, PARTIES, ChargeurAffinage, LotAffinage, l
 from forge.chemins import verifier_place
 from forge.donnees.telechargement import MARGE_PLACE
 from forge.evaluation.perte import autocast
-from forge.fichiers import ESPACE_FINE, ecrire_atomique, ecrire_texte, entier
+from forge.fichiers import ESPACE_FINE, duree, ecrire_atomique, ecrire_texte, entier, nombre
 from forge.modele.modes import en_evaluation
 
 if TYPE_CHECKING:  # importés pour les annotations seulement : la boucle importe ce module
@@ -53,6 +55,9 @@ if TYPE_CHECKING:  # importés pour les annotations seulement : la boucle import
     from forge.entrainement.methodes import VersionDeDepart
 
 _FINE = ESPACE_FINE
+
+# Une ligne d'avancement du calcul de la référence au plus toutes les 30 secondes.
+SECONDES_ENTRE_PROGRES = 30
 
 
 # --- Les log-probabilités et la perte ------------------------------------------------------
@@ -135,11 +140,17 @@ def verifier_les_paires(lot: LotAffinage, dossier: Path) -> None:
 
 
 def calculer_reference(
-    modele: nn.Module, dossier: Path, partie: str, taille_lot: int, appareil: torch.device
+    modele: nn.Module,
+    dossier: Path,
+    partie: str,
+    taille_lot: int,
+    appareil: torch.device,
+    avancer: Callable[[int], None] | None = None,
 ) -> np.ndarray:
     """Les log-probabilités de toutes les rangées de `partie` selon `modele`, dans l'ordre du fichier.
 
-    Le modèle calcule en mode évaluation, sous `autocast`, par paquets de `taille_lot` rangées.
+    Le modèle calcule en mode évaluation, sous `autocast`, par paquets de `taille_lot` rangées ;
+    `avancer(n)` est appelé après chaque paquet de `n` rangées.
     """
     chargeur = ChargeurAffinage(dossier, partie, taille_lot, graine=0)
     valeurs = np.empty(chargeur.rangees, dtype=np.float64)
@@ -150,6 +161,8 @@ def calculer_reference(
             verifier_les_paires(lot, dossier)
             logps, _ = logps_des_rangees(modele, lot, appareil)
             valeurs[debut:fin] = logps.double().cpu().numpy()
+            if avancer is not None:
+                avancer(fin - debut)
     return valeurs
 
 
@@ -182,8 +195,10 @@ def preparer_reference(
     Une partie (`train`, `val`) est recalculée si son `reference.bin` manque, n'a pas une valeur par
     rangée, ou si son `reference.json` manque ou nomme une autre version de départ (nom et empreinte des
     poids). La description est effacée avant le calcul et écrite après les valeurs, chacune d'un coup :
-    un calcul interrompu ne laisse jamais une description juste sur des valeurs fausses. Une ligne au
-    journal (`noter`) dit si la référence a été calculée ou relue.
+    un calcul interrompu (Ctrl+C compris) ne laisse ni fichier à moitié écrit, ni description juste sur
+    des valeurs fausses. Pendant le calcul, une ligne à l'écran au plus toutes les
+    `SECONDES_ENTRE_PROGRES` secondes donne les rangées faites, le débit et le temps restant. Une ligne au
+    journal (`noter`) dit si la référence a été calculée (et en combien de temps) ou relue.
     """
     index = lire_index(dossier)
     rangees = {partie: int(index["rangees"][partie]) for partie in PARTIES if int(index["rangees"][partie]) > 0}
@@ -195,11 +210,31 @@ def preparer_reference(
         return
     combien = ", ".join(f"{entier(rangees[partie], milliers=_FINE)} rangées de {partie}" for partie in a_calculer)
     print(f"Référence de la DPO{_FINE}: calcul des log-probabilités de {combien} avec {version}…", flush=True)
+    total = sum(rangees[partie] for partie in a_calculer)
+    faites = 0
+    debut = dernier_affichage = time.perf_counter()
+
+    def avancer(n: int) -> None:
+        """Compte `n` rangées de plus ; au plus toutes les `SECONDES_ENTRE_PROGRES` secondes, une ligne d'avancement."""
+        nonlocal faites, dernier_affichage
+        faites += n
+        maintenant = time.perf_counter()
+        if faites >= total or maintenant - dernier_affichage < SECONDES_ENTRE_PROGRES:
+            return
+        dernier_affichage = maintenant
+        debit = faites / max(maintenant - debut, 1e-9)
+        print(
+            f"Référence de la DPO{_FINE}: {entier(faites, milliers=_FINE)} rangées sur {entier(total, milliers=_FINE)} "
+            f"({nombre(100 * faites / total, 1)}{_FINE}%) · {nombre(debit, 1, milliers=_FINE)} rangées/s · "
+            f"reste ≈ {duree((total - faites) / debit)}",
+            flush=True,
+        )
+
     for partie in a_calculer:
         dossier_partie = dossier / partie
         for ancien in ("reference.json", "reference.bin"):  # la description d'abord
             (dossier_partie / ancien).unlink(missing_ok=True)
-        valeurs = calculer_reference(modele, dossier, partie, taille_lot, appareil).astype("<f8")
+        valeurs = calculer_reference(modele, dossier, partie, taille_lot, appareil, avancer).astype("<f8")
         verifier_place(valeurs.nbytes + MARGE_PLACE, dossier_partie)
         ecrire_atomique(dossier_partie / "reference.bin", lambda fichier: fichier.write(valeurs.tobytes()))
         description = {
@@ -209,5 +244,7 @@ def preparer_reference(
             "appareil": appareil.type,
         }
         ecrire_texte(dossier_partie / "reference.json", json.dumps(description, indent=2, ensure_ascii=False) + "\n")
-    message = f"Référence de la DPO calculée avec {version}{_FINE}: {combien}, dans {dossier}."
+    temps = duree(time.perf_counter() - debut)
+    print(f"Référence de la DPO{_FINE}: {entier(total, milliers=_FINE)} rangées en {temps}.", flush=True)
+    message = f"Référence de la DPO calculée avec {version} en {temps}{_FINE}: {combien}, dans {dossier}."
     noter({"evenement": "reference", "message": message})

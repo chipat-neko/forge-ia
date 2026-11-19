@@ -28,7 +28,10 @@ from forge.affinage.jeu import IGNORE, ChargeurAffinage, LotAffinage, lire_index
 from forge.entrainement.chargeur import ChargeurJetons
 from forge.erreurs import DonneesManquantes
 from forge.evaluation.perte import autocast, perte_sur_morceaux
+from forge.fichiers import ESPACE_FINE
 from forge.modele.modes import en_evaluation
+
+_FINE = ESPACE_FINE
 
 # Nombre de morceaux (ou de rangées) de validation lus pour mesurer la perte de validation :
 # toujours les mêmes, quel que soit `micro_lot` (moins si la validation en a moins).
@@ -40,6 +43,13 @@ PAIRES_DE_VALIDATION = 256
 
 class PerteNonFinie(ArithmeticError):
     """La perte ou la norme des gradients n'est plus un nombre fini (infini ou « NaN »)."""
+
+
+class PreparationInterrompue(Exception):
+    """Ctrl+C pendant `preparer` (le calcul de la référence de la DPO) : rien n'est sauvegardé.
+
+    Son message dit ce qui est perdu et ce que fera la reprise ; la boucle y ajoute la commande de reprise.
+    """
 
 
 @dataclass(frozen=True)
@@ -67,7 +77,10 @@ class Methode:
        `VersionDeDepart` (`None` pour le pré-entraînement) ; `reprise` dit si l'entraînement repart
        d'une sauvegarde (vrai) ou de zéro (faux). `noter(ligne)` met une ligne de côté pour le
        journal (un dictionnaire, auquel la boucle ajoute `"pas"`) : elle y est écrite juste après
-       la ligne de début, ou, si `preparer` lève une exception, avant que l'exception remonte ;
+       la ligne de début, ou, si `preparer` lève une exception, avant que l'exception remonte. Une
+       méthode dont la préparation est longue fait d'un Ctrl+C une `PreparationInterrompue` : la boucle
+       écrit alors ses notes et une ligne « pause » au journal, affiche le message et la commande de
+       reprise, et s'arrête sans rien sauvegarder ;
     2. `creer_chargeurs(config, contexte, noter) -> (train, val | None)` : les chargeurs
        d'entraînement et de validation. Ils sont créés APRÈS `preparer` : un fichier que `preparer`
        écrit ou remplace (le `reference.bin` de la DPO) n'est encore ouvert par personne. Sans
@@ -295,9 +308,19 @@ def _valider_sft(modele, chargeur_val, depart_val, appareil, config, contexte) -
 
 
 def _preparer_dpo(config, modele, appareil, noter, *, depart: VersionDeDepart | None, reprise: bool) -> dict:
-    """Vérifie le jeu, puis calcule (ou relit) la référence avec le modèle de départ, avant tout pas."""
+    """Vérifie le jeu, puis calcule (ou relit) la référence avec le modèle de départ, avant tout pas.
+
+    Un Ctrl+C pendant le calcul est une pause : rien n'est écrit à moitié (`preparer_reference` écrit
+    chaque fichier d'un coup), et la reprise refait le calcul.
+    """
     _verifier_le_jeu(config, "dpo")
-    preparer_reference(config.dossier_donnees, modele, appareil, depart, config.micro_lot, noter)
+    try:
+        preparer_reference(config.dossier_donnees, modele, appareil, depart, config.micro_lot, noter)
+    except KeyboardInterrupt:
+        raise PreparationInterrompue(
+            f"Pause pendant le calcul de la référence{_FINE}: rien n'est sauvegardé, la référence sera "
+            "recalculée à la reprise."
+        ) from None
     return {}
 
 

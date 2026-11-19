@@ -331,18 +331,34 @@ Avec `methode = "dpo"`, ton IA apprend de paires de préférences : `donnees` es
 qu'écrit `forge preferences`. La version de départ sert aussi de référence : avant le premier pas, la
 log-probabilité de chaque réponse selon elle est calculée une seule fois et rangée dans le jeu
 (`reference.bin`, avec `reference.json` qui nomme la version) ; un autre entraînement depuis la même
-version, ou une reprise, la relit. `micro_lot` doit être pair : une paire tient dans un même
-micro-lot. La table `[dpo]` règle la méthode (ici, ses valeurs par défaut) :
+version, ou une reprise, la relit. Ce calcul passe une fois sur toutes les rangées du jeu : il affiche
+son avancement toutes les 30 secondes, et Ctrl+C l'arrête sans rien écrire (la reprise le refait).
+`micro_lot` doit être pair : une paire tient dans un même micro-lot. La table `[dpo]` règle la
+méthode (ici, ses valeurs par défaut).
+
+Un exemple complet, qui se lance tel quel sur le jeu de `forge preferences --recette preferences-1.8`
+(rangées de 768 jetons) ; les réglages de ton IA 1.8 viendront avec son entraînement :
 
 ```toml
 methode = "dpo"
-depart = "ton-ia-1.7"        # la version de départ, qui sert aussi de référence
-donnees = "preferences-1.8"  # FORGE_DONNEES/affinage/preferences-1.8
+depart = "ton-ia-1.7"          # la version de départ, qui sert aussi de référence
+preset = "tres_grand"          # les dimensions de la version de départ
+donnees = "preferences-1.8"    # FORGE_DONNEES/affinage/preferences-1.8
+longueur = 768                 # la longueur des rangées du jeu
+jetons_total = 4_915_200       # 100 pas
+taille_lot_jetons = 49_152     # 32 paires par pas : un multiple de micro_lot × longueur
+micro_lot = 2                  # pair
+taux_max = 1e-6
+echauffement = 10
+poids_decroissance = 0.0
+evaluation_tous_pas = 20
+appareil = "cuda"
+sortie = "essai-dpo"
 
 [dpo]
-beta = 0.1                   # la force de la préférence
-normaliser_longueur = false  # true : comparer les gains par jeton plutôt que par réponse
-poids_sft = 1.0              # le poids du terme SFT sur la réponse choisie (0 l'enlève)
+beta = 0.1                     # la force de la préférence
+normaliser_longueur = false    # true : comparer les gains par jeton plutôt que par réponse
+poids_sft = 1.0                # le poids du terme SFT sur la réponse choisie (0 l'enlève)
 ```
 
 Le journal écrit à chaque pas la log-probabilité par jeton des réponses choisies et rejetées, leurs

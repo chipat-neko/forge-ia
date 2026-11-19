@@ -45,6 +45,7 @@ from forge.exporter import empreinte_sha256
 from forge.modele import Transformer
 from forge.publication import charger_publication, nom_des_poids
 
+FINE = "\u202f"  # l'espace fine insécable des sorties à l'écran
 MESURES = ("logps_choisie", "logps_rejetee", "recompense_choisie", "recompense_rejetee", "marge", "exactitude")
 
 
@@ -146,9 +147,9 @@ def compter_les_calculs(monkeypatch) -> list[str]:
     vraie = dpo.calculer_reference
     parties = []
 
-    def calculer_reference(modele, dossier, partie, taille_lot, appareil):
+    def calculer_reference(modele, dossier, partie, taille_lot, appareil, avancer=None):
         parties.append(partie)
-        return vraie(modele, dossier, partie, taille_lot, appareil)
+        return vraie(modele, dossier, partie, taille_lot, appareil, avancer)
 
     monkeypatch.setattr(dpo, "calculer_reference", calculer_reference)
     return parties
@@ -289,6 +290,118 @@ def test_reference_relue_si_le_depart_est_le_meme(tmp_path, monkeypatch):
     for sortie in ("b", "c"):
         (ligne,) = [l for l in lire_journal(tmp_path / sortie) if l.get("evenement") == "reference"]
         assert "relue" in ligne["message"]
+
+
+def test_reprise_apres_invalidation_de_la_reference(tmp_path, monkeypatch):
+    """Une reprise dont la référence a été invalidée la recalcule avec le modèle de départ, pas avec la politique."""
+    calculs = compter_les_calculs(monkeypatch)
+    config = cfg_dpo(tmp_path / "a")
+    entrainer(config, arreter_apres=3)
+    train = Path(config.donnees) / "train"
+    avant = (train / "reference.bin").read_bytes()
+    (train / "reference.json").unlink()
+    r = entrainer(cfg_dpo(tmp_path / "a"), reprendre=True, arreter_apres=5)
+    assert r["pas"] == 5
+    assert calculs == ["train", "val", "train"]
+    assert (train / "reference.bin").read_bytes() == avant  # à l'octet près : les poids de départ, pas ceux du pas 3
+
+
+def test_reference_tronquee_recalculee(tmp_path, monkeypatch):
+    """Un `reference.bin` qui n'a pas une valeur par rangée est recalculé, même si sa description est juste."""
+    calculs = compter_les_calculs(monkeypatch)
+    config = cfg_dpo(tmp_path / "a")
+    entrainer(config, arreter_apres=1)
+    train = Path(config.donnees) / "train"
+    avant = (train / "reference.bin").read_bytes()
+    (train / "reference.bin").write_bytes(avant[:-8])
+    entrainer(cfg_dpo(tmp_path / "b"), arreter_apres=1)
+    assert calculs == ["train", "val", "train"]
+    assert (train / "reference.bin").read_bytes() == avant
+
+
+def test_l_avancement_du_calcul_de_la_reference(tmp_path, monkeypatch, capsys):
+    """Une ligne d'avancement au plus toutes les 30 s (aucune pour un calcul plus court), puis la durée."""
+    config = cfg_dpo(tmp_path / "a")
+    entrainer(config, arreter_apres=1)
+    sortie = capsys.readouterr().out
+    assert "rangées sur" not in sortie  # le calcul a duré moins de 30 s
+    assert f"Référence de la DPO{FINE}: 60 rangées en " in sortie
+    for fichier in Path(config.donnees).rglob("reference.*"):
+        fichier.unlink()
+    monkeypatch.setattr(dpo, "SECONDES_ENTRE_PROGRES", 0)  # une ligne après chaque paquet
+    entrainer(cfg_dpo(tmp_path / "b"), arreter_apres=1)
+    lignes = [l for l in capsys.readouterr().out.splitlines() if "rangées sur 60" in l]
+    # 48 + 12 rangées par paquets de 4 : 15 paquets, une ligne après chacun sauf le dernier.
+    assert len(lignes) == 14
+    assert lignes[0].startswith(f"Référence de la DPO{FINE}: 4 rangées sur 60 (6,7{FINE}%) · ")
+    assert all("rangées/s · reste ≈ " in l for l in lignes)
+    (ligne,) = [l for l in lire_journal(tmp_path / "b") if l.get("evenement") == "reference"]
+    assert " en " in ligne["message"]  # la durée du calcul, pour la mesurer sur la carte
+
+
+def ecrire_toml(config: ConfigEntrainement, fichier: Path) -> Path:
+    """La configuration `config` (celle de `cfg_dpo`) en TOML, comme `forge entrainer --config` la lit."""
+    m = config.modele
+    lignes = [
+        'methode = "dpo"',
+        f"depart = '{config.depart}'",
+        f"donnees = '{config.donnees}'",
+        f"sortie = '{config.sortie}'",
+        f"jetons_total = {config.jetons_total}",
+        f"taille_lot_jetons = {config.taille_lot_jetons}",
+        f"micro_lot = {config.micro_lot}",
+        f"taux_max = {config.taux_max}",
+        f"echauffement = {config.echauffement}",
+        f"poids_decroissance = {config.poids_decroissance}",
+        f"evaluation_tous_pas = {config.evaluation_tous_pas}",
+        'appareil = "cpu"',
+        'compiler = "non"',
+        "[preset]",
+        f"taille_vocabulaire = {m.taille_vocabulaire}",
+        f"dim = {m.dim}",
+        f"couches = {m.couches}",
+        f"tetes = {m.tetes}",
+        f"longueur_contexte = {m.longueur_contexte}",
+        "",
+    ]
+    fichier.write_text("\n".join(lignes), encoding="utf-8")
+    return fichier
+
+
+def test_ctrl_c_pendant_le_calcul_de_la_reference(tmp_path, monkeypatch, capsys):
+    """Ctrl+C pendant le calcul de la référence : une pause propre, rien d'écrit, et la reprise refait tout."""
+    from forge.__main__ import main
+
+    fichier = ecrire_toml(cfg_dpo(tmp_path / "dpo"), tmp_path / "dpo.toml")
+    config = lire_config(fichier)
+    vraie = dpo.logps_des_rangees
+    appels = []
+
+    def logps_puis_ctrl_c(*arguments, **options):
+        appels.append(1)
+        if len(appels) == 2:
+            raise KeyboardInterrupt  # comme Ctrl+C pendant le deuxième paquet de rangées
+        return vraie(*arguments, **options)
+
+    monkeypatch.setattr(dpo, "logps_des_rangees", logps_puis_ctrl_c)
+    capsys.readouterr()
+    assert main(["entrainer", "--config", str(fichier), "--arreter-apres", "3"]) == 0
+    sortie = capsys.readouterr()
+    assert sortie.err == ""  # ni trace d'erreur, ni « Erreur »
+    assert (
+        f"Pause pendant le calcul de la référence{FINE}: rien n'est sauvegardé, la référence sera recalculée à la "
+        f"reprise. Pour reprendre{FINE}: python -m forge entrainer --config {fichier} --reprendre" in sortie.out
+    )
+    jeu = Path(config.donnees)
+    assert not list(jeu.rglob("reference.*")) and not list(jeu.rglob("*.tmp"))  # aucun fichier partiel
+    assert not (tmp_path / "dpo" / "sauvegardes").exists()
+    derniere = lire_journal(tmp_path / "dpo")[-1]
+    assert derniere["evenement"] == "pause" and derniere["pas"] == 0 and "référence" in derniere["message"]
+
+    monkeypatch.setattr(dpo, "logps_des_rangees", vraie)
+    suite = entrainer(config, reprendre=True, arreter_apres=3)
+    assert (jeu / "train" / "reference.bin").is_file() and (jeu / "val" / "reference.bin").is_file()
+    assert suite["pertes"] == entrainer(cfg_dpo(tmp_path / "temoin"), arreter_apres=3)["pertes"]
 
 
 # --------------------------------------------------------------------------------------
@@ -564,6 +677,20 @@ def test_la_table_dpo_du_toml(tmp_path):
         encoding="utf-8",
     )
     assert lire_config(fichier).dpo == ReglagesDPO(beta=0.2, normaliser_longueur=False, poids_sft=0.5)
+
+
+def test_l_exemple_du_readme_se_lit_tel_quel(tmp_path):
+    """L'exemple TOML de la DPO du README est une configuration complète, aux rangées du jeu `preferences-1.8`."""
+    from forge.preferences.construction import RECETTES_PREFERENCES
+
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+    debut = readme.index('```toml\nmethode = "dpo"') + len("```toml\n")
+    fichier = tmp_path / "dpo.toml"
+    fichier.write_text(readme[debut : readme.index("```", debut)], encoding="utf-8")
+    config = lire_config(fichier)
+    assert config.methode == "dpo" and config.dpo == ReglagesDPO()
+    assert config.longueur == RECETTES_PREFERENCES[config.donnees].longueur
+    assert config.pas_total == 100 and config.taille_lot_jetons // config.longueur // 2 == 32  # 32 paires par pas
 
 
 def test_reprise_refusee_si_les_reglages_dpo_changent(tmp_path):
