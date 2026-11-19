@@ -2,7 +2,7 @@
 
 Ton IA est un petit modèle de langage, créé de zéro pour le site « La Forge IA ». Un modèle de langage
 est un programme qui a appris à deviner la suite d'un texte, morceau par morceau. Cette version est celle
-du chapitre 1.7 : c'est ton IA 1.5, affinée le 18 novembre 2026 sur des conversations en français, pour
+du chapitre 1.7 : c'est ton IA 1.5, affinée le 19 novembre 2026 sur des conversations en français, pour
 qu'elle réponde à une question au lieu de prolonger un texte.
 
 ## En chiffres
@@ -11,18 +11,18 @@ qu'elle réponde à une question au lieu de prolonger un texte.
   32 768 jetons de vocabulaire, 2 048 jetons lus au plus d'un coup.
 - **Un affinage supervisé** (en anglais, SFT) : ton IA relit des conversations, et elle n'apprend que les
   réponses de l'assistant. 135 471 conversations (111 497 280 jetons, dont 85 483 056 appris), lues deux
-  fois : 3 338 pas, 218 759 168 positions.
-- **4 h 44 min 35 s de calcul** sur une carte graphique RTX 5070 Ti, en 3 sessions, du 18 novembre 2026
-  à 02:34 au même jour à 08:48.
-- **Elle finit ses réponses** : 52,8 % de ses réponses se terminent, contre 0,0 % pour 1.5. Elles sont en
-  français dans 98,8 % des cas (87,2 % pour 1.5).
+  fois : 3 338 pas, au taux d'apprentissage 1e-4.
+- **4 h 44 min 51 s de calcul** sur une carte graphique RTX 5070 Ti, en une session, le 19 novembre 2026
+  de 10:11 à 15:04.
+- **Elle finit ses réponses** : 51,0 % de ses réponses se terminent, contre 0,0 % pour 1.5. Elles sont en
+  français dans 99,4 % des cas (87,2 % pour 1.5).
 - **Elle suit moins bien les consignes que 1.5** : sur IFEval-FR (235 demandes en français, avec des
-  consignes vérifiables, comme « sans virgule »), 16,2 % des demandes sont respectées en entier, contre
+  consignes vérifiables, comme « sans virgule »), 14,5 % des demandes sont respectées en entier, contre
   21,7 % pour 1.5.
 - **Elle prédit moins bien que 1.5 le texte libre** : sur le texte qu'elle avait lu en 1.5, son erreur
-  monte de 0,779 à 1,250 bit par octet (plus c'est bas, mieux elle prédit).
-- **Calcul :** elle résout 3 problèmes de calcul simples sur 400, 1 problème de MGSM sur 250 et 4 de
-  GSM8K-Platinum sur 1 196 : presque rien, mais 1.5 n'en résolvait aucun.
+  monte de 0,779 à 0,972 bit par octet (plus c'est bas, mieux elle prédit).
+- **Calcul :** elle résout 1 problème de calcul simple sur 400, aucun des 250
+  problèmes de MGSM et 10 des 1 196 de GSM8K-Platinum : presque rien, mais 1.5 n'en résolvait aucun.
 
 Ces mesures viennent de `rapport.json`, joint. Le récit complet est dans `ton-ia-1.7.md`, joint aussi.
 
@@ -30,32 +30,39 @@ Ces mesures viennent de `rapport.json`, joint. Le récit complet est dans `ton-i
 
 - Répondre à une question, puis s'arrêter, une fois sur deux à peu près.
 - Répondre en français.
-- Dire qui elle est : « Je suis ton IA, une petite intelligence artificielle qui écrit en français. »
 - Donner un fait très connu : « La capitale de la France est Paris. »
 - Écrire une définition juste quand elle est très courante (la photosynthèse, dans l'évaluation).
+- Dire qu'elle est ton IA : « Je suis ton IA, une petite intelligence artificielle… », mais en se
+  répétant.
 
 ## Ce qu'elle ne sait pas faire
 
-- **Calculer.** À « Combien font 12 fois 7 ? », elle répète une même phrase sans donner de nombre.
-- **Dire des choses vraies à coup sûr.** Elle écrit des choses fausses : des nuages bleus pour expliquer
-  la couleur du ciel, une « molalité » pour distinguer un virus d'une bactérie.
+- **Calculer.** À « Combien font 12 fois 7 ? », elle répète la question sans répondre.
+- **Dire des choses vraies à coup sûr.** Elle écrit des choses fausses : le ciel serait bleu « parce que
+  les nuages sont blancs », virus et bactéries se reproduiraient par « transformation ».
 - **Respecter une consigne de forme** (« tout en minuscules », « sans virgule ») : elle le fait moins
   souvent que 1.5.
-- **Écrire du code qui marche.** À la demande d'une fonction Python, elle écrit un calcul faux, sans
-  code.
-- **S'arrêter à coup sûr.** 47 % de ses réponses vont jusqu'à la limite de longueur sans finir ;
-  dans les échantillons, elle y répète souvent une même phrase.
+- **Écrire du code.** À la demande d'une fonction Python, elle déroule des étapes de calcul, sans code.
+- **S'arrêter à coup sûr.** 49 % de ses réponses vont jusqu'à la limite de longueur sans finir ; dans les
+  échantillons, elle y répète souvent une même phrase.
 - **Prolonger un texte libre aussi bien que 1.5.** Son erreur sur ce texte a monté (voir plus haut).
 - **Lire un long texte.** Au-delà de 2 048 jetons, elle oublie le début.
+
+## Une autre version, non publiée
+
+Un premier entraînement complet, au taux 3e-4, apprenait un peu mieux les conversations, mais il
+prédisait nettement moins bien le texte libre : 3,766 nats par jeton sur le texte du pré-entraînement,
+contre 2,928 pour cette version et 2,347 pour 1.5. Il est gardé en local pour comparer, et n'est pas
+publié. Le récit est dans `ton-ia-1.7.md`.
 
 ## Les fichiers
 
 | Fichier | Taille | Empreinte SHA-256 | Ce qu'il contient |
 | --- | ---: | --- | --- |
-| `ton-ia-1.7.safetensors` | 867 161 248 octets (827,0 Mo) | `b53eb7e2880e542e87ace535b13fcce99c1435c5c903dea192d267028aead8b8` | les poids du modèle |
+| `ton-ia-1.7.safetensors` | 867 161 248 octets (827,0 Mo) | `6a6d2c08e15d4dc22fa3205d11e28ad3eb82d6944c649788836a125c25758d32` | les poids du modèle |
 | `config.json` | 134 octets | `ae0207b367080a6577c2d95ef81ba5fb84c6bf2be11d03a07eedd8a9fe598621` | les dimensions du modèle |
 | `tokenizer-ton-ia-v1.json` | 546 692 octets | `3001e7ab40630739c4dec807c7a92c0d4fb469cc0fc4afa368704395391f21ba` | le tokenizer |
-| `rapport.json` | 17 773 octets | `98b6475a3fdbdfcca57af1dc0381ef1b2f34a068128b9cbd03892ac671afb749` | les mesures de l'évaluation, avec celles de 1.5 en regard |
+| `rapport.json` | 17 660 octets | `8e7d291ab2fda4681229d872f9f3f97047500963db739cd20bd736c4de3767b5` | les mesures de l'évaluation, avec celles de 1.5 en regard |
 | `ton-ia-1.7.md` | — | — | le récit complet de l'affinage et de l'évaluation |
 | `LISEZMOI.md` | — | — | cette fiche |
 

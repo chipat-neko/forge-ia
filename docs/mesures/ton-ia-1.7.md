@@ -1,9 +1,11 @@
 # Ton IA 1.7 : apprendre à converser
 
 Ton IA 1.7 est le premier vrai affinage de ton IA : un affinage supervisé (SFT) de la version publiée
-`ton-ia-1.5` sur des conversations en français. Ce document raconte ses données, l'essai
-chronométré, le balayage du taux d'apprentissage, l'entraînement du 18 novembre 2026, son évaluation du
-19 novembre, et ce que ton IA 1.7 sait faire ou non.
+`ton-ia-1.5` sur des conversations en français. Ce document raconte ses données, l'essai chronométré, le
+balayage du taux d'apprentissage, un premier entraînement complet au taux 3e-4 (18 novembre 2026),
+l'oubli qu'il a fait mesurer, la décision qui a suivi, puis l'entraînement complet au taux 1e-4 (19
+novembre) : c'est lui, la version publiée `ton-ia-1.7`. Puis son évaluation, et ce qu'elle sait faire ou
+non.
 
 ## En bref
 
@@ -19,19 +21,24 @@ chronométré, le balayage du taux d'apprentissage, l'entraînement du 18 novemb
 - **La carte, pas le processeur :** 13 444 jetons par seconde sur la carte (micro-lot 1, 12,8 Go au
   plus), 196,6 sur le processeur avec ses 16 fils : 68 fois moins.
 - **Le masque par document coûte 34 %** d'un pas complet : 4,885 s contre 3,651 s sans masque.
-- **Le taux d'apprentissage : 3e-4.** Quatre essais de 300 pas : la perte de validation finit à 1,214
-  avec 3e-4, 1,279 avec 1e-4, 1,398 avec 3e-5 et 1,526 avec 1e-5. C'est le plus grand taux essayé.
-- **L'entraînement :** 3 338 pas (deux époques), 4 h 44 min 35 s de calcul en 3 sessions, le 18
-  novembre 2026. La perte de validation baisse à chaque mesure, de 1,424 (pas 100) à **0,941** (pas
-  3 338). La version courte : 739 pas, 1 h 04 min 37 s, validation 1,095.
-- **L'évaluation**, de 1.5 à 1.7 (version courte entre parenthèses) :
-  - réponses terminées : 0,0 % → **52,8 %** (54,0 %) ;
-  - réponses en français : 87,2 % → 98,8 % (99,7 %) ;
-  - IFEval-FR, invites respectées : 21,7 % → 16,2 % (15,7 %) : **moins bien que 1.5** ;
-  - oubli, perte sur le texte du pré-entraînement : 2,347 → 3,766 nats par jeton (2,998) :
-    **elle prédit moins bien que 1.5 le texte libre** ;
-  - problèmes justes : générés 0 → 3 sur 400 (0), MGSM 0 → 1 sur 250 (0),
-    GSM8K-Platinum 0 → 4 sur 1 196 (6).
+- **Le taux d'apprentissage : 1e-4.** Le balayage (quatre essais de 300 pas) avait retenu 3e-4, celui
+  dont la perte de conversation finissait la plus basse. Entraînée en entier à 3e-4, ton IA prédit
+  nettement moins bien le texte de son pré-entraînement : sa perte y monte de 2,347 (1.5) à 3,766. Une
+  version courte à 1e-4 oubliant moins (2,615 contre 2,998), l'entraînement complet a été refait à 1e-4,
+  et c'est lui qui est publié.
+- **L'entraînement publié :** 3 338 pas (deux époques), le 19 novembre 2026, en une session : 4 h 52 min
+  20 s de Python, dont 4 h 44 min 51 s de calcul. La perte de validation baisse à chaque mesure, de 1,422
+  (pas 100) à **0,988** (pas 3 338). La pause et la reprise réelles ont été faites sur l'entraînement à
+  3e-4.
+- **L'évaluation**, de 1.5 à 1.7 (complète à 3e-4 entre parenthèses) :
+  - réponses terminées : 0,0 % → **51,0 %** (52,8 %) ;
+  - réponses en français : 87,2 % → 99,4 % (98,8 %) ;
+  - IFEval-FR, invites respectées : 21,7 % → 14,5 % (16,2 %) : **moins bien que 1.5** ; l'écart
+    entre 1e-4 et 3e-4 ne se confirme pas au second passage (15,3 % et 15,7 %) ;
+  - perte sur le texte du pré-entraînement : 2,347 → 2,928 nats par jeton (3,766) : **elle prédit moins
+    bien que 1.5 le texte libre, mais bien mieux qu'à 3e-4** ;
+  - problèmes justes : générés 0 → 1 sur 400 (3), MGSM 0 → 0 sur 250 (1),
+    GSM8K-Platinum 0 → 10 sur 1 196 (4).
 
 ## 1. Les données
 
@@ -206,6 +213,9 @@ réserves :
 Les sauvegardes de 1e-5, 3e-5 et 1e-4 sont effacées (leurs journaux restent). Celle de 3e-4 reste dans
 `entrainements/sft-1.7-balayage-3e-4`.
 
+Ce choix, fait sur la seule perte de conversation, a été revu après l'évaluation de l'entraînement
+complet : la version publiée est entraînée au taux 1e-4 (sections 4 à 6).
+
 **Les durées.** Chaque essai a fait ses 300 pas en 1 486 à 1 504 s de calcul : 4,88 s par pas en
 médiane, plus environ 10 s à chaque validation, écriture de `meilleur.pt` (1,62 Gio) comprise. Avec le
 chargement de ton-ia-1.5 et la sauvegarde finale (4,85 Gio), la commande entière a pris de 25 min 47 s à
@@ -214,27 +224,12 @@ carte occupée à 93 % en moyenne, 12,9 à 13,0 Go au plus. Les tests de forge
 pendant les huit premières minutes du deuxième essai : 13 359 jetons par seconde sur ses 20 pas d'alors,
 0,6 % sous le premier essai.
 
-## 4. Les deux entraînements qui suivent
+## 4. L'entraînement complet au taux 3e-4
 
-- **Le complet** (`configs/sft-1.7.toml`) : 3 338 pas, deux époques des 53 401 rangées d'entraînement
-  (218 759 168 positions). Durée prévue d'après le balayage : 3 338 × 4,88 s = 4 h 32 min de pas, plus
-  34 validations (6 min), une sauvegarde d'étape toutes les 30 minutes (environ 4 min en tout), le
-  chargement et la pause prévue : **environ 4 h 45 min de calcul**. Le plan l'estimait à 3 h, pour
-  environ 180 millions de jetons au débit du pré-entraînement (17 316 jetons par seconde). L'écart vient
-  du masque par document (34 %) et des 219 millions de positions.
-- **Le court** (`configs/sft-1.7-court.toml`) : les mêmes réglages, 739 pas (48 431 104 positions, une
-  heure au débit mesuré de 13 444 jetons par seconde), dans la sortie `ton-ia-1.7-court`. Durée prévue :
-  739 × 4,88 s = 1 h 00 min de pas, plus 7 validations et une sauvegarde d'étape : **environ 1 h 03 min**
-  de calcul.
-- **La place sur D:** chaque entraînement garde ses deux dernières sauvegardes d'étape (4,85 Gio chacune)
-  et `meilleur.pt` (1,62 Gio) : environ 11,3 Gio. Il reste 184 Go libres.
-
-Les durées réelles sont dans les sections 5 et 6.
-
-## 5. L'entraînement complet
-
-Lancé par `travail-long.ps1` (fenêtre « Ton IA : sft-1.7 », journal `journaux\sft-1.7.log`), avec le
-chien de garde, le 18 novembre 2026. Fini au pas 3 338 à 08:48:34, code 0.
+Le 18 novembre 2026, avec le taux retenu par le balayage : `configs/sft-1.7.toml` à `taux_max = 3e-4`,
+gardé depuis sous le nom `configs/sft-1.7-3e-4.toml` (sortie `entrainements\sft-1.7-3e-4`, journal de la
+fenêtre `journaux\sft-1.7-3e-4.log`). Lancé par `travail-long.ps1`, avec le chien de garde. C'est sur cet
+entraînement que la pause et la reprise ont été faites pour de vrai, deux fois :
 
 | Session | Démarrage | Premier pas prêt | Fin | Pas | Durée de Python | Fin de la session |
 | --- | --- | --- | --- | --- | ---: | --- |
@@ -242,132 +237,183 @@ chien de garde, le 18 novembre 2026. Fini au pas 3 338 à 08:48:34, code 0.
 | 2 | 03:07:26 | 03:14:49 | 04:11:30 | 373 à 1 027 | 1 h 04 min 02 s | pause pour le jeu de l'utilisateur (Ctrl+C à 04:11:08) |
 | 3 | 05:29:37 | 05:31:10 | 08:48:39 | 1 028 à 3 338 | 3 h 18 min 58 s | fin |
 
-- **Calcul :** 17 075 s, soit 4 h 44 min 35 s (`secondes` du journal, sans les chargements) ; 4 h 45 min
-  étaient prévues. Python a tourné 4 h 55 min 17 s en tout, chargements et sauvegardes compris. Du
-  premier lancement à la fin : 6 h 13 min 58 s, avec les pauses (24 s et 1 h 18 min 07 s).
-- **Les reprises :** la deuxième session a mis 7 min 23 s à reprendre (sauvegarde de 4,85 Gio et version
-  de départ relues sur D:), la troisième 1 min 33 s.
-- **Débit :** médiane de 13 389, 13 303 et 13 340 jetons par seconde selon la session.
-  8 sauvegardes d'étape toutes les 30 minutes environ, plus celles des deux pauses et de la fin (11 en
-  tout).
+- **Calcul :** 17 075 s, soit 4 h 44 min 35 s ; Python a tourné 4 h 55 min 17 s, chargements et
+  sauvegardes compris.
 - **La courbe continue sans saut** à chaque pause : perte moyenne 1,265 sur les 20 pas avant le pas 372,
-  1,271 sur les 20 pas après ; 1,128 avant le pas 1 027, 1,132 après. Le taux reprend où il
-  était (2,937e-4 au pas 372, 2,936e-4 au pas 373).
+  1,271 sur les 20 pas après ; 1,128 avant le pas 1 027, 1,132 après. Le taux reprend où
+  il était (2,937e-4 au pas 372, 2,936e-4 au pas 373).
+- **La fin :** perte 0,708 au pas 3 338, validation 0,941 (la plus basse, `meilleur.pt`).
 
-La perte part de 2,208 au pas 1 et finit à 0,708 au pas 3 338. La perte de validation
-(64 rangées, nats par jeton appris) est mesurée tous les 100 pas ; elle baisse à chaque mesure, de
-1,424 au pas 100 à **0,941** au pas 3 338, la plus basse : `meilleur.pt` est le pas 3 338.
+La version courte à 3e-4 (`configs/sft-1.7-court-3e-4.toml`, sortie
+`entrainements\ton-ia-1.7-court-3e-4`) a suivi d'une traite : 739 pas, 1 h 04 min 37 s de Python,
+validation 1,095 au pas 739.
 
-| Pas | Perte d'entraînement (moyenne) | Validation au dernier pas du bloc |
-| --- | ---: | ---: |
-| 1 à 200 | 1,481 | 1,331 |
-| 201 à 400 | 1,289 | 1,247 |
-| 401 à 600 | 1,224 | 1,194 |
-| 601 à 800 | 1,183 | 1,153 |
-| 801 à 1 000 | 1,148 | 1,118 |
-| 1 001 à 1 200 | 1,123 | 1,089 |
-| 1 201 à 1 400 | 1,095 | 1,066 |
-| 1 401 à 1 600 | 1,065 | 1,036 |
-| 1 601 à 1 800 | 0,951 | 1,023 |
-| 1 801 à 2 000 | 0,883 | 1,009 |
-| 2 001 à 2 200 | 0,875 | 0,993 |
-| 2 201 à 2 400 | 0,868 | 0,979 |
-| 2 401 à 2 600 | 0,846 | 0,966 |
-| 2 601 à 2 800 | 0,848 | 0,956 |
-| 2 801 à 3 000 | 0,837 | 0,949 |
-| 3 001 à 3 200 | 0,827 | 0,943 |
-| 3 201 à 3 338 | 0,832 | 0,941 |
+## 5. L'oubli mesuré, et la décision
 
-La deuxième époque commence au pas 1 669 (53 401 rangées ÷ 32 par pas). La perte d'entraînement y tombe
-vite : de 1,065 (pas 1 401 à 1 600) à 0,883 (pas 1 801 à 2 000). La validation, sur des conversations
-jamais vues, ne baisse que de 1,036 à 1,009 : la deuxième époque relit les mêmes conversations, et la
-perte d'entraînement y baisse bien plus que la validation. La validation baisse encore jusqu'au bout,
-mais de moins en moins : de 0,949 au pas 3 000 à 0,941 à la fin.
+Exportées et évaluées le 19 novembre au matin (section 7), les deux versions à 3e-4 répondent : elles
+finissent 52,8 % et 54,0 % de leurs réponses, contre 0 % pour 1.5. Mais la complète
+prédit nettement moins bien le texte du pré-entraînement : sa perte sur ce texte monte de 2,347 (1.5) à
+3,766 nats par jeton, soit de 0,779 à 1,250 bit par octet. La courte à 3e-4 monte à 2,998.
 
-## 6. La version courte
+Le balayage avait choisi le taux sur la seule perte de conversation, et le meilleur taux pour elle est
+celui qui fait le plus oublier. Le contrôleur a jugé qu'un tel oubli gênerait les chapitres suivants (le
+code de 1.10, l'alignement de 1.8). Sa décision, le 19 novembre :
 
-`configs/sft-1.7-court.toml`, lancée par `travail-long.ps1` juste après (fenêtre « Ton IA :
-ton-ia-1.7-court »), d'une traite : de 08:49:19 à 09:53:57, **1 h 04 min 37 s** de Python, dont 3 776 s
-de calcul (1 h 02 min 56 s ; 1 h 03 min prévue). Débit médian 13 381 jetons par seconde. Perte 1,058 au
-pas 739, validation **1,095** (la plus basse : `meilleur.pt` est le pas 739).
+1. ne pas publier la version à 3e-4 ;
+2. lancer d'abord une version courte au taux 1e-4 (une heure), exportée et évaluée comme les autres ;
+3. si elle oublie nettement moins (perte sur le texte du pré-entraînement bien sous 2,998), avec des
+   parts de réponses terminées et en français proches, refaire l'entraînement complet à 1e-4 et publier
+   celui-là ; sinon, publier celui à 3e-4.
 
-| Pas | Perte d'entraînement (moyenne) | Validation | Validation du complet au même pas |
+La courte à 1e-4 : perte sur le texte du pré-entraînement 2,615 (contre 2,998 à 3e-4), réponses
+terminées 47,5 % (54,0 %), en français 99,1 % (99,7 %), IFEval-FR 14,9 %
+(15,7 %). Le critère est rempli : l'entraînement complet est refait au taux 1e-4, et c'est
+lui qui est publié sous le nom `ton-ia-1.7`. Les versions à 3e-4 restent sur le disque, pour comparer ;
+elles ne sont pas publiées.
+
+Les réglages destinés aux lecteurs gardent leurs noms : `configs/sft-1.7.toml` et
+`configs/sft-1.7-court.toml` sont à 1e-4, les originaux à 3e-4 sont gardés sous
+`configs/sft-1.7-3e-4.toml` et `configs/sft-1.7-court-3e-4.toml`.
+
+## 6. L'entraînement complet au taux 1e-4 : la version publiée
+
+Le 19 novembre 2026, `configs/sft-1.7.toml` (`taux_max = 1e-4`, le reste inchangé), sortie
+`entrainements\sft-1.7`, journal de la fenêtre `journaux\sft-1.7.log`. Lancé par `travail-long.ps1`, avec
+le chien de garde, en une seule session, sans pause : la pause et la reprise ont été essayées sur
+l'entraînement à 3e-4 (section 4), avec le même code.
+
+- **Démarrage :** 10:11:46 ; premier pas à 10:18:36. Les 6 min 45 s de chargement viennent du disque D:,
+  occupé à ce moment par un autre travail.
+- **Fin :** pas 3 338 à 15:04:05, code 0. **4 h 52 min 20 s** de Python, dont 17 091 s de calcul (4 h 44
+  min 51 s). Débit médian 13 379 jetons par seconde ; 9 sauvegardes d'étape, une toutes les 30 minutes
+  environ, plus celle de la fin.
+- **La courbe :** perte 2,208 au pas 1, 0,798 au pas 3 338. La perte de validation baisse à chaque
+  mesure, de 1,422 (pas 100) à **0,988** (pas 3 338, la plus basse : `meilleur.pt` est ce pas).
+
+| Pas | Perte d'entraînement (moyenne) | Validation au dernier pas | Validation à 3e-4, même pas |
 | --- | ---: | ---: | ---: |
-| 1 à 100 | 1,588 | 1,423 | 1,424 |
-| 101 à 200 | 1,370 | 1,323 | 1,331 |
-| 201 à 300 | 1,294 | 1,258 | 1,283 |
-| 301 à 400 | 1,235 | 1,204 | 1,247 |
-| 401 à 500 | 1,192 | 1,156 | 1,219 |
-| 501 à 600 | 1,135 | 1,121 | 1,194 |
-| 601 à 700 | 1,123 | 1,099 | 1,173 |
-| 701 à 739 | 1,100 | 1,095 | — |
+| 1 à 200 | 1,498 | 1,322 | 1,331 |
+| 201 à 400 | 1,272 | 1,234 | 1,247 |
+| 401 à 600 | 1,205 | 1,180 | 1,194 |
+| 601 à 800 | 1,166 | 1,140 | 1,153 |
+| 801 à 1 000 | 1,134 | 1,112 | 1,118 |
+| 1 001 à 1 200 | 1,115 | 1,086 | 1,089 |
+| 1 201 à 1 400 | 1,092 | 1,068 | 1,066 |
+| 1 401 à 1 600 | 1,070 | 1,048 | 1,036 |
+| 1 601 à 1 800 | 0,987 | 1,039 | 1,023 |
+| 1 801 à 2 000 | 0,936 | 1,029 | 1,009 |
+| 2 001 à 2 200 | 0,929 | 1,019 | 0,993 |
+| 2 201 à 2 400 | 0,929 | 1,010 | 0,979 |
+| 2 401 à 2 600 | 0,911 | 1,004 | 0,966 |
+| 2 601 à 2 800 | 0,917 | 0,997 | 0,956 |
+| 2 801 à 3 000 | 0,909 | 0,993 | 0,949 |
+| 3 001 à 3 200 | 0,903 | 0,990 | 0,943 |
+| 3 201 à 3 338 | 0,908 | 0,988 | 0,941 |
 
-À pas égal, la version courte est devant : son taux descend plus vite (cosinus sur 739 pas au lieu de
-3 338). À la fin, le complet va plus bas (0,941 contre 1,095).
+Jusqu'au pas 1 300, la validation à 1e-4 est à peine plus basse qu'à 3e-4 (1,075 contre 1,076 au pas
+1 300) ; à partir du pas 1 400, elle est au-dessus, et finit 0,047 plus haut (0,988 contre 0,941) : le
+taux plus petit apprend un peu moins les conversations. La deuxième époque commence au pas 1 669 (53 401
+rangées ÷ 32 par pas) : la perte d'entraînement baisse de 1,070 (pas 1 401 à 1 600) à 0,936 (pas 1 801 à
+2 000), la validation de 1,048 à 1,029 : ton IA relit les mêmes conversations, et la perte d'entraînement
+baisse bien plus que la validation.
 
-## 7. L'évaluation : 1.5, 1.7 et la version courte côte à côte
+### La version courte à 1e-4
 
-Exportées par `forge exporter` dans `publications\ton-ia-1.7` et `publications\ton-ia-1.7-court` (le
-`meilleur.pt` de chacune), puis mesurées le 19 novembre 2026 sur la carte par `forge evaluer-etape
---etape 1.7`, avec `ton-ia-1.5` (téléchargée) en référence. Les réponses sont écrites en glouton. Le
-rapport est `evaluations\ton-ia-1.7-1.7\rapport.json` (1.7 et 1.5) et
-`evaluations\ton-ia-1.7-court-1.7\rapport.json`.
+`configs/sft-1.7-court.toml` (sortie `entrainements\ton-ia-1.7-court`, journal
+`journaux\ton-ia-1.7-court.log`), le 19 novembre de 08:40:56 à 09:45:06, d'une traite : **1 h 04 min 05
+s** de Python, dont 3 778 s de calcul. Perte 1,121 au pas 739, validation **1,160** (la plus basse).
 
-| Mesure | `ton-ia-1.5` | `ton-ia-1.7` | `ton-ia-1.7-court` |
+| Pas | Perte d'entraînement (moyenne) | Validation | Validation à 3e-4, même pas |
 | --- | ---: | ---: | ---: |
-| Perte sur les conversations de validation (nats par jeton appris, 64 ex.) | 2,300 | 0,936 | 1,080 |
-| IFEval-FR, invites dont toutes les consignes sont respectées (235) | 21,7 % | 16,2 % | 15,7 % |
-| IFEval-FR, consignes respectées | 31,9 % | 26,4 % | 26,4 % |
-| Réponses terminées par `<|fin_tour|>` (335) | 0,0 % | 52,8 % | 54,0 % |
-| Réponses en français | 87,2 % | 98,8 % | 99,7 % |
-| Réponses dans une autre langue | 0,3 % | 0,0 % | 0,0 % |
-| Réponses de langue indéterminée | 12,5 % | 1,2 % | 0,3 % |
-| Longueur moyenne d'une réponse (mots) | 320,7 | 215,2 | 222,5 |
-| Oubli : perte sur le texte du pré-entraînement (nats par jeton, 64 morceaux) | 2,347 | 3,766 | 2,998 |
-| Oubli : bits par octet sur ce texte | 0,779 | 1,250 | 0,995 |
+| 1 à 100 | 1,634 | 1,422 | 1,423 |
+| 101 à 200 | 1,362 | 1,320 | 1,323 |
+| 201 à 300 | 1,289 | 1,264 | 1,258 |
+| 301 à 400 | 1,245 | 1,224 | 1,204 |
+| 401 à 500 | 1,217 | 1,193 | 1,156 |
+| 501 à 600 | 1,177 | 1,173 | 1,121 |
+| 601 à 700 | 1,175 | 1,162 | 1,099 |
+| 701 à 739 | 1,160 | 1,160 | 1,095 |
 
-Les mesures de l'étape 1.9 (problèmes de calcul), passées aussi par `forge evaluer-etape --etape 1.9`
-(rapports `evaluations\ton-ia-1.7-1.9` et `ton-ia-1.7-court-1.9`), donnent le point de départ du
-raisonnement :
+## 7. L'évaluation : 1.5, 1.7 et ses variantes côte à côte
 
-| Mesure | `ton-ia-1.5` | `ton-ia-1.7` | `ton-ia-1.7-court` |
-| --- | ---: | ---: | ---: |
-| Problèmes générés, exactitude en glouton (400) | 0,0 % | 0,8 % | 0,0 % |
-| Problèmes générés, réponses terminées | 0,0 % | 57,0 % | 47,0 % |
-| Problèmes générés, au moins un juste sur 8 essais | 0,0 % | 2,8 % | 1,8 % |
-| MGSM-rev2 en français, exactitude (250) | 0,0 % | 0,4 % | 0,0 % |
-| MGSM-rev2, réponses terminées | 0,0 % | 36,0 % | 23,6 % |
-| GSM8K-Platinum en français, exactitude (1 196) | 0,0 % | 0,3 % | 0,5 % |
-| GSM8K-Platinum, réponses terminées | 0,0 % | 33,5 % | 27,5 % |
+Chaque version est exportée par `forge exporter` (son `meilleur.pt`) dans `publications\`, puis mesurée
+sur la carte par `forge evaluer-etape`, en glouton. `ton-ia-1.5` (téléchargée) passe les mêmes mesures en
+référence, avec la version publiée : sa colonne vient de `evaluations\ton-ia-1.7-1.7` et
+`ton-ia-1.7-1.9`.
+
+| Version | Taux | Poids | Rapports |
+| --- | --- | --- | --- |
+| `ton-ia-1.7` (publiée) | 1e-4 | `publications\ton-ia-1.7` | `evaluations\ton-ia-1.7-1.7`, `ton-ia-1.7-1.9` |
+| courte | 1e-4 | `publications\ton-ia-1.7-court` | `evaluations\ton-ia-1.7-court-1.7`, `-1.9` |
+| complète à 3e-4 | 3e-4 | `publications\ton-ia-1.7-3e-4` | `evaluations\ton-ia-1.7-3e-4-1.7`, `-1.9` |
+| courte à 3e-4 | 3e-4 | `publications\ton-ia-1.7-court-3e-4` | `evaluations\ton-ia-1.7-court-3e-4-1.7`, `-1.9` |
+
+Les dossiers des trois autres versions ont été renommés après leur évaluation. Leurs `rapport.json` sont
+une archive : ils gardent le nom qu'avait la version au moment de la mesure (`ton-ia-1.7` pour la
+complète à 3e-4, `ton-ia-1.7-court` pour la courte à 3e-4, `ton-ia-1.7-court-1e-4` pour la courte à
+1e-4). Leur empreinte SHA-256 dit de quels poids il s'agit (section 10).
+
+**Les mesures de l'étape 1.7 :**
+
+| Mesure | `ton-ia-1.5` | **`ton-ia-1.7`** (1e-4) | courte (1e-4) | complète à 3e-4 | courte à 3e-4 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Perte sur les conversations de validation (nats par jeton appris, 64 ex.) | 2,300 | 0,978 | 1,140 | 0,936 | 1,080 |
+| IFEval-FR, invites dont toutes les consignes sont respectées (235) | 21,7 % | 14,5 % | 14,9 % | 16,2 % | 15,7 % |
+| IFEval-FR, consignes respectées | 31,9 % | 24,1 % | 24,1 % | 26,4 % | 26,4 % |
+| Réponses terminées par `<|fin_tour|>` (335) | 0,0 % | 51,0 % | 47,5 % | 52,8 % | 54,0 % |
+| Réponses en français | 87,2 % | 99,4 % | 99,1 % | 98,8 % | 99,7 % |
+| Réponses dans une autre langue | 0,3 % | 0,3 % | 0,6 % | 0,0 % | 0,0 % |
+| Réponses de langue indéterminée | 12,5 % | 0,3 % | 0,3 % | 1,2 % | 0,3 % |
+| Longueur moyenne d'une réponse (mots) | 320,7 | 213,4 | 241,3 | 215,2 | 222,5 |
+| Perte sur le texte du pré-entraînement (nats par jeton, 64 morceaux) | 2,347 | 2,928 | 2,615 | 3,766 | 2,998 |
+| Bits par octet sur ce texte | 0,779 | 0,972 | 0,868 | 1,250 | 0,995 |
+
+**Les mesures de l'étape 1.9** (problèmes de calcul, passées aussi pour voir d'où partira le
+raisonnement) :
+
+| Mesure | `ton-ia-1.5` | **`ton-ia-1.7`** (1e-4) | courte (1e-4) | complète à 3e-4 | courte à 3e-4 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Problèmes générés, justes en glouton (sur 400) | 0 (0,0 %) | 1 (0,2 %) | 1 (0,2 %) | 3 (0,8 %) | 0 (0,0 %) |
+| Problèmes générés, au moins un juste sur 8 essais | 0,0 % | 1,2 % | 2,8 % | 2,8 % | 1,8 % |
+| Problèmes générés, réponses terminées | 0,0 % | 65,2 % | 54,5 % | 57,0 % | 47,0 % |
+| MGSM-rev2 en français, justes (sur 250) | 0 | 0 | 0 | 1 | 0 |
+| MGSM-rev2, réponses terminées | 0,0 % | 38,8 % | 38,4 % | 36,0 % | 23,6 % |
+| GSM8K-Platinum en français, justes (sur 1 196) | 0 | 10 | 6 | 4 | 6 |
+| GSM8K-Platinum, réponses terminées | 0,0 % | 45,4 % | 35,5 % | 33,5 % | 27,5 % |
+| IFEval-FR, invites respectées (second passage) | 20,9 % | 15,3 % | 15,7 % | 15,7 % | 15,3 % |
+| Réponses terminées (second passage) | 0,0 % | 48,1 % | 47,5 % | 51,9 % | 54,0 % |
+
+**Le bruit.** Le même modèle, mesuré deux fois, ne donne pas tout à fait les mêmes nombres : `ton-ia-1.7`
+respecte 14,5 % des invites d'IFEval-FR à l'étape 1.7 et 15,3 % à l'étape 1.9 ; 1.5, 21,7 % et 20,9 %.
+Les réponses terminées passent de 51,0 % à 48,1 %. Le lot de génération dépend de la mémoire libre de la
+carte ; cause probable, non vérifiée : les calculs en bf16 d'un lot à l'autre changent parfois un jeton
+choisi en glouton. Un écart de l'ordre d'un point sur IFEval-FR, ou de quelques points sur les réponses
+terminées, n'est donc pas une différence. Pour les problèmes, quelques réponses justes sur des centaines
+ne départagent personne.
 
 Ce que disent ces nombres :
 
-- **Ton IA 1.7 finit ses réponses**, ce que 1.5 ne faisait jamais : 52,8 % des réponses se terminent par
-  `<|fin_tour|>`, contre 0,0 %. Elle répond en français dans 98,8 % des cas (87,2 % pour 1.5), et
-  plus court (215,2 mots en moyenne contre 320,7).
-- **Elle suit moins bien les consignes d'IFEval-FR que 1.5** : 16,2 % des invites entièrement
-  respectées, contre 21,7 % ; 26,4 % des consignes, contre 31,9 %.
-- **Elle prédit moins bien que 1.5 le texte de son pré-entraînement** : la perte sur ce texte monte
-  de 2,347 à 3,766 nats par jeton (0,779 à 1,250 bit par octet). La version courte, qui a moins appris
-  les conversations (perte de 1,080 contre 0,936), monte moins (2,998 nats par jeton) et suit les
-  consignes à peu près pareil (15,7 %).
-- **Sur les conversations de validation**, la perte passe de 2,300 (1.5) à 0,936 (1.7) et
-  1,080 (version courte).
-- **Les problèmes :** voir le tableau ci-dessus ; 1.7 résout 3 problèmes générés sur 400 en glouton
-  (0,8 %, 2,8 % avec au moins un juste sur 8 essais), 1 problème de MGSM sur 250 et 4 de GSM8K-Platinum
-  sur 1 196 ; la version courte, 0, 0 et 6. 1.5 n'en résolvait aucun : elle ne finissait aucune réponse.
-  1.7 en finit 57,0 % (problèmes générés), mais presque toujours avec un nombre faux. Ces scores restent
-  au niveau de presque rien.
-- **Deux passages ne donnent pas exactement les mêmes nombres.** Le rapport de l'étape 1.9 repasse
-  IFEval-FR : 15,7 % pour 1.7 et 20,9 % pour 1.5, contre 16,2 % et 21,7 % ci-dessus. Le lot de
-  génération dépend de la mémoire libre de la carte ; cause probable, non vérifiée : les calculs en bf16
-  d'un lot à l'autre changent parfois un jeton choisi en glouton. Un écart de moins d'un point sur
-  IFEval-FR n'est donc pas une différence.
+- **Ton IA 1.7 finit ses réponses**, ce que 1.5 ne faisait jamais : 51,0 % de réponses terminées, contre
+  0,0 %. Elle répond en français dans 99,4 % des cas (87,2 % pour 1.5), et plus court (213,4 mots en
+  moyenne contre 320,7).
+- **Elle suit moins bien les consignes d'IFEval-FR que 1.5** : 14,5 % des invites entièrement respectées,
+  contre 21,7 % (et 15,3 % contre 20,9 % au second passage) : l'écart dépasse largement le bruit.
+  Entre les quatre versions affinées, les écarts du premier passage (de 14,5 % à 16,2 %) ne
+  se confirment pas au second (de 15,3 % à 15,7 %) : aucune ne suit mieux les consignes qu'une autre.
+- **Elle prédit moins bien que 1.5 le texte de son pré-entraînement, mais bien mieux qu'à 3e-4** : la
+  perte sur ce texte passe de 2,347 (1.5) à 2,928 nats par jeton, contre 3,766 pour la complète à 3e-4
+  (0,779, 0,972 et 1,250 bit par octet). L'écart avec 1.5 est de 0,58 nat au lieu de 1,42.
+- **Elle apprend un peu moins les conversations qu'à 3e-4** : perte de validation 0,978 contre
+  0,936 (1.5 : 2,300).
+- **Les problèmes :** 1 problème généré juste sur 400 en glouton, 0 sur 250 pour MGSM, 10 sur 1 196 pour
+  GSM8K-Platinum : presque rien, comme les autres versions affinées ; 1.5 n'en résolvait aucun, car elle
+  ne finissait aucune réponse.
 
 ## 8. Les échantillons
-Les dix invites fixes de `forge evaluer-etape`, en glouton, 200 jetons au plus. Les réponses de
-`ton-ia-1.7` sont recopiées telles quelles, sans tri ni retouche. Celles de `ton-ia-1.5` et de la version
-courte sont dans leurs rapports.
+
+Les dix invites fixes de `forge evaluer-etape`, en glouton, 200 jetons au plus, pour la version publiée
+(`evaluations\ton-ia-1.7-1.7`). Les réponses sont recopiées telles quelles, sans tri ni retouche. Celles
+des autres versions sont dans leurs rapports.
 
 ### 1. « Quelle est la capitale de la France ? »
 
@@ -382,7 +428,7 @@ La capitale de la France est Paris.
 Réponse terminée par `<|fin_tour|>` :
 
 ```text
-Le ciel est bleu parce que les nuages et les nuages sont tous deux bleu. Le ciel est bleu parce que les nuages et les nuages sont tous deux bleu.
+Le ciel est bleu parce que les nuages sont blancs et que le ciel est bleu. Le ciel est bleu parce que les nuages sont blancs et que le ciel est bleu.
 ```
 
 ### 3. « Explique en deux phrases comment fonctionne la photosynthèse. »
@@ -390,15 +436,15 @@ Le ciel est bleu parce que les nuages et les nuages sont tous deux bleu. Le ciel
 Réponse terminée par `<|fin_tour|>` :
 
 ```text
-La photosynthèse est le processus par lequel les plantes, les algues et certaines bactéries utilisent l'énergie lumineuse pour convertir le dioxyde de carbone et l'eau en glucides et en oxygène. Ce processus est réalisé par les plantes, qui possèdent des chloroplastes et des pigments photosynthétiques.
+La photosynthèse est le processus par lequel les plantes, les algues et certaines bactéries utilisent l'énergie lumineuse pour convertir le dioxyde de carbone ($CO_2$) et l'eau ($H_2O$) en glucides (comme le glucose) et en oxygène ($O_2$).
 ```
 
 ### 4. « Combien font 12 fois 7 ? »
 
-Réponse coupée par la limite de 200 jetons :
+Réponse terminée par `<|fin_tour|>` :
 
 ```text
-Pour déterminer le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de fois que le nombre de
+Pour déterminer combien font 12 fois 7 ?
 ```
 
 ### 5. « Donne-moi trois conseils pour bien dormir. »
@@ -406,31 +452,33 @@ Pour déterminer le nombre de fois que le nombre de fois que le nombre de fois q
 Réponse coupée par la limite de 200 jetons :
 
 ```text
-1. Le plus grand secret pour le sommeil : Le sommeil est une période de repos et de préparation. Il est essentiel de le préparer avant de dormir. 2. La position du sommeil : Le sommeil est essentiel pour la récupération physique et mentale. Il est essentiel de s'assurer que le corps est en état de se rééveiller et de se réhydrater. 3. La position du sommeil : Le sommeil est essentiel pour la relaxation et la consolidation de la mémoire. Il est essentiel de s'assurer que le corps se réévalue et se réévalue. 4. La position du sommeil : Le sommeil est essentiel pour la régulation émotionnelle et la consolidation des souvenirs. Il est essentiel de s'assurer que le corps se réévalue et se réévalue. 5. La position du sommeil : Le sommeil est essentiel pour la récupération physique et mentale. Il est essentiel de s'assurer que le corps se réévalue et se réévalue. 6. La
+Je vous recommande de prendre trois mesures pour bien dormir, car le sommeil est un processus complexe et multidimensionnel. Voici quelques conseils pour bien dormir :
+
+1. **Éviter les écrans avant le coucher** : Éviter les écrans avant le coucher augmente les risques de troubles du sommeil, de fatigue et de troubles du sommeil nocturne. Les écrans sont un outil de communication essentiel pour le sommeil.
+
+2. **Apprendre à utiliser des techniques de relaxation** : Apprendre à relaxer efficacement est essentiel pour réduire l'anxiété et améliorer le sommeil. La relaxation est un facteur clé de l'endormissement.
+
+3. **Apprendre à gérer le stress et à gérer le sommeil** : Le sommeil est essentiel pour la santé physique et mentale. Le stress peut perturber le sommeil, ce qui peut aggraver l'insomnie et le sommeil paradoxal.
+
+4. **Apprendre à gérer le stress et à gérer le sommeil** : Le sommeil est essentiel pour la santé physique et mentale.
 ```
 
 ### 6. « Quelle est la différence entre un virus et une bactérie ? »
 
-Réponse coupée par la limite de 200 jetons :
+Réponse terminée par `<|fin_tour|>` :
 
 ```text
-La différence entre un virus et une bactérie réside dans la **molalité** (ou la proportion de particules virales dans un échantillon) et dans la **masse** (ou la charge virale) de ces particules.
-
-Voici une explication détaillée :
-
-### 1. La différence fondamentale
-La **molalité** est définie comme le nombre de particules (ou de particules) par unité de **masse** (ou de volume) de l'échantillon.
-
-- **Les virus** : Ce sont des particules **molaires** (elles ont une structure tridimensionnelle rigide). Ils ne peuvent pas se déplacer facilement à travers un milieu matériel (comme l'eau ou l'air) sans se déposer dans un milieu matériel (comme l'eau).
-- **Les bactéries** : Ce sont des particules **molaires** (elles ont une structure rigide et une capacité de mouvement). Elles peuvent se déplacer à travers un milieu matériel (comme l'eau) sans se déposer dans un milieu
+La différence entre un virus et une bactérie réside dans leur mode de reproduction et leur mode de reproduction. Les virus sont des parasites intracellulaires obligatoires qui se reproduisent uniquement par la **transformation** (la transformation d'un organisme vivant en organisme vivant). Les bactéries sont des organismes procaryotes qui se reproduisent uniquement par la **transformation** (la transformation d'un organisme vivant en un autre).
 ```
 
 ### 7. « Écris un court texte sur l'automne en moins de 50 mots, tout en minuscules. »
 
-Réponse terminée par `<|fin_tour|>` :
+Réponse coupée par la limite de 200 jetons :
 
 ```text
-L'automne est un court texte qui contient 4 vers. Il est composé de 4 vers, chacun contenant un vers différent.
+l'automne est une saison de transition, de renouveau et de renouveau. Voici quelques conseils pour écrire un texte sur l'automne, en commençant par les plus courants :
+
+1. **taille des mots** : il est préférable de commencer par des mots simples, comme « printemps », « été », « automne », « hiver », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », « printemps », «
 ```
 
 ### 8. « Présente-toi en trois phrases, sans utiliser de virgule. »
@@ -438,7 +486,7 @@ L'automne est un court texte qui contient 4 vers. Il est composé de 4 vers, cha
 Réponse terminée par `<|fin_tour|>` :
 
 ```text
-Je suis désolé, je ne peux pas vous aider avec mes trois phrases.
+Je suis ton IA, je suis ton IA, je suis ton IA.
 ```
 
 ### 9. « Qui es-tu ? »
@@ -446,7 +494,7 @@ Je suis désolé, je ne peux pas vous aider avec mes trois phrases.
 Réponse terminée par `<|fin_tour|>` :
 
 ```text
-Je suis ton IA, une petite intelligence artificielle qui écrit en français.
+Je suis ton IA, une petite intelligence artificielle qui est à la fois intelligente et intelligente. Je suis ton IA, une intelligence artificielle qui est à la fois intelligente et intelligente. Je suis ton IA, une intelligence artificielle qui est à la fois intelligente et intelligente. Je suis ton IA, une intelligence artificielle qui est à la fois intelligente et intelligente.
 ```
 
 ### 10. « Écris une fonction Python qui renvoie la somme des carrés d'une liste de nombres. »
@@ -456,66 +504,73 @@ Réponse coupée par la limite de 200 jetons :
 ```text
 Pour calculer la somme des carrés d'une liste de nombres, nous devons suivre les étapes suivantes :
 
-1. **Trouver le plus petit commun multiple (PPCM) de 2 et 3** de la liste.
-2. **Trouver la plus grande racine carrée de 2 et 3** de la liste.
-3. **Trouver la plus petite racine carrée de 3 et 4** de la liste.
+1. **Identifier les nombres** : Nous avons deux nombres : 1 et 2.
+2. **Remplacer les nombres dans la fonction** : La fonction retourne la somme des carrés des nombres $\{1, 2, 3, 4, 5, 6, 7, 8, 9\}$.
+3. **Calculer la somme** : La somme est la somme des carrés des nombres $\{1, 2, 3, 4, 5, 6, 7, 8, 9\}$.
 
-### Étape 1 : Trouver la plus grande racine carrée de 2 et 3
+### Étape 1 : Calculer la somme des carrés
 
-Nous cherchons la plus grande racine carrée de 2 et 3. Nous pouvons factoriser le produit :
-$$2^3 = 8$$
+La somme des carrés est la somme des carrés des nombres entiers $1, 2, 3, 4, 5, 6, 7, 8, 9$.
 
-En utilisant la factorisation de 2 et 3 :
-$$2^3 = 16$$
-
-Donc, la plus grande racine carrée est **16**.
-
-### Étape 2 : Trouver la plus grande racine carrée de 3 et 4
-
-Nous cherchons
+$$
+\be
 ```
 
-`ton-ia-1.7` termine 6 de ces dix réponses, la version courte 3, `ton-ia-1.5` 0 : toutes celles de 1.5
-sont coupées par la limite, et la plupart répètent une même phrase.
+`ton-ia-1.7` termine 7 de ces dix réponses ; la courte à 1e-4 3, la complète à 3e-4 6, la courte à 3e-4
+3, et `ton-ia-1.5` 0 : toutes celles de 1.5 vont jusqu'à la limite.
 
 ## 9. Ce que ton IA 1.7 sait faire, et ce qu'elle ne sait pas faire
 
-D'après les mesures et les dix échantillons ci-dessus :
+D'après les mesures de la version publiée et ses dix échantillons :
 
 **Elle sait :**
 
-- répondre à une question, puis s'arrêter : elle finit plus de la moitié de ses réponses (52,8 %), et 6
-  des dix échantillons ;
-- répondre en français (98,8 % des réponses) ;
-- dire qui elle est (échantillon 9) et donner un fait très connu (échantillon 1 : Paris) ;
-- écrire une définition correcte quand elle est courante (échantillon 3, la photosynthèse).
+- répondre à une question, puis s'arrêter, à peu près une fois sur deux : 51,0 % de réponses
+  terminées (section 7), et 7 des dix échantillons ;
+- répondre en français : 99,4 % des réponses ;
+- donner un fait très connu (échantillon 1 : « La capitale de la France est Paris. ») ;
+- écrire une définition correcte quand elle est courante (échantillon 3, la photosynthèse, en une phrase
+  au lieu des deux demandées) ;
+- dire qu'elle est « ton IA » (échantillons 8 et 9), en se répétant.
 
 **Elle ne sait pas :**
 
-- calculer : « Combien font 12 fois 7 ? » tourne en boucle sans réponse (échantillon 4) ; 3 problèmes
-  générés justes sur 400, 1 sur 250 pour MGSM, 4 sur 1 196 pour GSM8K-Platinum ;
-- dire des choses vraies à coup sûr : elle écrit des choses fausses (échantillons 2, 6 et 10 : des nuages
-  bleus, une « molalité » des virus, des racines carrées fausses) ;
-- respecter une consigne de forme : moins bien que 1.5 sur IFEval-FR (16,2 % contre 21,7 %), et dans les
-  échantillons 7 et 8 (« en minuscules », « sans virgule ») ;
-- écrire du code : à la demande d'une fonction Python, elle écrit un calcul faux, sans code (échantillon
-  10) ;
-- éviter les répétitions : 4 des dix échantillons sont coupés par la limite, souvent en répétant (4 et
-  5) ;
+- calculer : à « Combien font 12 fois 7 ? », elle répète la question sans répondre (échantillon 4) ;
+  1 problème généré juste sur 400, 0 sur 250 pour MGSM, 10 sur 1 196 pour GSM8K-Platinum ;
+- dire des choses vraies à coup sûr : elle écrit des choses fausses (échantillon 2 : le ciel est bleu
+  « parce que les nuages sont blancs » ; échantillon 5 : les écrans, « un outil de communication
+  essentiel pour le sommeil » ; échantillon 6 : virus et bactéries se reproduiraient par
+  « transformation ») ;
+- respecter une consigne de forme : 14,5 % des invites d'IFEval-FR, contre 21,7 % pour 1.5 ; dans les
+  échantillons, une majuscule malgré « tout en minuscules » (7) et des virgules malgré « sans virgule »
+  (8) ;
+- écrire du code : à la demande d'une fonction Python, elle déroule des étapes de calcul sans code
+  (échantillon 10) ;
+- s'arrêter à coup sûr : 49,0 % de ses réponses vont jusqu'à la limite de longueur, et elle répète
+  souvent une même phrase (échantillons 7, 8 et 9) ;
 - prolonger un texte libre aussi bien que 1.5 : sa perte sur le texte du pré-entraînement monte de
-  2,347 à 3,766 nats par jeton.
+  2,347 à 2,928 nats par jeton (moins qu'à 3e-4, 3,766).
 
 ## 10. Les fichiers de la version `ton-ia-1.7`
 
 | Fichier | Octets | SHA-256 |
 | --- | ---: | --- |
-| `ton-ia-1.7.safetensors` | 867 161 248 | `b53eb7e2880e542e87ace535b13fcce99c1435c5c903dea192d267028aead8b8` |
+| `ton-ia-1.7.safetensors` | 867 161 248 | `6a6d2c08e15d4dc22fa3205d11e28ad3eb82d6944c649788836a125c25758d32` |
 | `config.json` | 134 | `ae0207b367080a6577c2d95ef81ba5fb84c6bf2be11d03a07eedd8a9fe598621` |
 | `tokenizer-ton-ia-v1.json` | 546 692 | `3001e7ab40630739c4dec807c7a92c0d4fb469cc0fc4afa368704395391f21ba` |
-| `rapport.json` (de `evaluations\ton-ia-1.7-1.7`) | 17 773 | `98b6475a3fdbdfcca57af1dc0381ef1b2f34a068128b9cbd03892ac671afb749` |
+| `rapport.json` (de `evaluations\ton-ia-1.7-1.7`) | 17 660 | `8e7d291ab2fda4681229d872f9f3f97047500963db739cd20bd736c4de3767b5` |
 
 Les poids sont en bf16, exportés par `forge exporter` depuis
-`entrainements\sft-1.7\sauvegardes\meilleur.pt` (le pas 3 338). `config.json` et le tokenizer sont ceux
-de 1.5, à l'octet près. La version courte est exportée de même dans `publications\ton-ia-1.7-court`
-(`ton-ia-1.7-court.safetensors`, SHA-256
-`22473f1a872f8a95d73ab54194bc6a634f5fc17f357f19b6ea498ee857661aaf`), sans Release.
+`entrainements\sft-1.7\sauvegardes\meilleur.pt` (le pas 3 338 de l'entraînement à 1e-4). `config.json` et
+le tokenizer sont ceux de 1.5, à l'octet près.
+
+Les trois autres versions restent sur le disque, pour comparer ; aucune n'est publiée :
+
+| Version | Fichier des poids | SHA-256 |
+| --- | --- | --- |
+| courte à 1e-4 | `publications\ton-ia-1.7-court\ton-ia-1.7-court.safetensors` | `2a598395efef1a1bfc2b4cf3376603baea723d4e8f98de34e8d715e98d5c3a92` |
+| complète à 3e-4 | `publications\ton-ia-1.7-3e-4\ton-ia-1.7-3e-4.safetensors` | `b53eb7e2880e542e87ace535b13fcce99c1435c5c903dea192d267028aead8b8` |
+| courte à 3e-4 | `publications\ton-ia-1.7-court-3e-4\ton-ia-1.7-court-3e-4.safetensors` | `22473f1a872f8a95d73ab54194bc6a634f5fc17f357f19b6ea498ee857661aaf` |
+
+Leurs fichiers de poids ont été renommés avec leur dossier ; leur contenu, et donc leur empreinte, n'a
+pas changé.
