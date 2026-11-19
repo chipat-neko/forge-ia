@@ -18,7 +18,7 @@ non.
 - **Le jeu `sft-1.7` :** 135 471 conversations, 111 497 280 jetons (dont 85 483 056 appris), empaquetées
   en 53 401 rangées d'entraînement et 1 095 de validation. 3 min 37 s de préparation, 5,47 Gio de
   mémoire au plus, 535,5 Mio sur D:.
-- **La carte, pas le processeur :** 13 444 jetons par seconde sur la carte (micro-lot 1, 12,8 Go au
+- **La carte, pas le processeur :** 13 444 jetons par seconde sur la carte (micro-lot 1, 12,5 Gio au
   plus), 196,6 sur le processeur avec ses 16 fils : 68 fois moins.
 - **Le masque par document coûte 34 %** d'un pas complet : 4,885 s contre 3,651 s sans masque.
 - **Le taux d'apprentissage : 1e-4.** Le balayage (quatre essais de 300 pas) avait retenu 3e-4, celui
@@ -45,7 +45,8 @@ non.
 ### La version de départ
 
 `python -m forge publication --etiquette ton-ia-1.5` a téléchargé la Release dans
-`FORGE_DONNEES/publications/ton-ia-1.5`, en 43 s :
+`FORGE_DONNEES/publications/ton-ia-1.5` (`FORGE_DONNEES` est le dossier des données, hors du dépôt : voir
+« Où vont les données » dans `projets/forge/README.md`), en 43 s :
 
 | Fichier | Octets | SHA-256 |
 | --- | ---: | --- |
@@ -110,7 +111,7 @@ sortent :
 - **Trop longs :** un exemple de plus de 1 536 jetons est écarté, jamais coupé. C'est le cas de 21,8 %
   des conversations tirées de Luth-2 (32 712 sur 150 000).
 - **Décontamination :** comparée à IFEval-FR, MGSM-rev2, GSM8K-Platinum-fr et HumanEval (62 exemples
-  écartés). HumanEval-FR n'existe pas encore (tâche 20) : la préparation le dit.
+  écartés). HumanEval-FR n'existe pas encore (il viendra avec le chapitre 1.10) : la préparation le dit.
 - **Les ressources :** 3 min 37 s, 5,47 Gio de mémoire vive au plus (relevée par psutil toutes les
   0,5 s), 561 527 559 octets (535,5 Mio) sur D:.
 
@@ -119,7 +120,7 @@ sortent :
 Le 18 novembre 2026, carte au repos (moins de 10 % d'utilisation, Ollama ne tournait pas), avec
 `configs/sft-1.7.toml` dont seuls changent `micro_lot`, `appareil` et `sortie`, par `--arreter-apres`.
 La mémoire de la carte est celle que montre `nvidia-smi`, relevée chaque seconde : elle compte aussi
-Windows (environ 0,4 Go au repos). Le débit est la médiane des pas 2 à 10 (le premier pas chauffe la
+Windows (environ 0,4 Gio au repos). Le débit est la médiane des pas 2 à 10 (le premier pas chauffe la
 carte).
 
 ### Le micro-lot
@@ -140,7 +141,7 @@ rapide. Les pertes des deux sont les mêmes au pas 1 (2,208390) : le micro-lot
 
 | Appareil | Pas | Débit | Fils | Mémoire au plus |
 | --- | ---: | ---: | --- | --- |
-| Carte (RTX 5070 Ti), micro-lot 1 | 10 | 13 444 jetons/s | 0,5 cœur équivalent | 12,8 Go sur la carte, 4,85 Gio de mémoire vive |
+| Carte (RTX 5070 Ti), micro-lot 1 | 10 | 13 444 jetons/s | 0,5 cœur équivalent | 12,5 Gio sur la carte, 4,85 Gio de mémoire vive |
 | Processeur (Ryzen 7 9800X3D) | 3 | 196,6 jetons/s | 16 fils | 13,97 Gio de mémoire vive |
 
 Sur le processeur, un pas prend 333 s : 196,3, 196,6 et 196,8 jetons par seconde. Les 16 cœurs logiques
@@ -151,9 +152,10 @@ vite : elle est retenue. L'entraînement complet prendrait 12 jours et 21 heur
 ### Ce que coûte le masque par document
 
 Une rangée empaquette en moyenne 2,12 conversations ; le masque par document empêche chacune de voir
-celle qui la précède. Avec ce masque, l'attention perd le chemin rapide de la carte (la tâche 3 l'avait
-vu sur l'attention seule : de 0,15 à 0,63 ms par couche). Mesuré ici sur un pas complet (32 micro-lots
-d'une rangée, avant, arrière, écrêtage et AdamW), mêmes rangées, médiane de 6 pas par variante :
+celle qui la précède. Avec ce masque, l'attention perd le chemin rapide de la carte (une mesure
+précédente du projet l'avait vu sur l'attention seule : de 0,15 à 0,63 ms par couche). Mesuré ici sur un
+pas complet (32 micro-lots d'une rangée, avant, arrière, écrêtage et AdamW), mêmes rangées, médiane de 6
+pas par variante :
 
 | Variante | Secondes par pas | Débit | Mémoire allouée au plus |
 | --- | ---: | ---: | ---: |
@@ -220,7 +222,7 @@ complet : la version publiée est entraînée au taux 1e-4 (sections 4 à 6).
 médiane, plus environ 10 s à chaque validation, écriture de `meilleur.pt` (1,62 Gio) comprise. Avec le
 chargement de ton-ia-1.5 et la sauvegarde finale (4,85 Gio), la commande entière a pris de 25 min 47 s à
 25 min 56 s : moins de 30 minutes, comme prévu. Débit médian de 13 371 à 13 426 jetons par seconde ;
-carte occupée à 93 % en moyenne, 12,9 à 13,0 Go au plus. Les tests de forge tournaient sur le processeur
+carte occupée à 93 % en moyenne, 12,6 à 12,7 Gio au plus. Les tests de forge tournaient sur le processeur
 pendant les huit premières minutes du deuxième essai : 13 359 jetons par seconde sur ses 20 pas d'alors,
 0,6 % sous le premier essai.
 
@@ -234,7 +236,7 @@ entraînement que la pause et la reprise ont été faites pour de vrai, deux foi
 | Session | Démarrage | Premier pas prêt | Fin | Pas | Durée de Python | Fin de la session |
 | --- | --- | --- | --- | --- | ---: | --- |
 | 1 | 02:34:41 | 02:34:58 | 03:07:02 | 1 à 372 | 32 min 17 s | pause d'essai (Ctrl+C à 03:06:32, pause notée 22 s plus tard) |
-| 2 | 03:07:26 | 03:14:49 | 04:11:30 | 373 à 1 027 | 1 h 04 min 02 s | pause pour le jeu de l'utilisateur (Ctrl+C à 04:11:08) |
+| 2 | 03:07:26 | 03:14:49 | 04:11:30 | 373 à 1 027 | 1 h 04 min 02 s | pause pour une autre utilisation du PC (Ctrl+C à 04:11:08) |
 | 3 | 05:29:37 | 05:31:10 | 08:48:39 | 1 028 à 3 338 | 3 h 18 min 58 s | fin |
 
 - **Calcul :** 17 075 s, soit 4 h 44 min 35 s ; Python a tourné 4 h 55 min 17 s, chargements et
@@ -256,8 +258,8 @@ prédit nettement moins bien le texte du pré-entraînement : sa perte sur ce 
 3,766 nats par jeton, soit de 0,779 à 1,250 bit par octet. La courte à 3e-4 monte à 2,998.
 
 Le balayage avait choisi le taux sur la seule perte de conversation, et le meilleur taux pour elle est
-celui qui fait le plus oublier. Le contrôleur a jugé qu'un tel oubli gênerait les chapitres suivants (le
-code de 1.10, l'alignement de 1.8). Sa décision, le 19 novembre :
+celui qui fait le plus oublier. Nous avons jugé qu'un tel oubli gênerait les chapitres suivants (le code
+de 1.10, l'alignement de 1.8). La décision, le 19 novembre :
 
 1. ne pas publier la version à 3e-4 ;
 2. lancer d'abord une version courte au taux 1e-4 (une heure), exportée et évaluée comme les autres ;
@@ -265,11 +267,12 @@ code de 1.10, l'alignement de 1.8). Sa décision, le 19 novembre :
    parts de réponses terminées et en français proches, refaire l'entraînement complet à 1e-4 et publier
    celui-là ; sinon, publier celui à 3e-4.
 
-La courte à 1e-4 : perte sur le texte du pré-entraînement 2,615 (contre 2,998 à 3e-4), réponses
-terminées 47,5 % (54,0 %), en français 99,1 % (99,7 %), IFEval-FR 14,9 %
-(15,7 %). Le critère est rempli : l'entraînement complet est refait au taux 1e-4, et c'est
-lui qui est publié sous le nom `ton-ia-1.7`. Les versions à 3e-4 restent sur le disque, pour comparer ;
-elles ne sont pas publiées.
+La courte à 1e-4 : perte sur le texte du pré-entraînement 2,615 (contre 2,998 à 3e-4), réponses terminées
+47,5 % (54,0 %, soit 6,5 points de moins à 1e-4), en français 99,1 % (99,7 %), IFEval-FR 14,9 % (15,7 %).
+Le critère a été jugé rempli : l'oubli baisse nettement, et les parts restent proches, à 6,5 points près
+pour les réponses terminées. L'entraînement complet est donc refait au taux 1e-4, et c'est lui qui est
+publié sous le nom `ton-ia-1.7`. Les versions à 3e-4 restent sur le disque, pour comparer ; elles ne sont
+pas publiées.
 
 Les réglages destinés aux lecteurs gardent leurs noms : `configs/sft-1.7.toml` et
 `configs/sft-1.7-court.toml` sont à 1e-4, les originaux à 3e-4 sont gardés sous
@@ -320,8 +323,9 @@ baisse bien plus que la validation.
 ### La version courte à 1e-4
 
 `configs/sft-1.7-court.toml` (sortie `entrainements\ton-ia-1.7-court`, journal
-`journaux\ton-ia-1.7-court.log`), le 19 novembre de 08:40:56 à 09:45:06, d'une traite : **1 h 04 min 05
-s** de Python, dont 3 778 s de calcul. Perte 1,121 au pas 739, validation **1,160** (la plus basse).
+`journaux\ton-ia-1.7-court.log`, dont l'en-tête garde le nom de l'essai, `ton-ia-1.7-court-1e-4`, d'avant
+le renommage), le 19 novembre de 08:40:56 à 09:45:06, d'une traite : **1 h 04 min 05 s** de Python, dont
+3 778 s de calcul. Perte 1,121 au pas 739, validation **1,160** (la plus basse).
 
 | Pas | Perte d'entraînement (moyenne) | Validation | Validation à 3e-4, même pas |
 | --- | ---: | ---: | ---: |
@@ -373,9 +377,9 @@ raisonnement) :
 
 | Mesure | `ton-ia-1.5` | **`ton-ia-1.7`** (1e-4) | courte (1e-4) | complète à 3e-4 | courte à 3e-4 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Problèmes générés, justes en glouton (sur 400) | 0 (0,0 %) | 1 (0,2 %) | 1 (0,2 %) | 3 (0,8 %) | 0 (0,0 %) |
-| Problèmes générés, au moins un juste sur 8 essais | 0,0 % | 1,2 % | 2,8 % | 2,8 % | 1,8 % |
-| Problèmes générés, réponses terminées | 0,0 % | 65,2 % | 54,5 % | 57,0 % | 47,0 % |
+| Problèmes générés, justes en glouton (sur 400) | 0 (0,0 %) | 1 (0,3 %) | 1 (0,3 %) | 3 (0,8 %) | 0 (0,0 %) |
+| Problèmes générés, au moins un juste sur 8 essais | 0,0 % | 1,3 % | 2,8 % | 2,8 % | 1,8 % |
+| Problèmes générés, réponses terminées | 0,0 % | 65,3 % | 54,5 % | 57,0 % | 47,0 % |
 | MGSM-rev2 en français, justes (sur 250) | 0 | 0 | 0 | 1 | 0 |
 | MGSM-rev2, réponses terminées | 0,0 % | 38,8 % | 38,4 % | 36,0 % | 23,6 % |
 | GSM8K-Platinum en français, justes (sur 1 196) | 0 | 10 | 6 | 4 | 6 |
@@ -397,7 +401,8 @@ Ce que disent ces nombres :
   0,0 %. Elle répond en français dans 99,4 % des cas (87,2 % pour 1.5), et plus court (213,4 mots en
   moyenne contre 320,7).
 - **Elle suit moins bien les consignes d'IFEval-FR que 1.5** : 14,5 % des invites entièrement respectées,
-  contre 21,7 % (et 15,3 % contre 20,9 % au second passage) : l'écart dépasse largement le bruit.
+  contre 21,7 %. Sur 235 invites, cet écart fait environ deux écarts types ; il tient aux deux
+  passages (15,3 % contre 20,9 % au second) et sur les consignes (24,1 % contre 31,9 %).
   Entre les quatre versions affinées, les écarts du premier passage (de 14,5 % à 16,2 %) ne
   se confirment pas au second (de 15,3 % à 15,7 %) : aucune ne suit mieux les consignes qu'une autre.
 - **Elle prédit moins bien que 1.5 le texte de son pré-entraînement, mais bien mieux qu'à 3e-4** : la
@@ -528,10 +533,12 @@ D'après les mesures de la version publiée et ses dix échantillons :
 - répondre à une question, puis s'arrêter, à peu près une fois sur deux : 51,0 % de réponses
   terminées (section 7), et 7 des dix échantillons ;
 - répondre en français : 99,4 % des réponses ;
-- donner un fait très connu (échantillon 1 : « La capitale de la France est Paris. ») ;
-- écrire une définition correcte quand elle est courante (échantillon 3, la photosynthèse, en une phrase
-  au lieu des deux demandées) ;
-- dire qu'elle est « ton IA » (échantillons 8 et 9), en se répétant.
+- donner un fait très connu, sur la seule invite qui en demande un (échantillon 1 : « La capitale de la
+  France est Paris. ») ;
+- écrire une définition correcte, sur la seule invite qui en demande une (échantillon 3, la
+  photosynthèse, en une phrase au lieu des deux demandées) ;
+- dire qu'elle est « ton IA », sur les deux invites qui parlent d'elle (échantillons 8 et 9), en se
+  répétant.
 
 **Elle ne sait pas :**
 
@@ -559,6 +566,7 @@ D'après les mesures de la version publiée et ses dix échantillons :
 | `config.json` | 134 | `ae0207b367080a6577c2d95ef81ba5fb84c6bf2be11d03a07eedd8a9fe598621` |
 | `tokenizer-ton-ia-v1.json` | 546 692 | `3001e7ab40630739c4dec807c7a92c0d4fb469cc0fc4afa368704395391f21ba` |
 | `rapport.json` (de `evaluations\ton-ia-1.7-1.7`) | 17 660 | `8e7d291ab2fda4681229d872f9f3f97047500963db739cd20bd736c4de3767b5` |
+| `rapport-etape-1.9.json` (copie de `evaluations\ton-ia-1.7-1.9\rapport.json`) | 20 465 | `e068bb4550fa247f05f4c4b5105962c8f42aada8ca39d57b69b6ce220c1eea60` |
 
 Les poids sont en bf16, exportés par `forge exporter` depuis
 `entrainements\sft-1.7\sauvegardes\meilleur.pt` (le pas 3 338 de l'entraînement à 1e-4). `config.json` et

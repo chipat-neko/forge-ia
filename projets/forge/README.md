@@ -610,8 +610,8 @@ publié (`ton-ia-1.5.safetensors`, `config.json`, `tokenizer-ton-ia-v1.json`) ; 
 second, qui passe les mêmes mesures, mises en regard dans le tableau :
 
 ```powershell
-uv run --extra gpu python -m forge evaluer-etape --modele "$env:FORGE_DONNEES\publication\ton-ia-1.5" --etape 1.9
-uv run --extra gpu python -m forge evaluer-etape --modele "$env:FORGE_DONNEES\publications\ton-ia-1.7" --etape 1.7 --reference "$env:FORGE_DONNEES\publication\ton-ia-1.5" --n-max 20
+uv run --extra gpu python -m forge evaluer-etape --modele "$env:FORGE_DONNEES\publications\ton-ia-1.5" --etape 1.9
+uv run --extra gpu python -m forge evaluer-etape --modele "$env:FORGE_DONNEES\publications\ton-ia-1.7" --etape 1.7 --reference "$env:FORGE_DONNEES\publications\ton-ia-1.5" --n-max 20
 ```
 
 À l'étape `1.8`, la victoire fait répondre les deux versions (en glouton) aux mêmes invites : 500 par défaut, ou,

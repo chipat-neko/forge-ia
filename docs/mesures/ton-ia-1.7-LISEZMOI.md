@@ -14,26 +14,31 @@ qu'elle réponde à une question au lieu de prolonger un texte.
   fois : 3 338 pas, au taux d'apprentissage 1e-4.
 - **4 h 44 min 51 s de calcul** sur une carte graphique RTX 5070 Ti, en une session, le 19 novembre 2026
   de 10:11 à 15:04.
-- **Elle finit ses réponses** : 51,0 % de ses réponses se terminent, contre 0,0 % pour 1.5. Elles sont en
-  français dans 99,4 % des cas (87,2 % pour 1.5).
+- **Elle finit environ une réponse sur deux** : 51,0 % de ses réponses se terminent, contre 0,0 % pour
+  1.5. Elles sont en français dans 99,4 % des cas (87,2 % pour 1.5). (`rapport.json`)
 - **Elle suit moins bien les consignes que 1.5** : sur IFEval-FR (235 demandes en français, avec des
   consignes vérifiables, comme « sans virgule »), 14,5 % des demandes sont respectées en entier, contre
-  21,7 % pour 1.5.
-- **Elle prédit moins bien que 1.5 le texte libre** : sur le texte qu'elle avait lu en 1.5, son erreur
-  monte de 0,779 à 0,972 bit par octet (plus c'est bas, mieux elle prédit).
+  21,7 % pour 1.5. (`rapport.json`)
+- **Elle prédit moins bien que 1.5 le texte libre** : sur du texte du même genre que celui de son
+  pré-entraînement, mis de côté (64 morceaux qu'elle n'a jamais appris), son erreur monte de
+  0,779 à 0,972 bit par octet (plus c'est bas, mieux elle prédit). (`rapport.json`)
 - **Calcul :** elle résout 1 problème de calcul simple sur 400, aucun des 250
   problèmes de MGSM et 10 des 1 196 de GSM8K-Platinum : presque rien, mais 1.5 n'en résolvait aucun.
+  (`rapport-etape-1.9.json`)
 
-Ces mesures viennent de `rapport.json`, joint. Le récit complet est dans `ton-ia-1.7.md`, joint aussi.
+Chaque mesure dit de quel fichier elle vient : `rapport.json` (l'évaluation de l'étape 1.7) ou
+`rapport-etape-1.9.json` (l'évaluation de l'étape 1.9, avec les problèmes de calcul). Les deux sont
+joints, avec ton IA 1.5 mesurée en regard. Le récit complet est dans `ton-ia-1.7.md`, joint aussi.
 
 ## Ce que ton IA sait faire
 
 - Répondre à une question, puis s'arrêter, une fois sur deux à peu près.
 - Répondre en français.
-- Donner un fait très connu : « La capitale de la France est Paris. »
-- Écrire une définition juste quand elle est très courante (la photosynthèse, dans l'évaluation).
-- Dire qu'elle est ton IA : « Je suis ton IA, une petite intelligence artificielle… », mais en se
-  répétant.
+- Donner un fait très connu, sur la seule des dix questions d'essai qui en demande un : « La capitale de
+  la France est Paris. »
+- Écrire une définition juste, sur la seule question d'essai qui en demande une (la photosynthèse).
+- Dire qu'elle est ton IA, sur les deux questions d'essai qui parlent d'elle : « Je suis ton IA, une
+  petite intelligence artificielle… », mais en se répétant.
 
 ## Ce qu'elle ne sait pas faire
 
@@ -46,7 +51,7 @@ Ces mesures viennent de `rapport.json`, joint. Le récit complet est dans `ton-i
 - **S'arrêter à coup sûr.** 49 % de ses réponses vont jusqu'à la limite de longueur sans finir ; dans les
   échantillons, elle y répète souvent une même phrase.
 - **Prolonger un texte libre aussi bien que 1.5.** Son erreur sur ce texte a monté (voir plus haut).
-- **Lire un long texte.** Au-delà de 2 048 jetons, elle oublie le début.
+- **Lire un long texte.** Elle ne lit que 2 048 jetons à la fois.
 
 ## Une autre version, non publiée
 
@@ -59,10 +64,11 @@ publié. Le récit est dans `ton-ia-1.7.md`.
 
 | Fichier | Taille | Empreinte SHA-256 | Ce qu'il contient |
 | --- | ---: | --- | --- |
-| `ton-ia-1.7.safetensors` | 867 161 248 octets (827,0 Mo) | `6a6d2c08e15d4dc22fa3205d11e28ad3eb82d6944c649788836a125c25758d32` | les poids du modèle |
+| `ton-ia-1.7.safetensors` | 867 161 248 octets (827,0 Mio) | `6a6d2c08e15d4dc22fa3205d11e28ad3eb82d6944c649788836a125c25758d32` | les poids du modèle |
 | `config.json` | 134 octets | `ae0207b367080a6577c2d95ef81ba5fb84c6bf2be11d03a07eedd8a9fe598621` | les dimensions du modèle |
 | `tokenizer-ton-ia-v1.json` | 546 692 octets | `3001e7ab40630739c4dec807c7a92c0d4fb469cc0fc4afa368704395391f21ba` | le tokenizer |
-| `rapport.json` | 17 660 octets | `8e7d291ab2fda4681229d872f9f3f97047500963db739cd20bd736c4de3767b5` | les mesures de l'évaluation, avec celles de 1.5 en regard |
+| `rapport.json` | 17 660 octets | `8e7d291ab2fda4681229d872f9f3f97047500963db739cd20bd736c4de3767b5` | les mesures de l'évaluation de l'étape 1.7, avec celles de 1.5 en regard |
+| `rapport-etape-1.9.json` | 20 465 octets | `e068bb4550fa247f05f4c4b5105962c8f42aada8ca39d57b69b6ce220c1eea60` | les mesures de l'évaluation de l'étape 1.9 (problèmes de calcul), avec celles de 1.5 en regard |
 | `ton-ia-1.7.md` | — | — | le récit complet de l'affinage et de l'évaluation |
 | `LISEZMOI.md` | — | — | cette fiche |
 
@@ -79,9 +85,11 @@ Comme pour 1.5, il manque exprès le poids `sortie.weight` : la sortie réutil
 
 Il te faut le paquet `forge` du dépôt [chipat-neko/forge-ia](https://github.com/chipat-neko/forge-ia),
 dans `projets/forge`, et l'outil `uv`, qui installe PyTorch et safetensors pour toi. Depuis
-`projets/forge`, mets les trois fichiers du modèle dans un dossier `ton-ia-1.7`, puis :
+`projets/forge`, télécharge les trois fichiers du modèle dans un dossier `ton-ia-1.7` (ou mets-les-y
+toi-même), puis parle avec elle :
 
 ```powershell
+uv run --extra cpu python -m forge publication --etiquette ton-ia-1.7 --dossier ton-ia-1.7
 uv run --extra cpu python -m forge discuter --modele ton-ia-1.7 --temperature 0.7
 ```
 
@@ -116,20 +124,35 @@ réponse.
   1.5. La configuration et le tokenizer aussi. La licence MIT te permet de les utiliser, de les copier,
   de les modifier et de les partager, même pour vendre, à condition de garder la mention du droit
   d'auteur et le texte de la licence. Elle ne donne aucune garantie.
-- **Le pré-entraînement** (celui de 1.5) garde ses licences : voir la fiche de `ton-ia-1.5`.
-- **Les conversations de l'affinage** gardent leurs propres licences :
+- **Le pré-entraînement** est celui de ton IA 1.5, d'où part 1.7. Ses trois sources gardent leurs
+  licences (le détail est dans la fiche de la Release
+  [ton-ia-1.5](https://github.com/chipat-neko/forge-ia/releases/tag/ton-ia-1.5)) :
+  - le français du web : `HuggingFaceFW/fineweb-2` (partie `fra_Latn`), sous **ODC-By 1.0** ;
+  - Wikipédia en français : `wikimedia/wikipedia`, version `20231101.fr`, sous **CC BY-SA 3.0** et
+    **GFDL** ;
+  - le code Python : `codeparrot/github-code-clean`, compilation sous **Apache-2.0**. Seuls les fichiers
+    sous `mit`, `apache-2.0`, `bsd-2-clause`, `bsd-3-clause`, `isc`, `unlicense` ou `cc0-1.0` ont été
+    gardés.
+- **Les conversations de l'affinage** gardent aussi leurs licences :
   - `kurakurai/Luth-2-Post-Training-SFT`, sous **CC BY 4.0**. On n'en garde que les lignes dont les
     réponses viennent de Qwen (Apache-2.0), en écartant les sources dont les fiches disent que les
     questions viennent de Llama ou d'OpenAI : toutes les lignes gardées viennent de
-    `nvidia/Nemotron-Post-Training-Dataset-v2`. D'après la fiche de Luth-2, les
-    lignes que Nemotron a tirées de StackOverflow restent sous **CC BY-SA 4.0**. Elles ne sont pas
-    marquées : on ne peut pas les retirer, et elles restent dans les données, en nombre inconnu. Elles
-    sont traitées comme Wikipédia (CC BY-SA) dans le pré-entraînement de 1.5 : les poids restent sous
-    licence MIT, et cette fiche le dit ;
+    `nvidia/Nemotron-Post-Training-Dataset-v2`. Ses fiches ne nomment pas le modèle qui a écrit une
+    partie de ses questions (les questions « synthétiques ») : ce point n'a pas pu être vérifié. D'après
+    la fiche de Luth-2, les lignes que Nemotron a tirées de StackOverflow restent sous **CC BY-SA 4.0**.
+    Elles ne sont pas marquées : on ne peut pas les retirer, et elles restent dans les données, en nombre
+    inconnu ;
   - `CohereLabs/aya_dataset` (partie française) et `OpenAssistant/oasst2` (arbres en français), sous
     **Apache-2.0** ;
   - des conversations écrites par le code du dépôt (messages système, identité de ton IA), sous
     **licence MIT** ; les réponses des messages système viennent de Luth-2 (CC BY 4.0).
+- **Ces lignes sous CC BY-SA sont traitées comme Wikipédia dans 1.5.** Wikipédia, sous CC BY-SA, est
+  dans le pré-entraînement depuis 1.5, et les poids de 1.5 sont publiés sous licence MIT, avec
+  l'avertissement ci-dessous. Les poids de 1.7 suivent la même règle. Pour toi qui réutilises ces poids :
+  tu les utilises sous la licence MIT ; mais si un texte écrit par ton IA recopie un passage de ces
+  données, ce passage garde sa licence. Pour un passage sous CC BY-SA, il faut citer sa source et
+  partager sous la même licence ce qui en est tiré. Si tu ne veux pas de poids entraînés sur des textes
+  sous CC BY-SA, ni 1.5 ni 1.7 ne conviennent. C'est le choix du projet, pas un avis juridique.
 - **Les jeux d'évaluation** (IFEval-FR, MGSM-rev2, GSM8K-Platinum-fr, HumanEval) n'ont servi qu'à
   mesurer, jamais à apprendre.
 
