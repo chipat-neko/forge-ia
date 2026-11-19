@@ -145,9 +145,10 @@ de problèmes que demandé.
 exemples, retire les doublons et tout ce qui ressemble à un jeu d'évaluation (8 mots de suite en
 commun avec une invite d'IFEval-FR, de MGSM, de GSM8K-Platinum-fr, de HumanEval ou d'un problème
 d'évaluation), encode les conversations avec le format de ton IA, les empaquette en rangées de
-2 049 jetons et écrit le jeu. Deux recettes existent : `sft-1.7` (le SFT de la partie 1.7) et
-`raisonnement-1.9` (le SFT de raisonnement de la partie 1.9) ; leurs parts sont dans
-`docs/donnees.md`, section « Vague 2 : les jeux d'affinage ».
+2 049 jetons et écrit le jeu. Trois recettes existent : `sft-1.7` (le SFT de la partie 1.7),
+`raisonnement-1.9` (le SFT de raisonnement de la partie 1.9) et `code-1.10` (le SFT de code de la partie
+1.10, qui a besoin de la traduction maison des consignes de code et des exemples de `forge fim`) ; leurs
+parts sont dans `docs/donnees.md`, section « Vague 2 : les jeux d'affinage ».
 
 ```powershell
 uv run --extra gpu python -m forge preparer --recette sft-1.7
@@ -164,6 +165,28 @@ refusée. Les jeux d'évaluation absents du disque sont dits : la décontamina
 Deux préparations donnent le même jeu, à l'octet près. Rien n'est écrit avant la fin de la lecture, et
 `.complet` vient en dernier : après une coupure ou un Ctrl+C, on relance la même commande, qui refait
 le même jeu.
+
+## Remplir un trou dans du code
+
+Un éditeur écrit souvent au milieu d'un fichier, avec du code avant et après le curseur. `fim` fabrique les
+exemples qui l'apprennent à ton IA : chaque document du code Python sous licence permissive du
+pré-entraînement (`textes/principal/code_python`, de 1 500 jetons au plus) est coupé en un préfixe, un milieu
+et un suffixe, à deux positions tirées au hasard comme dans l'article d'origine (en points de code : un emoji
+ou une lettre accentuée n'est jamais coupé en deux). L'exemple s'écrit dans l'ordre préfixe, suffixe, milieu :
+`<|fin_texte|> <|trou_prefixe|> préfixe <|trou_suffixe|> suffixe <|trou_milieu|> milieu <|fin_tour|>`, et la
+perte ne porte que sur le milieu et `<|fin_tour|>`.
+
+```powershell
+uv run --extra gpu python -m forge fim --sortie fim-1.10 --exemples 60000 --graine 0
+uv run --extra gpu python -m forge fim --sortie fim-evaluation --exemples 200 --graine 1 --validation --lignes
+```
+
+Les éléments vont sous `FORGE_DONNEES/conversations/<sortie>/` (`conversations-*.jsonl.gz` par fragments et
+`.complet`), où la part `fim:<sortie>` d'une recette les lit. Sans `--validation`, seuls les documents que le
+pré-entraînement n'a pas mis de côté sont coupés ; avec lui, seuls ceux de sa validation, le jeu est d'usage
+`evaluation` et `preparer` le refuse. `--lignes` donne pour milieu une ligne entière du tiers du milieu du
+code, le cas de l'évaluation. Relancer la même commande ne refait rien ; une coupure reprend au dernier
+fragment, et d'autres réglages dans un dossier déjà écrit sont refusés.
 
 ## Construire les paires de préférences de 1.8
 

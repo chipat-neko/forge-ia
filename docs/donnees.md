@@ -338,11 +338,17 @@ sa licence et son lien.
 | --- | --- |
 | `sft-1.7` | `luth2_conversation` 150 000, `aya_fr` tout, `oasst2_fr` tout, `systeme_genere` 20 000, `identite` tout |
 | `raisonnement-1.9` | `problemes:entrainement-1.9` 60 000, `luth2_conversation` 12 000, `systeme_genere` 3 000, `identite` tout |
+| `code-1.10` | `code_fr:consignes-code-fr` tout, `luth2_code` 40 000, `fim:fim-1.10` 60 000, `luth2_conversation` 15 000, `problemes:entrainement-1.9` 10 000, `identite` tout |
 
 - **Tirage :** les exemples d'une source sont tirés dans l'ordre de `Hasard(graine).melanger`, le même
   à chaque préparation et d'une recette à l'autre : la part de rappel de `raisonnement-1.9` reprend les
   premiers exemples de `sft-1.7`.
 - **Doublons :** retirés par l'empreinte du premier tour de l'utilisateur.
+- **Remplissage (`fim:NOM`) :** les éléments de `python -m forge fim` (code Python sous licence permissive
+  du pré-entraînement, coupé en préfixe, milieu et suffixe) deviennent des exemples
+  `<|trou_prefixe|> … <|trou_suffixe|> … <|trou_milieu|> milieu <|fin_tour|>`, appris sur le milieu seulement.
+  Ils n'ont pas d'invite : les doublons se comptent sur le code entier, sans décontamination. Un dossier
+  d'usage évaluation (`--validation`) est refusé.
 - **Jeux d'évaluation :** une part qui en est un (IFEval-FR, MGSM-rev2, GSM8K-Platinum-fr, HumanEval,
   HumanEval-FR) est refusée, avec une erreur qui la nomme. Des problèmes générés ne servent que
   s'ils sont d'usage `entrainement`.

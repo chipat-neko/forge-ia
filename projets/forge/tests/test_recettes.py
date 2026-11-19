@@ -126,7 +126,7 @@ def ids_gardes(dossier: Path) -> list[str]:
 
 
 def test_les_deux_recettes_du_plan():
-    assert tuple(RECETTES) == ("sft-1.7", "raisonnement-1.9")
+    assert tuple(RECETTES) == ("sft-1.7", "raisonnement-1.9", "code-1.10")
     sft = RECETTES["sft-1.7"]
     assert sft.nom == "sft-1.7"
     assert [(p.source, p.exemples_max) for p in sft.parts] == [
@@ -160,7 +160,7 @@ def test_une_source_inconnue_ou_qui_n_est_pas_une_conversation_est_refusee():
     with pytest.raises(ValueError, match="opc_educational"):
         preparer_jeu(recette(Part("opc_educational", None)))
     with pytest.raises(ValueError, match="pas encore"):
-        preparer_jeu(recette(Part("fim:x", None)))
+        preparer_jeu(recette(Part("code_fr:x", None)))
 
 
 def test_des_problemes_d_evaluation_ne_servent_pas_a_l_entrainement():

@@ -1,7 +1,7 @@
 """Point d'entrée en ligne de commande : `python -m forge <commande>`.
 
 Les commandes `donnees`, `tokenizer`, `compression`, `encoder`, `mesurer`,
-`entrainer`, `evaluer`, `exporter`, `publication`, `suivi`, `conversations`, `problemes`, `preparer`, `preferences`, `evaluer-etape` et `discuter` s'y branchent une par une, au fil des
+`entrainer`, `evaluer`, `exporter`, `publication`, `suivi`, `conversations`, `problemes`, `fim`, `preparer`, `preferences`, `evaluer-etape` et `discuter` s'y branchent une par une, au fil des
 tâches du plan (chacune ajoute son sous-parseur dans `construire_parseur`). Toutes sont là.
 """
 
@@ -1092,6 +1092,136 @@ def _ajouter_problemes(sous_parseurs) -> None:
     commande.set_defaults(fonction=_commande_problemes, parseur=commande)
 
 
+def _commande_fim(choix: argparse.Namespace) -> int:
+    """`forge fim` : coupe des documents de code en préfixe, milieu et suffixe, par fragments sous `conversations/NOM`."""
+    # Imports ici : les autres commandes n'ont pas besoin du remplissage au milieu.
+    import json
+
+    from forge.chemins import PlaceInsuffisante, racine_donnees, sous_forge_donnees
+    from forge.code.fim import elements_fim
+    from forge.conversation.telechargement import PREFIXE
+    from forge.fichiers import ESPACE_FINE, ecrire_texte, entier
+    from forge.fragments import SortieParFragments
+
+    fine = ESPACE_FINE
+
+    def erreur(message: str) -> int:
+        print(f"Erreur{fine}: {message}", file=sys.stderr)
+        return 1
+
+    if choix.exemples < 1:
+        return erreur("--exemples doit être au moins 1.")
+    textes = Path(choix.textes) if choix.textes else racine_donnees() / "textes" / "principal" / "code_python"
+    if not textes.is_dir() or not any(textes.glob("*.jsonl.gz")):
+        return erreur(
+            f"il n'y a pas de textes de code dans {textes}. Télécharge-les avec python -m forge donnees "
+            "(voir le README, section « Télécharger les textes »), ou donne --textes DOSSIER."
+        )
+    usage = "evaluation" if choix.validation else "entrainement"
+    index = {"usage": usage, "graine": choix.graine, "exemples": choix.exemples, "lignes": choix.lignes}
+    dossier = sous_forge_donnees(choix.sortie, "conversations")
+    chemin_de_l_index = dossier / "index.json"
+    if chemin_de_l_index.is_file():
+        ancien = json.loads(chemin_de_l_index.read_text(encoding="utf-8"))
+        if ancien != index:
+            return erreur(
+                f"{dossier} contient déjà des éléments d'autres réglages (graine {ancien.get('graine')}, "
+                f"{ancien.get('exemples')} demandés, usage {ancien.get('usage')}). Donne un autre nom à --sortie, "
+                "ou supprime ce dossier pour recommencer."
+            )
+    try:
+        sortie = SortieParFragments(dossier, PREFIXE)
+    except RuntimeError as probleme:
+        return erreur(str(probleme))
+    if sortie.complet:
+        print(f"Déjà fait{fine}: {entier(sortie.deja, milliers=fine)} éléments dans {dossier}, rien à refaire.")
+        return 0
+    try:
+        elements = list(elements_fim(textes, choix.exemples, choix.graine, choix.validation, lignes=choix.lignes))
+    except KeyboardInterrupt:
+        print(f"Interrompu{fine}: rien n'est écrit. Relance la même commande.", file=sys.stderr)
+        return 130
+    except OSError as probleme:
+        return erreur(f"lecture des textes impossible ({probleme}). Vérifie le disque, puis relance la même commande.")
+    if not elements:
+        return erreur(
+            f"aucun document utilisable dans {textes} (de 1 500 jetons au plus, "
+            f"{'de la validation' if choix.validation else 'hors validation'} du pré-entraînement)."
+        )
+    if len(elements) < choix.exemples:
+        print(
+            f"Attention{fine}: {entier(len(elements), milliers=fine)} éléments sur {entier(choix.exemples, milliers=fine)} "
+            "demandés (il n'y a pas assez de documents utilisables dans ces textes).",
+            flush=True,
+        )
+    try:
+        ecrire_texte(chemin_de_l_index, json.dumps(index, indent=2, ensure_ascii=False) + "\n")
+        try:
+            for element in elements[sortie.deja :]:
+                sortie.ajouter(element)
+                if sortie.plein:
+                    sortie.valider()
+        except KeyboardInterrupt:
+            sortie.valider()
+            print(
+                f"Interrompu{fine}: {entier(sortie.deja, milliers=fine)} éléments sur "
+                f"{entier(len(elements), milliers=fine)} sont écrits dans {dossier}. Relance la même commande{fine}: "
+                "elle reprend là, sans doublon.",
+                file=sys.stderr,
+            )
+            return 130
+        sortie.terminer(
+            {
+                "nom": choix.sortie,
+                "usage": usage,
+                "sorte": "fim",
+                "lignes": choix.lignes,
+                "graine": choix.graine,
+                "elements": len(elements),
+                "epuisee": True,
+            }
+        )
+    except (PlaceInsuffisante, OSError) as probleme:
+        return erreur(f"écriture impossible dans {dossier} ({probleme}). Corrige la cause, puis relance la même commande.")
+    mot = "évaluation" if usage == "evaluation" else "entraînement"
+    cas = "d'une ligne" if choix.lignes else "au hasard"
+    print(f"{entier(len(elements), milliers=fine)} éléments de remplissage {cas} ({mot}) dans {dossier}.")
+    return 0
+
+
+def _ajouter_fim(sous_parseurs) -> None:
+    commande = _nouvelle_commande(
+        sous_parseurs,
+        "fim",
+        "Fabrique des exemples de remplissage au milieu (FIM, ordre préfixe-suffixe-milieu) à partir du code "
+        "Python sous licence permissive du pré-entraînement (textes/principal/code_python) : chaque document "
+        "de 1 500 jetons au plus est coupé en préfixe, milieu et suffixe. Écrit par fragments sous "
+        "FORGE_DONNEES/conversations/NOM, repris après une coupure. Sans --validation, seuls les documents "
+        "d'entraînement sont coupés ; avec, seuls ceux que le pré-entraînement a mis de côté, et le jeu est "
+        "d'usage évaluation (il ne va jamais dans un entraînement).",
+    )
+    commande.add_argument("--sortie", required=True, metavar="NOM", help="le dossier, sous FORGE_DONNEES/conversations")
+    commande.add_argument("--exemples", required=True, type=int, metavar="N", help="combien d'éléments (un par document)")
+    commande.add_argument("--graine", required=True, type=int, metavar="G", help="la graine des coupures")
+    commande.add_argument(
+        "--validation",
+        action="store_true",
+        help="prend les documents de la validation du pré-entraînement, pour l'évaluation (usage évaluation)",
+    )
+    commande.add_argument(
+        "--lignes",
+        action="store_true",
+        help="le milieu est une ligne entière du tiers du milieu du code, pour l'évaluation (sans lui, deux coupures au hasard)",
+    )
+    commande.add_argument(
+        "--textes",
+        default=None,
+        metavar="DOSSIER",
+        help="les textes de code (par défaut FORGE_DONNEES/textes/principal/code_python)",
+    )
+    commande.set_defaults(fonction=_commande_fim, parseur=commande)
+
+
 def _commande_preparer(choix: argparse.Namespace) -> int:
     """`forge preparer` : assemble une recette de jeu d'affinage et l'écrit sur disque."""
     # Imports ici : les autres commandes n'ont pas besoin des recettes.
@@ -1518,6 +1648,7 @@ def construire_parseur() -> argparse.ArgumentParser:
     _ajouter_suivi(sous_parseurs)
     _ajouter_conversations(sous_parseurs)
     _ajouter_problemes(sous_parseurs)
+    _ajouter_fim(sous_parseurs)
     _ajouter_preparer(sous_parseurs)
     _ajouter_preferences(sous_parseurs)
     _ajouter_evaluer_etape(sous_parseurs)

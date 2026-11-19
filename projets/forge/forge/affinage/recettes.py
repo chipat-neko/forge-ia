@@ -37,6 +37,7 @@ from pathlib import Path
 from forge.affinage.empaquetage import empaqueter
 from forge.affinage.jeu import ecrire_jeu, lire_index
 from forge.chemins import racine_donnees, sous_forge_donnees, verifier_place
+from forge.code.fim import exemple_fim
 from forge.conversation.format import ExempleMasque, Tour, conversation_depuis_json, encoder_conversation
 from forge.conversation.generees import conversations_identite, conversations_systeme
 from forge.conversation.sources import (
@@ -49,6 +50,7 @@ from forge.conversation.sources import (
 from forge.conversation.telechargement import PREFIXE, dossier_de_la_source, lire_pour_entrainement
 from forge.donnees.melange import est_validation
 from forge.donnees.nettoyage import empreinte
+from forge.donnees.sources import SOURCES as SOURCES_DE_TEXTES
 from forge.donnees.telechargement import MARGE_PLACE
 from forge.erreurs import DonneesManquantes
 from forge.evaluation.langue import mots
@@ -63,7 +65,8 @@ TOKENIZER = Path(__file__).parent.parent / "ressources" / "tokenizer-ton-ia-v1.j
 SYSTEME_GENERE = "systeme_genere"
 IDENTITE = "identite"
 PREFIXE_DES_PROBLEMES = "problemes:"
-PREFIXES_A_VENIR = {"fim:": "la tâche 19 (FIM)", "code_fr:": "la tâche 20 (code en français)"}
+PREFIXE_DU_FIM = "fim:"
+PREFIXES_A_VENIR = {"code_fr:": "la tâche 20 (code en français)"}
 
 GRAMME = 8  # la décontamination compare des suites de 8 mots
 FACTEUR_DE_LA_BASE = 4  # `systeme_genere` regarde 4 × n conversations : toutes ne se transforment pas
@@ -79,7 +82,10 @@ CLES_D_INVITE = ("invite", "question", "prompt", "enonce", "instruction")
 @dataclass(frozen=True)
 class Part:
     """Une part d'une recette : `source` (le nom d'une source de conversations, `"systeme_genere"`,
-    `"identite"`, `"problemes:<nom>"`, `"fim:<nom>"` ou `"code_fr:<nom>"`) et `exemples_max` (`None` : tout)."""
+    `"identite"`, `"problemes:<nom>"`, `"fim:<nom>"` ou `"code_fr:<nom>"`) et `exemples_max` (`None` : tout).
+
+    `fim:<nom>` est un dossier de `forge fim` (`conversations/<nom>/`, d'usage entraînement) : chaque élément
+    devient un exemple de remplissage au milieu (`forge.code.fim`), qui n'a ni invite ni décontamination."""
 
     source: str
     exemples_max: int | None
@@ -146,6 +152,17 @@ RECETTES: dict[str, Recette] = {
                 Part(IDENTITE, None),
             ),
         ),
+        Recette(
+            "code-1.10",
+            (
+                Part("code_fr:consignes-code-fr", None),
+                Part("luth2_code", 40_000),
+                Part(PREFIXE_DU_FIM + "fim-1.10", 60_000),
+                Part("luth2_conversation", 15_000),
+                Part(PREFIXE_DES_PROBLEMES + "entrainement-1.9", 10_000),
+                Part(IDENTITE, None),
+            ),
+        ),
     )
 }
 
@@ -182,7 +199,7 @@ def _verifier_les_parts(recette: Recette) -> None:
     """Refuse, sans toucher au disque, une part interdite, inconnue ou pas encore disponible."""
     for part in recette.parts:
         nom = part.source
-        if nom in (SYSTEME_GENERE, IDENTITE) or nom.startswith(PREFIXE_DES_PROBLEMES):
+        if nom in (SYSTEME_GENERE, IDENTITE) or nom.startswith((PREFIXE_DES_PROBLEMES, PREFIXE_DU_FIM)):
             continue
         for prefixe, tache in PREFIXES_A_VENIR.items():
             if nom.startswith(prefixe):
@@ -193,7 +210,7 @@ def _verifier_les_parts(recette: Recette) -> None:
                 raise _refus_de_l_evaluation(nom)
             raise ValueError(
                 f"Source inconnue : {nom!r}. Les sources sont {', '.join(SOURCES_CONVERSATIONS)}, "
-                f"{SYSTEME_GENERE}, {IDENTITE} et problemes:<nom>."
+                f"{SYSTEME_GENERE}, {IDENTITE}, problemes:<nom> et fim:<nom>."
             )
         source_d_entrainement(nom)  # UsageInterdit si elle est réservée à l'évaluation
         if source.sorte != "conversation":
@@ -265,6 +282,26 @@ def _lecteur_de_problemes(nom: str) -> Callable[[], Iterator[dict]]:
             "(de 0 à 999 999)."
         )
     return lambda: lire_elements(dossier, "problemes")
+
+
+def _lecteur_de_fim(nom: str) -> Callable[[], Iterator[dict]]:
+    """Le lecteur des éléments de remplissage `nom` (`forge fim`) ; refuse ceux d'un autre usage et dit ce qui manque."""
+    dossier = sous_forge_donnees(nom, "conversations")
+    commande = f"python -m forge fim --sortie {nom} --exemples N --graine G"
+    marqueur = dossier / ".complet"
+    if not marqueur.is_file():
+        raise DonneesManquantes(
+            f"Les éléments de remplissage {nom!r} ne sont pas (ou pas entièrement) générés\u202f: {marqueur} manque. "
+            f"Lance, avec les bons nombre et graine\u202f: {commande}"
+        )
+    usage = json.loads(marqueur.read_text(encoding="utf-8")).get("usage")
+    if usage != "entrainement":
+        raise ValueError(
+            f"{PREFIXE_DU_FIM}{nom}\u202f: ces éléments sont d'usage {usage!r}, pas d'entraînement. Ils ne vont jamais "
+            "dans un jeu d'entraînement\u202f: génère-en sans --validation, avec "
+            f"{commande}"
+        )
+    return lambda: lire_elements(dossier, PREFIXE)
 
 
 def _tours_de_probleme(element: dict) -> list[Tour]:
@@ -402,6 +439,9 @@ def _licence_de(part: Part, base: Part | None) -> tuple[str, str]:
         return f"{LICENCE_DU_PROJET} (textes écrits à la main dans le dépôt)", LIEN_DE_LA_LICENCE_DU_PROJET
     if nom.startswith(PREFIXE_DES_PROBLEMES):
         return f"{LICENCE_DU_PROJET} (problèmes générés par le code du dépôt)", LIEN_DE_LA_LICENCE_DU_PROJET
+    if nom.startswith(PREFIXE_DU_FIM):  # des morceaux du code Python sous licence permissive du pré-entraînement
+        code = SOURCES_DE_TEXTES["code_python"]
+        return f"remplissage de {code.nom}\u202f: {code.licence}", code.url_licence
     # systeme_genere : le code du dépôt, et des réponses transformées d'une source
     assert base is not None
     source = SOURCES_CONVERSATIONS[base.source]
@@ -420,6 +460,42 @@ def _ecrire_les_identifiants(chemin: Path, identifiants: list[str]) -> None:
 
     verifier_place(len(contenu) + MARGE_PLACE, chemin.parent)
     ecrire_atomique(chemin, ecrire)
+
+
+def _lire_le_fim(
+    elements: Iterator[dict],
+    c: _Comptes,
+    tok: TokenizerOctets,
+    recette: Recette,
+    vus: set[str],
+    train: list[ExempleMasque],
+    val: list[ExempleMasque],
+) -> None:
+    """Met les exemples de remplissage d'une part `fim:` dans `train` et `val`.
+
+    Pas d'invite d'utilisateur ici : les doublons se comptent sur le code entier (préfixe, milieu, suffixe),
+    la validation se répartit sur son empreinte, et aucune décontamination n'est faite (aucun jeu d'évaluation
+    de code n'a la forme d'un fichier coupé). Ces exemples n'ont pas d'invite à ne pas reprendre : ils n'entrent
+    pas dans `ids.txt.gz`.
+    """
+    for element in elements:
+        c.lus += 1
+        try:
+            prefixe, milieu, suffixe = element["prefixe"], element["milieu"], element["suffixe"]
+            exemple = exemple_fim(prefixe, milieu, suffixe, tok)
+        except (KeyError, TypeError, ValueError):
+            c.invalides += 1
+            continue
+        cle = empreinte(prefixe + milieu + suffixe)
+        if cle in vus:
+            c.doublons += 1
+            continue
+        vus.add(cle)
+        if len(exemple.ids) > recette.jetons_max_exemple:
+            c.trop_longs += 1
+            continue
+        c.gardes += 1
+        (val if est_validation(cle, recette.part_validation) else train).append(exemple)
 
 
 def preparer_jeu(
@@ -451,6 +527,8 @@ def preparer_jeu(
             lecteurs[part.source] = lambda source=source: lire_pour_entrainement(source)
         elif part.source.startswith(PREFIXE_DES_PROBLEMES):
             lecteurs[part.source] = _lecteur_de_problemes(part.source[len(PREFIXE_DES_PROBLEMES) :])
+        elif part.source.startswith(PREFIXE_DU_FIM):
+            lecteurs[part.source] = _lecteur_de_fim(part.source[len(PREFIXE_DU_FIM) :])
     decontamination = _charger_l_evaluation(ecrire_message)
 
     tirages: dict[str, _Tirage] = {}
@@ -459,6 +537,12 @@ def preparer_jeu(
         if nom not in tirages:
             tirages[nom] = _Tirage(lecteurs[nom], recette.graine)
         return tirages[nom]
+
+    def elements_de(part: Part) -> Iterator[dict]:
+        """Les éléments d'une source lue (conversations, problèmes ou remplissage), `exemples_max` tirés au hasard."""
+        if part.exemples_max is None:
+            return lecteurs[part.source]()
+        return iter(tirage(part.source).prendre(0, part.exemples_max))
 
     def conversations_de(part: Part) -> Iterator[list[Tour]]:
         nom = part.source
@@ -478,12 +562,8 @@ def preparer_jeu(
                 )
             yield from produites
         else:
-            if part.exemples_max is None:
-                elements = lecteurs[nom]()
-            else:
-                elements = iter(tirage(nom).prendre(0, part.exemples_max))
             convertir = _tours_de_probleme if nom.startswith(PREFIXE_DES_PROBLEMES) else conversation_depuis_json
-            for element in elements:
+            for element in elements_de(part):
                 yield convertir(element)
 
     vus: set[str] = set()
@@ -494,6 +574,9 @@ def preparer_jeu(
     for part in recette.parts:
         ecrire_message(f"{part.source}\u202f: préparation…")
         c = comptes[part.source] = _Comptes()
+        if part.source.startswith(PREFIXE_DU_FIM):
+            _lire_le_fim(elements_de(part), c, tok, recette, vus, train, val)
+            continue
         est_probleme = part.source.startswith(PREFIXE_DES_PROBLEMES)
         for tours in conversations_de(part):
             c.lus += 1
