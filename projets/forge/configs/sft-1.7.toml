@@ -48,11 +48,13 @@ micro_lot = 1
 
 # Taux d'apprentissage : montée de 0 à taux_max pendant les 50 premiers pas, puis descente en
 # cosinus jusqu'à taux_max ÷ 10 au dernier pas. Aucune source pour un modèle de cette taille
-# entraîné de zéro : choisi par un balayage de 300 pas par taux. 1e-5, 3e-5 et 1e-4 d'abord, puis
-# 3e-4, car 1e-4 était au bord. 3e-4 finit avec la plus basse perte de validation (1,214, contre
-# 1,279, 1,398 et 1,526). C'est encore le plus grand taux essayé : un taux plus grand n'a pas été
-# mesuré.
-taux_max = 3e-4
+# entraîné de zéro : d'abord un balayage de 300 pas par taux, 1e-5, 3e-5, 1e-4 et 3e-4. 3e-4 y finit
+# avec la plus basse perte de validation des conversations (1,214, contre 1,279 pour 1e-4, 1,398 et
+# 1,526). Mais entraîné en entier à 3e-4 (configs/sft-1.7-3e-4.toml), ton IA oublie beaucoup de son
+# pré-entraînement : sa perte sur ce texte passe de 2,347 à 3,766. Les deux versions courtes, d'une
+# heure, le mesurent : 2,998 à 3e-4, 2,615 à 1e-4, pour un IFEval-FR proche (15,7 % et 14,9 %). D'où
+# 1e-4, réglé le 19 novembre 2026.
+taux_max = 1e-4
 echauffement = 50
 
 # Réglages d'AdamW et écrêtage des gradients : ceux de principal.toml, sauf la décroissance des
