@@ -83,9 +83,13 @@ def _premiere_ligne(erreur: BaseException) -> str:
 
 
 def _nouvelle_commande(sous_parseurs, nom: str, aide: str) -> argparse.ArgumentParser:
-    """Ajoute une sous-commande, avec son aide en français."""
+    """Ajoute une sous-commande, avec son aide en français.
+
+    argparse lit l'aide comme un gabarit `%` (« 20 % » y est une erreur, refusée dès la création à partir de
+    Python 3.14) : on y double les `%`. La description, elle, n'est formatée que si elle contient `%(prog)`.
+    """
     commande = sous_parseurs.add_parser(
-        nom, help=aide, description=aide, formatter_class=_AideFrancaise, add_help=False
+        nom, help=aide.replace("%", "%%"), description=aide, formatter_class=_AideFrancaise, add_help=False
     )
     commande._optionals.title = "Options"
     commande.add_argument("-h", "--help", action="help", help="Affiche cette aide, puis quitte.")
