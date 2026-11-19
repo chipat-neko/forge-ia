@@ -7,6 +7,7 @@ notes (tout y est entier, booléen ou texte), à 10⁻¹² près pour la perte D
 
 import json
 
+import pytest
 from forge.evaluation.consignes import CONTRAINTES
 from forge.evaluation.langue import MOTS_ANGLAIS, MOTS_FRANCAIS
 
@@ -31,10 +32,55 @@ def texte_de(nom: str) -> dict:
     return next(t for t in attendus()["textes"] if t["nom"] == nom)
 
 
+# Les seuls flottants du fichier sont ceux de la grille DPO, qui passent par exp et log1p : la bibliothèque mathématique
+# du C (MSVC sous Windows, glibc sous Linux) n'arrondit pas pareil, d'où un dernier chiffre différent d'un système à
+# l'autre. Ils sont comparés à 1e-12 près (relatif), comme le jumeau `dpo.ts` ; tout le reste (notes, verdicts, entiers,
+# textes, ordre des clés) est comparé exactement.
+TOLERANCE = 1e-12
+CLES_AVEC_EXP_ET_LOG = ("perte", "derivee")
+
+
+def memes_attendus(relu, calcule, chemin: str = "") -> list[str]:
+    """Les différences entre deux valeurs JSON : exactes, sauf les flottants de `CLES_AVEC_EXP_ET_LOG` (1e-12 relatif)."""
+    if isinstance(relu, dict) and isinstance(calcule, dict):
+        if list(relu) != list(calcule):
+            return [f"{chemin} : clés {list(relu)} contre {list(calcule)}"]
+        fautes = []
+        for cle in relu:
+            if cle in CLES_AVEC_EXP_ET_LOG and isinstance(relu[cle], float) and isinstance(calcule[cle], float):
+                if abs(relu[cle] - calcule[cle]) > TOLERANCE * max(abs(relu[cle]), abs(calcule[cle])):
+                    fautes.append(f"{chemin}.{cle} : {relu[cle]!r} contre {calcule[cle]!r}")
+            else:
+                fautes += memes_attendus(relu[cle], calcule[cle], f"{chemin}.{cle}")
+        return fautes
+    if isinstance(relu, list) and isinstance(calcule, list):
+        if len(relu) != len(calcule):
+            return [f"{chemin} : {len(relu)} éléments contre {len(calcule)}"]
+        return [f for i, (a, b) in enumerate(zip(relu, calcule)) for f in memes_attendus(a, b, f"{chemin}[{i}]")]
+    return [] if (type(relu) is type(calcule) and relu == calcule) else [f"{chemin} : {relu!r} contre {calcule!r}"]
+
+
 def test_attendus_a_jour():
-    assert CHEMIN_ATTENDUS.read_bytes().decode("utf-8") == vers_json(calculer_attendus()) + "\n", (
-        "tests/attendus.json n'est plus à jour. Régénère-le\u202f: uv run --extra cpu python -m alignement_pas_a_pas.attendus"
+    fautes = memes_attendus(attendus(), json.loads(vers_json(calculer_attendus())))
+    assert not fautes, (
+        "tests/attendus.json n'est plus à jour (" + "; ".join(fautes[:3]) + "). Régénère-le : uv run --extra cpu python -m alignement_pas_a_pas.attendus"
     )
+
+
+def test_la_comparaison_tolere_exp_et_log1p_mais_pas_le_reste():
+    base = {"textes": [{"nom": "a", "mots": 3}], "grille_dpo": [{"beta": 0.1, "perte": 0.8050311234277941, "derivee": -0.05}]}
+    proche = json.loads(json.dumps(base))
+    proche["grille_dpo"][0]["perte"] = 0.8050311234277943  # le dernier chiffre d'un autre système
+    assert memes_attendus(base, proche) == []
+    loin = json.loads(json.dumps(base))
+    loin["grille_dpo"][0]["perte"] = 0.80503112343
+    assert memes_attendus(base, loin)
+    autre = json.loads(json.dumps(base))
+    autre["grille_dpo"][0]["beta"] = 0.1000000000001  # un réglage n'est pas tolérant
+    assert memes_attendus(base, autre)
+    autre = json.loads(json.dumps(base))
+    autre["textes"][0]["mots"] = 4
+    assert memes_attendus(base, autre)
 
 
 def test_le_fichier_est_ecrit_comme_les_autres_attendus():
@@ -135,8 +181,9 @@ def test_la_grille_dpo_a_27_points():
     assert [list(p) for p in grille][0] == ["beta", "ecart_choisie", "ecart_rejetee", "perte", "derivee"]
     assert {p["beta"] for p in grille} == set(BETAS)
     for p in grille:
-        assert p["perte"] == perte_dpo_a_la_main(p["ecart_choisie"], p["ecart_rejetee"], 0.0, 0.0, p["beta"])
-        assert p["derivee"] == derivee_a_la_main(p["beta"], p["ecart_choisie"], p["ecart_rejetee"])
+        # exp et log1p ne s'arrondissent pas pareil sous Windows et sous Linux : 1e-12 relatif, pas l'égalité.
+        assert p["perte"] == pytest.approx(perte_dpo_a_la_main(p["ecart_choisie"], p["ecart_rejetee"], 0.0, 0.0, p["beta"]), rel=1e-12)
+        assert p["derivee"] == pytest.approx(derivee_a_la_main(p["beta"], p["ecart_choisie"], p["ecart_rejetee"]), rel=1e-12)
         assert abs(p["beta"] * (p["ecart_choisie"] - p["ecart_rejetee"])) < 20  # sous le seuil du softplus de PyTorch
         assert p["perte"] > 0 and p["derivee"] < 0
 
