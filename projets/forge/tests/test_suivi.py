@@ -243,6 +243,30 @@ def test_perte_infinie(tmp_path, capsys, processus):
     assert "taux_max" in texte
 
 
+def test_les_mesures_de_la_dpo(tmp_path, capsys):
+    """La DPO écrit `logps_choisie` et `exactitude` à chaque pas : le suivi les montre, sinon il n'en dit rien."""
+    config = ecrire_config(tmp_path, pas_total=100)
+    ecrire_journal(tmp_path, debut_du_journal() + [pas_(pas, 30.0 * pas) for pas in range(1, 31)])
+    texte = suivi(capsys, config)
+    assert "Log-probabilité" not in texte and "Exactitude" not in texte
+
+    lignes = debut_du_journal() + [
+        pas_(pas, 30.0 * pas, logps_choisie=-2 + 0.02 * pas, exactitude=0.75 if pas % 2 == 0 else 0.5)
+        for pas in range(1, 31)
+    ]
+    ecrire_journal(tmp_path, lignes)
+    texte = suivi(capsys, config)
+    # Dernier pas (30) : -2 + 0,6 = -1,4 ; moyenne des pas 11 à 30 : -2 + 0,02 × 20,5 = -1,59.
+    assert (
+        f"Log-probabilité de la choisie{FINE}: -1,400 par jeton (moyenne des {PERTES_RECENTES} derniers "
+        f"pas{FINE}: -1,590)" in texte
+    )
+    assert (
+        f"Exactitude{FINE}: 75{FINE}% des paires (moyenne des {PERTES_RECENTES} derniers pas{FINE}: 62,5{FINE}%)"
+        in texte
+    )
+
+
 # --- Le débit et le temps restant ------------------------------------------------------
 
 

@@ -293,12 +293,13 @@ décident de ce qui change :
 
 - `methode` : `"pre_entrainement"` (par défaut : la section précédente) ou `"sft"`, l'affinage
   supervisé. Ton IA apprend alors des conversations, et la perte ne porte que sur les jetons appris
-  (les réponses de l'assistant) : c'est leur moyenne sur tout le pas, tous micro-lots compris ;
+  (les réponses de l'assistant) : c'est leur moyenne sur tout le pas, tous micro-lots compris. Ou
+  `"dpo"`, l'apprentissage par préférences (plus bas) ;
 - `depart` : la version publiée d'où l'on part, obligatoire pour un affinage. Un nom va sous
   `FORGE_DONNEES/publications/` (le dossier que remplit `python -m forge publication --etiquette
   ton-ia-1.5`), un chemin absolu est gardé tel quel. Ses poids sont copiés dans le modèle avant le
   premier pas ; ses dimensions doivent être celles du `preset`, et son tokenizer celui du jeu ;
-- `donnees` : pour le SFT, un jeu d'affinage, sous `FORGE_DONNEES/affinage/`. Ses rangées ont la
+- `donnees` : pour le SFT et la DPO, un jeu d'affinage, sous `FORGE_DONNEES/affinage/`. Ses rangées ont la
   longueur `longueur` (par défaut, le contexte du modèle), et `taille_lot_jetons` compte leurs
   positions, bourrage compris.
 
@@ -325,6 +326,29 @@ Pour un essai chronométré, `--arreter-apres N` s'arrête au pas N, avec une sa
 uv run --extra gpu python -m forge entrainer --config configs/mini.toml --arreter-apres 20
 uv run --extra gpu python -m forge entrainer --config configs/mini.toml --reprendre
 ```
+
+Avec `methode = "dpo"`, ton IA apprend de paires de préférences : `donnees` est un jeu `dpo`, celui
+qu'écrit `forge preferences`. La version de départ sert aussi de référence : avant le premier pas, la
+log-probabilité de chaque réponse selon elle est calculée une seule fois et rangée dans le jeu
+(`reference.bin`, avec `reference.json` qui nomme la version) ; un autre entraînement depuis la même
+version, ou une reprise, la relit. `micro_lot` doit être pair : une paire tient dans un même
+micro-lot. La table `[dpo]` règle la méthode (ici, ses valeurs par défaut) :
+
+```toml
+methode = "dpo"
+depart = "ton-ia-1.7"        # la version de départ, qui sert aussi de référence
+donnees = "preferences-1.8"  # FORGE_DONNEES/affinage/preferences-1.8
+
+[dpo]
+beta = 0.1                   # la force de la préférence
+normaliser_longueur = false  # true : comparer les gains par jeton plutôt que par réponse
+poids_sft = 1.0              # le poids du terme SFT sur la réponse choisie (0 l'enlève)
+```
+
+Le journal écrit à chaque pas la log-probabilité par jeton des réponses choisies et rejetées, leurs
+récompenses, la marge entre elles et l'exactitude (la part des paires déjà dans le bon ordre) ;
+`forge suivi` montre la log-probabilité des choisies et l'exactitude. La validation mesure la perte de
+la DPO et l'exactitude sur les 256 premières paires de validation.
 
 ### Ton IA 1.7 : apprendre à converser
 

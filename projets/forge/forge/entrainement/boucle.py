@@ -105,20 +105,73 @@ class CompilationImpossible(RuntimeError):
 # --- La configuration -----------------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class ReglagesDPO:
+    """Les réglages propres à la DPO, la table `[dpo]` du TOML (voir `forge.affinage.dpo`).
+
+    - `beta` : la force de la préférence. Plus il est grand, plus la politique peut s'éloigner de
+      la référence (la version de départ) pour séparer la réponse choisie de la rejetée ;
+    - `normaliser_longueur` : comparer les gains par jeton plutôt que sur toute la réponse, pour
+      qu'une réponse longue ne pèse pas plus qu'une courte ;
+    - `poids_sft` : le poids du terme SFT, la perte par jeton de la réponse choisie, qui l'empêche
+      de devenir moins probable alors que l'écart grandit (0 l'enlève).
+    """
+
+    beta: float = 0.1
+    normaliser_longueur: bool = False
+    poids_sft: float = 1.0
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.beta, int | float) or isinstance(self.beta, bool) or self.beta <= 0:
+            raise ValueError(
+                f"beta vaut {self.beta!r} dans [dpo] : il faut un nombre plus grand que 0 (0.1 par défaut)."
+            )
+        if not isinstance(self.normaliser_longueur, bool):
+            raise ValueError(
+                f"normaliser_longueur vaut {self.normaliser_longueur!r} dans [dpo] : écris true ou false "
+                "(false par défaut)."
+            )
+        if not isinstance(self.poids_sft, int | float) or isinstance(self.poids_sft, bool) or self.poids_sft < 0:
+            raise ValueError(
+                f"poids_sft vaut {self.poids_sft!r} dans [dpo] : il faut un nombre positif ou nul (1.0 par défaut, "
+                "0 enlève le terme SFT)."
+            )
+        object.__setattr__(self, "beta", float(self.beta))
+        object.__setattr__(self, "poids_sft", float(self.poids_sft))
+
+
+def _reglages_dpo(valeur, fichier: str) -> ReglagesDPO:
+    """La table `[dpo]` (un dictionnaire, ou déjà des `ReglagesDPO`) ; sans table, les valeurs par défaut."""
+    if valeur is None:
+        return ReglagesDPO()
+    if isinstance(valeur, ReglagesDPO):
+        return valeur
+    if not isinstance(valeur, dict):
+        raise ValueError(f"[dpo] doit être une table de réglages dans {fichier}, pas {valeur!r}.")
+    connus = [champ.name for champ in dataclasses.fields(ReglagesDPO)]
+    inconnus = sorted(set(valeur) - set(connus))
+    if inconnus:
+        raise ValueError(
+            f"Réglage inconnu dans la table [dpo] de {fichier} : {', '.join(inconnus)}. "
+            f"Réglages possibles : {', '.join(connus)}."
+        )
+    return ReglagesDPO(**valeur)
+
+
 @dataclass(frozen=True, kw_only=True)
 class ConfigEntrainement:
     """Les réglages d'un entraînement, lus depuis un fichier TOML par `lire_config`.
 
     - `methode` : la méthode d'entraînement, un nom de `METHODES` (`forge.entrainement.methodes`) :
-      « pre_entrainement » (par défaut) ou « sft » (affinage supervisé) ;
+      « pre_entrainement » (par défaut), « sft » (affinage supervisé) ou « dpo » (préférences) ;
     - `depart` : pour un affinage, le dossier de la version publiée d'où l'on part (un nom va sous
       `FORGE_DONNEES/publications/`, là où `forge publication` la télécharge). Obligatoire pour
       un affinage, interdit pour le pré-entraînement, qui part de poids tirés au hasard ;
     - `preset` : la taille du modèle, un nom de `PRESETS` (« mini », « petit »…) ; on peut
       aussi donner une `ConfigModele` (ou, dans le TOML, une table `[preset]`) ;
     - `donnees` : le dossier des données. Pour le pré-entraînement, celui des jetons de
-      `forge encoder --donnees <nom>` (un nom va sous `FORGE_DONNEES/jetons/`) ; pour le SFT, un
-      jeu d'affinage (sous `FORGE_DONNEES/affinage/`). Un chemin absolu est gardé tel quel ;
+      `forge encoder --donnees <nom>` (un nom va sous `FORGE_DONNEES/jetons/`) ; pour le SFT et la
+      DPO, un jeu d'affinage (sous `FORGE_DONNEES/affinage/`). Un chemin absolu est gardé tel quel ;
     - `jetons_total` : combien de jetons lire en tout ; avec `taille_lot_jetons`, il fixe le
       nombre de pas ;
     - `taille_lot_jetons` : jetons vus par pas d'optimisation (le « lot ») ; pour un affinage,
@@ -140,7 +193,9 @@ class ConfigEntrainement:
       s'il échoue) ou « non » ;
     - `sortie` : le dossier du journal et des sauvegardes (un nom va sous
       `FORGE_DONNEES/entrainements/`) ;
-    - `dpo`, `grpo` : les tables `[dpo]` et `[grpo]` du TOML, réglages propres à ces méthodes ;
+    - `dpo`, `grpo` : les tables `[dpo]` et `[grpo]` du TOML, réglages propres à ces méthodes.
+      Pour methode = "dpo", `dpo` devient des `ReglagesDPO` (leurs valeurs par défaut sans table),
+      et `micro_lot` doit être pair : une paire (choisie, rejetée) tient dans un même micro-lot ;
     - `fichier` : le fichier TOML lu, rempli par `lire_config` (il sert aux messages).
     """
 
@@ -163,7 +218,7 @@ class ConfigEntrainement:
     appareil: str = "cuda"
     compiler: str = "auto"
     sortie: str
-    dpo: dict | None = None
+    dpo: ReglagesDPO | dict | None = None
     grpo: dict | None = None
     fichier: str | None = None
 
@@ -195,6 +250,14 @@ class ConfigEntrainement:
                 raise ValueError(
                     f"{nom} vaut {valeur!r} : il faut un nombre entier d'au moins {minimum} "
                     "(dans le TOML, écris par exemple 200_000_000 plutôt que 2e8)."
+                )
+        if self.methode == "dpo":
+            object.__setattr__(self, "dpo", _reglages_dpo(self.dpo, self.fichier or "la configuration"))
+            if self.micro_lot % 2:
+                raise ValueError(
+                    f"micro_lot vaut {self.micro_lot} : la DPO lit chaque paire (réponse choisie, réponse "
+                    "rejetée) dans un même micro-lot, il faut un nombre pair. Mets par exemple micro_lot = "
+                    f"{max(2, self.micro_lot - 1)} dans {self.fichier or 'la configuration'}."
                 )
         if self.graine >= 2**32:
             raise ValueError(f"graine vaut {self.graine} : il faut un entier plus petit que 2³² (4 294 967 296).")

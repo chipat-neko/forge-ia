@@ -9,9 +9,11 @@ réglage `methode` de la configuration en choisit une. Ce module enregistre :
   tirés au hasard. C'est le code d'avant, inchangé : il passe toujours par
   `forge.entrainement.boucle.pas_d_optimisation` ;
 - `sft` (affinage supervisé) : apprendre des conversations (`affinage/`) en partant d'une version
-  publiée de ton IA. La perte ne porte que sur les jetons appris (les réponses de l'assistant).
+  publiée de ton IA. La perte ne porte que sur les jetons appris (les réponses de l'assistant) ;
+- `dpo` : apprendre des paires de préférences (`affinage/`, jeu de sorte `dpo`), elle aussi depuis
+  une version publiée, qui sert de référence (`forge.affinage.dpo`).
 
-La DPO et le GRPO s'y ajoutent avec `enregistrer_methode`.
+Le GRPO s'y ajoutera avec `enregistrer_methode`.
 """
 
 from collections.abc import Callable
@@ -21,6 +23,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from forge.affinage.dpo import logps_des_rangees, perte_dpo, preparer_reference, verifier_les_paires
 from forge.affinage.jeu import IGNORE, ChargeurAffinage, LotAffinage, lire_index
 from forge.entrainement.chargeur import ChargeurJetons
 from forge.erreurs import DonneesManquantes
@@ -30,6 +33,9 @@ from forge.modele.modes import en_evaluation
 # Nombre de morceaux (ou de rangées) de validation lus pour mesurer la perte de validation :
 # toujours les mêmes, quel que soit `micro_lot` (moins si la validation en a moins).
 MORCEAUX_DE_VALIDATION = 64
+
+# Nombre de paires de validation lues par la DPO (moins si la validation en a moins).
+PAIRES_DE_VALIDATION = 256
 
 
 class PerteNonFinie(ArithmeticError):
@@ -142,18 +148,15 @@ def _valider_pre_entrainement(modele, chargeur_val, depart_val, appareil, config
 # --- L'affinage supervisé (SFT) -----------------------------------------------------------
 
 
-def _chargeurs_sft(config, contexte, noter) -> tuple[ChargeurAffinage, ChargeurAffinage | None]:
-    """Les rangées de `affinage/<donnees>`, après avoir vérifié la sorte et la longueur du jeu.
-
-    Un jeu sans rangée de validation n'a pas de validation (le journal le dit) ; un fichier de
-    validation abîmé est une erreur.
-    """
+def _verifier_le_jeu(config, sorte: str) -> dict:
+    """Le jeu `affinage/<donnees>` est complet, de sorte `sorte`, et ses rangées ont la longueur
+    attendue ; rend son index."""
     dossier = config.dossier_donnees
     index = lire_index(dossier)
-    if index.get("sorte") != "sft":
+    if index.get("sorte") != sorte:
         raise ValueError(
-            f"Le jeu {dossier} est de sorte {index.get('sorte')!r} : methode = \"sft\" lit un jeu de sorte "
-            "« sft ». Donne un jeu préparé pour le SFT, ou la méthode qui va avec ce jeu."
+            f"Le jeu {dossier} est de sorte {index.get('sorte')!r} : methode = \"{sorte}\" lit un jeu de sorte "
+            f"« {sorte} ». Donne un jeu préparé pour cette méthode, ou la méthode qui va avec ce jeu."
         )
     longueur = config.longueur_des_rangees
     if int(index["longueur"]) != longueur:
@@ -163,6 +166,17 @@ def _chargeurs_sft(config, contexte, noter) -> tuple[ChargeurAffinage, ChargeurA
             f"{index['longueur']} dans {config.fichier or 'la configuration'}, ou refais `forge preparer` "
             f"avec des rangées de {longueur}."
         )
+    return index
+
+
+def _chargeurs_d_affinage(config, noter, sorte: str) -> tuple[ChargeurAffinage, ChargeurAffinage | None]:
+    """Les rangées de `affinage/<donnees>`, après avoir vérifié la sorte et la longueur du jeu.
+
+    Un jeu sans rangée de validation n'a pas de validation (le journal le dit) ; un fichier de
+    validation abîmé est une erreur.
+    """
+    index = _verifier_le_jeu(config, sorte)
+    dossier = config.dossier_donnees
     chargeur = ChargeurAffinage(dossier, "train", config.micro_lot, config.graine)
     if int(index["rangees"]["val"]) == 0:
         noter(
@@ -173,6 +187,10 @@ def _chargeurs_sft(config, contexte, noter) -> tuple[ChargeurAffinage, ChargeurA
         )
         return chargeur, None
     return chargeur, ChargeurAffinage(dossier, "val", config.micro_lot, config.graine)
+
+
+def _chargeurs_sft(config, contexte, noter) -> tuple[ChargeurAffinage, ChargeurAffinage | None]:
+    return _chargeurs_d_affinage(config, noter, "sft")
 
 
 def somme_des_pertes(logits: torch.Tensor, cibles: torch.Tensor) -> torch.Tensor:
@@ -273,6 +291,112 @@ def _valider_sft(modele, chargeur_val, depart_val, appareil, config, contexte) -
     return {"perte_val": perte_sft_validation(modele, chargeur_val, depart_val, rangees, appareil)}
 
 
+# --- La DPO (préférences) ------------------------------------------------------------------
+
+
+def _preparer_dpo(config, modele, appareil, noter, *, depart: VersionDeDepart | None, reprise: bool) -> dict:
+    """Vérifie le jeu, puis calcule (ou relit) la référence avec le modèle de départ, avant tout pas."""
+    _verifier_le_jeu(config, "dpo")
+    preparer_reference(config.dossier_donnees, modele, appareil, depart, config.micro_lot, noter)
+    return {}
+
+
+def _chargeurs_dpo(config, contexte, noter) -> tuple[ChargeurAffinage, ChargeurAffinage | None]:
+    return _chargeurs_d_affinage(config, noter, "dpo")
+
+
+def _termes_des_paires(modele: nn.Module, lot: LotAffinage, appareil: torch.device, dossier) -> list[torch.Tensor]:
+    """`pc, pr, qc, qr, lc, lr` d'un lot de paires (rangée choisie, rangée rejetée, à la suite) : les
+    log-probabilités de la politique, celles de la référence (lues avec le lot) et les jetons appris."""
+    if lot.reference is None:
+        raise ValueError(
+            f"Le jeu {dossier} n'a pas de référence (reference.bin) : relance la même commande, la DPO la "
+            "calcule avant le premier pas."
+        )
+    verifier_les_paires(lot, dossier)
+    logps, appris = logps_des_rangees(modele, lot, appareil)
+    reference = lot.reference.to(appareil)
+    return [logps[0::2], logps[1::2], reference[0::2], reference[1::2], appris[0::2], appris[1::2]]
+
+
+def pas_dpo(
+    modele: nn.Module,
+    optimiseur: torch.optim.Optimizer,
+    chargeur: ChargeurAffinage,
+    config,
+    taux_du_pas: float,
+    appareil: torch.device,
+    contexte: dict,
+    *,
+    numero: int,
+) -> dict:
+    """Un pas de DPO : `accumulation` micro-lots de paires, puis une mise à jour des poids.
+
+    La perte du pas est la moyenne sur toutes ses paires, tous micro-lots compris (comme le SFT, qui
+    moyenne sur tous ses jetons appris) : chaque micro-lot fait `backward` de la perte de ses paires,
+    pesée par sa part des paires du pas. Les mesures (`perte_dpo`) sont calculées une fois, sur toutes
+    les paires du pas.
+
+    `numero` (le numéro du pas) ne sert pas à la DPO, qui ne tire rien au hasard.
+
+    Rend `{"perte": …}` et les six mesures (`logps_choisie`, `logps_rejetee`, `recompense_choisie`,
+    `recompense_rejetee`, `marge`, `exactitude`). Une réponse sans jeton appris est une `ValueError` (le
+    jeu est abîmé) ; une perte ou une norme des gradients non finie lève `PerteNonFinie` avant de
+    toucher aux poids.
+    """
+    lots = [chargeur.lot() for _ in range(config.accumulation)]
+    paires = sum(lot.ids.shape[0] // 2 for lot in lots)
+    for groupe in optimiseur.param_groups:
+        groupe["lr"] = taux_du_pas
+    optimiseur.zero_grad(set_to_none=True)
+    termes = []
+    for lot in lots:
+        termes_du_lot = _termes_des_paires(modele, lot, appareil, config.dossier_donnees)
+        perte, _ = perte_dpo(*termes_du_lot, config.dpo)
+        (perte * (termes_du_lot[0].shape[0] / paires)).backward()
+        termes.append([terme.detach() for terme in termes_du_lot])
+    norme = torch.nn.utils.clip_grad_norm_(modele.parameters(), config.ecretage)
+    perte, mesures = perte_dpo(*(torch.cat(colonne) for colonne in zip(*termes)), config.dpo)
+    if not torch.isfinite(torch.stack([perte, norme.to(perte.dtype)])).all():
+        raise PerteNonFinie(f"perte {perte.item()}, norme des gradients {norme.item()}")
+    optimiseur.step()
+    return {"perte": perte.item(), **{nom: valeur.item() for nom, valeur in mesures.items()}}
+
+
+@torch.no_grad()
+def mesures_dpo_validation(
+    modele: nn.Module, chargeur_val: ChargeurAffinage, depart: dict, n_paires: int, appareil: torch.device, reglages
+) -> dict:
+    """La perte de la DPO et l'exactitude sur les `n_paires` premières paires de validation.
+
+    Le chargeur repart toujours de `depart` : ce sont toujours les mêmes paires. On les lit par paquets
+    de la taille du chargeur, le dernier coupé au besoin : le résultat ne dépend pas de la taille des
+    paquets. Rend `{"perte_val": …, "exactitude_val": …}`.
+    """
+    chargeur_val.restaurer(depart)
+    termes = []
+    with en_evaluation(modele):
+        restantes = 2 * n_paires
+        while restantes > 0:
+            lot = chargeur_val.lot()
+            if lot.ids.shape[0] > restantes:
+                lot = LotAffinage(
+                    ids=lot.ids[:restantes],
+                    cibles=lot.cibles[:restantes],
+                    documents=lot.documents[:restantes],
+                    reference=None if lot.reference is None else lot.reference[:restantes],
+                )
+            termes.append(_termes_des_paires(modele, lot, appareil, chargeur_val.dossier))
+            restantes -= lot.ids.shape[0]
+    perte, mesures = perte_dpo(*(torch.cat(colonne) for colonne in zip(*termes)), reglages)
+    return {"perte_val": perte.item(), "exactitude_val": mesures["exactitude"].item()}
+
+
+def _valider_dpo(modele, chargeur_val, depart_val, appareil, config, contexte) -> dict:
+    paires = min(PAIRES_DE_VALIDATION, chargeur_val.unites)
+    return mesures_dpo_validation(modele, chargeur_val, depart_val, paires, appareil, config.dpo)
+
+
 enregistrer_methode(
     Methode(
         nom="pre_entrainement",
@@ -289,5 +413,14 @@ enregistrer_methode(
         preparer=sans_contexte,
         pas=pas_sft,
         valider=_valider_sft,
+    )
+)
+enregistrer_methode(
+    Methode(
+        nom="dpo",
+        creer_chargeurs=_chargeurs_dpo,
+        preparer=_preparer_dpo,
+        pas=pas_dpo,
+        valider=_valider_dpo,
     )
 )

@@ -10,6 +10,9 @@
   ce PC), elle reste celle de l'ouverture du fichier tant que l'entraînement le garde ouvert ;
 - le pas, les jetons vus, la dernière perte et la moyenne des `PERTES_RECENTES` derniers pas,
   la dernière perte de validation ;
+- pour la DPO, quand le journal les a : la log-probabilité par jeton de la réponse choisie
+  (`logps_choisie`) et l'exactitude (la part des paires classées dans le bon ordre), avec leur
+  moyenne sur les mêmes derniers pas ;
 - le débit récent et le temps restant estimé ;
 - la dernière sauvegarde (fichier et pas).
 
@@ -231,6 +234,9 @@ class Suivi:
     restant: float | None  # secondes ; None si inconnu ou fini
     sauvegarde: str | None
     pas_sauvegarde: int | None
+    # La DPO : les valeurs des `PERTES_RECENTES` derniers pas qui en ont (aucune hors DPO).
+    logps_choisie_recentes: tuple[float, ...] = ()
+    exactitude_recentes: tuple[float, ...] = ()
 
 
 def _debit(pas_faits: list[dict], taille_lot: int) -> tuple[float | None, int]:
@@ -252,6 +258,12 @@ def _debit(pas_faits: list[dict], taille_lot: int) -> tuple[float | None, int]:
     if _est_un_nombre(vitesse) and vitesse > 0:
         return float(vitesse), 1
     return None, 0
+
+
+def _recentes(pas_faits: list[dict], cle: str) -> tuple[float, ...]:
+    """Les valeurs de `cle` des `PERTES_RECENTES` derniers pas qui l'ont, dans l'ordre."""
+    valeurs = [ligne[cle] for ligne in pas_faits if _est_un_nombre(ligne.get(cle))]
+    return tuple(valeurs[-PERTES_RECENTES:])
 
 
 def calculer_suivi(lignes: list[dict], pas_total: int, taille_lot: int, actif: bool | None = None) -> Suivi:
@@ -304,6 +316,8 @@ def calculer_suivi(lignes: list[dict], pas_total: int, taille_lot: int, actif: b
         restant=restant,
         sauvegarde=sauvegardes[-1]["fichier"] if sauvegardes else None,
         pas_sauvegarde=sauvegardes[-1].get("pas") if sauvegardes else None,
+        logps_choisie_recentes=_recentes(pas_faits, "logps_choisie"),
+        exactitude_recentes=_recentes(pas_faits, "exactitude"),
     )
 
 
@@ -324,6 +338,19 @@ def _pourcent(pas: int, total: int) -> str:
     dixiemes = pas * 1000 // total if total else 0
     texte = _decimal(dixiemes / 10, 1).removesuffix(",0")
     return f"{texte}{_FINE}%"
+
+
+def _part(valeur: float) -> str:
+    """Une part en pour cent, au dixième : 62,5 %, 75 %."""
+    return f"{_decimal(100 * valeur, 1).removesuffix(',0')}{_FINE}%"
+
+
+def _derniere_et_moyenne(valeurs: tuple[float, ...], formater, unite: str) -> str:
+    """La dernière valeur, son unité, puis la moyenne des derniers pas s'il y en a au moins deux."""
+    texte = f"{formater(valeurs[-1])}{unite}"
+    if len(valeurs) >= 2:
+        texte += f" (moyenne des {len(valeurs)} derniers pas{_FINE}: {formater(sum(valeurs) / len(valeurs))})"
+    return texte
 
 
 def texte_du_suivi(suivi: Suivi, reglages: Reglages) -> str:
@@ -375,6 +402,11 @@ def texte_du_suivi(suivi: Suivi, reglages: Reglages) -> str:
         )
     else:
         lignes.append(f"  Dernière perte{_FINE}: {_decimal(suivi.perte, 3)}")
+    if suivi.logps_choisie_recentes:
+        valeur = _derniere_et_moyenne(suivi.logps_choisie_recentes, lambda v: _decimal(v, 3), " par jeton")
+        lignes.append(f"  Log-probabilité de la choisie{_FINE}: {valeur}")
+    if suivi.exactitude_recentes:
+        lignes.append(f"  Exactitude{_FINE}: {_derniere_et_moyenne(suivi.exactitude_recentes, _part, ' des paires')}")
     if suivi.perte_val is None:
         lignes.append(f"  Dernière validation{_FINE}: aucune pour l'instant")
     else:

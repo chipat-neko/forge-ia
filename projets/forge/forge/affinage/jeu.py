@@ -246,7 +246,16 @@ class ChargeurAffinage:
             pris = min(voulues - len(unites), self.unites - self.position)
             unites.extend(int(u) for u in self._ordre[self.position : self.position + pris])
             self.position += pris
-        numeros = [u * self._groupe + k for u in unites for k in range(self._groupe)]
+        return self._lot([u * self._groupe + k for u in unites for k in range(self._groupe)])
+
+    def lot_des_rangees(self, debut: int, fin: int) -> LotAffinage:
+        """Les rangées `debut` à `fin` (exclue), dans l'ordre du fichier, sans bouger la position du
+        chargeur : de quoi parcourir toute une partie, comme le calcul de la référence de la DPO."""
+        if not 0 <= debut < fin <= self.rangees:
+            raise ValueError(f"Rangées {debut} à {fin} demandées, la partie {self.partie} en a {self.rangees}.")
+        return self._lot(list(range(debut, fin)))
+
+    def _lot(self, numeros: list[int]) -> LotAffinage:
         ids = np.stack([self._ids[n] for n in numeros]).astype(np.int64)
         appris = np.stack([self._appris[n] for n in numeros]).astype(bool)
         documents = np.stack([self._documents[n] for n in numeros]).astype(np.int64)
